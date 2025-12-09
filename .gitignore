@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pdb
+
+# Virtualenv
+.venv/
+env/
+venv/
+
+# Build / dist
+build/
+dist/
+*.egg-info/
+
+# Editor / OS
+.idea/
+.vscode/
+*.swp
+.DS_Store
+
+# Logs
+*.log
+
+# Local config overrides
+.env
