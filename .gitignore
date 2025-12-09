@@ -26,3 +26,9 @@ dist/
 
 # Local config overrides
 .env
+
+# Local data / artifacts
+healtharchive.db
+tmp-test.warc.gz
+.pytest_cache/
+.coverage
