@@ -1,1 +1,11 @@
-# Core runtime deps (to be filled as we go)
+# Core runtime deps (kept roughly in sync with pyproject.toml)
+SQLAlchemy>=2.0
+alembic>=1.13
+warcio>=1.7
+beautifulsoup4>=4.12
+fastapi>=0.110
+uvicorn[standard]>=0.30
+httpx>=0.27
+
+# Test-only dependencies (install via extras or manually in dev)
+pytest>=8.0

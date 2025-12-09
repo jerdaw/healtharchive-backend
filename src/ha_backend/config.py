@@ -45,3 +45,31 @@ def get_archive_tool_config() -> ArchiveToolConfig:
     return ArchiveToolConfig(archive_root=archive_root, archive_tool_cmd=cmd)
 
 
+# === Database configuration ===
+
+# By default we keep things simple and use a SQLite database file in the
+# repository root. This can be overridden via HEALTHARCHIVE_DATABASE_URL.
+DEFAULT_DATABASE_URL = f"sqlite:///{REPO_ROOT / 'healtharchive.db'}"
+
+
+@dataclass
+class DatabaseConfig:
+    """
+    Database connection settings.
+
+    For now this is a very small wrapper around a single DATABASE_URL string,
+    but it gives us a stable place to grow later (pool settings, echo flags,
+    etc.).
+    """
+
+    database_url: str = DEFAULT_DATABASE_URL
+
+
+def get_database_config() -> DatabaseConfig:
+    """
+    Return the current database configuration, honouring environment overrides.
+    """
+    url = os.environ.get("HEALTHARCHIVE_DATABASE_URL", DEFAULT_DATABASE_URL)
+    return DatabaseConfig(database_url=url)
+
+

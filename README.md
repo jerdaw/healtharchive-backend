@@ -3,27 +3,302 @@
 This repository contains the backend services and archiving pipeline for
 [HealthArchive.ca](https://healtharchive.ca).
 
-It currently includes:
+The backend has three main responsibilities:
 
-- A vendored copy of `archive_tool`, a wrapper around `zimit`/Docker used to
-  crawl and archive web content.
-- A basic configuration module.
-- A small CLI for environment checks.
+- **Run crawl jobs** for sources like Health Canada (`hc`) and PHAC (`phac`)
+  by calling the `archive_tool` CLI (which wraps `zimit` in Docker).
+- **Index WARCs into snapshots** (URL + timestamp + HTML text, etc.) in a
+  relational database.
+- **Expose HTTP APIs** that the Next.js frontend uses for search, source
+  summaries, and snapshot viewing.
 
-## Layout
+For a deep architecture and implementation walkthrough, see
+`docs/documentation.md`. This README is intentionally shorter and focused on
+practical usage.
+
+---
+
+## Project layout (high level)
 
 ```text
-healtharchive-backend/
-  pyproject.toml
-  requirements.txt
-  .gitignore
-  src/
-    ha_backend/
-      __init__.py
-      config.py
-      cli.py
-    archive_tool/
-      ... (vendored from zimit-scraper-aio)
-  scripts/
-    run_archive.py        # legacy-style archive_tool entrypoint
+.
+├── README.md
+├── docs/
+│   └── documentation.md      # Detailed architecture and implementation guide
+├── pyproject.toml            # Package + dependency metadata
+├── requirements.txt          # Convenience requirements file (mirrors pyproject)
+├── alembic/                  # Database migrations
+├── src/
+│   ├── ha_backend/           # Backend package
+│   │   ├── api/              # FastAPI app, public + admin routes
+│   │   ├── cli.py            # ha-backend CLI entrypoint
+│   │   ├── config.py         # Archive root + DB + tool config
+│   │   ├── db.py             # SQLAlchemy engine/session helpers
+│   │   ├── indexing/         # WARC discovery, parsing, text extraction, mapping
+│   │   ├── job_registry.py   # Per-source job templates (hc, phac)
+│   │   ├── jobs.py           # Persistent job runner → archive_tool
+│   │   ├── logging_config.py # Shared logging configuration
+│   │   ├── models.py         # ORM models (Source, ArchiveJob, Snapshot, Topic)
+│   │   ├── seeds.py          # Initial Source seeding
+│   │   └── worker/           # Long-running worker loop for queued jobs
+│   └── archive_tool/         # Vendored copy of the archiver, with its own docs
+└── tests/                    # Pytest suite
+```
+
+The `archive_tool` package is vendored from a separate repository and is used
+as an external CLI. Its internal documentation lives under
+`src/archive_tool/docs/documentation.md`.
+
+---
+
+## Installation & setup
+
+### 1. Prerequisites
+
+- Python **3.11+**
+- Docker (required by `archive_tool` / `zimit` for crawls)
+- A Python virtual environment (recommended)
+
+### 2. Install dependencies
+
+From the repo root:
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+
+# Install runtime + dev dependencies and entrypoints:
+pip install -e ".[dev]"
+```
+
+This provides:
+
+- `ha-backend` – backend CLI
+- `archive-tool` – console script pointing at the vendored `archive_tool`
+
+### 3. Database
+
+By default the backend uses a SQLite file at:
+
+- `HEALTHARCHIVE_DATABASE_URL` (env) **or**
+- `sqlite:///healtharchive.db` at the repo root.
+
+To verify connectivity:
+
+```bash
+ha-backend check-db
+```
+
+For production, you will typically point `HEALTHARCHIVE_DATABASE_URL` at a
+Postgres instance and run Alembic migrations:
+
+```bash
+alembic upgrade head
+```
+
+### 4. Archive root & archive_tool
+
+The backend writes job output under an archive root directory:
+
+- `HEALTHARCHIVE_ARCHIVE_ROOT` (env) **or**
+- `/mnt/nasd/nobak/healtharchive/jobs` by default.
+
+To verify the archive root and `archive_tool`:
+
+```bash
+ha-backend check-env           # shows archive root and checks writability
+ha-backend check-archive-tool  # runs 'archive-tool --help'
+```
+
+---
+
+## Running the API
+
+The FastAPI app lives at `ha_backend.api:app`. Once your virtualenv and DB
+are configured:
+
+```bash
+uvicorn ha_backend.api:app --reload
+```
+
+Key public endpoints (all prefixed with `/api`):
+
+- `GET /api/health`  
+  Basic health check (`status`, DB connectivity, job and snapshot counts).
+
+- `GET /api/sources`  
+  Per-source summaries derived from indexed snapshots.
+
+- `GET /api/search`  
+  Full-text style search over snapshots (with filters for `source`, `topic`,
+  pagination, etc.).
+
+- `GET /api/snapshot/{id}`  
+  Snapshot metadata for a single record.
+
+- `GET /api/snapshots/raw/{id}`  
+  Returns the archived HTML document for embedding in the frontend.
+
+Admin + observability endpoints (protected by a simple admin token):
+
+- `GET /api/admin/jobs` – list jobs (filters: `source`, `status`)
+- `GET /api/admin/jobs/{id}` – detailed job info
+- `GET /api/admin/jobs/status-counts` – job counts by status
+- `GET /api/admin/jobs/{id}/snapshots` – list snapshots for a job
+- `GET /metrics` – Prometheus-style metrics (jobs, cleanup_status, snapshots)
+
+Admin endpoints require a token when `HEALTHARCHIVE_ADMIN_TOKEN` is set (see
+“Admin auth” below).
+
+---
+
+## Running the worker
+
+The worker process polls for queued jobs and runs both the crawl (`archive_tool`)
+and indexing pipeline.
+
+Start it via the CLI:
+
+```bash
+ha-backend start-worker
+```
+
+Options:
+
+- `--poll-interval SECONDS` – sleep delay when no work is found (default 30).
+- `--once` – process at most one job and exit (useful for cron / debugging).
+
+The worker:
+
+- Looks for `ArchiveJob` rows with `status in ("queued", "retryable")`.
+- Runs `run_persistent_job(job_id)` which calls `archive_tool` as a subprocess.
+- On crawl success, runs `index_job(job_id)` to ingest WARCs into `Snapshot`s.
+- Applies a simple retry policy (`MAX_CRAWL_RETRIES`) before marking jobs
+  permanently `failed`.
+
+---
+
+## Creating and managing jobs
+
+The backend exposes a small CLI layer for managing `ArchiveJob` rows.
+
+### Seed sources
+
+Ensure `Source` rows for `hc` and `phac` exist:
+
+```bash
+ha-backend seed-sources
+```
+
+### Create a job from registry defaults
+
+For example, a monthly Health Canada job:
+
+```bash
+ha-backend create-job --source hc
+```
+
+This:
+
+- Uses the `SourceJobConfig` for `hc` (seeds, naming template, tool options).
+- Creates an `ArchiveJob` row with `status="queued"` and a unique `output_dir`.
+
+### Run a specific DB-backed job once
+
+```bash
+ha-backend run-db-job --id 42
+```
+
+This calls `archive_tool` with the stored seeds, `output_dir`, and tool
+options. It updates `status`, timestamps, and `crawler_exit_code`.
+
+### Index an existing job
+
+If you ran a crawl separately and just want to index WARCs:
+
+```bash
+ha-backend index-job --id 42
+```
+
+### List and inspect jobs
+
+```bash
+ha-backend list-jobs
+ha-backend show-job --id 42
+```
+
+### Retry and cleanup
+
+- Retry a failed crawl or reindex:
+
+  ```bash
+  ha-backend retry-job --id 42
+  ```
+
+  - For `status="failed"` → sets `status="retryable"` for another crawl.
+  - For `status="index_failed"` → sets `status="completed"` so indexing can re-run.
+
+- Cleanup temp dirs and state for an **indexed** job:
+
+  ```bash
+  ha-backend cleanup-job --id 42
+  ```
+
+  This:
+
+  - Uses `archive_tool`’s `CrawlState` and `cleanup_temp_dirs(...)` to delete
+    `.tmp*` directories and the `.archive_state.json` file under `output_dir`.
+  - Leaves the job directory and any final ZIM in place.
+  - Updates `ArchiveJob.cleanup_status = "temp_cleaned"` and `cleaned_at`.
+
+> **Note:** `cleanup-job` is destructive for temporary crawl artifacts
+> (including WARCs under `.tmp*`). Only run it after you are confident the
+> job has been fully indexed and any desired ZIMs or exports are verified.
+
+---
+
+## Configuration (environment variables)
+
+The backend reads configuration from environment variables with sensible
+defaults:
+
+- `HEALTHARCHIVE_DATABASE_URL`  
+  SQLAlchemy URL for the DB. Defaults to `sqlite:///healtharchive.db` in the
+  repo root.
+
+- `HEALTHARCHIVE_ARCHIVE_ROOT`  
+  Base directory for job output dirs (passed as `--output-dir` to `archive_tool`).
+  Defaults to `/mnt/nasd/nobak/healtharchive/jobs`.
+
+- `HEALTHARCHIVE_TOOL_CMD`  
+  Command used to invoke the archiver. Defaults to `archive-tool`.
+
+- `HEALTHARCHIVE_ADMIN_TOKEN`  
+  Optional admin token. If set, `/api/admin/*` and `/metrics` require either:
+  - `Authorization: Bearer <token>` or
+  - `X-Admin-Token: <token>`  
+  If unset, admin endpoints are open (intended only for local development).
+
+- `HEALTHARCHIVE_LOG_LEVEL`  
+  Global log level (`DEBUG`, `INFO`, etc.). Defaults to `INFO`.
+
+---
+
+## Detailed architecture
+
+For a full walkthrough of:
+
+- ORM models and status lifecycle
+- Job registry and how per-source jobs are configured
+- `archive_tool` integration and adaptive strategies
+- Indexing pipeline and snapshot schema
+- HTTP API routes and JSON schemas
+- Worker loop and retry semantics
+- Cleanup and retention strategy (Phase 9)
+
+see `docs/documentation.md`.
+
+The vendored `archive_tool` also has its own detailed documentation in
+`src/archive_tool/docs/documentation.md` describing its internal state
+machine and Docker orchestration.
 

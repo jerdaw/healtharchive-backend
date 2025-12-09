@@ -1,0 +1,59 @@
+from __future__ import annotations
+
+from typing import List, Optional
+
+from pydantic import BaseModel
+
+
+class SourceSummarySchema(BaseModel):
+  sourceCode: str
+  sourceName: str
+  recordCount: int
+  firstCapture: str
+  lastCapture: str
+  topics: List[str]
+  latestRecordId: Optional[int]
+
+
+class SnapshotSummarySchema(BaseModel):
+  id: int
+  title: Optional[str]
+  sourceCode: str
+  sourceName: str
+  language: Optional[str]
+  topics: List[str]
+  captureDate: str
+  originalUrl: str
+  snippet: Optional[str]
+  rawSnapshotUrl: Optional[str]
+
+
+class SearchResponseSchema(BaseModel):
+  results: List[SnapshotSummarySchema]
+  total: int
+  page: int
+  pageSize: int
+
+
+class SnapshotDetailSchema(BaseModel):
+  id: int
+  title: Optional[str]
+  sourceCode: str
+  sourceName: str
+  language: Optional[str]
+  topics: List[str]
+  captureDate: str
+  originalUrl: str
+  snippet: Optional[str]
+  rawSnapshotUrl: Optional[str]
+  mimeType: Optional[str]
+  statusCode: Optional[int]
+
+
+__all__ = [
+  "SourceSummarySchema",
+  "SnapshotSummarySchema",
+  "SearchResponseSchema",
+  "SnapshotDetailSchema",
+]
+
