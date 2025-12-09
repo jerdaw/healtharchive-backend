@@ -355,6 +355,15 @@ Examples:
   - Merges `default_seeds` + extra seeds.
   - Copies `default_zimit_passthrough_args`.
   - Copies and updates `default_tool_options` with any `overrides`.
+  - Performs basic validation of `tool_options` to fail fast on
+    misconfiguration:
+
+    - If `enable_adaptive_workers=True` but `enable_monitoring` is not `True`,
+      a `ValueError` is raised.
+    - If `enable_vpn_rotation=True` but `enable_monitoring` is not `True`,
+      a `ValueError` is raised.
+    - If `enable_vpn_rotation=True` but `vpn_connect_command` is missing or
+      empty, a `ValueError` is raised.
 
 Result structure:
 
@@ -944,21 +953,27 @@ Implementation notes:
 
   1. Load the `ArchiveJob` by ID.
   2. If job is missing → error, exit 1.
-  3. If `job.status != "indexed"` → refuse cleanup, exit 1.
+  3. If `job.status` is **not** one of:
+     - `"indexed"` – indexing completed successfully, or
+     - `"index_failed"` – indexing failed and you have decided not to retry,
+     then refuse cleanup and exit 1.
      - This ensures we don’t delete temp dirs while a job might still be
-       resumed or indexing is incomplete.
+       resumed or indexing is in progress.
   4. Validate `output_dir` exists and is a directory.
   5. Use `archive_tool.state.CrawlState(output_dir, initial_workers=1)` to
      instantiate state and locate the state file.
   6. Use `state.get_temp_dir_paths()` to get known temp dirs; fall back to
      `find_latest_temp_dir_fallback` if none are tracked.
-  7. If temp dirs were found:
+  7. If neither temp dirs nor the state file exist:
+     - Print a message that there is nothing to clean up and **do not** change
+       `cleanup_status` or `cleaned_at`.
+  8. Otherwise (if temp dirs and/or state file exist):
      - Call `cleanup_temp_dirs(temp_dirs, state.state_file_path)`:
        - Deletes `.tmp*` directories and the `.archive_state.json`.
-  8. Update job:
-     - `cleanup_status = "temp_cleaned"`
-     - `cleaned_at = now`
-     - `state_file_path = None`
+     - Update job:
+       - `cleanup_status = "temp_cleaned"`
+       - `cleaned_at = now`
+       - `state_file_path = None`
 
 > **Caution:** This cleanup removes WARCs stored under `.tmp*` directories,
 > consistent with `archive_tool`’s own `--cleanup` behavior. In v1 you should
@@ -1005,8 +1020,8 @@ All commands are available via the `ha-backend` entrypoint.
   - `retry-job --id ID` – mark:
     - `failed` jobs as `retryable` (for another crawl).
     - `index_failed` jobs as `completed` (for re-indexing).
-  - `cleanup-job --id ID [--mode temp]` – cleanup temp dirs/state for indexed
-    jobs.
+  - `cleanup-job --id ID [--mode temp]` – cleanup temp dirs/state for jobs in
+    status `indexed` or `index_failed`.
   - `start-worker [--poll-interval N] [--once]` – start the worker loop.
 
 ---
@@ -1054,4 +1069,3 @@ Together, the backend + `archive_tool` + frontend form a pipeline from:
 
 > Web → crawl (Docker + `zimit`) → WARCs → Snapshots in DB → searchable
 > archive UI at HealthArchive.ca.
-

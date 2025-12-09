@@ -315,11 +315,11 @@ def cmd_retry_job(args: argparse.Namespace) -> None:
         elif job.status == "index_failed":
             job.status = "completed"
             print(f"Job {job.id} marked for re-indexing (status set to completed).")
-    else:
-        print(
-            f"Job {job.id} is in status {job.status!r}; nothing to retry.",
-            file=sys.stderr,
-        )
+        else:
+            print(
+                f"Job {job.id} is in status {job.status!r}; nothing to retry.",
+                file=sys.stderr,
+            )
 
 
 def cmd_cleanup_job(args: argparse.Namespace) -> None:

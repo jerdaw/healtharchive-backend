@@ -237,8 +237,9 @@ ha-backend show-job --id 42
 
   - For `status="failed"` → sets `status="retryable"` for another crawl.
   - For `status="index_failed"` → sets `status="completed"` so indexing can re-run.
+  - For other statuses, the command logs that there is nothing to retry.
 
-- Cleanup temp dirs and state for an **indexed** job:
+- Cleanup temp dirs and state for an **indexed** or **index_failed** job:
 
   ```bash
   ha-backend cleanup-job --id 42
@@ -249,11 +250,13 @@ ha-backend show-job --id 42
   - Uses `archive_tool`’s `CrawlState` and `cleanup_temp_dirs(...)` to delete
     `.tmp*` directories and the `.archive_state.json` file under `output_dir`.
   - Leaves the job directory and any final ZIM in place.
-  - Updates `ArchiveJob.cleanup_status = "temp_cleaned"` and `cleaned_at`.
+  - Updates `ArchiveJob.cleanup_status = "temp_cleaned"` and `cleaned_at` when
+    there was actually a state file and/or temp dirs to remove.
 
 > **Note:** `cleanup-job` is destructive for temporary crawl artifacts
 > (including WARCs under `.tmp*`). Only run it after you are confident the
-> job has been fully indexed and any desired ZIMs or exports are verified.
+> job has been fully indexed (or indexing has failed in a way you do not
+> plan to recover from) and any desired ZIMs or exports are verified.
 
 ---
 
@@ -301,4 +304,3 @@ see `docs/documentation.md`.
 The vendored `archive_tool` also has its own detailed documentation in
 `src/archive_tool/docs/documentation.md` describing its internal state
 machine and Docker orchestration.
-
