@@ -858,6 +858,15 @@ Defined directly in `ha_backend.api.__init__`:
     - `healtharchive_jobs_cleanup_status_total{cleanup_status="..."}`
     - `healtharchive_snapshots_total`
     - `healtharchive_snapshots_total{source="hc"}`, etc.
+
+### 8.7 CORS
+
+- CORS is enabled on the public API routes. Allowed origins are derived from
+  `HEALTHARCHIVE_CORS_ORIGINS` (comma-separated). Defaults cover local dev and
+  production (`http://localhost:3000`, `http://localhost:5173`,
+  `https://healtharchive.ca`, `https://www.healtharchive.ca`).
+- Admin and metrics routes remain token-gated even when CORS allows browser
+  access to public routes.
   - Returns plain‑text body with HELP/TYPE comments suitable for Prometheus.
 
 ---

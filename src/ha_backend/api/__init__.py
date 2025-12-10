@@ -2,10 +2,12 @@ from __future__ import annotations
 
 from ha_backend.logging_config import configure_logging
 from fastapi import Depends, FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import PlainTextResponse
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from ha_backend.config import get_cors_origins
 from ha_backend.db import get_session
 from ha_backend.models import ArchiveJob, Snapshot, Source
 
@@ -19,6 +21,14 @@ configure_logging()
 app = FastAPI(
   title="HealthArchive Backend API",
   version="0.1.0",
+)
+
+app.add_middleware(
+  CORSMiddleware,
+  allow_origins=get_cors_origins(),
+  allow_credentials=False,
+  allow_methods=["*"],
+  allow_headers=["*"],
 )
 
 

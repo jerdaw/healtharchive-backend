@@ -103,6 +103,8 @@ directory:
 export HEALTHARCHIVE_DATABASE_URL=sqlite:///$(pwd)/.dev-healtharchive.db
 export HEALTHARCHIVE_ARCHIVE_ROOT=$(pwd)/.dev-archive-root
 export HEALTHARCHIVE_ADMIN_TOKEN=localdev-admin  # optional for admin routes
+# Optional CORS overrides (defaults already cover localhost + prod domains)
+# export HEALTHARCHIVE_CORS_ORIGINS=http://localhost:3000,http://localhost:5173
 alembic upgrade head
 ```
 
@@ -172,6 +174,34 @@ Admin + observability endpoints (protected by a simple admin token):
 
 Admin endpoints require a token when `HEALTHARCHIVE_ADMIN_TOKEN` is set (see
 “Admin auth” below).
+
+### Dev .env helper
+
+For convenience, you can copy `.env.example` to `.env` (git-ignored) and source
+it in your shell:
+
+```bash
+cp .env.example .env
+source .env
+alembic upgrade head
+uvicorn ha_backend.api:app --reload --port 8001
+```
+
+Do not commit real secrets in `.env`; use host-managed env vars for staging/prod.
+
+### CORS / frontend origins
+
+The API enables CORS for the public endpoints. Allowed origins come from
+`HEALTHARCHIVE_CORS_ORIGINS` (comma-separated). Defaults cover local dev and
+production:
+
+```
+http://localhost:3000, http://localhost:5173, https://healtharchive.ca, https://www.healtharchive.ca
+```
+
+Set `HEALTHARCHIVE_CORS_ORIGINS` when your frontend runs on a different host
+or port (e.g., a preview/staging domain). Admin routes remain token-gated even
+when CORS is enabled.
 
 ---
 

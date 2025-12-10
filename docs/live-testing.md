@@ -33,6 +33,13 @@ Use a local SQLite DB and archive root so you never touch production paths:
 export HEALTHARCHIVE_DATABASE_URL=sqlite:///$(pwd)/.dev-healtharchive.db
 export HEALTHARCHIVE_ARCHIVE_ROOT=$(pwd)/.dev-archive-root
 export HEALTHARCHIVE_ADMIN_TOKEN=localdev-admin  # optional but recommended
+# Optional: set CORS origins if your frontend runs on a non-default host
+# (defaults already include http://localhost:3000 and https://healtharchive.ca)
+# export HEALTHARCHIVE_CORS_ORIGINS=http://localhost:3000
+
+# Shortcut: copy the sample file and source it
+# cp .env.example .env
+# source .env
 ```
 
 Run Alembic migrations once to create the schema:
