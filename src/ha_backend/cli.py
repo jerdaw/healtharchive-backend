@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import argparse
-import subprocess
+import subprocess  # nosec: B404 - controlled CLI invocation of external tool
 import sys
 from typing import Sequence
 
@@ -43,8 +43,9 @@ def cmd_check_archive_tool(args: argparse.Namespace) -> None:
     print("Running 'archive-tool --help' to verify archive_tool...")
     print("-----------------------------------------")
 
-    # We intentionally call the configured command; default is 'archive-tool'
-    result = subprocess.run(
+    # We intentionally call the configured command; default is 'archive-tool'.
+    # Command and arguments are controlled by configuration, not end-user input.
+    result = subprocess.run(  # nosec: B603 - subprocess is used for a CLI helper
         [cfg.archive_tool_cmd, "--help"],
         capture_output=True,
         text=True,
