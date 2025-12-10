@@ -96,4 +96,3 @@ def test_run_job_uses_archive_root_and_tool(monkeypatch, tmp_path) -> None:
 
     assert job_dir.parent == Path(tmp_path)
     assert job_dir.name.endswith("__echo-job")
-

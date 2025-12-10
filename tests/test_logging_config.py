@@ -18,4 +18,3 @@ def test_configure_logging_defaults_to_info(monkeypatch) -> None:
     root = logging.getLogger()
     # Either INFO or lower (NOTSET) is acceptable, but INFO is the default.
     assert root.level in (logging.INFO, logging.NOTSET)
-

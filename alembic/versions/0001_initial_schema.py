@@ -10,9 +10,9 @@ Creates core tables:
 
 from __future__ import annotations
 
-from alembic import op
 import sqlalchemy as sa
 
+from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "0001_initial_schema"
@@ -127,9 +127,7 @@ def upgrade() -> None:
     op.create_index(
         "ix_archive_jobs_source_id", "archive_jobs", ["source_id"], unique=False
     )
-    op.create_index(
-        "ix_archive_jobs_status", "archive_jobs", ["status"], unique=False
-    )
+    op.create_index("ix_archive_jobs_status", "archive_jobs", ["status"], unique=False)
 
     # topics
     op.create_table(
@@ -187,15 +185,9 @@ def upgrade() -> None:
             server_default=sa.func.now(),
         ),
     )
-    op.create_index(
-        "ix_snapshots_job_id", "snapshots", ["job_id"], unique=False
-    )
-    op.create_index(
-        "ix_snapshots_source_id", "snapshots", ["source_id"], unique=False
-    )
-    op.create_index(
-        "ix_snapshots_url", "snapshots", ["url"], unique=False
-    )
+    op.create_index("ix_snapshots_job_id", "snapshots", ["job_id"], unique=False)
+    op.create_index("ix_snapshots_source_id", "snapshots", ["source_id"], unique=False)
+    op.create_index("ix_snapshots_url", "snapshots", ["url"], unique=False)
     op.create_index(
         "ix_snapshots_normalized_url_group",
         "snapshots",

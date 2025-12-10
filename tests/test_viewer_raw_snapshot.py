@@ -1,11 +1,10 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from io import BytesIO
 from pathlib import Path
 
 from fastapi.testclient import TestClient
-from io import BytesIO
-
 from warcio.warcwriter import WARCWriter
 
 from ha_backend import db as db_module
@@ -44,8 +43,7 @@ def _write_test_warc(warc_path: Path, url: str, html: str) -> str:
                 "HTTP/1.1 200 OK\r\n"
                 "Content-Type: text/html; charset=utf-8\r\n"
                 "Content-Length: " + str(len(html.encode("utf-8"))) + "\r\n"
-                "\r\n" +
-                html
+                "\r\n" + html
             ).encode("utf-8")
         )
         record = writer.create_warc_record(

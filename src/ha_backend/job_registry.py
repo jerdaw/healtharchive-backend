@@ -8,7 +8,8 @@ from typing import Any, Dict, Iterable, List, Optional
 from sqlalchemy.orm import Session
 
 from .config import get_archive_tool_config
-from .models import ArchiveJob as ORMArchiveJob, Source
+from .models import ArchiveJob as ORMArchiveJob
+from .models import Source
 
 
 @dataclass

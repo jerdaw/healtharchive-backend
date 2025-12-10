@@ -1,6 +1,6 @@
 # archive_tool/constants.py
-from pathlib import Path
 import re  # Add import re
+from pathlib import Path
 
 DOCKER_IMAGE = "ghcr.io/openzim/zimit"
 CONTAINER_OUTPUT_DIR = Path("/output")

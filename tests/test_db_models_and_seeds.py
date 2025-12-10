@@ -92,9 +92,7 @@ def test_model_roundtrip_relationships(tmp_path, monkeypatch) -> None:
 
     # New session to exercise relationship loading.
     with get_session() as session:
-        loaded_source = (
-            session.query(Source).filter_by(code="test-source").one()
-        )
+        loaded_source = session.query(Source).filter_by(code="test-source").one()
         assert loaded_source.jobs
         assert loaded_source.snapshots
 
@@ -106,9 +104,10 @@ def test_model_roundtrip_relationships(tmp_path, monkeypatch) -> None:
         loaded_snapshot = loaded_job.snapshots[0]
         assert loaded_snapshot.url == "https://example.org/page"
         # SQLite stores timezone-aware datetimes as naive; normalise before comparing.
-        assert loaded_snapshot.capture_timestamp.replace(
-            tzinfo=timezone.utc
-        ) == captured_at
+        assert (
+            loaded_snapshot.capture_timestamp.replace(tzinfo=timezone.utc)
+            == captured_at
+        )
         assert loaded_snapshot.source is loaded_source
         assert loaded_snapshot.topics
         assert loaded_snapshot.topics[0].slug == "example-topic"

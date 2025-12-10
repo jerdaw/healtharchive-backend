@@ -1,14 +1,13 @@
 from __future__ import annotations
 
+import sys
 from io import StringIO
 from pathlib import Path
 
-import sys
-
+from ha_backend import cli as cli_module
 from ha_backend import db as db_module
 from ha_backend.db import Base, get_engine, get_session
 from ha_backend.models import ArchiveJob, Source
-from ha_backend import cli as cli_module
 from ha_backend.seeds import seed_sources
 
 

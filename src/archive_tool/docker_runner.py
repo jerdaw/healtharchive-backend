@@ -1,11 +1,11 @@
 # archive_tool/docker_runner.py
 import logging
+import os  # Import os for DEVNULL
 import subprocess
 import time
 import uuid
 from pathlib import Path
-from typing import List, Optional, Tuple, Dict, Any
-import os  # Import os for DEVNULL
+from typing import Any, Dict, List, Optional, Tuple
 
 from .constants import CONTAINER_OUTPUT_DIR
 

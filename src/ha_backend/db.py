@@ -68,4 +68,3 @@ def get_session() -> Iterator[Session]:
 
 
 __all__ = ["Base", "get_engine", "get_session", "get_session_factory"]
-

@@ -254,9 +254,7 @@ def run_persistent_job(job_id: int) -> int:
     if enable_monitoring and enable_adaptive_workers:
         extra_tool_args.append("--enable-adaptive-workers")
         if "min_workers" in tool_options:
-            extra_tool_args.extend(
-                ["--min-workers", str(tool_options["min_workers"])]
-            )
+            extra_tool_args.extend(["--min-workers", str(tool_options["min_workers"])])
         if "max_worker_reductions" in tool_options:
             extra_tool_args.extend(
                 [

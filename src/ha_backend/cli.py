@@ -12,10 +12,9 @@ from .db import get_engine, get_session
 from .indexing import index_job
 from .job_registry import create_job_for_source
 from .jobs import create_job, run_persistent_job
+from .logging_config import configure_logging
 from .seeds import seed_sources
 from .worker import run_worker_loop
-from .logging_config import configure_logging
-
 
 # === Command implementations ===
 
@@ -126,7 +125,8 @@ def cmd_create_job(args: argparse.Namespace) -> None:
     """
     source_code = args.source
 
-    from .models import ArchiveJob as ORMArchiveJob  # local import to avoid cycles
+    from .models import \
+        ArchiveJob as ORMArchiveJob  # local import to avoid cycles
 
     # Build any per-job Zimit passthrough args for dev/testing (page limit,
     # crawl depth, etc.).
@@ -204,7 +204,8 @@ def cmd_list_jobs(args: argparse.Namespace) -> None:
     """
     List recent ArchiveJob rows with optional filters.
     """
-    from .models import ArchiveJob as ORMArchiveJob, Source
+    from .models import ArchiveJob as ORMArchiveJob
+    from .models import Source
 
     rows_data = []
     with get_session() as session:
@@ -348,11 +349,12 @@ def cmd_cleanup_job(args: argparse.Namespace) -> None:
     temp dirs (including WARCs) and the state file, but leaves the job
     output directory and any final ZIM in place.
     """
-    from pathlib import Path
     from datetime import datetime, timezone
+    from pathlib import Path
 
     from archive_tool.state import CrawlState
-    from archive_tool.utils import cleanup_temp_dirs, find_latest_temp_dir_fallback
+    from archive_tool.utils import (cleanup_temp_dirs,
+                                    find_latest_temp_dir_fallback)
 
     from .models import ArchiveJob as ORMArchiveJob
 
@@ -424,7 +426,9 @@ def cmd_register_job_dir(args: argparse.Namespace) -> None:
     from datetime import datetime, timezone
     from pathlib import Path
 
-    from .models import ArchiveJob as ORMArchiveJob, Source  # local import to avoid cycles
+    from .models import \
+        ArchiveJob as ORMArchiveJob  # local import to avoid cycles
+    from .models import Source
 
     output_dir = Path(args.output_dir).resolve()
     if not output_dir.is_dir():

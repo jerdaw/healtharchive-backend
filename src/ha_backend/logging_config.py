@@ -43,4 +43,3 @@ def configure_logging(level: Optional[int] = None) -> None:
 
 
 __all__ = ["configure_logging"]
-

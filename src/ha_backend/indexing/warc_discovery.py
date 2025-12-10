@@ -4,8 +4,8 @@ from pathlib import Path
 from typing import List
 
 from archive_tool.state import CrawlState
-from archive_tool.utils import find_all_warc_files, find_latest_temp_dir_fallback
-
+from archive_tool.utils import (find_all_warc_files,
+                                find_latest_temp_dir_fallback)
 from ha_backend.models import ArchiveJob
 
 
@@ -39,4 +39,3 @@ def discover_warcs_for_job(
 
 
 __all__ = ["discover_warcs_for_job"]
-

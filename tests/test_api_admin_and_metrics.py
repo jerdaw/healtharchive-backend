@@ -1,9 +1,8 @@
 from __future__ import annotations
 
+import os
 from datetime import datetime, timezone
 from pathlib import Path
-
-import os
 
 from fastapi.testclient import TestClient
 
@@ -211,6 +210,5 @@ def test_metrics_include_cleanup_status_labels(tmp_path, monkeypatch) -> None:
 
     assert 'healtharchive_jobs_cleanup_status_total{cleanup_status="none"}' in body
     assert (
-        'healtharchive_jobs_cleanup_status_total{cleanup_status="temp_cleaned"}'
-        in body
+        'healtharchive_jobs_cleanup_status_total{cleanup_status="temp_cleaned"}' in body
     )

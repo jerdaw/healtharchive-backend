@@ -1,10 +1,10 @@
 # archive_tool/strategies.py
-import logging
-import time
 import argparse
-import shutil  # For which()
+import logging
 import shlex
+import shutil  # For which()
 import threading
+import time
 
 # Use absolute imports
 from archive_tool.state import CrawlState
@@ -23,7 +23,8 @@ def attempt_worker_reduction(state: CrawlState, args: argparse.Namespace) -> boo
     Returns True if adaptation requiring restart was successfully initiated.
     """
     # --- Import needed here since it's conditionally used ---
-    from archive_tool.docker_runner import stop_docker_container, current_container_id
+    from archive_tool.docker_runner import (current_container_id,
+                                            stop_docker_container)
 
     # --- End Import ---
 
@@ -64,7 +65,9 @@ def attempt_worker_reduction(state: CrawlState, args: argparse.Namespace) -> boo
     return True
 
 
-def attempt_vpn_rotation(state: CrawlState, args: argparse.Namespace, stop_event: threading.Event) -> bool:
+def attempt_vpn_rotation(
+    state: CrawlState, args: argparse.Namespace, stop_event: threading.Event
+) -> bool:
     """
     Attempts IP rotation via VPN **without stopping the container**.
     Checks limits, frequency, and command existence.

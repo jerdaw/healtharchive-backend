@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import os
-from pathlib import Path
 from dataclasses import dataclass
+from pathlib import Path
 from typing import List
 
 # === Core paths ===
@@ -79,23 +79,23 @@ class DatabaseConfig:
 
 
 def get_database_config() -> DatabaseConfig:
-  """
-  Return the current database configuration, honouring environment overrides.
-  """
-  url = os.environ.get("HEALTHARCHIVE_DATABASE_URL", DEFAULT_DATABASE_URL)
-  return DatabaseConfig(database_url=url)
+    """
+    Return the current database configuration, honouring environment overrides.
+    """
+    url = os.environ.get("HEALTHARCHIVE_DATABASE_URL", DEFAULT_DATABASE_URL)
+    return DatabaseConfig(database_url=url)
 
 
 def get_cors_origins() -> List[str]:
-  """
-  Return the list of allowed CORS origins for the public API.
+    """
+    Return the list of allowed CORS origins for the public API.
 
-  Controlled via HEALTHARCHIVE_CORS_ORIGINS (comma-separated). Falls back to
-  a sensible set covering local dev and production domains.
-  """
-  raw = os.environ.get("HEALTHARCHIVE_CORS_ORIGINS")
-  if raw is not None:
-    origins = [origin.strip() for origin in raw.split(",") if origin.strip()]
-    if origins:
-      return origins
-  return DEFAULT_CORS_ORIGINS
+    Controlled via HEALTHARCHIVE_CORS_ORIGINS (comma-separated). Falls back to
+    a sensible set covering local dev and production domains.
+    """
+    raw = os.environ.get("HEALTHARCHIVE_CORS_ORIGINS")
+    if raw is not None:
+        origins = [origin.strip() for origin in raw.split(",") if origin.strip()]
+        if origins:
+            return origins
+    return DEFAULT_CORS_ORIGINS

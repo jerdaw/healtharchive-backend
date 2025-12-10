@@ -2,15 +2,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from ha_backend.config import (
-    DEFAULT_ARCHIVE_ROOT,
-    DEFAULT_ARCHIVE_TOOL_CMD,
-    DEFAULT_DATABASE_URL,
-    ArchiveToolConfig,
-    DatabaseConfig,
-    get_archive_tool_config,
-    get_database_config,
-)
+from ha_backend.config import (DEFAULT_ARCHIVE_ROOT, DEFAULT_ARCHIVE_TOOL_CMD,
+                               DEFAULT_DATABASE_URL, ArchiveToolConfig,
+                               DatabaseConfig, get_archive_tool_config,
+                               get_database_config)
 
 
 def test_archive_tool_config_defaults(monkeypatch) -> None:
@@ -58,4 +53,3 @@ def test_database_config_env_override(monkeypatch) -> None:
     monkeypatch.setenv("HEALTHARCHIVE_DATABASE_URL", custom_url)
     cfg = get_database_config()
     assert cfg.database_url == custom_url
-

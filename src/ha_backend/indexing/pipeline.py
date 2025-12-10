@@ -7,12 +7,8 @@ from sqlalchemy.orm import Session
 
 from ha_backend.db import get_session
 from ha_backend.indexing.mapping import record_to_snapshot
-from ha_backend.indexing.text_extraction import (
-    detect_language,
-    extract_text,
-    extract_title,
-    make_snippet,
-)
+from ha_backend.indexing.text_extraction import (detect_language, extract_text,
+                                                 extract_title, make_snippet)
 from ha_backend.indexing.warc_discovery import discover_warcs_for_job
 from ha_backend.indexing.warc_reader import iter_html_records
 from ha_backend.models import ArchiveJob, Snapshot
@@ -126,4 +122,3 @@ def index_job(job_id: int) -> int:
 
 
 __all__ = ["index_job"]
-

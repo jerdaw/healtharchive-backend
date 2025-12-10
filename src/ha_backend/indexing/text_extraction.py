@@ -72,4 +72,3 @@ def detect_language(text: str, headers: Optional[Dict[str, str]] = None) -> str:
 
 
 __all__ = ["extract_title", "extract_text", "make_snippet", "detect_language"]
-

@@ -1,19 +1,19 @@
 # archive_tool/monitor.py
+import argparse  # Keep for type hint in __init__
 import json
 import logging
+import os
 import re
+import signal  # For killpg
 import subprocess
 import threading
 import time
 from queue import Queue
 from typing import Dict, Optional
-import argparse  # Keep for type hint in __init__
-import os
-import signal  # For killpg
 
+from .constants import HTTP_ERROR_PATTERNS, TIMEOUT_PATTERNS
 # Use absolute imports within the package
 from .state import CrawlState
-from .constants import TIMEOUT_PATTERNS, HTTP_ERROR_PATTERNS
 
 # DO NOT import current_docker_process - use passed handle instead
 

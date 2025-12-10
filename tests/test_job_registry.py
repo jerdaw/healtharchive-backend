@@ -4,16 +4,13 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
+
 from ha_backend import db as db_module
 from ha_backend.db import Base, get_engine, get_session
-from ha_backend.job_registry import (
-    SOURCE_JOB_CONFIGS,
-    build_job_config,
-    build_output_dir_for_job,
-    create_job_for_source,
-    generate_job_name,
-    get_config_for_source,
-)
+from ha_backend.job_registry import (SOURCE_JOB_CONFIGS, build_job_config,
+                                     build_output_dir_for_job,
+                                     create_job_for_source, generate_job_name,
+                                     get_config_for_source)
 from ha_backend.models import ArchiveJob, Source
 from ha_backend.seeds import seed_sources
 
@@ -85,7 +82,9 @@ def test_build_job_config_merges_defaults_and_overrides() -> None:
     cfg = SOURCE_JOB_CONFIGS["hc"]
     overrides = {"cleanup": True, "initial_workers": 4}
 
-    config = build_job_config(cfg, extra_seeds=["https://extra.example"], overrides=overrides)
+    config = build_job_config(
+        cfg, extra_seeds=["https://extra.example"], overrides=overrides
+    )
 
     assert "seeds" in config
     assert "zimit_passthrough_args" in config

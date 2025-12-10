@@ -4,27 +4,17 @@ import json
 import logging
 import os
 import re
+import subprocess
 import time
 from pathlib import Path
-from typing import (
-    List,
-    Optional,
-    Tuple,
-    Dict,
-    Any,
-)  # Ensure necessary types are imported
-import subprocess
+from typing import (Any, Dict, List,  # Ensure necessary types are imported
+                    Optional, Tuple)
 
 # Use absolute imports
 from . import constants  # Import constants module
-
 # Import specific constants used here for clarity
-from .constants import (
-    CONTAINER_OUTPUT_DIR,
-    TEMP_DIR_PREFIX,
-    REQUIRED_FINAL_ARGS_PREFIXES,
-    STATS_REGEX,
-)
+from .constants import (CONTAINER_OUTPUT_DIR, REQUIRED_FINAL_ARGS_PREFIXES,
+                        STATS_REGEX, TEMP_DIR_PREFIX)
 
 logger = logging.getLogger("website_archiver.utils")
 

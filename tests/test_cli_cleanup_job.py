@@ -1,17 +1,15 @@
 from __future__ import annotations
 
+import sys
 from datetime import datetime, timezone
 from io import StringIO
 from pathlib import Path
 
-import sys
-
 from archive_tool.state import CrawlState
-
+from ha_backend import cli as cli_module
 from ha_backend import db as db_module
 from ha_backend.db import Base, get_engine, get_session
 from ha_backend.models import ArchiveJob, Source
-from ha_backend import cli as cli_module
 
 
 def _init_test_db(tmp_path: Path, monkeypatch) -> None:
@@ -144,4 +142,3 @@ def test_cleanup_job_rejects_non_indexed_status(tmp_path, monkeypatch) -> None:
         assert job is not None
         assert job.status == "running"
         assert job.cleanup_status == "none"
-

@@ -101,4 +101,3 @@ def iter_html_records(warc_path: Path) -> Iterator[ArchiveRecord]:
 
 
 __all__ = ["ArchiveRecord", "iter_html_records"]
-

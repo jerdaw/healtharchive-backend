@@ -10,14 +10,9 @@ from ha_backend.db import get_session
 from ha_backend.models import ArchiveJob, Snapshot, Source
 
 from .deps import require_admin
-from .schemas_admin import (
-    JobDetailSchema,
-    JobListResponseSchema,
-    JobSnapshotSummarySchema,
-    JobStatusCountsSchema,
-    JobSummarySchema,
-)
-
+from .schemas_admin import (JobDetailSchema, JobListResponseSchema,
+                            JobSnapshotSummarySchema, JobStatusCountsSchema,
+                            JobSummarySchema)
 
 router = APIRouter(
     prefix="/admin",
@@ -45,7 +40,9 @@ def list_jobs(
     """
     List archive jobs with optional filtering by source code and status.
     """
-    query = db.query(ArchiveJob, Source).join(Source, ArchiveJob.source_id == Source.id, isouter=True)
+    query = db.query(ArchiveJob, Source).join(
+        Source, ArchiveJob.source_id == Source.id, isouter=True
+    )
 
     if source:
         query = query.filter(Source.code == source.lower())
@@ -56,10 +53,7 @@ def list_jobs(
     total = query.count()
 
     rows = (
-        query.order_by(ArchiveJob.created_at.desc())
-        .offset(offset)
-        .limit(limit)
-        .all()
+        query.order_by(ArchiveJob.created_at.desc()).offset(offset).limit(limit).all()
     )
 
     items: List[JobSummarySchema] = []

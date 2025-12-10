@@ -7,9 +7,9 @@ Create Date: 2025-12-09 00:00:00
 
 from __future__ import annotations
 
-from alembic import op
 import sqlalchemy as sa
 
+from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "0002_cleanup_fields"
@@ -37,4 +37,3 @@ def upgrade() -> None:
 def downgrade() -> None:
     op.drop_column("archive_jobs", "cleaned_at")
     op.drop_column("archive_jobs", "cleanup_status")
-

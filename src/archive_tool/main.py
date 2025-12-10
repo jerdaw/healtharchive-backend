@@ -1,30 +1,22 @@
 # archive_tool/main.py
-import logging
-import signal
-import threading
-import sys
-import time
+import argparse
 import datetime
-import subprocess
-import threading
+import logging
 import os
+import shutil
+import signal
+import subprocess
+import sys
+import threading
+import time
+import traceback  # Import traceback for detailed exception logging
 from pathlib import Path
 from queue import Empty, Queue
-from typing import List, Optional, Tuple, Dict, Any
-import shutil
-import argparse
-import traceback  # Import traceback for detailed exception logging
+from typing import Any, Dict, List, Optional, Tuple
 
 # Use absolute imports within the package
-from archive_tool import (
-    cli,
-    constants,
-    state,
-    utils,
-    docker_runner,
-    monitor,
-    strategies,
-)
+from archive_tool import (cli, constants, docker_runner, monitor, state,
+                          strategies, utils)
 
 # Setup logger for this module
 # Note: Root logger is configured in main(), this just gets the specific logger
@@ -198,9 +190,11 @@ def run_final_build_stage_sync(
         )
         try:
             logger.debug(f"Attempting to write logs for {stage_name}...")
-            with open(stdout_log_path, "w", encoding="utf-8") as f1, open(
-                stderr_log_path, "w", encoding="utf-8"
-            ) as f2, open(combined_log_path, "w", encoding="utf-8") as f3:
+            with (
+                open(stdout_log_path, "w", encoding="utf-8") as f1,
+                open(stderr_log_path, "w", encoding="utf-8") as f2,
+                open(combined_log_path, "w", encoding="utf-8") as f3,
+            ):
                 f1.write(stdout_content)
                 f2.write(stderr_content)
                 f3.write(combined_content)
@@ -808,7 +802,9 @@ def main():
                         logger.info("Attempting strategy: VPN Rotation (Live)")
                         try:
                             # Pass crawl_state and script_args
-                            if strategies.attempt_vpn_rotation(crawl_state, script_args, stop_event):
+                            if strategies.attempt_vpn_rotation(
+                                crawl_state, script_args, stop_event
+                            ):
                                 logger.info(
                                     "VPN rotation (Live) strategy SUCCESSFUL. Container continues running."
                                 )

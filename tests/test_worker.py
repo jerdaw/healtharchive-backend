@@ -70,7 +70,9 @@ def test_worker_processes_queued_job_and_indexes(monkeypatch, tmp_path) -> None:
             j.indexed_page_count = 42
         return 0
 
-    monkeypatch.setattr("ha_backend.worker.main.run_persistent_job", fake_run_persistent_job)
+    monkeypatch.setattr(
+        "ha_backend.worker.main.run_persistent_job", fake_run_persistent_job
+    )
     monkeypatch.setattr("ha_backend.worker.main.index_job", fake_index_job)
 
     # Single iteration should process the job fully.

@@ -35,4 +35,3 @@ def find_record_for_snapshot(snapshot: Snapshot) -> Optional[ArchiveRecord]:
 
 
 __all__ = ["find_record_for_snapshot"]
-
