@@ -13,7 +13,8 @@ The backend has three main responsibilities:
   summaries, and snapshot viewing.
 
 For a deep architecture and implementation walkthrough, see
-`docs/documentation.md`. This README is intentionally shorter and focused on
+`docs/documentation.md`. For a step‑by‑step local live‑testing guide, see
+`docs/live-testing.md`. This README is intentionally shorter and focused on
 practical usage.
 
 ---
@@ -24,7 +25,8 @@ practical usage.
 .
 ├── README.md
 ├── docs/
-│   └── documentation.md      # Detailed architecture and implementation guide
+│   ├── documentation.md      # Detailed architecture and implementation guide
+│   └── live-testing.md       # Step-by-step local live testing guide
 ├── pyproject.toml            # Package + dependency metadata
 ├── requirements.txt          # Convenience requirements file (mirrors pyproject)
 ├── alembic/                  # Database migrations

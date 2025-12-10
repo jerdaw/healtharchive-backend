@@ -120,6 +120,7 @@ def build_job_config(
     *,
     extra_seeds: Optional[Iterable[str]] = None,
     overrides: Optional[Dict[str, Any]] = None,
+    extra_zimit_args: Optional[Iterable[str]] = None,
 ) -> Dict[str, Any]:
     """
     Construct the configuration JSON for an ArchiveJob row from a registry
@@ -130,6 +131,8 @@ def build_job_config(
         seeds.extend(extra_seeds)
 
     zimit_args: List[str] = list(source_cfg.default_zimit_passthrough_args)
+    if extra_zimit_args:
+        zimit_args.extend(extra_zimit_args)
 
     tool_options: Dict[str, Any] = dict(source_cfg.default_tool_options)
     if overrides:
@@ -172,6 +175,7 @@ def create_job_for_source(
     *,
     session: Session,
     overrides: Optional[Dict[str, Any]] = None,
+    extra_zimit_args: Optional[Iterable[str]] = None,
 ) -> ORMArchiveJob:
     """
     Create and persist a new ArchiveJob for the given source.
@@ -202,7 +206,11 @@ def create_job_for_source(
         now=now,
     )
 
-    job_config = build_job_config(cfg, overrides=overrides)
+    job_config = build_job_config(
+        cfg,
+        overrides=overrides,
+        extra_zimit_args=extra_zimit_args,
+    )
 
     job = ORMArchiveJob(
         source=source,

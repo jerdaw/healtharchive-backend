@@ -228,7 +228,8 @@ def get_snapshot_detail(
   snap = (
     db.query(Snapshot)
     .options(joinedload(Snapshot.source), joinedload(Snapshot.topics))
-    .get(snapshot_id)
+    .filter(Snapshot.id == snapshot_id)
+    .first()
   )
 
   if snap is None or snap.source is None:
@@ -266,7 +267,7 @@ def get_snapshot_raw(
   """
   Serve raw HTML content for a snapshot by reading the underlying WARC record.
   """
-  snap = db.query(Snapshot).get(snapshot_id)
+  snap = db.get(Snapshot, snapshot_id)
   if snap is None:
     raise HTTPException(status_code=404, detail="Snapshot not found")
 

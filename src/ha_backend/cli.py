@@ -128,17 +128,35 @@ def cmd_create_job(args: argparse.Namespace) -> None:
 
     from .models import ArchiveJob as ORMArchiveJob  # local import to avoid cycles
 
+    # Build any per-job Zimit passthrough args for dev/testing (page limit,
+    # crawl depth, etc.).
+    extra_zimit_args: list[str] = []
+    page_limit = getattr(args, "page_limit", None)
+    if page_limit is not None:
+        extra_zimit_args.extend(["--pageLimit", str(page_limit)])
+
+    depth = getattr(args, "depth", None)
+    if depth is not None:
+        extra_zimit_args.extend(["--depth", str(depth)])
+
     with get_session() as session:
         job_row: ORMArchiveJob = create_job_for_source(
             source_code,
             session=session,
+            extra_zimit_args=extra_zimit_args or None,
         )
 
+        # Capture fields before the session is closed to avoid accessing
+        # a detached instance after commit.
+        job_id = job_row.id
+        job_name = job_row.name
+        job_output_dir = job_row.output_dir
+
     print("Created job:")
-    print(f"  ID:         {job_row.id}")
+    print(f"  ID:         {job_id}")
     print(f"  Source:     {source_code}")
-    print(f"  Name:       {job_row.name}")
-    print(f"  Output dir: {job_row.output_dir}")
+    print(f"  Name:       {job_name}")
+    print(f"  Output dir: {job_output_dir}")
 
 
 def cmd_run_db_job(args: argparse.Namespace) -> None:
@@ -395,6 +413,63 @@ def cmd_cleanup_job(args: argparse.Namespace) -> None:
         job.state_file_path = None
 
 
+def cmd_register_job_dir(args: argparse.Namespace) -> None:
+    """
+    Attach an ArchiveJob row to an existing archive_tool output directory.
+
+    This is primarily intended for development and debugging when you already
+    have a crawl directory on disk (produced by archive_tool) and want to
+    index its WARCs via the backend.
+    """
+    from datetime import datetime, timezone
+    from pathlib import Path
+
+    from .models import ArchiveJob as ORMArchiveJob, Source  # local import to avoid cycles
+
+    output_dir = Path(args.output_dir).resolve()
+    if not output_dir.is_dir():
+        print(
+            f"ERROR: Output directory {output_dir} does not exist or is not a directory.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    with get_session() as session:
+        src = session.query(Source).filter_by(code=args.source.lower()).one_or_none()
+        if src is None:
+            print(
+                f"ERROR: Source with code {args.source!r} does not exist. "
+                "Run 'ha-backend seed-sources' or insert it manually.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+
+        now = datetime.now(timezone.utc)
+        job_name = args.name or output_dir.name
+
+        job = ORMArchiveJob(
+            source_id=src.id,
+            name=job_name,
+            output_dir=str(output_dir),
+            status="completed",  # ready for indexing
+            queued_at=now,
+            started_at=now,
+            finished_at=now,
+        )
+        session.add(job)
+        session.flush()
+        job_id = job.id
+
+    print("Registered job from existing directory:")
+    print(f"  ID:         {job_id}")
+    print(f"  Source:     {args.source}")
+    print(f"  Name:       {job_name}")
+    print(f"  Output dir: {output_dir}")
+    print("")
+    print("You can now index this job with:")
+    print(f"  ha-backend index-job --id {job_id}")
+
+
 def cmd_start_worker(args: argparse.Namespace) -> None:
     """
     Start the background worker loop.
@@ -496,6 +571,16 @@ def build_parser() -> argparse.ArgumentParser:
         "--source",
         required=True,
         help="Source code (e.g. 'hc', 'phac').",
+    )
+    p_create.add_argument(
+        "--page-limit",
+        type=int,
+        help="Optional Zimit --pageLimit for this job (dev/testing).",
+    )
+    p_create.add_argument(
+        "--depth",
+        type=int,
+        help="Optional Zimit --depth for this job (dev/testing).",
     )
     p_create.set_defaults(func=cmd_create_job)
 
@@ -617,6 +702,30 @@ def build_parser() -> argparse.ArgumentParser:
         help="Run a single iteration and exit.",
     )
     p_worker.set_defaults(func=cmd_start_worker)
+
+    # register-job-dir
+    p_register = subparsers.add_parser(
+        "register-job-dir",
+        help=(
+            "Attach an ArchiveJob row to an existing archive_tool output "
+            "directory (advanced/dev)."
+        ),
+    )
+    p_register.add_argument(
+        "--source",
+        required=True,
+        help="Source code for the job (e.g. 'hc').",
+    )
+    p_register.add_argument(
+        "--output-dir",
+        required=True,
+        help="Existing archive_tool output directory to attach.",
+    )
+    p_register.add_argument(
+        "--name",
+        help="Optional logical job name; defaults to the directory name.",
+    )
+    p_register.set_defaults(func=cmd_register_job_dir)
 
     return parser
 

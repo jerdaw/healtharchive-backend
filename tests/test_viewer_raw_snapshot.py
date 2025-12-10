@@ -99,3 +99,48 @@ def test_raw_snapshot_route_serves_html(tmp_path, monkeypatch) -> None:
     resp = client.get(f"/api/snapshots/raw/{snapshot_id}")
     assert resp.status_code == 200
     assert "Hello from WARC" in resp.text
+
+
+def test_raw_snapshot_missing_warc_returns_404(tmp_path, monkeypatch) -> None:
+    """
+    When the underlying WARC file is missing, the viewer should return 404
+    with a meaningful error message.
+    """
+    client = _init_test_app(tmp_path, monkeypatch)
+
+    missing_warc = tmp_path / "warcs" / "missing.warc.gz"
+    url = "https://example.org/missing"
+
+    with get_session() as session:
+        src = Source(
+            code="test",
+            name="Test Source",
+            base_url="https://example.org",
+            description="Test",
+            enabled=True,
+        )
+        session.add(src)
+        session.flush()
+
+        snap = Snapshot(
+            job_id=None,
+            source_id=src.id,
+            url=url,
+            normalized_url_group=url,
+            capture_timestamp=datetime(2025, 1, 1, 12, 0, tzinfo=timezone.utc),
+            mime_type="text/html",
+            status_code=200,
+            title="Missing WARC Page",
+            snippet="Snapshot with missing WARC",
+            language="en",
+            warc_path=str(missing_warc),
+            warc_record_id="missing-id",
+        )
+        session.add(snap)
+        session.flush()
+        snapshot_id = snap.id
+
+    resp = client.get(f"/api/snapshots/raw/{snapshot_id}")
+    assert resp.status_code == 404
+    body = resp.json()
+    assert "Underlying WARC file" in body["detail"]

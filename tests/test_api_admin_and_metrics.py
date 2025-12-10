@@ -190,3 +190,27 @@ def test_metrics_content_includes_basic_counters(tmp_path, monkeypatch) -> None:
     assert "healtharchive_jobs_total" in body
     assert "healtharchive_snapshots_total" in body
 
+
+def test_metrics_include_cleanup_status_labels(tmp_path, monkeypatch) -> None:
+    """
+    /metrics should emit cleanup_status breakdown when jobs exist with
+    different cleanup_status values.
+    """
+    monkeypatch.delenv("HEALTHARCHIVE_ADMIN_TOKEN", raising=False)
+    client = _init_test_app(tmp_path, monkeypatch)
+    _seed_basic_data()
+
+    # Mark one job as temp_cleaned to exercise the label.
+    with get_session() as session:
+        job = session.query(ArchiveJob).first()
+        job.cleanup_status = "temp_cleaned"
+
+    resp = client.get("/metrics")
+    assert resp.status_code == 200
+    body = resp.text
+
+    assert 'healtharchive_jobs_cleanup_status_total{cleanup_status="none"}' in body
+    assert (
+        'healtharchive_jobs_cleanup_status_total{cleanup_status="temp_cleaned"}'
+        in body
+    )

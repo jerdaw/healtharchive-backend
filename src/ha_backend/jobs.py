@@ -288,10 +288,10 @@ def run_persistent_job(job_id: int) -> int:
         )
 
     # Compose final extra args: tool args first, then the Zimit passthrough
-    # arguments after a literal '--' separator (if any).
+    # arguments (no additional '--' separator needed; archive_tool will pass
+    # these directly through to zimit).
     full_extra_args: list[str] = list(extra_tool_args)
     if zimit_args:
-        full_extra_args.append("--")
         full_extra_args.extend(zimit_args)
 
     rc = runtime_job.run(

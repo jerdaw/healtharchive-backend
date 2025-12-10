@@ -96,6 +96,23 @@ def list_jobs(
     )
 
 
+@router.get("/jobs/status-counts", response_model=JobStatusCountsSchema)
+def job_status_counts(
+    db: Session = Depends(get_db),
+) -> JobStatusCountsSchema:
+    """
+    Return counts of jobs grouped by status.
+    """
+    rows = (
+        db.query(ArchiveJob.status, func.count(ArchiveJob.id))
+        .group_by(ArchiveJob.status)
+        .all()
+    )
+
+    counts = {status: count for status, count in rows}
+    return JobStatusCountsSchema(counts=counts)
+
+
 @router.get("/jobs/{job_id}", response_model=JobDetailSchema)
 def get_job_detail(
     job_id: int,
@@ -146,23 +163,6 @@ def get_job_detail(
         config=job.config,
         lastStats=job.last_stats_json,
     )
-
-
-@router.get("/jobs/status-counts", response_model=JobStatusCountsSchema)
-def job_status_counts(
-    db: Session = Depends(get_db),
-) -> JobStatusCountsSchema:
-    """
-    Return counts of jobs grouped by status.
-    """
-    rows = (
-        db.query(ArchiveJob.status, func.count(ArchiveJob.id))
-        .group_by(ArchiveJob.status)
-        .all()
-    )
-
-    counts = {status: count for status, count in rows}
-    return JobStatusCountsSchema(counts=counts)
 
 
 @router.get(
