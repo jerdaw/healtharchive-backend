@@ -175,6 +175,10 @@ Admin + observability endpoints (protected by a simple admin token):
 Admin endpoints require a token when `HEALTHARCHIVE_ADMIN_TOKEN` is set (see
 “Admin auth” below).
 
+These endpoints are intended for internal operators and monitoring systems
+only. The public Next.js frontend does **not** call `/api/admin/*` or
+`/metrics` directly.
+
 ### Dev .env helper
 
 For convenience, you can copy `.env.example` to `.env` (git-ignored) and source
@@ -347,9 +351,72 @@ defaults:
   - `Authorization: Bearer <token>` or
   - `X-Admin-Token: <token>`  
   If unset, admin endpoints are open (intended only for local development).
+  In staging and production you should **always** set a long, random token and
+  store it as a secret in your hosting platform (never committed to the repo).
 
 - `HEALTHARCHIVE_LOG_LEVEL`  
   Global log level (`DEBUG`, `INFO`, etc.). Defaults to `INFO`.
+
+- `HEALTHARCHIVE_CORS_ORIGINS`  
+  Comma-separated list of allowed Origins for CORS on the public API routes.
+  If unset, a built-in default is used:
+
+  - `http://localhost:3000`
+  - `http://localhost:5173`
+  - `https://healtharchive.ca`
+  - `https://www.healtharchive.ca`
+
+  In production and staging you should set this explicitly so that only
+  expected frontend hosts can call the API from a browser. Examples:
+
+  - **Production (frontend at healtharchive.ca):**
+
+    ```bash
+    export HEALTHARCHIVE_CORS_ORIGINS="https://healtharchive.ca,https://www.healtharchive.ca"
+    ```
+
+  - **Staging (frontend at healtharchive.vercel.app):**
+
+    ```bash
+    export HEALTHARCHIVE_CORS_ORIGINS="https://healtharchive.vercel.app"
+    ```
+
+  You can also include `http://localhost:3000` if you want local development
+  to talk directly to a remote API instance.
+
+For a more complete checklist covering staging/production configuration,
+DNS, and Vercel env vars, see `hosting-and-live-server-to-dos.md`.
+
+---
+
+## Continuous integration
+
+A GitHub Actions workflow (`.github/workflows/backend-ci.yml`) is intended to
+run on pushes to `main` and on pull requests. It:
+
+- Checks out the repository.
+- Sets up Python 3.11.
+- Installs dependencies with:
+
+  ```bash
+  pip install -e ".[dev]"
+  ```
+
+- Runs the test suite:
+
+  ```bash
+  pytest -q
+  ```
+
+The CI job uses a temporary SQLite database via:
+
+```bash
+HEALTHARCHIVE_DATABASE_URL=sqlite:///./ci-healtharchive.db
+```
+
+so no external DB or Docker services are required. Crawls are not executed in
+CI; tests focus on unit-level behavior (DB models, APIs, job orchestration,
+etc.).
 
 ---
 
@@ -366,6 +433,43 @@ For a full walkthrough of:
 - Cleanup and retention strategy (Phase 9)
 
 see `docs/documentation.md`.
+
+### Frontend integration smoke test
+
+Once a frontend is pointed at this backend (via `NEXT_PUBLIC_API_BASE_URL` on
+the frontend side and `HEALTHARCHIVE_CORS_ORIGINS` here), you can perform a
+quick end-to-end smoke test:
+
+1. **Verify API health from the frontend host**
+
+   From a shell:
+
+   ```bash
+   curl -i "$API_BASE_URL/api/health"
+   curl -i "$API_BASE_URL/api/sources"
+   ```
+
+   You should see HTTP 200 responses and JSON bodies. If you add an `Origin`
+   header matching the frontend (e.g. `https://healtharchive.ca`), the response
+   should include:
+
+   ```text
+   Access-Control-Allow-Origin: https://healtharchive.ca
+   Vary: Origin
+   ```
+
+2. **Exercise the UI**
+
+   From the frontend domain (staging or production):
+
+   - Visit `/archive`:
+     - With the backend up, the filters should show `Filters (live API)` and
+       search/pagination should be backed by real snapshot data.
+     - If you intentionally stop the backend (in staging), the UI should show
+       a small “Backend unreachable” banner (when enabled) and fall back to
+       the demo dataset with a clear notice.
+   - Visit `/archive/browse-by-source` and `/snapshot/[id]` to confirm source
+     summaries and snapshot details load correctly against the live API.
 
 The vendored `archive_tool` also has its own detailed documentation in
 `src/archive_tool/docs/documentation.md` describing its internal state

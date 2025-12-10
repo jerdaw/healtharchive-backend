@@ -13,8 +13,13 @@ from ha_backend.db import get_session
 from ha_backend.indexing.viewer import find_record_for_snapshot
 from ha_backend.models import ArchiveJob, Snapshot, Source, Topic
 
-from .schemas import (SearchResponseSchema, SnapshotDetailSchema,
-                      SnapshotSummarySchema, SourceSummarySchema)
+from .schemas import (
+    SearchResponseSchema,
+    SnapshotDetailSchema,
+    SnapshotSummarySchema,
+    SourceSummarySchema,
+    TopicRefSchema,
+)
 
 router = APIRouter()
 
@@ -105,16 +110,18 @@ def list_sources(db: Session = Depends(get_db)) -> List[SourceSummarySchema]:
             latest_snapshot[0] if latest_snapshot else None
         )
 
-        # Distinct topic labels (if any)
-        topic_labels = (
-            db.query(Topic.label)
+        # Distinct topics (slug + label, if any)
+        topic_rows = (
+            db.query(Topic.slug, Topic.label)
             .join(Topic.snapshots)
             .filter(Snapshot.source_id == source.id)
             .distinct()
             .order_by(Topic.label)
             .all()
         )
-        topics = [label for (label,) in topic_labels]
+        topics = [
+            TopicRefSchema(slug=slug, label=label) for (slug, label) in topic_rows
+        ]
 
         summaries.append(
             SourceSummarySchema(
@@ -139,6 +146,19 @@ def list_sources(db: Session = Depends(get_db)) -> List[SourceSummarySchema]:
     return summaries
 
 
+@router.get("/topics", response_model=List[TopicRefSchema])
+def list_topics(db: Session = Depends(get_db)) -> List[TopicRefSchema]:
+    """
+    Return the canonical list of topics (slug + label), sorted by label.
+    """
+    topics = (
+        db.query(Topic)
+        .order_by(Topic.label)
+        .all()
+    )
+    return [TopicRefSchema(slug=t.slug, label=t.label) for t in topics]
+
+
 @router.get("/search", response_model=SearchResponseSchema)
 def search_snapshots(
     q: Optional[str] = Query(default=None),
@@ -157,7 +177,8 @@ def search_snapshots(
         query = query.filter(Source.code == source.lower())
 
     if topic:
-        query = query.join(Snapshot.topics).join(Topic).filter(Topic.slug == topic)
+        # Join the topics association once and filter by topic slug.
+        query = query.join(Snapshot.topics).filter(Topic.slug == topic)
 
     if q:
         ilike_pattern = f"%{q}%"
@@ -193,7 +214,10 @@ def search_snapshots(
             else str(snap.capture_timestamp)
         )
 
-        topics = [t.label for t in snap.topics] if snap.topics is not None else []
+        topic_refs = [
+            TopicRefSchema(slug=t.slug, label=t.label)
+            for t in (snap.topics or [])
+        ]
 
         results.append(
             SnapshotSummarySchema(
@@ -202,7 +226,7 @@ def search_snapshots(
                 sourceCode=source_obj.code,
                 sourceName=source_obj.name,
                 language=snap.language,
-                topics=topics,
+                topics=topic_refs,
                 captureDate=capture_date,
                 originalUrl=snap.url,
                 snippet=snap.snippet,
@@ -242,7 +266,10 @@ def get_snapshot_detail(
         else str(snap.capture_timestamp)
     )
 
-    topics = [t.label for t in snap.topics] if snap.topics is not None else []
+    topic_refs = [
+        TopicRefSchema(slug=t.slug, label=t.label)
+        for t in (snap.topics or [])
+    ]
 
     return SnapshotDetailSchema(
         id=snap.id,
@@ -250,7 +277,7 @@ def get_snapshot_detail(
         sourceCode=snap.source.code,
         sourceName=snap.source.name,
         language=snap.language,
-        topics=topics,
+        topics=topic_refs,
         captureDate=capture_date,
         originalUrl=snap.url,
         snippet=snap.snippet,

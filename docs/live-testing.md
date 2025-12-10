@@ -117,7 +117,7 @@ Expect:
 
 ### 2.3 Admin endpoints
 
-With `HEALTHARCHIVE_ADMIN_TOKEN` **unset**:
+With `HEALTHARCHIVE_ADMIN_TOKEN` **unset** (local dev only):
 
 ```bash
 curl http://localhost:8001/api/admin/jobs
@@ -133,6 +133,44 @@ curl -H "Authorization: Bearer localdev-admin" \
 ```
 
 Confirms admin auth + simple bearer token protection.
+
+### 2.4 Admin access patterns (local vs staging/prod)
+
+In local development it is acceptable to either leave
+`HEALTHARCHIVE_ADMIN_TOKEN` unset (open admin endpoints) or to use a simple
+token like `localdev-admin` as shown above.
+
+In staging and production you should **always** set a strong, random admin
+token and treat it as a secret:
+
+```bash
+export HEALTHARCHIVE_ADMIN_TOKEN="prod-admin-token-from-secret-store"
+uvicorn ha_backend.api:app --host 0.0.0.0 --port 8001
+```
+
+From a trusted machine you can then verify access:
+
+- Without a token (should be forbidden when the env var is set):
+
+  ```bash
+  curl -i "https://api.healtharchive.ca/api/admin/jobs"
+  curl -i "https://api.healtharchive.ca/metrics"
+  ```
+
+- With the correct token:
+
+  ```bash
+  curl -i \
+    -H "Authorization: Bearer $HEALTHARCHIVE_ADMIN_TOKEN" \
+    "https://api.healtharchive.ca/api/admin/jobs"
+
+  curl -i \
+    -H "Authorization: Bearer $HEALTHARCHIVE_ADMIN_TOKEN" \
+    "https://api.healtharchive.ca/metrics"
+  ```
+
+In staging/prod you should call these endpoints only from operator tooling
+or monitoring systems (Prometheus, etc.), not from the public frontend.
 
 ---
 

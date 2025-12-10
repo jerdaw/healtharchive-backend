@@ -122,6 +122,12 @@ def test_search_endpoint_basic(tmp_path, monkeypatch) -> None:
     assert "total" in data
     assert data["total"] == 3
     assert len(data["results"]) == 3
+    first_result = data["results"][0]
+    assert isinstance(first_result["topics"], list)
+    if first_result["topics"]:
+        first_topic = first_result["topics"][0]
+        assert "slug" in first_topic
+        assert "label" in first_topic
 
 
 def test_search_filters_by_source(tmp_path, monkeypatch) -> None:
@@ -147,6 +153,38 @@ def test_search_filters_by_query(tmp_path, monkeypatch) -> None:
     assert data["total"] == 1
     result = data["results"][0]
     assert "COVID-19 guidance" in result["title"]
+    assert any(
+        t["slug"] == "covid-19" and t["label"] == "COVID-19"
+        for t in result["topics"]
+    )
+
+
+def test_search_filters_by_topic_slug(tmp_path, monkeypatch) -> None:
+    client = _init_test_app(tmp_path, monkeypatch)
+    _seed_search_data()
+
+    resp = client.get("/api/search", params={"topic": "covid-19"})
+    assert resp.status_code == 200
+    data = resp.json()
+
+    assert data["total"] == 1
+    result = data["results"][0]
+    assert any(
+        t["slug"] == "covid-19" and t["label"] == "COVID-19"
+        for t in result["topics"]
+    )
+
+
+def test_search_returns_empty_for_unknown_topic_slug(tmp_path, monkeypatch) -> None:
+    client = _init_test_app(tmp_path, monkeypatch)
+    _seed_search_data()
+
+    resp = client.get("/api/search", params={"topic": "non-existent-topic"})
+    assert resp.status_code == 200
+    data = resp.json()
+
+    assert data["total"] == 0
+    assert data["results"] == []
 
 
 def test_snapshot_detail_endpoint(tmp_path, monkeypatch) -> None:
@@ -164,6 +202,29 @@ def test_snapshot_detail_endpoint(tmp_path, monkeypatch) -> None:
     assert body["id"] == snap_id
     assert body["originalUrl"]
     assert body["sourceCode"] in {"hc", "phac"}
+    assert isinstance(body["topics"], list)
+    if body["topics"]:
+        first_topic = body["topics"][0]
+        assert "slug" in first_topic
+        assert "label" in first_topic
+
+
+def test_sources_endpoint_topics_shape(tmp_path, monkeypatch) -> None:
+    client = _init_test_app(tmp_path, monkeypatch)
+    _seed_search_data()
+
+    resp = client.get("/api/sources")
+    assert resp.status_code == 200
+    data = resp.json()
+
+    assert isinstance(data, list)
+    assert data
+    for source in data:
+        assert "topics" in source
+        assert isinstance(source["topics"], list)
+        for topic in source["topics"]:
+            assert "slug" in topic
+            assert "label" in topic
 
 
 def test_snapshot_detail_not_found(tmp_path, monkeypatch) -> None:
@@ -171,3 +232,83 @@ def test_snapshot_detail_not_found(tmp_path, monkeypatch) -> None:
 
     resp = client.get("/api/snapshot/9999")
     assert resp.status_code == 404
+
+
+def test_topics_endpoint(tmp_path, monkeypatch) -> None:
+    client = _init_test_app(tmp_path, monkeypatch)
+    _seed_search_data()
+
+    resp = client.get("/api/topics")
+    assert resp.status_code == 200
+    data = resp.json()
+
+    # We seeded two topics: COVID-19 and Influenza.
+    slugs = {t["slug"] for t in data}
+    labels = {t["label"] for t in data}
+
+    assert "covid-19" in slugs
+    assert "flu" in slugs
+    assert "COVID-19" in labels
+    assert "Influenza" in labels
+
+
+def test_search_pagination_defaults(tmp_path, monkeypatch) -> None:
+    client = _init_test_app(tmp_path, monkeypatch)
+    _seed_search_data()
+
+    resp = client.get("/api/search")
+    assert resp.status_code == 200
+    data = resp.json()
+
+    assert data["page"] == 1
+    assert data["pageSize"] == 20
+    assert data["total"] == 3
+    assert len(data["results"]) == 3
+
+
+def test_search_pagination_custom_and_out_of_range(tmp_path, monkeypatch) -> None:
+    client = _init_test_app(tmp_path, monkeypatch)
+    _seed_search_data()
+
+    # With 3 rows, page 1 size 2 should return 2 results.
+    resp_page1 = client.get("/api/search", params={"page": 1, "pageSize": 2})
+    assert resp_page1.status_code == 200
+    data_page1 = resp_page1.json()
+    assert data_page1["page"] == 1
+    assert data_page1["pageSize"] == 2
+    assert data_page1["total"] == 3
+    assert len(data_page1["results"]) == 2
+
+    # Page 2 with size 2 should return the remaining 1 result.
+    resp_page2 = client.get("/api/search", params={"page": 2, "pageSize": 2})
+    assert resp_page2.status_code == 200
+    data_page2 = resp_page2.json()
+    assert data_page2["page"] == 2
+    assert data_page2["pageSize"] == 2
+    assert data_page2["total"] == 3
+    assert len(data_page2["results"]) == 1
+
+    # Page 3 with size 2 is out-of-range for 3 total rows: empty results, total unchanged.
+    resp_page3 = client.get("/api/search", params={"page": 3, "pageSize": 2})
+    assert resp_page3.status_code == 200
+    data_page3 = resp_page3.json()
+    assert data_page3["page"] == 3
+    assert data_page3["pageSize"] == 2
+    assert data_page3["total"] == 3
+    assert data_page3["results"] == []
+
+
+def test_search_invalid_page_and_page_size(tmp_path, monkeypatch) -> None:
+    client = _init_test_app(tmp_path, monkeypatch)
+    _seed_search_data()
+
+    # page must be >= 1
+    resp_page0 = client.get("/api/search", params={"page": 0})
+    assert resp_page0.status_code == 422
+
+    # pageSize must be between 1 and 100
+    resp_negative_page_size = client.get("/api/search", params={"pageSize": 0})
+    assert resp_negative_page_size.status_code == 422
+
+    resp_too_large_page_size = client.get("/api/search", params={"pageSize": 101})
+    assert resp_too_large_page_size.status_code == 422

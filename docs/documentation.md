@@ -11,7 +11,10 @@ This document is an in‑depth walkthrough of the **HealthArchive.ca backend**
 - Worker loop, retries, and cleanup/retention (Phase 9).
 
 For `archive_tool` internals (log parsing, Docker orchestration, run modes),
-see `src/archive_tool/docs/documentation.md`.
+see `src/archive_tool/docs/documentation.md`. For a shorter, task‑oriented
+overview of common commands and local testing flows, see
+`docs/live-testing.md`. For deployment‑oriented configuration (staging/prod
+env vars, DNS, Vercel), see `hosting-and-live-server-to-dos.md`.
 
 ---
 
@@ -96,6 +99,12 @@ Key roles:
 
 - Locate the **archive root** (`--output-dir` base) and `archive_tool` command.
 - Read the **database URL**.
+
+Admin‑related configuration is handled separately in `ha_backend/api/deps.py`,
+which reads `HEALTHARCHIVE_ADMIN_TOKEN` from the environment. When this token
+is **unset**, admin and metrics endpoints are effectively open and should only
+be used in local development. In staging and production you should always set
+`HEALTHARCHIVE_ADMIN_TOKEN` to a long, random value and treat it as a secret.
 
 #### ArchiveToolConfig
 
@@ -711,13 +720,20 @@ Public Pydantic models:
   recordCount: int
   firstCapture: str
   lastCapture: str
-  topics: List[str]
+  topics: List[TopicRef]  # distinct topics for this source
   latestRecordId: Optional[int]
+  ```
+
+- `TopicRef` (inline schema used in summaries and snapshots):
+
+  ```python
+  slug: str   # machine-readable topic identifier (used in queries)
+  label: str  # human-readable label shown in the UI
   ```
 
 - `SnapshotSummarySchema` – used by `/api/search`:
 
-  - `id`, `title`, `sourceCode`, `sourceName`, `language`, `topics`,
+  - `id`, `title`, `sourceCode`, `sourceName`, `language`, `topics: List[TopicRef]`,
     `captureDate`, `originalUrl`, `snippet`, `rawSnapshotUrl`.
 
 - `SearchResponseSchema`:
@@ -760,18 +776,38 @@ Public Pydantic models:
   - Aggregates `Snapshot` by `source_id`:
     - Counts, first/last capture dates, distinct topics, latest snapshot ID.
 
+- `GET /api/topics`:
+
+  - Returns the canonical list of topics that can be used for filters and UIs.
+  - Response: an array of objects with the shape:
+
+    ```json
+    [
+      { "slug": "covid-19", "label": "COVID-19" },
+      { "slug": "influenza", "label": "Influenza" }
+    ]
+    ```
+
+  - Topics are sorted by `label` in ascending order.
+
 - `GET /api/search`:
 
   - Query params:
     - `q: str | None` – keyword.
     - `source: str | None` – source code (e.g. `"hc"`).
-    - `topic: str | None` – topic slug.
-    - `page: int`, `pageSize: int`.
+    - `topic: str | None` – topic slug (see `TopicRef.slug`).
+    - `page: int` – 1‑based page index (default `1`, must be `>= 1`).
+    - `pageSize: int` – results per page (default `20`, minimum `1`, maximum `100`).
   - Filters:
     - `Source.code == source.lower()` when `source` set.
     - Joins `Snapshot.topics` / `Topic` when filtering by `topic`.
     - Keyword filter via `ILIKE` on `title`, `snippet`, and `url`.
   - Orders by `capture_timestamp DESC, id DESC`.
+  - Pagination semantics:
+    - `total` is the total number of matching snapshots across all pages.
+    - `results` contains at most `pageSize` snapshots for the requested `page`.
+    - Requesting a page past the end of the result set returns `200 OK` with `results: []` and `total` unchanged.
+    - Supplying an invalid `page` (`< 1`) or `pageSize` (`< 1` or `> 100`) yields `422 Unprocessable Entity` from FastAPI’s validation.
 
 - `GET /api/snapshot/{id}`:
 
@@ -828,7 +864,9 @@ Key models:
 
 ### 8.5 Admin routes (`routes_admin.py`)
 
-All routes are under `/api/admin` and use `require_admin` for auth.
+All routes are under `/api/admin` and use `require_admin` for auth. They are
+intended for internal operator tooling (CLI or a future admin console), not
+for the public web UI.
 
 - `GET /api/admin/jobs` → `JobListResponseSchema`:
   - Filters:
@@ -852,7 +890,9 @@ All routes are under `/api/admin` and use `require_admin` for auth.
 Defined directly in `ha_backend.api.__init__`:
 
 - `GET /metrics`:
-  - Protected by `require_admin` (same token behavior).
+  - Protected by `require_admin` (same token behavior) and intended for
+    scrape‑only use by monitoring systems (e.g., Prometheus) and internal
+    tooling.
   - Computes:
     - `healtharchive_jobs_total{status="..."}`
     - `healtharchive_jobs_cleanup_status_total{cleanup_status="..."}`
@@ -867,7 +907,35 @@ Defined directly in `ha_backend.api.__init__`:
   `https://healtharchive.ca`, `https://www.healtharchive.ca`).
 - Admin and metrics routes remain token-gated even when CORS allows browser
   access to public routes.
-  - Returns plain‑text body with HELP/TYPE comments suitable for Prometheus.
+
+Typical environment setups:
+
+- **Local development**:
+
+  ```bash
+  # often no override needed; defaults already include localhost:3000/5173
+  export HEALTHARCHIVE_DATABASE_URL=sqlite:///$(pwd)/.dev-healtharchive.db
+  export HEALTHARCHIVE_ARCHIVE_ROOT=$(pwd)/.dev-archive-root
+  # Optional CORS override if your frontend runs on a different origin:
+  # export HEALTHARCHIVE_CORS_ORIGINS=http://localhost:3000
+  ```
+
+- **Staging** (example):
+
+  ```bash
+  # frontend served from https://healtharchive.vercel.app
+  export HEALTHARCHIVE_CORS_ORIGINS=https://healtharchive.vercel.app
+  ```
+
+- **Production** (example):
+
+  ```bash
+  # frontend served from https://healtharchive.ca and https://www.healtharchive.ca
+  export HEALTHARCHIVE_CORS_ORIGINS=https://healtharchive.ca,https://www.healtharchive.ca
+  ```
+
+In all cases, CORS affects only the browser’s ability to call public routes;
+admin and metrics endpoints still require the admin token when configured.
 
 ---
 
