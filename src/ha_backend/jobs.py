@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import subprocess
+import subprocess  # nosec: B404 - expected for running archive_tool
 import sys
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -137,10 +137,16 @@ class RuntimeArchiveJob:
         try:
             if stream_output:
                 # Stream directly to this terminal.
-                result = subprocess.run(cmd)
+                # Command and arguments are derived from configuration and job
+                # metadata, not raw end-user input.
+                result = subprocess.run(cmd)  # nosec: B603
             else:
                 # Capture output (not used yet, but ready for future log piping).
-                result = subprocess.run(cmd, capture_output=True, text=True)
+                result = subprocess.run(  # nosec: B603
+                    cmd,
+                    capture_output=True,
+                    text=True,
+                )
                 print(result.stdout)
                 print(result.stderr)
             return result.returncode
