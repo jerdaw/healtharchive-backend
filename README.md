@@ -106,6 +106,19 @@ export HEALTHARCHIVE_ADMIN_TOKEN=localdev-admin  # optional for admin routes
 alembic upgrade head
 ```
 
+If you want to use Postgres locally via Docker for testing:
+
+```bash
+docker run --name ha-pg \
+  -e POSTGRES_USER=healtharchive \
+  -e POSTGRES_PASSWORD=healtharchive \
+  -e POSTGRES_DB=healtharchive \
+  -p 5432:5432 -d postgres:16
+
+export HEALTHARCHIVE_DATABASE_URL=postgresql+psycopg://healtharchive:healtharchive@localhost:5432/healtharchive
+alembic upgrade head
+```
+
 ### 4. Archive root & archive_tool
 
 The backend writes job output under an archive root directory:
@@ -237,6 +250,11 @@ manual run) and want to attach it to the DB for indexing, use:
 ha-backend register-job-dir --source hc --output-dir /path/to/job_dir [--name NAME]
 ha-backend index-job --id <printed ID>
 ```
+
+**Permissions note:** crawls run as root inside Docker. The registry defaults now
+enable `relax_perms` so temp WARCs are chmod’d readable after the crawl, allowing
+indexing without a host-side `sudo chown`. If you disable `relax_perms`, you may
+need to chown `.tmp*` before indexing.
 
 ### List and inspect jobs
 

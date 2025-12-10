@@ -31,7 +31,6 @@ dist/
 healtharchive.db
 .dev-healtharchive.db
 .dev-archive-root/
-/.dev-archive-root/
 tmp-test.warc.gz
 .pytest_cache/
 .coverage

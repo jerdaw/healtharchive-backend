@@ -1014,6 +1014,8 @@ All commands are available via the `ha-backend` entrypoint.
     attach a DB `ArchiveJob` to an existing archive_tool output directory
     (useful when a crawl has already been run and you want to index its
     WARCs).
+  - Job configs default to `relax_perms=True` for dev (adds `--relax-perms` so
+    temp WARCs are chmod’d readable on the host after a crawl).
 
 - Seeding:
   - `seed-sources` – insert baseline `Source` rows for `hc`, `phac`.
