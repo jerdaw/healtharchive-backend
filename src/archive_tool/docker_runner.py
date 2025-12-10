@@ -67,6 +67,8 @@ def start_docker_container(
     host_output_dir: Path,
     zimit_args: List[str],
     run_name: str,  # Add run_name for label
+    *,
+    relax_perms: bool = False,
 ) -> Tuple[Optional[subprocess.Popen], Optional[str]]:
     """Starts the Docker container asynchronously using Popen and a unique label."""
     global current_docker_process, current_container_id
@@ -85,6 +87,8 @@ def start_docker_container(
         f"archive_job={job_id}",
         docker_image,
     ]
+    if relax_perms:
+        docker_cmd.extend(["--user", "0:0"])
     docker_cmd.extend(zimit_args)
 
     logger.info(f"Executing Docker command (Job ID: {job_id}):\n{' '.join(docker_cmd)}")

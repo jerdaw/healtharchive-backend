@@ -1260,6 +1260,11 @@ def main():
     logger.info(f"Final Overall Status: {final_status.upper()}")
 
     temp_dir_paths = crawl_state.get_temp_dir_paths()  # Get final list of valid paths
+    if script_args.relax_perms:
+        try:
+            utils.relax_permissions(host_output_dir, temp_dir_paths)
+        except Exception as exc:
+            logger.warning(f"Failed to relax permissions: {exc}")
 
     if final_status == "success":
         final_zim_path = host_output_dir / f"{script_args.name}.zim"

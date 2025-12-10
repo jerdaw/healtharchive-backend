@@ -129,6 +129,15 @@ def parse_arguments() -> Tuple[argparse.Namespace, List[str]]:
         default=60,
         help="Minimum time (minutes) between VPN rotation attempts.",
     )
+    adapt_group.add_argument(
+        "--relax-perms",
+        action="store_true",
+        default=False,
+        help=(
+            "After a crawl, relax permissions on temp output (chmod a+rX) so host users "
+            "can read WARCs without sudo. Intended for dev."
+        ),
+    )
     # ... (backoff arg remains the same) ...
     adapt_group.add_argument(
         "--backoff-delay-minutes",

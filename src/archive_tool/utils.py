@@ -340,6 +340,43 @@ def cleanup_temp_dirs(temp_dir_paths: List[Path], state_file_path: Path):
     logger.info(f"Cleanup finished. Deleted {deleted_count} director(y/ies).")
 
 
+def relax_permissions(host_output_dir: Path, temp_dirs: List[Path]) -> None:
+    """
+    Make crawl artifacts world-readable so host users can index WARCs without sudo.
+    Runs chmod inside a root container to avoid host-side sudo.
+    """
+    if not temp_dirs:
+        logger.info("relax_permissions: no temp dirs to adjust.")
+        return
+
+    if not host_output_dir.exists():
+        logger.warning(
+            f"relax_permissions: output dir {host_output_dir} does not exist; skipping."
+        )
+        return
+
+    try:
+        logger.info("relax_permissions: ensuring WARCs are readable (chmod a+rX) ...")
+        cmd = [
+            "docker",
+            "run",
+            "--rm",
+            "-v",
+            f"{host_output_dir.resolve()}:/output",
+            "alpine",
+            "sh",
+            "-c",
+            "chmod -R a+rX /output/.tmp* 2>/dev/null || true",
+        ]
+        subprocess.run(cmd, check=False, capture_output=True, text=True)
+    except FileNotFoundError:
+        logger.warning(
+            "relax_permissions: docker not available; cannot adjust permissions."
+        )
+    except Exception as exc:
+        logger.warning(f"relax_permissions: unexpected error: {exc}")
+
+
 def filter_args_for_final_run(passthrough_args: List[str]) -> List[str]:
     """Removes args not needed for the final --warcs build."""
     # --- Initialize filtered ---

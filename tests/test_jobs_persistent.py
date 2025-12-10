@@ -162,6 +162,7 @@ def test_run_persistent_job_builds_monitoring_and_vpn_args(tmp_path, monkeypatch
         "60",
         "--backoff-delay-minutes",
         "15",
+        "--relax-perms",
         "--pageLimit",
         "5",
     )

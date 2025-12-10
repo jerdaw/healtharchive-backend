@@ -287,6 +287,9 @@ def run_persistent_job(job_id: int) -> int:
             ["--backoff-delay-minutes", str(tool_options["backoff_delay_minutes"])]
         )
 
+    if bool(tool_options.get("relax_perms", False)):
+        extra_tool_args.append("--relax-perms")
+
     # Compose final extra args: tool args first, then the Zimit passthrough
     # arguments (no additional '--' separator needed; archive_tool will pass
     # these directly through to zimit).

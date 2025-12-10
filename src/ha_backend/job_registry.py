@@ -48,6 +48,7 @@ SOURCE_JOB_CONFIGS: Dict[str, SourceJobConfig] = {
             "enable_vpn_rotation": False,
             "initial_workers": 1,
             "log_level": "INFO",
+            "relax_perms": True,  # ensure WARCs are readable on host in dev
         },
         schedule_hint="monthly",
     ),
@@ -64,6 +65,7 @@ SOURCE_JOB_CONFIGS: Dict[str, SourceJobConfig] = {
             "enable_vpn_rotation": False,
             "initial_workers": 1,
             "log_level": "INFO",
+            "relax_perms": True,
         },
         schedule_hint="monthly",
     ),
