@@ -37,6 +37,13 @@ def test_health_endpoint(tmp_path, monkeypatch) -> None:
     body = resp.json()
     assert body.get("status") == "ok"
 
+    # Basic security headers should be present on the health response.
+    assert resp.headers["X-Content-Type-Options"] == "nosniff"
+    assert (
+        resp.headers["Referrer-Policy"] == "strict-origin-when-cross-origin"
+    )
+    assert resp.headers["X-Frame-Options"] == "SAMEORIGIN"
+
 
 def test_health_endpoint_includes_checks(tmp_path, monkeypatch) -> None:
     client = _init_test_app(tmp_path, monkeypatch)

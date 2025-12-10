@@ -828,11 +828,17 @@ endpoints.
 
 Behavior:
 
-- Reads `HEALTHARCHIVE_ADMIN_TOKEN` from env.
-- If **unset**:
-  - Admin endpoints are **open** (dev mode).
-- If **set**:
-  - Requires token via either:
+- Reads `HEALTHARCHIVE_ENV` and `HEALTHARCHIVE_ADMIN_TOKEN` from the
+  environment.
+- If `HEALTHARCHIVE_ENV` is `"production"` or `"staging"` and
+  `HEALTHARCHIVE_ADMIN_TOKEN` is **unset**:
+  - Admin and metrics endpoints **fail closed** with HTTP 500 and a clear
+    error detail (`"Admin token not configured for this environment"`).
+- In other environments (or when `HEALTHARCHIVE_ENV` is unset) and the admin
+  token is **unset**:
+  - Admin endpoints are **open** (dev mode convenience).
+- When `HEALTHARCHIVE_ADMIN_TOKEN` is set:
+  - Requires the same token via either:
     - `Authorization: Bearer <token>` header, or
     - `X-Admin-Token: <token>` header.
   - On mismatch/missing token → `HTTP 403`.

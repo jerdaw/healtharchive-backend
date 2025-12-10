@@ -161,9 +161,13 @@ def list_topics(db: Session = Depends(get_db)) -> List[TopicRefSchema]:
 
 @router.get("/search", response_model=SearchResponseSchema)
 def search_snapshots(
-    q: Optional[str] = Query(default=None),
-    source: Optional[str] = Query(default=None),
-    topic: Optional[str] = Query(default=None),
+    q: Optional[str] = Query(default=None, min_length=1, max_length=256),
+    source: Optional[str] = Query(
+        default=None, min_length=1, max_length=16, pattern=r"^[a-z0-9-]+$"
+    ),
+    topic: Optional[str] = Query(
+        default=None, min_length=1, max_length=64, pattern=r"^[a-z0-9-]+$"
+    ),
     page: int = Query(default=1, ge=1),
     pageSize: int = Query(default=20, ge=1, le=100),
     db: Session = Depends(get_db),

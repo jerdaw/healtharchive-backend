@@ -25,12 +25,23 @@ async def require_admin(
     Dependency that enforces a simple token-based admin auth scheme.
 
     Behaviour:
-    - If HEALTHARCHIVE_ADMIN_TOKEN is unset, allow all requests (dev mode).
+    - If HEALTHARCHIVE_ENV is "production" or "staging" and
+      HEALTHARCHIVE_ADMIN_TOKEN is unset, fail closed with HTTP 500.
+    - If HEALTHARCHIVE_ADMIN_TOKEN is unset in other environments, allow all
+      requests (dev mode).
     - If set, require the same token via either:
       * Authorization: Bearer <token>
       * X-Admin-Token: <token>
     """
+    env = os.getenv("HEALTHARCHIVE_ENV", "development").lower()
     expected = _get_expected_admin_token()
+    if env in {"production", "staging"} and not expected:
+        # In non-dev environments, require an admin token to be configured.
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Admin token not configured for this environment",
+        )
+
     if not expected:
         # No token configured: treat admin endpoints as open (dev mode).
         return

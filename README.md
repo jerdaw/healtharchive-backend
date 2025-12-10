@@ -346,13 +346,23 @@ defaults:
 - `HEALTHARCHIVE_TOOL_CMD`  
   Command used to invoke the archiver. Defaults to `archive-tool`.
 
+- `HEALTHARCHIVE_ENV`  
+  High-level environment hint used by admin auth. Recognised values:
+  - `"development"` (default when unset): admin endpoints are open when
+    `HEALTHARCHIVE_ADMIN_TOKEN` is unset (dev convenience).
+  - `"staging"` or `"production"`: admin endpoints fail closed with HTTP 500
+    if `HEALTHARCHIVE_ADMIN_TOKEN` is not configured.
+
 - `HEALTHARCHIVE_ADMIN_TOKEN`  
   Optional admin token. If set, `/api/admin/*` and `/metrics` require either:
   - `Authorization: Bearer <token>` or
   - `X-Admin-Token: <token>`  
-  If unset, admin endpoints are open (intended only for local development).
-  In staging and production you should **always** set a long, random token and
-  store it as a secret in your hosting platform (never committed to the repo).
+  If unset and `HEALTHARCHIVE_ENV` is `"development"` (or unset), admin
+  endpoints are open (intended only for local development). In staging and
+  production you should **always** set a long, random token and store it as a
+  secret in your hosting platform (never committed to the repo); when
+  `HEALTHARCHIVE_ENV` is `"staging"` or `"production"` and this token is
+  missing, admin and metrics endpoints return HTTP 500.
 
 - `HEALTHARCHIVE_LOG_LEVEL`  
   Global log level (`DEBUG`, `INFO`, etc.). Defaults to `INFO`.
@@ -406,6 +416,11 @@ run on pushes to `main` and on pull requests. It:
 
   ```bash
   pytest -q
+  ```
+  - Runs a lightweight security scan over the backend package using Bandit:
+
+  ```bash
+  bandit -r src/ha_backend -q
   ```
 
 The CI job uses a temporary SQLite database via:

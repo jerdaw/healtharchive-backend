@@ -22,6 +22,8 @@ links to the detailed checklist later in this file.
   - [ ] Reload/restart the backend service with the new env vars.
   - [ ] Verify `/api/health`, `/api/sources`, `/api/search`, and CORS headers
         over HTTPS.
+  - [ ] Ensure HTTPS is enforced (HTTP→HTTPS redirect) and HSTS is enabled for
+        `api.healtharchive.ca` (and `api-staging.healtharchive.ca` if used).
   - [ ] Configure DNS for `api.healtharchive.ca` (and optionally
         `api-staging.healtharchive.ca`) pointing at the backend.
 
@@ -206,7 +208,21 @@ From a machine that can reach the backend host:
      curl -i "https://api.healtharchive.ca/api/sources"
      curl -i "https://api.healtharchive.ca/api/search?page=1&pageSize=10"
      ```
-   - Expect HTTP 200, JSON bodies, and CORS headers.
+  - Expect HTTP 200, JSON bodies, and CORS headers.
+
+4. **Security headers**
+
+   - Confirm that security-related headers are present on responses:
+
+     ```bash
+     curl -i "https://api.healtharchive.ca/api/health" | sed -n '1,20p'
+     ```
+
+   - Look for:
+     - `X-Content-Type-Options: nosniff`
+     - `Referrer-Policy: strict-origin-when-cross-origin`
+     - `X-Frame-Options: SAMEORIGIN`
+     - `Permissions-Policy: geolocation=(), microphone=(), camera=()`
 
 ---
 
@@ -315,6 +331,26 @@ After DNS is configured:
   ```
 - Then run the API health curl commands in §2.3 against the HTTPS URLs.
 
+### 4.3. TLS / HTTPS and HSTS
+
+- Terminate TLS (HTTPS) for `api.healtharchive.ca` (and
+  `api-staging.healtharchive.ca` if applicable) at your reverse proxy or load
+  balancer:
+  - Use Let's Encrypt or a managed certificate.
+  - Configure HTTP→HTTPS redirects for all HTTP traffic.
+- Add an `Strict-Transport-Security` header on HTTPS responses to enforce
+  long-lived HTTPS in browsers. For example, in Nginx:
+
+  ```nginx
+  add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+  ```
+
+- After enabling HSTS, verify with:
+
+  ```bash
+  curl -i "https://api.healtharchive.ca/api/health" | grep -i strict-transport-security
+  ```
+
 ---
 
 ## 5. End‑to‑end smoke checklist (staging/prod)
@@ -371,6 +407,20 @@ DNS configuration to production (with diagnostics turned off) and deploy.
 
 This document should be revisited and checked off as each environment (local,
 staging, production) is brought fully online.
+
+---
+
+## 5.3. Monitoring & uptime checks (optional but recommended)
+
+- Configure an external uptime monitor (e.g., UptimeRobot, healthchecks.io, or
+  your cloud provider) to poll:
+  - `https://api.healtharchive.ca/api/health` (backend health).
+  - `https://healtharchive.ca/archive` (frontend & backend integration).
+- Configure alerts (email/Slack/etc.) for repeated failures or slow responses.
+- If you deploy Prometheus or a similar system, scrape
+  `https://api.healtharchive.ca/metrics` and build dashboards/alerts for:
+  - `healtharchive_jobs_total{status="failed"}` – job failures.
+  - `healtharchive_snapshots_total` – sudden jumps in snapshot count.
 
 ---
 

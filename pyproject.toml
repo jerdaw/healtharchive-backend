@@ -28,6 +28,7 @@ dev = [
   "isort",
   "mypy",
   "pytest",
+  "bandit",
 ]
 
 [build-system]

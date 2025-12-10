@@ -88,6 +88,7 @@ def _seed_basic_data() -> None:
 def test_admin_jobs_open_when_no_token(tmp_path, monkeypatch) -> None:
     # Ensure admin token is not set.
     monkeypatch.delenv("HEALTHARCHIVE_ADMIN_TOKEN", raising=False)
+    monkeypatch.delenv("HEALTHARCHIVE_ENV", raising=False)
     client = _init_test_app(tmp_path, monkeypatch)
     _seed_basic_data()
 
@@ -100,6 +101,7 @@ def test_admin_jobs_open_when_no_token(tmp_path, monkeypatch) -> None:
 
 def test_admin_jobs_require_token_when_configured(tmp_path, monkeypatch) -> None:
     monkeypatch.setenv("HEALTHARCHIVE_ADMIN_TOKEN", "secret-token")
+    monkeypatch.delenv("HEALTHARCHIVE_ENV", raising=False)
     client = _init_test_app(tmp_path, monkeypatch)
     _seed_basic_data()
 
@@ -124,6 +126,7 @@ def test_admin_jobs_require_token_when_configured(tmp_path, monkeypatch) -> None
 
 def test_admin_job_detail_and_status_counts(tmp_path, monkeypatch) -> None:
     monkeypatch.delenv("HEALTHARCHIVE_ADMIN_TOKEN", raising=False)
+    monkeypatch.delenv("HEALTHARCHIVE_ENV", raising=False)
     client = _init_test_app(tmp_path, monkeypatch)
     _seed_basic_data()
 
@@ -150,6 +153,7 @@ def test_admin_job_detail_and_status_counts(tmp_path, monkeypatch) -> None:
 
 def test_admin_job_snapshots_endpoint(tmp_path, monkeypatch) -> None:
     monkeypatch.delenv("HEALTHARCHIVE_ADMIN_TOKEN", raising=False)
+    monkeypatch.delenv("HEALTHARCHIVE_ENV", raising=False)
     client = _init_test_app(tmp_path, monkeypatch)
     _seed_basic_data()
 
@@ -164,6 +168,7 @@ def test_admin_job_snapshots_endpoint(tmp_path, monkeypatch) -> None:
 
 def test_metrics_require_token_when_configured(tmp_path, monkeypatch) -> None:
     monkeypatch.setenv("HEALTHARCHIVE_ADMIN_TOKEN", "secret-token")
+    monkeypatch.delenv("HEALTHARCHIVE_ENV", raising=False)
     client = _init_test_app(tmp_path, monkeypatch)
     _seed_basic_data()
 
@@ -178,6 +183,7 @@ def test_metrics_require_token_when_configured(tmp_path, monkeypatch) -> None:
 
 def test_metrics_content_includes_basic_counters(tmp_path, monkeypatch) -> None:
     monkeypatch.delenv("HEALTHARCHIVE_ADMIN_TOKEN", raising=False)
+    monkeypatch.delenv("HEALTHARCHIVE_ENV", raising=False)
     client = _init_test_app(tmp_path, monkeypatch)
     _seed_basic_data()
 
@@ -196,6 +202,7 @@ def test_metrics_include_cleanup_status_labels(tmp_path, monkeypatch) -> None:
     different cleanup_status values.
     """
     monkeypatch.delenv("HEALTHARCHIVE_ADMIN_TOKEN", raising=False)
+    monkeypatch.delenv("HEALTHARCHIVE_ENV", raising=False)
     client = _init_test_app(tmp_path, monkeypatch)
     _seed_basic_data()
 
@@ -212,3 +219,19 @@ def test_metrics_include_cleanup_status_labels(tmp_path, monkeypatch) -> None:
     assert (
         'healtharchive_jobs_cleanup_status_total{cleanup_status="temp_cleaned"}' in body
     )
+
+
+def test_admin_requires_token_when_env_is_production(tmp_path, monkeypatch) -> None:
+    """
+    In production/staging environments, admin endpoints should fail closed if
+    HEALTHARCHIVE_ADMIN_TOKEN is not configured.
+    """
+    monkeypatch.setenv("HEALTHARCHIVE_ENV", "production")
+    monkeypatch.delenv("HEALTHARCHIVE_ADMIN_TOKEN", raising=False)
+    client = _init_test_app(tmp_path, monkeypatch)
+    _seed_basic_data()
+
+    resp = client.get("/api/admin/jobs")
+    assert resp.status_code == 500
+    body = resp.json()
+    assert body["detail"] == "Admin token not configured for this environment"

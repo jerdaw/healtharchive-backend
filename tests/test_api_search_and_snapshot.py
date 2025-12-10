@@ -312,3 +312,20 @@ def test_search_invalid_page_and_page_size(tmp_path, monkeypatch) -> None:
 
     resp_too_large_page_size = client.get("/api/search", params={"pageSize": 101})
     assert resp_too_large_page_size.status_code == 422
+
+
+def test_search_invalid_query_params(tmp_path, monkeypatch) -> None:
+    client = _init_test_app(tmp_path, monkeypatch)
+    _seed_search_data()
+
+    # q longer than 256 characters should be rejected.
+    long_q = "a" * 300
+    resp_long_q = client.get("/api/search", params={"q": long_q})
+    assert resp_long_q.status_code == 422
+
+    # source and topic must match slug regex.
+    resp_bad_source = client.get("/api/search", params={"source": "HC!"})
+    assert resp_bad_source.status_code == 422
+
+    resp_bad_topic = client.get("/api/search", params={"topic": "covid 19"})
+    assert resp_bad_topic.status_code == 422

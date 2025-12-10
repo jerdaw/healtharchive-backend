@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-from fastapi import Depends, FastAPI
+from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import PlainTextResponse
 from sqlalchemy import func
 from sqlalchemy.orm import Session
+from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 
 from ha_backend.config import get_cors_origins
 from ha_backend.db import get_session
@@ -22,11 +23,33 @@ app = FastAPI(
     version="0.1.0",
 )
 
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    """
+    Middleware that injects a small set of security-related headers on all
+    HTTP responses.
+    """
+
+    async def dispatch(
+        self, request: Request, call_next: RequestResponseEndpoint
+    ):
+        response = await call_next(request)
+        headers = response.headers
+        headers.setdefault("X-Content-Type-Options", "nosniff")
+        headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+        headers.setdefault("X-Frame-Options", "SAMEORIGIN")
+        headers.setdefault(
+            "Permissions-Policy",
+            "geolocation=(), microphone=(), camera=()",
+        )
+        return response
+
+
+app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=get_cors_origins(),
     allow_credentials=False,
-    allow_methods=["*"],
+    allow_methods=["GET", "HEAD", "OPTIONS"],
     allow_headers=["*"],
 )
 
