@@ -34,7 +34,7 @@ def upgrade() -> None:
             "enabled",
             sa.Boolean(),
             nullable=False,
-            server_default=sa.text("1"),
+            server_default=sa.text("true"),
         ),
         sa.Column(
             "created_at",
@@ -235,4 +235,3 @@ def downgrade() -> None:
     op.drop_table("archive_jobs")
     op.drop_index("ix_sources_code", table_name="sources")
     op.drop_table("sources")
-
