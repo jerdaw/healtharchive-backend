@@ -1010,6 +1010,10 @@ All commands are available via the `ha-backend` entrypoint.
   - `create-job --source CODE` – create `ArchiveJob` using registry defaults.
   - `run-db-job --id ID` – run `archive_tool` for an existing job.
   - `index-job --id ID` – index an existing job’s WARCs into snapshots.
+  - `register-job-dir --source CODE --output-dir PATH [--name NAME]` –
+    attach a DB `ArchiveJob` to an existing archive_tool output directory
+    (useful when a crawl has already been run and you want to index its
+    WARCs).
 
 - Seeding:
   - `seed-sources` – insert baseline `Source` rows for `hc`, `phac`.

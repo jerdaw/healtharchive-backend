@@ -505,6 +505,17 @@ PY
 
 Note the printed `JOB_ID` (e.g. `11`).
 
+**Alternative (CLI):** you can now do the same with a helper command:
+
+```bash
+ha-backend register-job-dir \
+  --source hc \
+  --output-dir .dev-archive-root/20251210T013134Z__hc-dev-warcs \
+  --name hc-dev-warcs
+```
+
+This creates a DB row in `status="completed"` so it is ready for indexing.
+
 ### 7.3 Index the job and verify via API
 
 Index the WARCs:

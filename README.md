@@ -80,10 +80,8 @@ This provides:
 
 ### 3. Database
 
-By default the backend uses a SQLite file at:
-
-- `HEALTHARCHIVE_DATABASE_URL` (env) **or**
-- `sqlite:///healtharchive.db` at the repo root.
+By default the backend uses a SQLite file at `sqlite:///healtharchive.db` in
+the repo root, or whatever you point `HEALTHARCHIVE_DATABASE_URL` at.
 
 To verify connectivity:
 
@@ -95,6 +93,16 @@ For production, you will typically point `HEALTHARCHIVE_DATABASE_URL` at a
 Postgres instance and run Alembic migrations:
 
 ```bash
+alembic upgrade head
+```
+
+For local development it is common to isolate everything under the repo
+directory:
+
+```bash
+export HEALTHARCHIVE_DATABASE_URL=sqlite:///$(pwd)/.dev-healtharchive.db
+export HEALTHARCHIVE_ARCHIVE_ROOT=$(pwd)/.dev-archive-root
+export HEALTHARCHIVE_ADMIN_TOKEN=localdev-admin  # optional for admin routes
 alembic upgrade head
 ```
 
@@ -220,6 +228,14 @@ If you ran a crawl separately and just want to index WARCs:
 
 ```bash
 ha-backend index-job --id 42
+```
+
+If you have an existing `archive_tool` output directory on disk (e.g. from a
+manual run) and want to attach it to the DB for indexing, use:
+
+```bash
+ha-backend register-job-dir --source hc --output-dir /path/to/job_dir [--name NAME]
+ha-backend index-job --id <printed ID>
 ```
 
 ### List and inspect jobs
