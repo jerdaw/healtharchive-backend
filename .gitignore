@@ -33,5 +33,10 @@ healtharchive.db
 .dev-healtharchive.db
 .dev-archive-root/
 tmp-test.warc.gz
+
+# Additional dev DBs / scratch artifacts
+.dev-*.db
+.dev-*-root/
+tmp-*.warc.gz
 .pytest_cache/
 .coverage
