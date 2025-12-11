@@ -110,6 +110,43 @@ async def metrics(
     for code, count in per_source_rows:
         lines.append(f'healtharchive_snapshots_total{{source="{code}"}} {int(count)}')
 
+    # Page-level crawl metrics (derived from ArchiveJob pages_* fields).
+    page_totals = db.query(
+        func.coalesce(func.sum(ArchiveJob.pages_crawled), 0),
+        func.coalesce(func.sum(ArchiveJob.pages_failed), 0),
+    ).one()
+    total_pages_crawled, total_pages_failed = page_totals
+
+    lines.append(
+        "# HELP healtharchive_jobs_pages_crawled_total Total pages crawled across all jobs"
+    )
+    lines.append("# TYPE healtharchive_jobs_pages_crawled_total gauge")
+    lines.append(f"healtharchive_jobs_pages_crawled_total {int(total_pages_crawled)}")
+
+    lines.append(
+        "# HELP healtharchive_jobs_pages_failed_total Total pages that failed to crawl across all jobs"
+    )
+    lines.append("# TYPE healtharchive_jobs_pages_failed_total gauge")
+    lines.append(f"healtharchive_jobs_pages_failed_total {int(total_pages_failed)}")
+
+    per_source_pages = (
+        db.query(
+            Source.code,
+            func.coalesce(func.sum(ArchiveJob.pages_crawled), 0),
+            func.coalesce(func.sum(ArchiveJob.pages_failed), 0),
+        )
+        .join(ArchiveJob, ArchiveJob.source_id == Source.id)
+        .group_by(Source.code)
+        .all()
+    )
+    for code, crawled_count, failed_count in per_source_pages:
+        lines.append(
+            f'healtharchive_jobs_pages_crawled_total{{source="{code}"}} {int(crawled_count)}'
+        )
+        lines.append(
+            f'healtharchive_jobs_pages_failed_total{{source="{code}"}} {int(failed_count)}'
+        )
+
     body = "\n".join(lines) + "\n"
     return PlainTextResponse(content=body)
 

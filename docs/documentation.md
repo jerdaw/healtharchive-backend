@@ -4,7 +4,7 @@ This document is an in‑depth walkthrough of the **HealthArchive.ca backend**
 (`healtharchive-backend` repo). It covers:
 
 - How the backend is structured.
-- How it integrates with the vendored `archive_tool`.
+- How it integrates with the `archive_tool` crawler subpackage.
 - The data model and job lifecycle.
 - The indexing pipeline (WARCs → snapshots).
 - HTTP APIs (public + admin) and metrics.
@@ -22,7 +22,7 @@ env vars, DNS, Vercel), see `hosting-and-live-server-to-dos.md`.
 
 ### 1.1 Components
 
-- **archive_tool** (vendored under `src/archive_tool/`):
+- **archive_tool** (internal subpackage under `src/archive_tool/`):
   - CLI wrapper around `zimit` + Docker.
   - Manages temporary output dirs, WARCs, and final ZIM build.
   - Tracks persistent state in `.archive_state.json` + `.tmp*` directories.
@@ -234,8 +234,8 @@ Key fields:
   - `crawler_exit_code: int | None` – exit code from the `archive_tool` process.
   - `crawler_status: str | None` – summarised status (e.g. `"success"`, `"failed"`).
   - `crawler_stage: str | None` – last known stage (not heavily used yet).
-  - `last_stats_json: JSON | None` – reserved for parsed crawl stats (if you choose to populate it later).
-  - `pages_crawled`, `pages_total`, `pages_failed`: simple integer metrics (currently set by indexer if desired).
+  - `last_stats_json: JSON | None` – parsed crawl stats from the latest combined log, when available.
+  - `pages_crawled`, `pages_total`, `pages_failed`: simple integer metrics derived from `last_stats_json` (best-effort).
 
 - WARC/ZIM counts:
   - `warc_file_count: int` – number of WARCs discovered for this job.
@@ -462,10 +462,10 @@ Responsibilities:
    - Core:
 
      ```python
-     initial_workers = int(tool_options.get("initial_workers", 1))
-     cleanup = bool(tool_options.get("cleanup", False))
-     overwrite = bool(tool_options.get("overwrite", False))
-     log_level = str(tool_options.get("log_level", "INFO"))
+     initial_workers = int(tool_options.initial_workers)
+     cleanup = bool(tool_options.cleanup)
+     overwrite = bool(tool_options.overwrite)
+     log_level = str(tool_options.log_level)
      ```
 
    - Monitoring options:
@@ -553,6 +553,98 @@ Responsibilities:
        - `crawler_status = "failed"`
 
 The worker uses `run_persistent_job(job_id)` for each queued job.
+
+### 5.3 Maintaining the archive_tool integration
+
+The backend and ``archive_tool`` share a small but important contract:
+
+- **Configuration JSON**:
+
+  - `ArchiveJob.config` stores a dict that is the serialised form of
+    `ArchiveJobConfig` from `ha_backend.archive_contract`:
+
+    ```json
+    {
+      "seeds": ["https://...", "..."],
+      "zimit_passthrough_args": ["--pageLimit", "10"],
+      "tool_options": {
+        "cleanup": false,
+        "overwrite": false,
+        "enable_monitoring": false,
+        "enable_adaptive_workers": false,
+        "enable_vpn_rotation": false,
+        "initial_workers": 1,
+        "log_level": "INFO",
+        "relax_perms": true,
+        "monitor_interval_seconds": 30,
+        "stall_timeout_minutes": 30,
+        "error_threshold_timeout": 10,
+        "error_threshold_http": 10,
+        "min_workers": 1,
+        "max_worker_reductions": 2,
+        "vpn_connect_command": "vpn connect ca",
+        "max_vpn_rotations": 3,
+        "vpn_rotation_frequency_minutes": 60,
+        "backoff_delay_minutes": 15
+      }
+    }
+    ```
+
+  - `SourceJobConfig.default_tool_options` in `ha_backend.job_registry` is the
+    source of truth for defaults; overrides are merged via
+    `build_job_config(...)` which uses `ArchiveToolOptions` +
+    `validate_tool_options(...)` to enforce invariants that mirror
+    `archive_tool.cli` (e.g. monitoring required for adaptive/VPN).
+
+- **CLI construction**:
+
+  - `ha_backend.jobs.run_persistent_job` is the only place that maps
+    `tool_options` fields to `archive_tool` CLI flags. It expects the argument
+    model described in `src/archive_tool/docs/documentation.md` and
+    `archive_tool/cli.py`.
+  - If you add or rename CLI options in `archive_tool`:
+
+    - Extend `ArchiveToolOptions` and `ArchiveJobConfig` to carry the new
+      fields.
+    - Update `run_persistent_job` to add/remove the corresponding flags.
+    - Adjust tests under `tests/test_job_registry.py`,
+      `tests/test_archive_contract.py`, and `tests/test_jobs_persistent.py`
+      that assert config and CLI behaviour.
+
+- **Stats and logs**:
+
+  - `archive_tool` writes combined logs
+    `archive_<stage_name>_*.combined.log` under each job's `output_dir` and
+    emits `"Crawl statistics"` JSON lines that
+    `archive_tool.utils.parse_last_stats_from_log` can parse.
+  - `ha_backend.crawl_stats.update_job_stats_from_logs`:
+
+    - Locates the latest combined log for a job.
+    - Calls `parse_last_stats_from_log(log_path)` to obtain a stats dict.
+    - Stores it in `ArchiveJob.last_stats_json`.
+    - Updates `pages_crawled`, `pages_total`, `pages_failed`, and
+      `combined_log_path` as a best-effort summary.
+
+  - `/metrics` exposes these page counters via:
+
+    - `healtharchive_jobs_pages_crawled_total`
+    - `healtharchive_jobs_pages_failed_total`
+    - per-source variants, backed by the `pages_*` fields on `ArchiveJob`.
+
+- **WARC discovery and cleanup**:
+
+  - `ha_backend.indexing.warc_discovery.discover_warcs_for_job` relies on
+    `archive_tool.state.CrawlState` and `archive_tool.utils.find_all_warc_files`
+    / `find_latest_temp_dir_fallback` for WARC discovery and temp dir
+    tracking.
+  - `ha_backend.cli.cmd_cleanup_job` uses `CrawlState` and
+    `archive_tool.utils.cleanup_temp_dirs` to remove `.tmp*` directories and
+    `.archive_state.json` safely once jobs are indexed.
+
+If you change log formats, state layout, or directory structure in
+`archive_tool`, update the corresponding backend helpers (`ArchiveJobConfig`,
+`run_persistent_job`, `update_job_stats_from_logs`, WARC discovery, and
+cleanup) and their tests to keep the contract in sync.
 
 ---
 
@@ -1138,11 +1230,12 @@ touching real data.
 ## 13. Relationship to archive_tool and the frontend
 
 - **archive_tool**:
-  - Lives under `src/archive_tool/`, vendored from the upstream project.
+  - Lives under `src/archive_tool/` and is maintained as part of this repo.
+    It originated as an earlier standalone crawler project but is now the
+    in-tree crawler/orchestrator subpackage for the backend.
   - The backend calls it strictly via the CLI (`archive-tool`) as a subprocess.
   - Its internal behavior (Docker orchestration, run modes, monitoring,
-    adaptive strategies) is documented in
-    `src/archive_tool/docs/documentation.md`.
+    adaptive strategies) is documented in `src/archive_tool/docs/documentation.md`.
 
 - **Frontend (healtharchive-frontend)**:
   - Next.js 16 app using the backend’s HTTP APIs:

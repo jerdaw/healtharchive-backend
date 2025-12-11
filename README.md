@@ -43,13 +43,15 @@ practical usage.
 │   │   ├── models.py         # ORM models (Source, ArchiveJob, Snapshot, Topic)
 │   │   ├── seeds.py          # Initial Source seeding
 │   │   └── worker/           # Long-running worker loop for queued jobs
-│   └── archive_tool/         # Vendored copy of the archiver, with its own docs
+│   └── archive_tool/         # Crawler/orchestrator subpackage, with its own docs
 └── tests/                    # Pytest suite
 ```
 
-The `archive_tool` package is vendored from a separate repository and is used
-as an external CLI. Its internal documentation lives under
-`src/archive_tool/docs/documentation.md`.
+The `archive_tool` package started as a separate repository and is now
+maintained in-tree as the backend's crawler/orchestrator subpackage. It is
+invoked primarily via its CLI (`archive-tool`) and integrates closely with the
+backend's job, worker, and indexing code. Its internal documentation lives
+under `src/archive_tool/docs/documentation.md`.
 
 ---
 
@@ -76,7 +78,7 @@ pip install -e ".[dev]"
 This provides:
 
 - `ha-backend` – backend CLI
-- `archive-tool` – console script pointing at the vendored `archive_tool`
+- `archive-tool` – console script pointing at the in-repo `archive_tool` package
 
 ### 3. Database
 
@@ -297,6 +299,23 @@ ha-backend list-jobs
 ha-backend show-job --id 42
 ```
 
+### Validate a job's configuration (dry-run)
+
+To validate that a job's configuration is coherent (seeds, tool options, and
+zimit args) without actually running a crawl, you can invoke the integrated
+`archive_tool` CLI in dry-run mode via:
+
+```bash
+ha-backend validate-job-config --id 42
+```
+
+This:
+
+- Reconstructs the `archive_tool` CLI arguments from `ArchiveJob.config`.
+- Runs `archive-tool` with `--dry-run` so it validates the configuration and
+  prints a summary.
+- Does **not** change the job's status or timestamps.
+
 ### Retry and cleanup
 
 - Retry a failed crawl or reindex:
@@ -442,10 +461,11 @@ For a full walkthrough of:
 - ORM models and status lifecycle
 - Job registry and how per-source jobs are configured
 - `archive_tool` integration and adaptive strategies
-- Indexing pipeline and snapshot schema
-- HTTP API routes and JSON schemas
-- Worker loop and retry semantics
-- Cleanup and retention strategy (Phase 9)
+-- Indexing pipeline and snapshot schema
+-- HTTP API routes and JSON schemas
+-- Worker loop and retry semantics
+-- Cleanup and retention strategy (Phase 9)
+-- How the backend integrates with the in-repo `archive_tool` crawler
 
 see `docs/documentation.md`.
 
@@ -486,6 +506,6 @@ quick end-to-end smoke test:
    - Visit `/archive/browse-by-source` and `/snapshot/[id]` to confirm source
      summaries and snapshot details load correctly against the live API.
 
-The vendored `archive_tool` also has its own detailed documentation in
+The `archive_tool` subpackage also has its own detailed documentation in
 `src/archive_tool/docs/documentation.md` describing its internal state
-machine and Docker orchestration.
+machine and Docker orchestration, and how it cooperates with the backend.

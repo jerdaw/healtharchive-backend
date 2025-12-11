@@ -18,7 +18,9 @@ def discover_warcs_for_job(
     Discover all WARC files associated with a given ArchiveJob.
 
     This uses archive_tool's CrawlState and utility helpers so we respect the
-    same layout and temp-dir tracking that the crawler uses.
+    same layout and temp-dir tracking that the crawler uses. These helpers
+    live in the in-repo ``archive_tool`` package and are expected to evolve
+    in tandem with this indexing code.
     """
     host_output_dir = Path(job.output_dir).resolve()
 

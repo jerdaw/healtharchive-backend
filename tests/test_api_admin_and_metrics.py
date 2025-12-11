@@ -191,9 +191,11 @@ def test_metrics_content_includes_basic_counters(tmp_path, monkeypatch) -> None:
     assert resp.status_code == 200
     body = resp.text
 
-    # We expect at least the job and snapshot metrics headers.
+    # We expect at least the job, snapshot, and page metrics headers.
     assert "healtharchive_jobs_total" in body
     assert "healtharchive_snapshots_total" in body
+    assert "healtharchive_jobs_pages_crawled_total" in body
+    assert "healtharchive_jobs_pages_failed_total" in body
 
 
 def test_metrics_include_cleanup_status_labels(tmp_path, monkeypatch) -> None:
@@ -219,6 +221,27 @@ def test_metrics_include_cleanup_status_labels(tmp_path, monkeypatch) -> None:
     assert (
         'healtharchive_jobs_cleanup_status_total{cleanup_status="temp_cleaned"}' in body
     )
+
+
+def test_metrics_include_page_totals_and_per_source(tmp_path, monkeypatch) -> None:
+    """
+    /metrics should emit global and per-source page counters based on
+    ArchiveJob.pages_* fields.
+    """
+    monkeypatch.delenv("HEALTHARCHIVE_ADMIN_TOKEN", raising=False)
+    monkeypatch.delenv("HEALTHARCHIVE_ENV", raising=False)
+    client = _init_test_app(tmp_path, monkeypatch)
+    _seed_basic_data()
+
+    resp = client.get("/metrics")
+    assert resp.status_code == 200
+    body = resp.text
+
+    # From _seed_basic_data we have one job with pages_crawled=10 and pages_failed=1.
+    assert "healtharchive_jobs_pages_crawled_total" in body
+    assert "healtharchive_jobs_pages_failed_total" in body
+    assert 'healtharchive_jobs_pages_crawled_total{source="hc"}' in body
+    assert 'healtharchive_jobs_pages_failed_total{source="hc"}' in body
 
 
 def test_admin_requires_token_when_env_is_production(tmp_path, monkeypatch) -> None:

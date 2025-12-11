@@ -360,6 +360,27 @@ def main():
     effective_initial_workers = max(1, initial_workers_arg)  # Ensure at least 1 worker
     logger.info(f"Effective initial worker count set to: {effective_initial_workers}")
 
+    # In dry-run mode we stop after validation and a configuration summary,
+    # without starting any Docker containers.
+    if getattr(script_args, "dry_run", False):
+        logger.info("Dry run requested; not starting crawl or Docker containers.")
+        logger.info("Configuration summary:")
+        logger.info("  Seeds: %s", ", ".join(script_args.seeds))
+        logger.info("  Name: %s", script_args.name)
+        logger.info("  Output directory: %s", host_output_dir)
+        logger.info("  Effective initial workers: %s", effective_initial_workers)
+        logger.info("  Monitoring enabled: %s", script_args.enable_monitoring)
+        logger.info(
+            "  Adaptive workers enabled: %s", script_args.enable_adaptive_workers
+        )
+        logger.info("  VPN rotation enabled: %s", script_args.enable_vpn_rotation)
+        if zimit_passthrough_args:
+            logger.info(
+                "  Zimit passthrough args: %s",
+                " ".join(zimit_passthrough_args),
+            )
+        return
+
     logger.info("Step 2: Loading or Initializing Crawl State")
     try:
         crawl_state = state.CrawlState(

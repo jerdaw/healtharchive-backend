@@ -1,5 +1,10 @@
 ## 1. Purpose and high-level overview
 
+Within the HealthArchive backend, the ``archive_tool`` package is the
+crawler/orchestrator subpackage responsible for driving Zimit + Docker and
+producing WARCs and final ZIMs. It started life as a standalone repository and
+is now maintained in-tree as part of the ``healtharchive-backend`` repo.
+
 This project is an **orchestrator around Zimit** (the `ghcr.io/openzim/zimit` Docker image). It turns a raw `zimit` crawl into a **resumable, monitored, multi-stage pipeline** that:
 
 1. **Runs/Resumes crawls** inside Docker using Zimit.
@@ -62,6 +67,98 @@ You normally run:
 * `strategies.py` – adaptive strategies: worker reduction and VPN rotation.
 * `constants.py` – static configuration: default image name, error patterns, log formats, acceptable exit codes, regexes.
 
+When used from the backend, the primary entrypoints are the ``archive_tool``
+CLI (console script `archive-tool`) and a handful of helpers imported by
+``ha_backend``:
+
+* ``ha_backend.jobs.run_persistent_job`` constructs the CLI based on
+  ``ArchiveJob.config["tool_options"]`` and ``archive_tool.cli``'s argument
+  model.
+* ``ha_backend.indexing.warc_discovery`` and ``ha_backend.cli.cmd_cleanup_job``
+  reuse ``archive_tool.state.CrawlState`` and ``archive_tool.utils`` helpers
+  for WARC discovery and cleanup.
+
+If you change the CLI surface area or state layout here, update the backend
+integration points and their docs accordingly.
+
+### Backend contract summary
+
+When called from the HealthArchive backend, the following expectations apply:
+
+- **CLI arguments**:
+
+  - ``ha_backend.jobs.run_persistent_job`` constructs the argv list using
+    ``ArchiveJobConfig.tool_options``:
+
+    - Core flags:
+
+      - `--seeds`, `--name`, `--output-dir`, `--initial-workers`, `--log-level`.
+      - `--cleanup` when `cleanup=True`.
+      - `--overwrite` when `overwrite=True`.
+
+    - Monitoring/adaptive flags:
+
+      - `--enable-monitoring` when `enable_monitoring=True`.
+      - Optional:
+        - `monitor_interval_seconds` → `--monitor-interval-seconds`.
+        - `stall_timeout_minutes` → `--stall-timeout-minutes`.
+        - `error_threshold_timeout` → `--error-threshold-timeout`.
+        - `error_threshold_http` → `--error-threshold-http`.
+      - `--enable-adaptive-workers` when `enable_adaptive_workers=True` and
+        monitoring is enabled.
+      - Optional:
+        - `min_workers` → `--min-workers`.
+        - `max_worker_reductions` → `--max-worker-reductions`.
+
+    - VPN/backoff flags:
+
+      - `--enable-vpn-rotation` when `enable_vpn_rotation=True`,
+        `enable_monitoring=True`, and `vpn_connect_command` is set.
+      - `--vpn-connect-command "<command>"` from `vpn_connect_command`.
+      - Optional:
+        - `max_vpn_rotations` → `--max-vpn-rotations`.
+        - `vpn_rotation_frequency_minutes`
+          → `--vpn-rotation-frequency-minutes`.
+      - `--backoff-delay-minutes` from `backoff_delay_minutes` when
+        monitoring is enabled.
+
+    - Other flags:
+
+      - `--relax-perms` when `relax_perms=True`.
+      - Zimit passthrough args from `zimit_passthrough_args` are appended
+        after the tool flags and passed through unchanged.
+
+- **State and directories**:
+
+  - ``CrawlState`` persists to `<output-dir>/.archive_state.json` and tracks:
+    host temp dir paths (`.tmp*`), current/initial workers, and adaptation
+    counters.
+  - Temporary crawl dirs live directly under `<output-dir>/.tmp*`.
+  - WARC discovery uses:
+
+    - ``utils.find_all_warc_files(temp_dir_paths)`` to locate WARCs under
+      `collections/crawl-*/archive` inside each temp dir.
+
+  - Backend indexing expects this layout for `discover_warcs_for_job(job)`.
+
+- **Logs and stats**:
+
+  - For final build stages, ``archive_tool.main`` writes log triples:
+
+    - `archive_<stage_name>_*.stdout.log`
+    - `archive_<stage_name>_*.stderr.log`
+    - `archive_<stage_name>_*.combined.log`
+
+    under the job's `--output-dir`.
+
+  - Crawl statistics are emitted as JSON in logs and parsed by
+    ``utils.parse_last_stats_from_log(combined_log_path)``, which the backend
+    calls via ``ha_backend.crawl_stats.update_job_stats_from_logs``.
+
+If you change CLI flags, log formats, or directory layout, you should update
+both this document and the backend integration modules (`ha_backend` contract
+helpers and associated tests) to keep behaviour coherent.
+
 ---
 
 ## 3. CLI contract and argument model
@@ -122,6 +219,15 @@ It uses `parse_known_args()` to split:
 * `--log-level` (`DEBUG`, `INFO` (default), `WARNING`, `ERROR`, `CRITICAL`)
 
   * Controls verbosity for all `website_archiver.*` loggers.
+
+* `--dry-run`
+
+  * If set, perform all configuration and environment validation steps, print
+    a summary of the planned crawl (seeds, name, output directory, effective
+    workers, monitoring/VPN flags, passthrough args), and then **exit without
+    starting any Docker containers or crawl stages**. This is primarily
+    useful for debugging job configs from the backend (`ha-backend
+    validate-job-config`) or from the CLI.
 
 #### 3.1.3 Monitoring configuration
 

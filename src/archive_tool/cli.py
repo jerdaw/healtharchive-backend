@@ -45,6 +45,14 @@ def parse_arguments() -> Tuple[argparse.Namespace, List[str]]:
         choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
         help="Set logging level.",
     )
+    tool_opts_group.add_argument(
+        "--dry-run",
+        action="store_true",
+        help=(
+            "Validate configuration and print a summary without running Docker "
+            "containers."
+        ),
+    )
 
     monitor_group = parser.add_argument_group("Monitoring Configuration")
     # ... (monitor args remain the same) ...
