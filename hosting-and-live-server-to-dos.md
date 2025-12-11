@@ -102,6 +102,16 @@ in your local shell). Typical flow:
     export HEALTHARCHIVE_DATABASE_URL=postgresql+psycopg://user:pass@db-host:5432/healtharchive
     ```
 
+- `HEALTHARCHIVE_ENV`
+  - High‑level environment hint used by admin auth.
+  - Recommended values:
+    - `development` (or unset) for local dev.
+    - `staging` for staging hosts.
+    - `production` for production hosts.
+  - When `HEALTHARCHIVE_ENV` is `staging` or `production` and
+    `HEALTHARCHIVE_ADMIN_TOKEN` is **unset**, admin and metrics endpoints fail
+    closed with HTTP 500 instead of being left open.
+
 - `HEALTHARCHIVE_ARCHIVE_ROOT`
   - Root directory where crawl jobs and WARCs will be written.
   - Must be on a filesystem with enough space and backups appropriate for
@@ -170,6 +180,16 @@ How you do this depends on your hosting stack:
   - Use the provider’s UI/CLI to set env vars.
   - Trigger a deployment or restart.
 
+In staging and production you will typically run **two** backend processes:
+
+- An API process (FastAPI + uvicorn) that serves `/api/**` and `/metrics`.
+- A worker process (`ha-backend start-worker --poll-interval 30`) that
+  continuously processes queued jobs.
+
+Both processes must see the same `HEALTHARCHIVE_DATABASE_URL`,
+`HEALTHARCHIVE_ARCHIVE_ROOT`, and related env vars from §2.1 so they share
+jobs and archive output consistently.
+
 ### 2.3. Backend smoke checks (staging/prod)
 
 From a machine that can reach the backend host:
@@ -223,6 +243,42 @@ From a machine that can reach the backend host:
      - `Referrer-Policy: strict-origin-when-cross-origin`
      - `X-Frame-Options: SAMEORIGIN`
      - `Permissions-Policy: geolocation=(), microphone=(), camera=()`
+
+---
+
+### 2.4. Archive storage & retention
+
+The `HEALTHARCHIVE_ARCHIVE_ROOT` directory is where crawl jobs and WARCs live.
+In staging and production you should treat it as **persistent, non‑ephemeral
+storage** and have a basic retention plan.
+
+Checklist for each non‑dev environment:
+
+- [ ] Place `HEALTHARCHIVE_ARCHIVE_ROOT` on a filesystem that:
+  - Is not ephemeral (survives VM/container restarts).
+  - Has enough capacity for expected WARCs and logs.
+  - Has a backup or snapshot policy appropriate for your risk tolerance.
+- [ ] Decide whether this path is:
+  - Backed up regularly (if you want WARCs as part of a disaster‑recovery
+    story), or
+  - Treated as “best‑effort cache” (if you rely on ZIMs/exports or other
+    secondary storage).
+- [ ] Decide when it is safe to delete temporary crawl artifacts:
+  - Only once jobs are `indexed` or `index_failed` *and* you have verified any
+    desired ZIMs/exports.
+  - Use the `ha-backend cleanup-job --id JOB_ID --mode temp` command for this
+    cleanup; it removes `.tmp*` directories and `.archive_state.json` but
+    leaves the main job directory and any final ZIMs.
+- [ ] For larger deployments, consider:
+  - Keeping a simple inventory of jobs (via `/api/admin/jobs` and metrics) so
+    you know roughly how many indexed jobs you have and how big `jobs/` is.
+  - Periodically reviewing `cleanup_status` via `/metrics`
+    (`healtharchive_jobs_cleanup_status_total{cleanup_status="temp_cleaned"}`)
+    to ensure temp artifacts are being pruned over time.
+
+For local development it is sufficient to keep `HEALTHARCHIVE_ARCHIVE_ROOT`
+inside the repo (e.g. `./.dev-archive-root`) and delete it manually when you
+want a clean slate.
 
 ---
 
@@ -384,8 +440,9 @@ On **production** (`https://healtharchive.ca`) and/or **staging**:
 4. Open a snapshot detail page `/snapshot/[id]`:
    - For a real backend snapshot ID:
      - Metadata (title, source, date, language, URL) is from `/api/snapshot/{id}`.
-     - “Open raw snapshot” button points at `/api/snapshots/raw/{id}` on the
-       API host.
+     - “Open raw snapshot” ultimately points at `https://api…/api/snapshots/raw/{id}`
+       on the API host (the frontend prefixes the `rawSnapshotUrl` path from
+       the API with `NEXT_PUBLIC_API_BASE_URL`).
    - For a demo snapshot ID:
      - Metadata comes from the bundled demo dataset, and the iframe points
        into `/demo-archive/**`.
@@ -407,6 +464,19 @@ DNS configuration to production (with diagnostics turned off) and deploy.
 
 This document should be revisited and checked off as each environment (local,
 staging, production) is brought fully online.
+
+For a more detailed staging rollout, see:
+
+- `docs/staging-rollout-checklist.md`
+
+For a more detailed production rollout, see:
+
+- `docs/production-rollout-checklist.md`
+
+For a more detailed staging verification of CSP, headers, CORS, and the
+snapshot viewer iframe behavior, see:
+
+- `healtharchive-frontend/docs/staging-verification.md`
 
 ---
 
@@ -467,25 +537,23 @@ becomes effective once you commit/push them and (optionally) protect branches.
 
 For each repo (`healtharchive-backend` and `healtharchive-frontend`):
 
-1. Commit and push the workflow files when ready (from your local clone):
-
-   - Backend: `.github/workflows/backend-ci.yml`
-   - Frontend: `.github/workflows/frontend-ci.yml`
-
-2. In the GitHub UI for each repo:
+1. Ensure the workflow files are present (already true in this repo) and
+   enabled in the GitHub UI:
 
    - Navigate to the repository on https://github.com.
    - Click the **Actions** tab.
    - If GitHub shows a banner like “Workflows are disabled for this fork,”
      click **Enable workflows**.
-   - Push a test commit or re‑run the latest workflow to verify that a run is
-     triggered for branch `main` and for pull requests:
-     - Backend CI should:
-       - Install deps via `pip install -e ".[dev]"`.
-       - Run `pytest -q`.
-     - Frontend CI should:
-       - Install deps via `npm ci`.
-       - Run `npm run lint` and `npm test`.
+
+2. Push a test commit or re‑run the latest workflow to verify that a run is
+   triggered for branch `main` and for pull requests:
+
+   - Backend CI should:
+     - Install deps via `pip install -e ".[dev]"`.
+     - Run `pytest -q`.
+   - Frontend CI should:
+     - Install deps via `npm ci`.
+     - Run `npm run lint` and `npm test`.
 
 ### 6.2. Configure branch protection (optional but recommended)
 

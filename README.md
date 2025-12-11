@@ -414,7 +414,13 @@ defaults:
   to talk directly to a remote API instance.
 
 For a more complete checklist covering staging/production configuration,
-DNS, and Vercel env vars, see `hosting-and-live-server-to-dos.md`.
+DNS, and Vercel env vars, see:
+
+- `hosting-and-live-server-to-dos.md`
+- `../ENVIRONMENTS.md`
+- `docs/staging-rollout-checklist.md`
+- `docs/production-rollout-checklist.md`
+- `docs/monitoring-and-ci-checklist.md`.
 
 ---
 

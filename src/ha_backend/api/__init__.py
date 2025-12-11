@@ -36,7 +36,12 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         headers = response.headers
         headers.setdefault("X-Content-Type-Options", "nosniff")
         headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
-        headers.setdefault("X-Frame-Options", "SAMEORIGIN")
+        # Keep X-Frame-Options for most responses, but allow the raw snapshot
+        # endpoint to be embedded in the frontend iframe. The raw snapshot
+        # route is a controlled HTML replay endpoint and is additionally
+        # sandboxed on the frontend side.
+        if not request.url.path.startswith("/api/snapshots/raw/"):
+            headers.setdefault("X-Frame-Options", "SAMEORIGIN")
         headers.setdefault(
             "Permissions-Policy",
             "geolocation=(), microphone=(), camera=()",

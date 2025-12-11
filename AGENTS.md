@@ -17,6 +17,10 @@ Canonical docs to consult first:
 - `docs/documentation.md` – architecture & implementation details.
 - `docs/live-testing.md` – step-by-step local testing flows.
 - `src/archive_tool/docs/documentation.md` – internals of the `archive_tool` crawler CLI.
+- `hosting-and-live-server-to-dos.md` – hosting/env/DNS/CORS checklist.
+- `docs/staging-rollout-checklist.md` – staging rollout steps.
+- `docs/production-rollout-checklist.md` – production rollout steps.
+- `docs/monitoring-and-ci-checklist.md` – monitoring, uptime, and CI guidance.
 
 When you’re doing anything beyond tiny local changes, **open those docs and sync your mental model first**.
 
