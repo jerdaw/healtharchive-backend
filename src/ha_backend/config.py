@@ -16,8 +16,8 @@ REPO_ROOT = Path(__file__).resolve().parents[2]  # src/ha_backend -> src -> repo
 
 # === Archive tool invocation ===
 
-# We prefer using the console script 'archive-tool' which points to
-# archive_tool.main:main via pyproject.toml.
+# We prefer using the console script 'archive-tool', provided by the in-repo
+# archive_tool package (archive_tool.main:main via pyproject.toml).
 DEFAULT_ARCHIVE_TOOL_CMD = "archive-tool"
 
 

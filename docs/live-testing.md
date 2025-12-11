@@ -23,7 +23,7 @@ pip install -e ".[dev]"
 This provides:
 
 - `ha-backend` – backend CLI
-- `archive-tool` – vendored archiver CLI (used via Docker)
+- `archive-tool` – crawler CLI implemented by the in-repo `archive_tool` package (uses Docker + Zimit)
 
 ### 0.2 Configure environment variables
 
@@ -195,11 +195,13 @@ If this fails, fix Docker or PATH before proceeding.
 From the repo root:
 
 ```bash
-archive-tool --help
+archive-tool --seeds https://example.org --name example --output-dir $(pwd)/.dev-archive-root/dry-run --dry-run
 ```
 
 This is not required for backend work, but is a quick sanity check that the
-vendored CLI works directly.
+integrated crawler CLI works directly and that your configuration (seeds,
+output directory, workers, monitoring flags) is valid without actually
+starting Docker containers.
 
 ---
 
@@ -665,8 +667,17 @@ Look for:
   healtharchive_snapshots_total{source="test"} 2
   ```
 
-Counts should roughly match `ha-backend list-jobs` and `/api/sources` /
-`/api/search`.
+- Page-level crawl metrics (best-effort from crawl logs):
+
+  ```text
+  healtharchive_jobs_pages_crawled_total 1234
+  healtharchive_jobs_pages_crawled_total{source="hc"} 789
+  healtharchive_jobs_pages_failed_total 12
+  healtharchive_jobs_pages_failed_total{source="hc"} 3
+  ```
+
+Counts should roughly match `ha-backend list-jobs`, `/api/sources` /
+`/api/search`, and the page counters shown in `/api/admin/jobs/{id}`.
 
 ---
 
