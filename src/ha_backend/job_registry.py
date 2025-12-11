@@ -7,6 +7,8 @@ from typing import Any, Dict, Iterable, List, Optional
 
 from sqlalchemy.orm import Session
 
+from .archive_contract import (ArchiveJobConfig, ArchiveToolOptions,
+                               validate_tool_options)
 from .config import get_archive_tool_config
 from .models import ArchiveJob as ORMArchiveJob
 from .models import Source
@@ -137,40 +139,19 @@ def build_job_config(
     if extra_zimit_args:
         zimit_args.extend(extra_zimit_args)
 
-    tool_options: Dict[str, Any] = dict(source_cfg.default_tool_options)
+    tool_options_data: Dict[str, Any] = dict(source_cfg.default_tool_options)
     if overrides:
-        tool_options.update(overrides)
+        tool_options_data.update(overrides)
 
-    # Basic validation to catch obviously invalid combinations early. This
-    # mirrors archive_tool's expectations:
-    #
-    # - enable_adaptive_workers requires enable_monitoring.
-    # - enable_vpn_rotation requires enable_monitoring and vpn_connect_command.
-    enable_monitoring = bool(tool_options.get("enable_monitoring", False))
-    enable_adaptive_workers = bool(tool_options.get("enable_adaptive_workers", False))
-    enable_vpn_rotation = bool(tool_options.get("enable_vpn_rotation", False))
-    vpn_connect_command = tool_options.get("vpn_connect_command")
+    tool_options = ArchiveToolOptions.from_dict(tool_options_data)
+    validate_tool_options(tool_options)
 
-    if enable_adaptive_workers and not enable_monitoring:
-        raise ValueError(
-            "tool_options.enable_adaptive_workers requires enable_monitoring=True"
-        )
-
-    if enable_vpn_rotation and not enable_monitoring:
-        raise ValueError(
-            "tool_options.enable_vpn_rotation requires enable_monitoring=True"
-        )
-
-    if enable_vpn_rotation and not vpn_connect_command:
-        raise ValueError(
-            "tool_options.enable_vpn_rotation requires vpn_connect_command to be set"
-        )
-
-    return {
-        "seeds": seeds,
-        "zimit_passthrough_args": zimit_args,
-        "tool_options": tool_options,
-    }
+    job_cfg = ArchiveJobConfig(
+        seeds=list(seeds),
+        zimit_passthrough_args=list(zimit_args),
+        tool_options=tool_options,
+    )
+    return job_cfg.to_dict()
 
 
 def create_job_for_source(

@@ -342,13 +342,88 @@ def cmd_retry_job(args: argparse.Namespace) -> None:
             )
 
 
+def cmd_validate_job_config(args: argparse.Namespace) -> None:
+    """
+    Validate a job's configuration by running archive_tool in dry-run mode.
+
+    This does not change the job's status or timestamps; it simply exercises
+    the CLI argument construction and lets archive_tool validate and print a
+    configuration summary.
+    """
+    from pathlib import Path
+
+    from .archive_contract import ArchiveJobConfig
+    from .jobs import RuntimeArchiveJob, _build_tool_extra_args
+    from .models import ArchiveJob as ORMArchiveJob
+
+    job_id = args.id
+
+    with get_session() as session:
+        job = session.get(ORMArchiveJob, job_id)
+        if job is None:
+            print(f"ERROR: Job {job_id} not found.", file=sys.stderr)
+            sys.exit(1)
+
+        raw_config = job.config or {}
+        job_cfg = ArchiveJobConfig.from_dict(raw_config)
+        seeds = list(job_cfg.seeds)
+        if not seeds:
+            print(
+                f"ERROR: Job {job_id} has no seeds configured; cannot validate.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+
+        tool_options = job_cfg.tool_options
+        zimit_args = list(job_cfg.zimit_passthrough_args)
+        output_dir = Path(job.output_dir)
+        job_name = job.name
+
+    runtime_job = RuntimeArchiveJob(name=job_name, seeds=seeds)
+
+    initial_workers = int(tool_options.initial_workers)
+    cleanup = bool(tool_options.cleanup)
+    overwrite = bool(tool_options.overwrite)
+    log_level = str(tool_options.log_level)
+
+    extra_tool_args: list[str] = _build_tool_extra_args(tool_options)
+    # Prepend --dry-run so archive_tool validates config without running Docker.
+    full_extra_args: list[str] = ["--dry-run"]
+    full_extra_args.extend(extra_tool_args)
+    if zimit_args:
+        full_extra_args.extend(zimit_args)
+
+    print("HealthArchive Backend – Validate Job Config")
+    print("------------------------------------------")
+    print(f"Job ID:      {job_id}")
+    print(f"Job name:    {job_name}")
+    print(f"Output dir:  {output_dir}")
+    print(f"Seeds:       {', '.join(seeds)}")
+    print("")
+
+    rc = runtime_job.run(
+        initial_workers=initial_workers,
+        cleanup=cleanup,
+        overwrite=overwrite,
+        log_level=log_level,
+        extra_args=full_extra_args,
+        stream_output=True,
+        output_dir_override=output_dir,
+    )
+
+    if rc != 0:
+        sys.exit(rc)
+
+
 def cmd_cleanup_job(args: argparse.Namespace) -> None:
     """
     Cleanup temporary directories and state for a completed/indexed job.
 
     Currently only 'temp' mode is supported, which removes archive_tool's
     temp dirs (including WARCs) and the state file, but leaves the job
-    output directory and any final ZIM in place.
+    output directory and any final ZIM in place. The underlying helpers
+    (CrawlState, cleanup_temp_dirs) live in the in-repo ``archive_tool``
+    package and should be kept in sync with this command.
     """
     from datetime import datetime, timezone
     from pathlib import Path
@@ -506,7 +581,7 @@ def build_parser() -> argparse.ArgumentParser:
     # check-archive-tool
     p_tool = subparsers.add_parser(
         "check-archive-tool",
-        help="Run 'archive-tool --help' to verify the vendored archive_tool.",
+        help="Run 'archive-tool --help' to verify the integrated archive_tool crawler CLI.",
     )
     p_tool.set_defaults(func=cmd_check_archive_tool)
 
@@ -669,6 +744,22 @@ def build_parser() -> argparse.ArgumentParser:
         help="ArchiveJob ID to retry.",
     )
     p_retry.set_defaults(func=cmd_retry_job)
+
+    # validate-job-config
+    p_validate = subparsers.add_parser(
+        "validate-job-config",
+        help=(
+            "Validate a job's configuration by running archive_tool in "
+            "dry-run mode without changing job status."
+        ),
+    )
+    p_validate.add_argument(
+        "--id",
+        type=int,
+        required=True,
+        help="ArchiveJob ID whose config should be validated.",
+    )
+    p_validate.set_defaults(func=cmd_validate_job_config)
 
     # cleanup-job
     p_cleanup = subparsers.add_parser(

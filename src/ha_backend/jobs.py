@@ -9,7 +9,9 @@ from typing import Iterable, Sequence
 
 from sqlalchemy.orm import Session
 
+from .archive_contract import ArchiveJobConfig, ArchiveToolOptions
 from .config import get_archive_tool_config
+from .crawl_stats import update_job_stats_from_logs
 from .db import get_session
 from .models import ArchiveJob as ORMArchiveJob
 
@@ -19,11 +21,12 @@ class RuntimeArchiveJob:
     """
     Minimal representation of a single archive_tool run.
 
-    For Phase 1A this is just an in-memory object that knows:
+    This is an in-memory object that knows:
     - what seeds to crawl
     - what logical name to use
     - where its output directory lives
-    and can construct + execute the archive_tool command.
+    and can construct + execute the archive_tool CLI command implemented by
+    the in-repo ``archive_tool`` package.
     """
 
     name: str
@@ -168,6 +171,85 @@ def create_job(name: str, seeds: Iterable[str]) -> RuntimeArchiveJob:
 ArchiveJob = RuntimeArchiveJob
 
 
+def _build_tool_extra_args(tool_options: ArchiveToolOptions) -> list[str]:
+    """
+    Build archive_tool-specific CLI options from ArchiveToolOptions.
+    """
+    extra_tool_args: list[str] = []
+
+    enable_monitoring = bool(tool_options.enable_monitoring)
+    if enable_monitoring:
+        extra_tool_args.append("--enable-monitoring")
+        if tool_options.monitor_interval_seconds is not None:
+            extra_tool_args.extend(
+                [
+                    "--monitor-interval-seconds",
+                    str(tool_options.monitor_interval_seconds),
+                ]
+            )
+        if tool_options.stall_timeout_minutes is not None:
+            extra_tool_args.extend(
+                [
+                    "--stall-timeout-minutes",
+                    str(tool_options.stall_timeout_minutes),
+                ]
+            )
+        if tool_options.error_threshold_timeout is not None:
+            extra_tool_args.extend(
+                [
+                    "--error-threshold-timeout",
+                    str(tool_options.error_threshold_timeout),
+                ]
+            )
+        if tool_options.error_threshold_http is not None:
+            extra_tool_args.extend(
+                [
+                    "--error-threshold-http",
+                    str(tool_options.error_threshold_http),
+                ]
+            )
+
+    enable_adaptive_workers = bool(tool_options.enable_adaptive_workers)
+    if enable_monitoring and enable_adaptive_workers:
+        extra_tool_args.append("--enable-adaptive-workers")
+        if tool_options.min_workers is not None:
+            extra_tool_args.extend(["--min-workers", str(tool_options.min_workers)])
+        if tool_options.max_worker_reductions is not None:
+            extra_tool_args.extend(
+                [
+                    "--max-worker-reductions",
+                    str(tool_options.max_worker_reductions),
+                ]
+            )
+
+    enable_vpn_rotation = bool(tool_options.enable_vpn_rotation)
+    vpn_connect_command = tool_options.vpn_connect_command
+    if enable_monitoring and enable_vpn_rotation and vpn_connect_command:
+        extra_tool_args.append("--enable-vpn-rotation")
+        extra_tool_args.extend(["--vpn-connect-command", str(vpn_connect_command)])
+        if tool_options.max_vpn_rotations is not None:
+            extra_tool_args.extend(
+                ["--max-vpn-rotations", str(tool_options.max_vpn_rotations)]
+            )
+        if tool_options.vpn_rotation_frequency_minutes is not None:
+            extra_tool_args.extend(
+                [
+                    "--vpn-rotation-frequency-minutes",
+                    str(tool_options.vpn_rotation_frequency_minutes),
+                ]
+            )
+
+    if enable_monitoring and tool_options.backoff_delay_minutes is not None:
+        extra_tool_args.extend(
+            ["--backoff-delay-minutes", str(tool_options.backoff_delay_minutes)]
+        )
+
+    if bool(tool_options.relax_perms):
+        extra_tool_args.append("--relax-perms")
+
+    return extra_tool_args
+
+
 def _load_job_for_update(session: Session, job_id: int) -> ORMArchiveJob:
     job = session.get(ORMArchiveJob, job_id)
     if job is None:
@@ -182,8 +264,12 @@ def run_persistent_job(job_id: int) -> int:
     This function:
     - loads the ORM job row
     - marks it as running
-    - executes archive_tool using the stored configuration
+    - executes the archive_tool CLI using the stored configuration
     - updates status, timestamps, and exit code on completion
+
+    The mapping from ``tool_options`` to CLI flags is intentionally kept in
+    sync with the argument model in ``archive_tool.cli``; if you change one
+    side, update the other.
     """
     # First session: validate and mark as running, and snapshot configuration.
     with get_session() as session:
@@ -194,10 +280,11 @@ def run_persistent_job(job_id: int) -> int:
                 f"Job {job_id} has status {job_row.status!r} and is not runnable."
             )
 
-        config = job_row.config or {}
-        tool_options = config.get("tool_options") or {}
-        zimit_args = list(config.get("zimit_passthrough_args") or [])
-        seeds = list(config.get("seeds") or [])
+        raw_config = job_row.config or {}
+        job_cfg = ArchiveJobConfig.from_dict(raw_config)
+        seeds = list(job_cfg.seeds)
+        zimit_args = list(job_cfg.zimit_passthrough_args)
+        tool_options = job_cfg.tool_options
 
         if not seeds:
             raise ValueError(
@@ -216,83 +303,13 @@ def run_persistent_job(job_id: int) -> int:
     output_dir = Path(output_dir_str)
     runtime_job = RuntimeArchiveJob(name=job_name, seeds=seeds)
 
-    initial_workers = int(tool_options.get("initial_workers", 1))
-    cleanup = bool(tool_options.get("cleanup", False))
-    overwrite = bool(tool_options.get("overwrite", False))
-    log_level = str(tool_options.get("log_level", "INFO"))
+    initial_workers = int(tool_options.initial_workers)
+    cleanup = bool(tool_options.cleanup)
+    overwrite = bool(tool_options.overwrite)
+    log_level = str(tool_options.log_level)
 
     # Build archive_tool-specific CLI options (before the '--' separator).
-    extra_tool_args: list[str] = []
-
-    enable_monitoring = bool(tool_options.get("enable_monitoring", False))
-    if enable_monitoring:
-        extra_tool_args.append("--enable-monitoring")
-        if "monitor_interval_seconds" in tool_options:
-            extra_tool_args.extend(
-                [
-                    "--monitor-interval-seconds",
-                    str(tool_options["monitor_interval_seconds"]),
-                ]
-            )
-        if "stall_timeout_minutes" in tool_options:
-            extra_tool_args.extend(
-                [
-                    "--stall-timeout-minutes",
-                    str(tool_options["stall_timeout_minutes"]),
-                ]
-            )
-        if "error_threshold_timeout" in tool_options:
-            extra_tool_args.extend(
-                [
-                    "--error-threshold-timeout",
-                    str(tool_options["error_threshold_timeout"]),
-                ]
-            )
-        if "error_threshold_http" in tool_options:
-            extra_tool_args.extend(
-                [
-                    "--error-threshold-http",
-                    str(tool_options["error_threshold_http"]),
-                ]
-            )
-
-    enable_adaptive_workers = bool(tool_options.get("enable_adaptive_workers", False))
-    if enable_monitoring and enable_adaptive_workers:
-        extra_tool_args.append("--enable-adaptive-workers")
-        if "min_workers" in tool_options:
-            extra_tool_args.extend(["--min-workers", str(tool_options["min_workers"])])
-        if "max_worker_reductions" in tool_options:
-            extra_tool_args.extend(
-                [
-                    "--max-worker-reductions",
-                    str(tool_options["max_worker_reductions"]),
-                ]
-            )
-
-    enable_vpn_rotation = bool(tool_options.get("enable_vpn_rotation", False))
-    vpn_connect_command = tool_options.get("vpn_connect_command")
-    if enable_monitoring and enable_vpn_rotation and vpn_connect_command:
-        extra_tool_args.append("--enable-vpn-rotation")
-        extra_tool_args.extend(["--vpn-connect-command", str(vpn_connect_command)])
-        if "max_vpn_rotations" in tool_options:
-            extra_tool_args.extend(
-                ["--max-vpn-rotations", str(tool_options["max_vpn_rotations"])]
-            )
-        if "vpn_rotation_frequency_minutes" in tool_options:
-            extra_tool_args.extend(
-                [
-                    "--vpn-rotation-frequency-minutes",
-                    str(tool_options["vpn_rotation_frequency_minutes"]),
-                ]
-            )
-
-    if enable_monitoring and "backoff_delay_minutes" in tool_options:
-        extra_tool_args.extend(
-            ["--backoff-delay-minutes", str(tool_options["backoff_delay_minutes"])]
-        )
-
-    if bool(tool_options.get("relax_perms", False)):
-        extra_tool_args.append("--relax-perms")
+    extra_tool_args: list[str] = _build_tool_extra_args(tool_options)
 
     # Compose final extra args: tool args first, then the Zimit passthrough
     # arguments (no additional '--' separator needed; archive_tool will pass
@@ -324,5 +341,9 @@ def run_persistent_job(job_id: int) -> int:
         else:
             job_row.status = "failed"
             job_row.crawler_status = "failed"
+
+        # Best-effort stats sync from archive_tool logs; failures are logged
+        # inside the helper and should not interfere with status updates.
+        update_job_stats_from_logs(job_row)
 
     return rc
