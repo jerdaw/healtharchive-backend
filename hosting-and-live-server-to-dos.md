@@ -7,6 +7,10 @@ production environments.
 Nothing in here requires code changes – it is all environment configuration,
 DNS, and manual verification.
 
+> **Note:** The current production deployment is a single Hetzner VPS using
+> Tailscale-only SSH, Caddy TLS, and nightly DB backups with an NAS pull. See
+> `docs/production-single-vps.md` for the exact runbook that was implemented.
+
 ---
 
 ## 0. Quick index of “remote‑only” tasks

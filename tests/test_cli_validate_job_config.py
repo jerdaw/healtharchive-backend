@@ -50,7 +50,7 @@ def test_validate_job_config_runs_dry_run_without_status_change(tmp_path, monkey
 
     # Point archive_tool_cmd at echo so the dry-run does not require Docker
     # inside tests; archive_tool itself still enforces its own invariants.
-    monkeypatch.setenv("HEALTHARCHIVE_TOOL_CMD", "archive-tool")
+    monkeypatch.setenv("HEALTHARCHIVE_TOOL_CMD", "echo")
 
     parser = cli_module.build_parser()
     args = parser.parse_args(["validate-job-config", "--id", str(job_id)])
@@ -74,4 +74,3 @@ def test_validate_job_config_runs_dry_run_without_status_change(tmp_path, monkey
         assert stored.status == original_status
         assert stored.started_at == original_started
         assert stored.finished_at == original_finished
-
