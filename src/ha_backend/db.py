@@ -5,6 +5,7 @@ from typing import Iterator
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
+from sqlalchemy.pool import StaticPool
 
 from .config import get_database_config
 
@@ -29,7 +30,22 @@ def get_engine():
     if _engine is None:
         db_cfg = get_database_config()
         # echo can be toggled via environment later if desired.
-        _engine = create_engine(db_cfg.database_url, future=True)
+        url = db_cfg.database_url
+        if url.startswith("sqlite://"):
+            connect_args = {"check_same_thread": False}
+            # Special-case in-memory SQLite so multiple sessions share a single
+            # connection (handy for tests and local dev).
+            if url in {"sqlite://", "sqlite:///:memory:"}:
+                _engine = create_engine(
+                    url,
+                    connect_args=connect_args,
+                    poolclass=StaticPool,
+                    future=True,
+                )
+            else:
+                _engine = create_engine(url, connect_args=connect_args, future=True)
+        else:
+            _engine = create_engine(url, future=True)
     return _engine
 
 

@@ -5,7 +5,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import PlainTextResponse
 from sqlalchemy import func
 from sqlalchemy.orm import Session
-from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 
 from ha_backend.config import get_cors_origins
 from ha_backend.db import get_session
@@ -23,33 +22,32 @@ app = FastAPI(
     version="0.1.0",
 )
 
-class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+@app.middleware("http")
+async def security_headers_middleware(request: Request, call_next):
     """
-    Middleware that injects a small set of security-related headers on all
-    HTTP responses.
+    Inject a small set of security-related headers on all HTTP responses.
+
+    Note: we implement this as function-based middleware (rather than
+    BaseHTTPMiddleware) to avoid known edge cases in Starlette's
+    BaseHTTPMiddleware with TestClient/anyio.
     """
-
-    async def dispatch(
-        self, request: Request, call_next: RequestResponseEndpoint
-    ):
-        response = await call_next(request)
-        headers = response.headers
-        headers.setdefault("X-Content-Type-Options", "nosniff")
-        headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
-        # Keep X-Frame-Options for most responses, but allow the raw snapshot
-        # endpoint to be embedded in the frontend iframe. The raw snapshot
-        # route is a controlled HTML replay endpoint and is additionally
-        # sandboxed on the frontend side.
-        if not request.url.path.startswith("/api/snapshots/raw/"):
-            headers.setdefault("X-Frame-Options", "SAMEORIGIN")
-        headers.setdefault(
-            "Permissions-Policy",
-            "geolocation=(), microphone=(), camera=()",
-        )
-        return response
+    response = await call_next(request)
+    headers = response.headers
+    headers.setdefault("X-Content-Type-Options", "nosniff")
+    headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+    # Keep X-Frame-Options for most responses, but allow the raw snapshot
+    # endpoint to be embedded in the frontend iframe. The raw snapshot
+    # route is a controlled HTML replay endpoint and is additionally
+    # sandboxed on the frontend side.
+    if not request.url.path.startswith("/api/snapshots/raw/"):
+        headers.setdefault("X-Frame-Options", "SAMEORIGIN")
+    headers.setdefault(
+        "Permissions-Policy",
+        "geolocation=(), microphone=(), camera=()",
+    )
+    return response
 
 
-app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=get_cors_origins(),
