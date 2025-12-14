@@ -9,7 +9,7 @@ from .models import Source
 
 def seed_sources(session: Session) -> int:
     """
-    Insert initial Source rows (hc, phac) if they do not already exist.
+    Insert initial Source rows (hc, phac, cihr) if they do not already exist.
 
     Returns the number of sources created.
     """
@@ -25,6 +25,12 @@ def seed_sources(session: Session) -> int:
             "Public Health Agency of Canada",
             "https://www.canada.ca/en/public-health.html",
             "Agency focused on public health, disease prevention, and health promotion in Canada.",
+        ),
+        (
+            "cihr",
+            "Canadian Institutes of Health Research",
+            "https://cihr-irsc.gc.ca/",
+            "Canada’s federal agency for health research funding, supporting the creation and translation of health knowledge.",
         ),
     ]
 

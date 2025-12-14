@@ -27,7 +27,7 @@ def _init_test_db(tmp_path: Path, monkeypatch) -> None:
 
 def test_seed_sources_idempotent(tmp_path, monkeypatch) -> None:
     """
-    seed_sources should insert hc/phac once and be idempotent on repeated calls.
+    seed_sources should insert hc/phac/cihr once and be idempotent on repeated calls.
     """
     _init_test_db(tmp_path, monkeypatch)
 
@@ -37,9 +37,9 @@ def test_seed_sources_idempotent(tmp_path, monkeypatch) -> None:
 
         codes = {code for (code,) in session.query(Source.code).all()}
 
-    assert created_first == 2
+    assert created_first == 3
     assert created_second == 0
-    assert {"hc", "phac"}.issubset(codes)
+    assert {"hc", "phac", "cihr"}.issubset(codes)
 
 
 def test_model_roundtrip_relationships(tmp_path, monkeypatch) -> None:
