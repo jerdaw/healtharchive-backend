@@ -1,8 +1,8 @@
 # Hosting & Live Server TODOs (Backend + Frontend)
 
 This document tracks the remaining **infrastructure / hosting steps** needed to
-run HealthArchive.ca with a fully wired frontend + backend in staging and
-production environments.
+run HealthArchive.ca with a fully wired frontend + backend in production
+(and optionally add a staging environment later).
 
 Nothing in here requires code changes – it is all environment configuration,
 DNS, and manual verification.
@@ -19,7 +19,7 @@ Use this as a map of everything that must be done **outside** your local dev
 environment (i.e., on live servers, in Vercel, or in the GitHub UI). Each item
 links to the detailed checklist later in this file.
 
-- **On backend servers (staging + production)** – see §2 and §4:
+- **On the backend server (production)** – see §2 and §4:
   - [ ] Provision a Postgres DB and set `HEALTHARCHIVE_DATABASE_URL`.
   - [ ] Choose and provision storage for `HEALTHARCHIVE_ARCHIVE_ROOT`.
   - [ ] Configure `HEALTHARCHIVE_ADMIN_TOKEN` and `HEALTHARCHIVE_CORS_ORIGINS`.
@@ -27,9 +27,11 @@ links to the detailed checklist later in this file.
   - [ ] Verify `/api/health`, `/api/sources`, `/api/search`, and CORS headers
         over HTTPS.
   - [ ] Ensure HTTPS is enforced (HTTP→HTTPS redirect) and HSTS is enabled for
-        `api.healtharchive.ca` (and `api-staging.healtharchive.ca` if used).
+        `api.healtharchive.ca` (and `api-staging.healtharchive.ca` only if you
+        later create a staging API).
   - [ ] Configure DNS for `api.healtharchive.ca` (and optionally
-        `api-staging.healtharchive.ca`) pointing at the backend.
+        `api-staging.healtharchive.ca` if you later create a staging API)
+        pointing at the backend.
 
 - **In Vercel for the frontend** – see §3 and §5:
   - [ ] Ensure the `healtharchive-frontend` GitHub repo is connected to a
@@ -64,17 +66,15 @@ Before configuring env vars, confirm the URLs you want to use:
   - `https://healtharchive.ca`
   - `https://www.healtharchive.ca`
 
-- **Frontend – staging / preview**
+- **Frontend – preview**
   - `https://healtharchive.vercel.app` (Vercel default)
   - plus any branch‑preview URLs Vercel creates
 
-- **Backend – production API**
-  - e.g. `https://api.healtharchive.ca`
+- **Backend – production API (current choice: single API for everything)**
+  - `https://api.healtharchive.ca` (used by both Preview and Production frontends)
 
-- **Backend – staging API** (optional)
-  - e.g. `https://api-staging.healtharchive.ca`
-  - If you don’t want a separate staging API, previews can re‑use
-    `https://api.healtharchive.ca`.
+- **Backend – staging API** (optional future)
+  - `https://api-staging.healtharchive.ca` (only if you later decide you want one)
 
 Once you’re happy with those hostnames, the remaining steps in this document
 assume that naming. Substitute your actual choices as needed.
@@ -317,7 +317,7 @@ In the Vercel dashboard for the `healtharchive-frontend` project:
    - Either click **Deploy** for the latest `main` commit in Vercel, or push a
      new commit to `main` so Vercel automatically builds and deploys.
 
-### 3.2. Preview / staging env vars
+### 3.2. Preview env vars (Vercel)
 
 Still in Vercel:
 
@@ -326,8 +326,7 @@ Still in Vercel:
 2. Under **Preview** environment variables, add:
 
    ```env
-   NEXT_PUBLIC_API_BASE_URL=https://api-staging.healtharchive.ca
-   # or reuse https://api.healtharchive.ca if you don't have a separate staging API
+   NEXT_PUBLIC_API_BASE_URL=https://api.healtharchive.ca
    ```
 
 3. Enable diagnostics to make issues more obvious:
@@ -338,9 +337,12 @@ Still in Vercel:
    NEXT_PUBLIC_SHOW_API_BASE_HINT=true
    ```
 
-4. Deploy a preview build (e.g., push to a feature branch or `staging`
-   branch) and confirm that Vercel creates a new preview URL under
-   `https://healtharchive.vercel.app` for that commit.
+4. Deploy a preview build (push a commit to a non-`main` branch) and note the
+   preview URL Vercel creates.
+
+   Expected limitation (by design): because the backend uses a strict CORS
+   allowlist, branch preview URLs like `https://healtharchive-git-...vercel.app`
+   may fall back to demo mode until you explicitly allow those origins.
 
 ### 3.3. Local development env (already mostly done)
 
@@ -419,16 +421,17 @@ Once backend env vars, Vercel env vars, and DNS are in place:
 
 ### 5.1. From the frontend domain
 
-On **production** (`https://healtharchive.ca`) and/or **staging**:
+On **production** (`https://healtharchive.ca`) and the Vercel domain
+(`https://healtharchive.vercel.app`):
 
 1. Visit `/archive`:
    - With backend up:
      - Filters header should show `Filters (live API)`.
      - If the DB has snapshots, you’ll see real data (no demo fallback notice).
-   - With backend intentionally stopped (only in staging):
-     - A small “Backend unreachable” banner appears (if enabled).
+   - If the backend is unreachable:
      - Filters header changes to `Filters (demo dataset fallback)`.
      - Demo records appear instead of live data.
+     - A small “Backend unreachable” banner may appear when diagnostics are enabled.
 
 2. Try filtering:
    - Choose a source and topic, e.g. `source=hc`, `topic=covid-19`.
@@ -438,7 +441,7 @@ On **production** (`https://healtharchive.ca`) and/or **staging**:
 3. Navigate to `/archive/browse-by-source`:
    - With backend up:
      - Cards should show real record counts and topics from `/api/sources`.
-   - With backend down (staging):
+   - If the backend is unreachable:
      - “Backend unavailable” callout appears and demo summaries are shown.
 
 4. Open a snapshot detail page `/snapshot/[id]`:
@@ -448,26 +451,26 @@ On **production** (`https://healtharchive.ca`) and/or **staging**:
        on the API host (the frontend prefixes the `rawSnapshotUrl` path from
        the API with `NEXT_PUBLIC_API_BASE_URL`).
    - For a demo snapshot ID:
-     - Metadata comes from the bundled demo dataset, and the iframe points
+    - Metadata comes from the bundled demo dataset, and the iframe points
        into `/demo-archive/**`.
 
-### 5.2. Console diagnostics (staging)
+### 5.2. Console diagnostics (Preview)
 
-On staging, with diagnostics enabled:
+On a Preview deployment, with diagnostics enabled:
 
 - Open `/archive` and check the browser console:
   - You should see something like:
     ```text
-    [healtharchive] API base URL (from NEXT_PUBLIC_API_BASE_URL or default): https://api-staging.healtharchive.ca
+    [healtharchive] API base URL (from NEXT_PUBLIC_API_BASE_URL or default): https://api.healtharchive.ca
     ```
   - If the base URL is wrong or the API is unreachable, the health banner and
     warning logs will make it obvious.
 
-If all of the above checks pass in staging, you can safely mirror the env and
-DNS configuration to production (with diagnostics turned off) and deploy.  
+Production deployments typically keep diagnostics turned off, so you may not
+see these console logs even when everything is wired correctly.
 
 This document should be revisited and checked off as each environment (local,
-staging, production) is brought fully online.
+production, and optional future staging) is brought fully online.
 
 For a more detailed staging rollout, see:
 
@@ -477,10 +480,10 @@ For a more detailed production rollout, see:
 
 - `docs/production-rollout-checklist.md`
 
-For a more detailed staging verification of CSP, headers, CORS, and the
-snapshot viewer iframe behavior, see:
+For a more detailed Preview/Production verification of CSP, headers, CORS, and
+the snapshot viewer iframe behavior, see:
 
-- `healtharchive-frontend/docs/staging-verification.md`
+- `healtharchive-frontend/docs/deployment-verification.md`
 
 ---
 
