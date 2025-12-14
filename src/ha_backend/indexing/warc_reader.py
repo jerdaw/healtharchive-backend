@@ -32,7 +32,14 @@ def _parse_warc_datetime(warc_date: Optional[str]) -> datetime:
     if not warc_date:
         return datetime.now(timezone.utc)
     try:
-        dt = parsedate_to_datetime(warc_date)
+        # WARC-Date is typically ISO8601 (e.g. "2025-04-21T02:56:00Z"), but some
+        # tools may emit RFC 2822-like strings. Try ISO8601 first, then fall
+        # back to email-style parsing.
+        iso_value = warc_date.strip()
+        if "T" in iso_value:
+            dt = datetime.fromisoformat(iso_value.replace("Z", "+00:00"))
+        else:
+            dt = parsedate_to_datetime(warc_date)
         if dt.tzinfo is None:
             dt = dt.replace(tzinfo=timezone.utc)
         return dt
