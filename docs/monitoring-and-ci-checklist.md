@@ -21,7 +21,7 @@ It is meant to complement:
 Primary health endpoint:
 
 - `GET https://api.healtharchive.ca/api/health`
-- (and in staging) `GET https://api-staging.healtharchive.ca/api/health`
+- `HEAD https://api.healtharchive.ca/api/health` (supported; some uptime tools use `HEAD`)
 
 Some uptime providers issue `HEAD` requests by default. The backend supports
 `HEAD /api/health` so monitors may use either method.
@@ -53,7 +53,8 @@ Suggested uptime monitor:
 - Configure an external service (UptimeRobot, healthchecks.io, your cloud
   provider) to poll:
   - `https://api.healtharchive.ca/api/health`
-  - Optionally `https://api-staging.healtharchive.ca/api/health`
+- If you later add a separate staging API, also poll:
+  - `https://api-staging.healtharchive.ca/api/health`
 - Alert on:
   - 5xx responses.
   - Timeouts.
@@ -88,7 +89,8 @@ Suggested uptime monitor:
 Metrics are exposed at:
 
 - `GET https://api.healtharchive.ca/metrics`
-- (staging) `GET https://api-staging.healtharchive.ca/metrics`
+- If you later add a separate staging API:
+  - `GET https://api-staging.healtharchive.ca/metrics`
 
 This endpoint is protected by `HEALTHARCHIVE_ADMIN_TOKEN`. In Prometheus or a
 similar system, you will typically:

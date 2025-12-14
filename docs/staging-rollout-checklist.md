@@ -13,11 +13,15 @@ It does **not** require or describe changes on your local machine, beyond
 pushing commits; all steps here are meant to be performed on the staging host
 and in Vercel / GitHub.
 
+> Note: the current production deployment intentionally runs **without** a
+> separate staging backend. If you are following the single‑VPS production
+> runbook, you can skip this checklist unless/until you decide to add staging.
+
 For background, see:
 
 - `healtharchive-backend/hosting-and-live-server-to-dos.md`
-- `ENVIRONMENTS.md`
-- `healtharchive-frontend/docs/staging-verification.md`
+- `docs/environment-matrix.md`
+- `healtharchive-frontend/docs/deployment-verification.md`
 
 ---
 
@@ -175,7 +179,7 @@ You will use this URL for the verification steps below.
 
 ## 3. Staging verification (browser)
 
-The following steps mirror `healtharchive-frontend/docs/staging-verification.md`
+The following steps mirror `healtharchive-frontend/docs/deployment-verification.md`
 but framed as a checklist.
 
 ### 3.1 Frontend security headers & CSP
@@ -256,4 +260,3 @@ Once the steps above pass, you can:
   complete for the staging environment.
 - Use the same patterns (with different env vars and hosts) when bringing
   production online.
-

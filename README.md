@@ -405,7 +405,7 @@ defaults:
     export HEALTHARCHIVE_CORS_ORIGINS="https://healtharchive.ca,https://www.healtharchive.ca"
     ```
 
-  - **Staging (frontend at healtharchive.vercel.app):**
+- **Preview (frontend at healtharchive.vercel.app):**
 
     ```bash
     export HEALTHARCHIVE_CORS_ORIGINS="https://healtharchive.vercel.app"
@@ -418,7 +418,8 @@ For a more complete checklist covering staging/production configuration,
 DNS, and Vercel env vars, see:
 
 - `hosting-and-live-server-to-dos.md`
-- `../ENVIRONMENTS.md`
+- `docs/environment-matrix.md`
+- `docs/production-single-vps.md`
 - `docs/staging-rollout-checklist.md`
 - `docs/production-rollout-checklist.md`
 - `docs/monitoring-and-ci-checklist.md`.
