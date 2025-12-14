@@ -13,9 +13,10 @@ The backend has three main responsibilities:
   summaries, and snapshot viewing.
 
 For a deep architecture and implementation walkthrough, see
-`docs/documentation.md`. For a step‑by‑step local live‑testing guide, see
-`docs/live-testing.md`. For the current production runbook (single VPS +
-Tailscale-only SSH + nightly backups), see `docs/production-single-vps.md`.
+`docs/architecture.md`. For a step‑by‑step local live‑testing guide, see
+`docs/development/live-testing.md`. For the current production runbook (single
+VPS + Tailscale-only SSH + nightly backups), see
+`docs/deployment/production-single-vps.md`.
 This README is intentionally shorter and focused on practical usage.
 
 ---
@@ -26,8 +27,11 @@ This README is intentionally shorter and focused on practical usage.
 .
 ├── README.md
 ├── docs/
-│   ├── documentation.md      # Detailed architecture and implementation guide
-│   └── live-testing.md       # Step-by-step local live testing guide
+│   ├── README.md             # Docs index
+│   ├── architecture.md       # Detailed architecture and implementation guide
+│   ├── development/          # Local dev + live-testing flows
+│   ├── deployment/           # Deployment/runbooks/checklists
+│   └── operations/           # Monitoring/uptime/CI guidance
 ├── pyproject.toml            # Package + dependency metadata
 ├── requirements.txt          # Convenience requirements file (mirrors pyproject)
 ├── alembic/                  # Database migrations
@@ -417,12 +421,12 @@ defaults:
 For a more complete checklist covering staging/production configuration,
 DNS, and Vercel env vars, see:
 
-- `hosting-and-live-server-to-dos.md`
-- `docs/environment-matrix.md`
-- `docs/production-single-vps.md`
-- `docs/staging-rollout-checklist.md`
-- `docs/production-rollout-checklist.md`
-- `docs/monitoring-and-ci-checklist.md`.
+- `docs/deployment/hosting-and-live-server-to-dos.md`
+- `docs/deployment/environment-matrix.md`
+- `docs/deployment/production-single-vps.md`
+- `docs/deployment/staging-rollout-checklist.md`
+- `docs/deployment/production-rollout-checklist.md`
+- `docs/operations/monitoring-and-ci-checklist.md`.
 
 ---
 
@@ -475,7 +479,7 @@ For a full walkthrough of:
 -- Cleanup and retention strategy (Phase 9)
 -- How the backend integrates with the in-repo `archive_tool` crawler
 
-see `docs/documentation.md`.
+see `docs/architecture.md`.
 
 ### Frontend integration smoke test
 

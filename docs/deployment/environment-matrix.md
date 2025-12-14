@@ -12,11 +12,11 @@ It is useful when:
 
 For deeper operational details, see:
 
-- `docs/production-single-vps.md` (current production runbook)
+- `production-single-vps.md` (current production runbook)
 - `hosting-and-live-server-to-dos.md` (high-level deployment checklist)
-- `docs/monitoring-and-ci-checklist.md` (uptime/monitoring guidance)
-- Frontend docs: `healtharchive-frontend/docs/documentation.md`
-- Frontend verification: `healtharchive-frontend/docs/deployment-verification.md`
+- `../operations/monitoring-and-ci-checklist.md` (uptime/monitoring guidance)
+- Frontend docs: `healtharchive-frontend/docs/implementation-guide.md`
+- Frontend verification: `healtharchive-frontend/docs/deployment/verification.md`
 
 ---
 

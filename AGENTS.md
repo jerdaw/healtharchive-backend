@@ -14,15 +14,16 @@
 
 Canonical docs to consult first:
 
-- `docs/documentation.md` – architecture & implementation details.
-- `docs/live-testing.md` – step-by-step local testing flows.
-- `docs/environment-matrix.md` – cross-repo env var and host matrix.
+- `docs/README.md` – docs index.
+- `docs/architecture.md` – architecture & implementation details.
+- `docs/development/live-testing.md` – step-by-step local testing flows.
+- `docs/deployment/environment-matrix.md` – cross-repo env var and host matrix.
 - `src/archive_tool/docs/documentation.md` – internals of the `archive_tool` crawler CLI.
-- `hosting-and-live-server-to-dos.md` – hosting/env/DNS/CORS checklist.
-- `docs/staging-rollout-checklist.md` – staging rollout steps.
-- `docs/production-rollout-checklist.md` – production rollout steps.
-- `docs/monitoring-and-ci-checklist.md` – monitoring, uptime, and CI guidance.
-- `docs/production-single-vps.md` – current production runbook (Hetzner + Tailscale-only SSH, nightly backups, NAS pull).
+- `docs/deployment/hosting-and-live-server-to-dos.md` – hosting/env/DNS/CORS checklist.
+- `docs/deployment/staging-rollout-checklist.md` – staging rollout steps.
+- `docs/deployment/production-rollout-checklist.md` – production rollout steps.
+- `docs/operations/monitoring-and-ci-checklist.md` – monitoring, uptime, and CI guidance.
+- `docs/deployment/production-single-vps.md` – current production runbook (Hetzner + Tailscale-only SSH, nightly backups, NAS pull).
 
 When you’re doing anything beyond tiny local changes, **open those docs and sync your mental model first**.
 
@@ -51,7 +52,7 @@ For how to:
 * Run specific CLI flows end-to-end,
 * Wire up Docker + `archive_tool`,
 
-→ **Follow `docs/live-testing.md` rather than inventing new commands**.
+→ **Follow `docs/development/live-testing.md` rather than inventing new commands**.
 
 When you add/modify functionality, you should:
 

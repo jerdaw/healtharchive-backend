@@ -13,8 +13,9 @@ This document is an in‑depth walkthrough of the **HealthArchive.ca backend**
 For `archive_tool` internals (log parsing, Docker orchestration, run modes),
 see `src/archive_tool/docs/documentation.md`. For a shorter, task‑oriented
 overview of common commands and local testing flows, see
-`docs/live-testing.md`. For deployment‑oriented configuration (staging/prod
-env vars, DNS, Vercel), see `hosting-and-live-server-to-dos.md`.
+`development/live-testing.md`. For deployment‑oriented configuration
+(staging/prod env vars, DNS, Vercel), see
+`deployment/hosting-and-live-server-to-dos.md`.
 
 ---
 
