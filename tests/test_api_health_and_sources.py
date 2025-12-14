@@ -44,6 +44,9 @@ def test_health_endpoint(tmp_path, monkeypatch) -> None:
     )
     assert resp.headers["X-Frame-Options"] == "SAMEORIGIN"
 
+    head_resp = client.head("/api/health")
+    assert head_resp.status_code == 200
+
 
 def test_health_endpoint_includes_checks(tmp_path, monkeypatch) -> None:
     client = _init_test_app(tmp_path, monkeypatch)

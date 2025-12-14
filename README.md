@@ -14,8 +14,9 @@ The backend has three main responsibilities:
 
 For a deep architecture and implementation walkthrough, see
 `docs/documentation.md`. For a step‑by‑step local live‑testing guide, see
-`docs/live-testing.md`. This README is intentionally shorter and focused on
-practical usage.
+`docs/live-testing.md`. For the current production runbook (single VPS +
+Tailscale-only SSH + nightly backups), see `docs/production-single-vps.md`.
+This README is intentionally shorter and focused on practical usage.
 
 ---
 

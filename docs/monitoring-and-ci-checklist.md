@@ -23,6 +23,9 @@ Primary health endpoint:
 - `GET https://api.healtharchive.ca/api/health`
 - (and in staging) `GET https://api-staging.healtharchive.ca/api/health`
 
+Some uptime providers issue `HEAD` requests by default. The backend supports
+`HEAD /api/health` so monitors may use either method.
+
 Expected behavior:
 
 - HTTP 200
@@ -218,4 +221,3 @@ On a regular cadence (e.g. monthly or quarterly), review:
 
 Recording a short “ops state” note alongside these reviews will make future
 debugging and capacity planning much easier.
-

@@ -21,6 +21,7 @@ Canonical docs to consult first:
 - `docs/staging-rollout-checklist.md` – staging rollout steps.
 - `docs/production-rollout-checklist.md` – production rollout steps.
 - `docs/monitoring-and-ci-checklist.md` – monitoring, uptime, and CI guidance.
+- `docs/production-single-vps.md` – current production runbook (Hetzner + Tailscale-only SSH, nightly backups, NAS pull).
 
 When you’re doing anything beyond tiny local changes, **open those docs and sync your mental model first**.
 

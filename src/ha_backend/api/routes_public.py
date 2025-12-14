@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import Response
 from fastapi.responses import HTMLResponse, JSONResponse
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session, joinedload
@@ -66,6 +67,18 @@ def health_check(db: Session = Depends(get_db)) -> JSONResponse:
     checks["snapshots"] = {"total": int(total_snapshots)}
 
     return JSONResponse(content={"status": status, "checks": checks})
+
+
+@router.head("/health")
+def health_check_head(db: Session = Depends(get_db)) -> Response:
+    """
+    HEAD variant of the health endpoint.
+
+    Some external uptime monitors issue HEAD requests by default; this route
+    mirrors the GET health check status code without returning a body.
+    """
+    resp = health_check(db=db)
+    return Response(status_code=resp.status_code, media_type="application/json")
 
 
 @router.get("/sources", response_model=List[SourceSummarySchema])
