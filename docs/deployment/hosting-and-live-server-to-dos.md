@@ -9,7 +9,7 @@ DNS, and manual verification.
 
 > **Note:** The current production deployment is a single Hetzner VPS using
 > Tailscale-only SSH, Caddy TLS, and nightly DB backups with an NAS pull. See
-> `docs/production-single-vps.md` for the exact runbook that was implemented.
+> `production-single-vps.md` for the exact runbook that was implemented.
 
 ---
 
@@ -474,16 +474,16 @@ production, and optional future staging) is brought fully online.
 
 For a more detailed staging rollout, see:
 
-- `docs/staging-rollout-checklist.md`
+- `staging-rollout-checklist.md`
 
 For a more detailed production rollout, see:
 
-- `docs/production-rollout-checklist.md`
+- `production-rollout-checklist.md`
 
 For a more detailed Preview/Production verification of CSP, headers, CORS, and
 the snapshot viewer iframe behavior, see:
 
-- `healtharchive-frontend/docs/deployment-verification.md`
+- `healtharchive-frontend/docs/deployment/verification.md`
 
 ---
 

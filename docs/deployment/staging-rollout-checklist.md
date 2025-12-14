@@ -19,9 +19,9 @@ and in Vercel / GitHub.
 
 For background, see:
 
-- `healtharchive-backend/hosting-and-live-server-to-dos.md`
-- `docs/environment-matrix.md`
-- `healtharchive-frontend/docs/deployment-verification.md`
+- `hosting-and-live-server-to-dos.md`
+- `environment-matrix.md`
+- `healtharchive-frontend/docs/deployment/verification.md`
 
 ---
 
@@ -100,8 +100,8 @@ staging host:
    (as in 1.1).
 
 2. Run the synthetic WARC script from
-   `healtharchive-backend/docs/live-testing.md` §6.1 (“Happy‑path viewer using
-   a synthetic WARC”). It will:
+   `healtharchive-backend/docs/development/live-testing.md` §6.1 (“Happy‑path
+   viewer using a synthetic WARC”). It will:
 
    - Create a small WARC file under `HEALTHARCHIVE_ARCHIVE_ROOT`.
    - Insert a `Snapshot` row in the staging DB.
@@ -179,7 +179,7 @@ You will use this URL for the verification steps below.
 
 ## 3. Staging verification (browser)
 
-The following steps mirror `healtharchive-frontend/docs/deployment-verification.md`
+The following steps mirror `healtharchive-frontend/docs/deployment/verification.md`
 but framed as a checklist.
 
 ### 3.1 Frontend security headers & CSP

@@ -8,9 +8,9 @@ This file pulls together the **ongoing operations** aspects of the project:
 
 It is meant to complement:
 
-- `hosting-and-live-server-to-dos.md`
-- `docs/staging-rollout-checklist.md`
-- `docs/production-rollout-checklist.md`
+- `../deployment/hosting-and-live-server-to-dos.md`
+- `../deployment/staging-rollout-checklist.md`
+- `../deployment/production-rollout-checklist.md`
 
 ---
 
