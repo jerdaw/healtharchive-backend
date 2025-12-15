@@ -535,6 +535,56 @@ def test_search_view_pages_ranking_v2_scores_best_snapshot_for_group(
     assert data_v2["results"][0]["title"] == "Latest updates"
 
 
+def test_search_view_pages_returns_canonical_original_url(tmp_path, monkeypatch) -> None:
+    client = _init_test_app(tmp_path, monkeypatch)
+
+    with get_session() as session:
+        hc = Source(
+            code="hc",
+            name="Health Canada",
+            base_url="https://www.canada.ca/en/health-canada.html",
+            description="Health Canada",
+            enabled=True,
+        )
+        session.add(hc)
+        session.flush()
+
+        session.add(
+            Snapshot(
+                job_id=None,
+                source_id=hc.id,
+                url="https://www.canada.ca/en/public-health/services/diseases/coronavirus-disease-covid-19.html?utm_campaign=x&wbdisable=true",
+                normalized_url_group="https://www.canada.ca/en/public-health/services/diseases/coronavirus-disease-covid-19.html",
+                capture_timestamp=datetime(2025, 4, 1, 12, 0, tzinfo=timezone.utc),
+                mime_type="text/html",
+                status_code=200,
+                title="Coronavirus disease (COVID-19) - Canada.ca",
+                snippet="COVID-19 hub page.",
+                language="en",
+                warc_path="/warcs/hc-covid-hub.warc.gz",
+                warc_record_id="hc-covid-hub",
+            )
+        )
+
+    resp_pages = client.get("/api/search", params={"q": "covid", "view": "pages"})
+    assert resp_pages.status_code == 200
+    data_pages = resp_pages.json()
+    assert data_pages["total"] == 1
+    assert (
+        data_pages["results"][0]["originalUrl"]
+        == "https://www.canada.ca/en/public-health/services/diseases/coronavirus-disease-covid-19.html"
+    )
+
+    resp_snaps = client.get("/api/search", params={"q": "covid", "view": "snapshots"})
+    assert resp_snaps.status_code == 200
+    data_snaps = resp_snaps.json()
+    assert data_snaps["total"] == 1
+    assert (
+        data_snaps["results"][0]["originalUrl"]
+        == "https://www.canada.ca/en/public-health/services/diseases/coronavirus-disease-covid-19.html?utm_campaign=x&wbdisable=true"
+    )
+
+
 def test_search_relevance_uses_page_signal_boost_for_tie_breaks(
     tmp_path, monkeypatch
 ) -> None:
