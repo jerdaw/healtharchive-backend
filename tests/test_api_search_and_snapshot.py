@@ -110,6 +110,45 @@ def _seed_search_data() -> None:
         session.add_all([s1, s2, s3])
 
 
+def _add_snapshot(
+    *,
+    source_code: str,
+    url: str,
+    title: str,
+    snippet: str,
+    capture_timestamp: datetime,
+    status_code: int,
+) -> int:
+    with get_session() as session:
+        source = session.query(Source).filter(Source.code == source_code).first()
+        assert source is not None
+
+        snap = Snapshot(
+            job_id=None,
+            source_id=source.id,
+            url=url,
+            normalized_url_group=url,
+            capture_timestamp=capture_timestamp,
+            mime_type="text/html",
+            status_code=status_code,
+            title=title,
+            snippet=snippet,
+            language="en",
+            warc_path=f"/warcs/{source_code}-extra.warc.gz",
+            warc_record_id=f"{source_code}-extra",
+        )
+        session.add(snap)
+        session.flush()
+        return int(snap.id)
+
+
+def _get_snapshot_id_by_title(title: str) -> int:
+    with get_session() as session:
+        snap = session.query(Snapshot).filter(Snapshot.title == title).first()
+        assert snap is not None
+        return int(snap.id)
+
+
 def test_search_endpoint_basic(tmp_path, monkeypatch) -> None:
     client = _init_test_app(tmp_path, monkeypatch)
     _seed_search_data()
@@ -329,3 +368,55 @@ def test_search_invalid_query_params(tmp_path, monkeypatch) -> None:
 
     resp_bad_topic = client.get("/api/search", params={"topic": "covid 19"})
     assert resp_bad_topic.status_code == 422
+
+
+def test_search_excludes_non_2xx_by_default(tmp_path, monkeypatch) -> None:
+    client = _init_test_app(tmp_path, monkeypatch)
+    _seed_search_data()
+
+    _add_snapshot(
+        source_code="hc",
+        url="https://www.canada.ca/en/health-canada/notfound.html",
+        title="Not Found - Canada.ca",
+        snippet="COVID-19 page missing.",
+        capture_timestamp=datetime(2025, 4, 1, 12, 0, tzinfo=timezone.utc),
+        status_code=404,
+    )
+
+    resp_default = client.get("/api/search", params={"q": "COVID-19"})
+    assert resp_default.status_code == 200
+    data_default = resp_default.json()
+    assert data_default["total"] == 1
+
+    resp_include = client.get(
+        "/api/search",
+        params={"q": "COVID-19", "includeNon2xx": "true"},
+    )
+    assert resp_include.status_code == 200
+    data_include = resp_include.json()
+    assert data_include["total"] == 2
+
+
+def test_search_sort_defaults_to_relevance_when_q_present(tmp_path, monkeypatch) -> None:
+    client = _init_test_app(tmp_path, monkeypatch)
+    _seed_search_data()
+
+    covid_id = _get_snapshot_id_by_title("COVID-19 guidance")
+    newer_id = _add_snapshot(
+        source_code="hc",
+        url="https://www.canada.ca/en/health-canada/press-release.html",
+        title="Press release",
+        snippet="COVID-19 update from Health Canada.",
+        capture_timestamp=datetime(2025, 12, 1, 12, 0, tzinfo=timezone.utc),
+        status_code=200,
+    )
+
+    resp_default = client.get("/api/search", params={"q": "COVID-19"})
+    assert resp_default.status_code == 200
+    data_default = resp_default.json()
+    assert data_default["results"][0]["id"] == covid_id
+
+    resp_newest = client.get("/api/search", params={"q": "COVID-19", "sort": "newest"})
+    assert resp_newest.status_code == 200
+    data_newest = resp_newest.json()
+    assert data_newest["results"][0]["id"] == newer_id
