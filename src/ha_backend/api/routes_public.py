@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 from datetime import datetime
+from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import Response
 from fastapi.responses import HTMLResponse, JSONResponse
-from sqlalchemy import func, or_
+from sqlalchemy import and_, case, func, or_
 from sqlalchemy.orm import Session, joinedload
 
 from ha_backend.db import get_session
@@ -172,6 +173,11 @@ def list_topics(db: Session = Depends(get_db)) -> List[TopicRefSchema]:
     return [TopicRefSchema(slug=t.slug, label=t.label) for t in topics]
 
 
+class SearchSort(str, Enum):
+    relevance = "relevance"
+    newest = "newest"
+
+
 @router.get("/search", response_model=SearchResponseSchema)
 def search_snapshots(
     q: Optional[str] = Query(default=None, min_length=1, max_length=256),
@@ -181,13 +187,30 @@ def search_snapshots(
     topic: Optional[str] = Query(
         default=None, min_length=1, max_length=64, pattern=r"^[a-z0-9-]+$"
     ),
+    sort: Optional[SearchSort] = Query(default=None),
+    includeNon2xx: bool = Query(default=False),
     page: int = Query(default=1, ge=1),
     pageSize: int = Query(default=20, ge=1, le=100),
     db: Session = Depends(get_db),
 ) -> SearchResponseSchema:
     """
-    Search snapshots by keyword, source, and/or topic with simple pagination.
+    Search snapshots by keyword, source, and/or topic with pagination.
+
+    Defaults:
+    - When a query `q` is present, sort defaults to "relevance".
+    - Otherwise sort defaults to "newest".
+    - Non-2xx responses are excluded by default (set includeNon2xx=true to include).
     """
+    q_clean = q.strip() if q else None
+    if q_clean == "":
+        q_clean = None
+
+    effective_sort = sort
+    if effective_sort is None:
+        effective_sort = SearchSort.relevance if q_clean else SearchSort.newest
+    if effective_sort == SearchSort.relevance and not q_clean:
+        effective_sort = SearchSort.newest
+
     query = db.query(Snapshot).join(Source)
 
     if source:
@@ -197,8 +220,17 @@ def search_snapshots(
         # Join the topics association once and filter by topic slug.
         query = query.join(Snapshot.topics).filter(Topic.slug == topic)
 
-    if q:
-        ilike_pattern = f"%{q}%"
+    if not includeNon2xx:
+        query = query.filter(
+            or_(
+                Snapshot.status_code.is_(None),
+                and_(Snapshot.status_code >= 200, Snapshot.status_code < 300),
+            )
+        )
+
+    ilike_pattern = None
+    if q_clean:
+        ilike_pattern = f"%{q_clean}%"
         query = query.filter(
             or_(
                 Snapshot.title.ilike(ilike_pattern),
@@ -210,9 +242,31 @@ def search_snapshots(
     total = query.count()
     offset = (page - 1) * pageSize
 
+    status_quality = case(
+        (Snapshot.status_code.is_(None), 0),
+        (and_(Snapshot.status_code >= 200, Snapshot.status_code < 300), 2),
+        (and_(Snapshot.status_code >= 300, Snapshot.status_code < 400), 1),
+        else_=-1,
+    )
+
+    order_by = []
+    if includeNon2xx:
+        order_by.append(status_quality.desc())
+
+    if effective_sort == SearchSort.relevance and q_clean and ilike_pattern:
+        match_score = case(
+            (Snapshot.title.ilike(ilike_pattern), 3),
+            (Snapshot.url.ilike(ilike_pattern), 2),
+            (Snapshot.snippet.ilike(ilike_pattern), 1),
+            else_=0,
+        )
+        order_by.append(match_score.desc())
+
+    order_by.extend([Snapshot.capture_timestamp.desc(), Snapshot.id.desc()])
+
     items = (
         query.options(joinedload(Snapshot.source), joinedload(Snapshot.topics))
-        .order_by(Snapshot.capture_timestamp.desc(), Snapshot.id.desc())
+        .order_by(*order_by)
         .offset(offset)
         .limit(pageSize)
         .all()
