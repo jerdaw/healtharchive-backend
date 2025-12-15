@@ -6,8 +6,7 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
-from fastapi.responses import Response
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from fastapi.responses import HTMLResponse, JSONResponse
 from sqlalchemy import and_, case, func, inspect, or_
 from sqlalchemy.orm import Session, joinedload, load_only
@@ -28,6 +27,7 @@ from ha_backend.search_ranking import (
 from ha_backend.runtime_metrics import observe_search_request
 
 from .schemas import (
+    ArchiveStatsSchema,
     SearchResponseSchema,
     SnapshotDetailSchema,
     SnapshotSummarySchema,
@@ -687,6 +687,48 @@ def health_check_head(db: Session = Depends(get_db)) -> Response:
     """
     resp = health_check(db=db)
     return Response(status_code=resp.status_code, media_type="application/json")
+
+
+@router.get("/stats", response_model=ArchiveStatsSchema)
+def get_archive_stats(response: Response, db: Session = Depends(get_db)) -> ArchiveStatsSchema:
+    """
+    Public archive stats used by the frontend (homepage snapshot metrics).
+
+    Keep this lightweight and cacheable; it should not leak admin-only details.
+    """
+
+    # 5 minutes on shared caches; short max-age for clients.
+    response.headers["Cache-Control"] = "public, max-age=60, s-maxage=300"
+
+    snapshots_total = int(db.query(func.count(Snapshot.id)).scalar() or 0)
+
+    pages_total = int(
+        db.query(
+            func.count(
+                func.distinct(func.coalesce(Snapshot.normalized_url_group, Snapshot.url))
+            )
+        ).scalar()
+        or 0
+    )
+
+    sources_total = int(
+        db.query(func.count(func.distinct(Snapshot.source_id)))
+        .filter(Snapshot.source_id.isnot(None))
+        .scalar()
+        or 0
+    )
+
+    latest_capture_ts = db.query(func.max(Snapshot.capture_timestamp)).scalar()
+    latest_capture_date = (
+        latest_capture_ts.date().isoformat() if latest_capture_ts else None
+    )
+
+    return ArchiveStatsSchema(
+        snapshotsTotal=snapshots_total,
+        pagesTotal=pages_total,
+        sourcesTotal=sources_total,
+        latestCaptureDate=latest_capture_date,
+    )
 
 
 @router.get("/sources", response_model=List[SourceSummarySchema])

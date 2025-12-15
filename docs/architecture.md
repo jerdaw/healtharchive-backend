@@ -77,6 +77,7 @@ overview of common commands and local testing flows, see
 4. **Serving**:
    - FastAPI app:
      - `GET /api/search` queries `Snapshot` for search results.
+     - `GET /api/stats` provides lightweight public archive totals for frontend metrics.
      - `GET /api/sources` summarises captures per `Source`.
      - `GET /api/snapshot/{id}` returns metadata for a single snapshot.
      - `GET /api/snapshots/raw/{id}` replays archived HTML from a WARC.
@@ -833,6 +834,10 @@ Public Pydantic models:
 
   - `results: List[SnapshotSummarySchema]`, `total`, `page`, `pageSize`.
 
+- `ArchiveStatsSchema` – used by `/api/stats`:
+
+  - `snapshotsTotal`, `pagesTotal`, `sourcesTotal`, `latestCaptureDate`.
+
 - `SnapshotDetailSchema` – used by `/api/snapshot/{id}`:
 
   - Contains metadata for a single snapshot including `mimeType` and
@@ -863,6 +868,19 @@ Public Pydantic models:
 
   - If the DB connectivity check fails, returns HTTP 500 with
     `{"status": "error", "checks": {"db": "error"}}`.
+
+- `GET /api/stats`:
+
+  - Returns lightweight, cacheable archive totals used by the frontend:
+
+    ```json
+    {
+      "snapshotsTotal": 12345,
+      "pagesTotal": 6789,
+      "sourcesTotal": 2,
+      "latestCaptureDate": "2025-04-19"
+    }
+    ```
 
 - `GET /api/sources`:
 
