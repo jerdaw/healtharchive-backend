@@ -889,13 +889,20 @@ Public Pydantic models:
     - `q: str | None` – keyword.
     - `source: str | None` – source code (e.g. `"hc"`).
     - `topic: str | None` – topic slug (see `TopicRef.slug`).
+    - `sort: "relevance" | "newest" | None` – sort mode.
+      - Default: `"relevance"` when `q` is present; otherwise `"newest"`.
+    - `includeNon2xx: bool` – include non‑2xx HTTP responses in results (default `false`).
     - `page: int` – 1‑based page index (default `1`, must be `>= 1`).
     - `pageSize: int` – results per page (default `20`, minimum `1`, maximum `100`).
   - Filters:
     - `Source.code == source.lower()` when `source` set.
     - Joins `Snapshot.topics` / `Topic` when filtering by `topic`.
     - Keyword filter via `ILIKE` on `title`, `snippet`, and `url`.
-  - Orders by `capture_timestamp DESC, id DESC`.
+    - By default, excludes non‑2xx responses (unless `includeNon2xx=true`).
+  - Ordering:
+    - If `sort="relevance"` and `q` is present, use a lightweight relevance scoring:
+      title match > URL match > snippet match, then recency.
+    - Otherwise order by `capture_timestamp DESC, id DESC` (newest first).
   - Pagination semantics:
     - `total` is the total number of matching snapshots across all pages.
     - `results` contains at most `pageSize` snapshots for the requested `page`.
