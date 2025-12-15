@@ -3,6 +3,9 @@ from __future__ import annotations
 from typing import Dict, Optional
 
 from bs4 import BeautifulSoup
+from urllib.parse import urljoin, urlsplit
+
+from ha_backend.indexing.mapping import normalize_url_for_grouping
 
 
 def extract_title(html: str) -> Optional[str]:
@@ -28,8 +31,23 @@ def extract_text(html: str) -> str:
     Extract plain text from HTML content.
     """
     soup = BeautifulSoup(html, "html.parser")
-    text = soup.get_text(separator=" ", strip=True)
-    return text
+
+    # Remove obvious non-content elements.
+    for tag in soup.find_all(["script", "style", "noscript"]):
+        tag.decompose()
+
+    # Drop common layout/boilerplate containers.
+    for tag in soup.find_all(["nav", "header", "footer", "aside", "form"]):
+        tag.decompose()
+
+    # Prefer main content when available.
+    root = soup.find("main") or soup.find(attrs={"role": "main"})
+    if root is not None:
+        text = root.get_text(separator=" ", strip=True)
+        if len(text) >= 200:
+            return text
+
+    return soup.get_text(separator=" ", strip=True)
 
 
 def make_snippet(text: str, max_len: int = 280) -> str:
@@ -70,5 +88,105 @@ def detect_language(text: str, headers: Optional[Dict[str, str]] = None) -> str:
 
     return "und"
 
+_ASSET_EXTENSIONS = (
+    ".7z",
+    ".avi",
+    ".css",
+    ".csv",
+    ".doc",
+    ".docx",
+    ".gif",
+    ".gz",
+    ".ico",
+    ".jpeg",
+    ".jpg",
+    ".js",
+    ".json",
+    ".map",
+    ".mov",
+    ".mp3",
+    ".mp4",
+    ".pdf",
+    ".png",
+    ".ppt",
+    ".pptx",
+    ".rar",
+    ".svg",
+    ".tgz",
+    ".txt",
+    ".wav",
+    ".webm",
+    ".webp",
+    ".wmv",
+    ".xls",
+    ".xlsx",
+    ".xml",
+    ".zip",
+)
 
-__all__ = ["extract_title", "extract_text", "make_snippet", "detect_language"]
+
+def extract_outlink_groups(
+    html: str,
+    *,
+    base_url: str,
+    from_group: str | None = None,
+    max_links: int = 200,
+) -> set[str]:
+    """
+    Extract a set of normalized_url_group strings for outgoing links found in main content.
+
+    This is used to derive simple authority signals (e.g., inlink counts) without
+    introducing a separate crawler or search service.
+    """
+    soup = BeautifulSoup(html, "html.parser")
+
+    # Remove obvious non-content elements.
+    for tag in soup.find_all(["script", "style", "noscript"]):
+        tag.decompose()
+
+    # Drop common layout/boilerplate containers.
+    for tag in soup.find_all(["nav", "header", "footer", "aside", "form"]):
+        tag.decompose()
+
+    root = soup.find("main") or soup.find(attrs={"role": "main"}) or soup
+    groups: set[str] = set()
+
+    for a in root.find_all("a", href=True):
+        href = a.get("href")
+        if not href:
+            continue
+        href = href.strip()
+        if not href or href.startswith("#"):
+            continue
+
+        href_lower = href.lower()
+        if href_lower.startswith(("mailto:", "tel:", "javascript:", "data:")):
+            continue
+
+        abs_url = urljoin(base_url, href)
+        parts = urlsplit(abs_url)
+        if parts.scheme not in ("http", "https") or not parts.netloc:
+            continue
+
+        path_lower = (parts.path or "").lower()
+        if any(path_lower.endswith(ext) for ext in _ASSET_EXTENSIONS):
+            continue
+
+        group = normalize_url_for_grouping(abs_url)
+        if from_group and group == from_group:
+            continue
+
+        groups.add(group)
+        if len(groups) >= max_links:
+            break
+
+    return groups
+
+
+__all__ = [
+    "extract_title",
+    "extract_text",
+    "make_snippet",
+    "detect_language",
+    "extract_outlink_groups",
+]

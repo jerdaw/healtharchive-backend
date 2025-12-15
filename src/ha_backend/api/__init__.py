@@ -10,6 +10,7 @@ from ha_backend.config import get_cors_origins
 from ha_backend.db import get_session
 from ha_backend.logging_config import configure_logging
 from ha_backend.models import ArchiveJob, Snapshot, Source
+from ha_backend.runtime_metrics import render_search_metrics_prometheus
 
 from .deps import require_admin
 from .routes_admin import router as admin_router
@@ -149,6 +150,8 @@ async def metrics(
         lines.append(
             f'healtharchive_jobs_pages_failed_total{{source="{code}"}} {int(failed_count)}'
         )
+
+    lines.extend(render_search_metrics_prometheus())
 
     body = "\n".join(lines) + "\n"
     return PlainTextResponse(content=body)

@@ -201,6 +201,427 @@ def cmd_seed_sources(args: argparse.Namespace) -> None:
     print(f"Seeded {created_count} source(s).")
 
 
+def cmd_backfill_search_vector(args: argparse.Namespace) -> None:
+    """
+    Backfill Snapshot.search_vector for Postgres FTS.
+
+    This is safe to run multiple times. By default it only fills rows where
+    search_vector is NULL.
+    """
+    from sqlalchemy import update
+
+    from .models import Snapshot
+    from .search import build_search_vector
+
+    batch_size: int = args.batch_size
+    start_id: int = args.start_id
+    job_id: int | None = args.job_id
+    force: bool = args.force
+
+    with get_session() as session:
+        dialect_name = session.get_bind().dialect.name
+        if dialect_name != "postgresql":
+            print(
+                f"Database dialect is {dialect_name!r}; Postgres FTS backfill is skipped."
+            )
+            return
+
+        last_id = start_id
+        total_updated = 0
+
+        while True:
+            batch_filters = [Snapshot.id > last_id]
+            if job_id is not None:
+                batch_filters.append(Snapshot.job_id == job_id)
+            if not force:
+                batch_filters.append(Snapshot.search_vector.is_(None))
+
+            ids = (
+                session.query(Snapshot.id)
+                .filter(*batch_filters)
+                .order_by(Snapshot.id)
+                .limit(batch_size)
+                .all()
+            )
+
+            if not ids:
+                break
+
+            max_id = ids[-1][0]
+            update_filters = [Snapshot.id > last_id, Snapshot.id <= max_id]
+            if job_id is not None:
+                update_filters.append(Snapshot.job_id == job_id)
+            if not force:
+                update_filters.append(Snapshot.search_vector.is_(None))
+
+            stmt = (
+                update(Snapshot)
+                .where(*update_filters)
+                .values(
+                    search_vector=build_search_vector(
+                        Snapshot.title, Snapshot.snippet, Snapshot.url
+                    )
+                )
+            )
+            result = session.execute(stmt)
+            session.commit()
+
+            batch_updated = int(result.rowcount or 0)
+            total_updated += batch_updated
+            print(
+                f"Backfilled search_vector for ids ({last_id}, {max_id}] "
+                f"({batch_updated} rows; total {total_updated})."
+            )
+            last_id = max_id
+
+    print(f"Done. Total rows updated: {total_updated}")
+
+
+def cmd_refresh_snapshot_metadata(args: argparse.Namespace) -> None:
+    """
+    Refresh title/snippet/language for snapshots of a job by re-reading WARCs.
+
+    This updates rows in place (snapshot IDs remain stable).
+    """
+    from pathlib import Path
+
+    from sqlalchemy import update
+
+    from .indexing.text_extraction import (
+        detect_language,
+        extract_text,
+        extract_title,
+        make_snippet,
+    )
+    from .indexing.warc_reader import iter_html_records
+    from .models import ArchiveJob as ORMArchiveJob
+    from .models import Snapshot
+    from .search import build_search_vector
+
+    job_id: int = args.job_id
+    batch_size: int = args.batch_size
+    dry_run: bool = args.dry_run
+    limit: int | None = args.limit
+
+    with get_session() as session:
+        job = session.get(ORMArchiveJob, job_id)
+        if job is None:
+            print(f"ERROR: Job {job_id} not found.", file=sys.stderr)
+            sys.exit(1)
+
+        dialect_name = session.get_bind().dialect.name
+        use_postgres_fts = dialect_name == "postgresql"
+
+        rows = (
+            session.query(
+                Snapshot.id,
+                Snapshot.warc_path,
+                Snapshot.warc_record_id,
+                Snapshot.url,
+            )
+            .filter(Snapshot.job_id == job_id)
+            .order_by(Snapshot.id)
+            .all()
+        )
+        if not rows:
+            print(f"No snapshots found for job {job_id}.")
+            return
+
+        by_record_id: dict[tuple[str, str], int] = {}
+        by_url: dict[tuple[str, str], list[int]] = {}
+        warc_paths: set[str] = set()
+
+        for snap_id, warc_path, warc_record_id, url in rows:
+            warc_paths.add(warc_path)
+            if warc_record_id:
+                by_record_id[(warc_path, warc_record_id)] = snap_id
+            else:
+                by_url.setdefault((warc_path, url), []).append(snap_id)
+
+        updates: list[dict[str, object]] = []
+        updated_count = 0
+        processed_records = 0
+
+        warc_paths_sorted = sorted(warc_paths)
+        print(f"Refreshing snapshot metadata for job {job_id} ({len(warc_paths_sorted)} WARC(s))…")
+
+        for warc_path_str in warc_paths_sorted:
+            warc_path = Path(warc_path_str)
+            if not warc_path.is_file():
+                print(f"WARNING: WARC not found: {warc_path}", file=sys.stderr)
+                continue
+
+            for rec in iter_html_records(warc_path):
+                processed_records += 1
+                if limit is not None and processed_records > limit:
+                    break
+
+                target_id = None
+                if rec.warc_record_id is not None:
+                    target_id = by_record_id.get((warc_path_str, rec.warc_record_id))
+
+                target_ids: list[int] = []
+                if target_id is not None:
+                    target_ids = [target_id]
+                else:
+                    target_ids = by_url.get((warc_path_str, rec.url), [])
+
+                if not target_ids:
+                    continue
+
+                html = rec.body_bytes.decode("utf-8", errors="replace")
+                title = extract_title(html)
+                text = extract_text(html)
+                snippet = make_snippet(text)
+                language = detect_language(text, rec.headers)
+
+                for sid in target_ids:
+                    updates.append(
+                        {
+                            "id": sid,
+                            "title": title,
+                            "snippet": snippet,
+                            "language": language,
+                        }
+                    )
+
+                if len(updates) >= batch_size:
+                    session.bulk_update_mappings(Snapshot, updates)
+                    if not dry_run:
+                        session.commit()
+                    updated_count += len(updates)
+                    updates.clear()
+
+            if limit is not None and processed_records > limit:
+                break
+
+        if updates:
+            session.bulk_update_mappings(Snapshot, updates)
+            if not dry_run:
+                session.commit()
+            updated_count += len(updates)
+            updates.clear()
+
+        if use_postgres_fts and not dry_run:
+            session.execute(
+                update(Snapshot)
+                .where(Snapshot.job_id == job_id)
+                .values(
+                    search_vector=build_search_vector(
+                        Snapshot.title, Snapshot.snippet, Snapshot.url
+                    )
+                )
+            )
+            session.commit()
+
+        if dry_run:
+            session.rollback()
+            print("Dry run complete (rolled back changes).")
+        else:
+            print(f"Updated {updated_count} snapshot(s).")
+
+
+def cmd_backfill_outlinks(args: argparse.Namespace) -> None:
+    """
+    Backfill SnapshotOutlink rows for snapshots by re-reading WARCs.
+
+    This is intended for production backfills after deploying the authority
+    schema, and can also be used locally for debugging.
+    """
+    from pathlib import Path
+
+    from sqlalchemy import inspect
+
+    from .authority import recompute_page_signals
+    from .indexing.mapping import normalize_url_for_grouping
+    from .indexing.text_extraction import extract_outlink_groups
+    from .indexing.warc_reader import iter_html_records
+    from .models import ArchiveJob as ORMArchiveJob
+    from .models import Snapshot, SnapshotOutlink
+
+    job_id: int = args.job_id
+    batch_size: int = args.batch_size
+    max_links_per_snapshot: int = args.max_links_per_snapshot
+    dry_run: bool = args.dry_run
+    limit: int | None = args.limit
+    update_signals: bool = args.update_signals
+
+    with get_session() as session:
+        inspector = inspect(session.get_bind())
+        if not inspector.has_table("snapshot_outlinks"):
+            print(
+                "ERROR: snapshot_outlinks table not found; run 'alembic upgrade head' first.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+
+        has_page_signals = inspector.has_table("page_signals")
+        if update_signals and not has_page_signals:
+            print(
+                "WARNING: page_signals table not found; PageSignal updates will be skipped.",
+                file=sys.stderr,
+            )
+            update_signals = False
+
+        job = session.get(ORMArchiveJob, job_id)
+        if job is None:
+            print(f"ERROR: Job {job_id} not found.", file=sys.stderr)
+            sys.exit(1)
+
+        rows = (
+            session.query(
+                Snapshot.id,
+                Snapshot.warc_path,
+                Snapshot.warc_record_id,
+                Snapshot.url,
+            )
+            .filter(Snapshot.job_id == job_id)
+            .order_by(Snapshot.id)
+            .all()
+        )
+        if not rows:
+            print(f"No snapshots found for job {job_id}.")
+            return
+
+        impacted_groups: set[str] = set()
+        existing_groups = (
+            session.query(SnapshotOutlink.to_normalized_url_group)
+            .join(Snapshot, Snapshot.id == SnapshotOutlink.snapshot_id)
+            .filter(Snapshot.job_id == job_id)
+            .distinct()
+            .all()
+        )
+        impacted_groups.update({g for (g,) in existing_groups if g})
+
+        snapshot_ids_subq = session.query(Snapshot.id).filter(Snapshot.job_id == job_id)
+        deleted = (
+            session.query(SnapshotOutlink)
+            .filter(SnapshotOutlink.snapshot_id.in_(snapshot_ids_subq))
+            .delete(synchronize_session=False)
+        )
+        if deleted:
+            print(f"Deleted {int(deleted)} existing outlink row(s) for job {job_id}.")
+
+        by_record_id: dict[tuple[str, str], list[int]] = {}
+        by_url: dict[tuple[str, str], list[int]] = {}
+        warc_paths: set[str] = set()
+
+        for snap_id, warc_path, warc_record_id, url in rows:
+            warc_paths.add(warc_path)
+            if warc_record_id:
+                by_record_id.setdefault((warc_path, warc_record_id), []).append(snap_id)
+            else:
+                by_url.setdefault((warc_path, url), []).append(snap_id)
+
+        warc_paths_sorted = sorted(warc_paths)
+        print(
+            f"Backfilling outlinks for job {job_id} ({len(rows)} snapshot(s), {len(warc_paths_sorted)} WARC(s))…"
+        )
+
+        pending: list[dict[str, object]] = []
+        inserted_rows = 0
+        processed_records = 0
+
+        for warc_path_str in warc_paths_sorted:
+            warc_path = Path(warc_path_str)
+            if not warc_path.is_file():
+                print(f"WARNING: WARC not found: {warc_path}", file=sys.stderr)
+                continue
+
+            for rec in iter_html_records(warc_path):
+                processed_records += 1
+                if limit is not None and processed_records > limit:
+                    break
+
+                if rec.status_code is None or not (200 <= rec.status_code < 300):
+                    continue
+
+                target_ids: list[int] = []
+                if rec.warc_record_id:
+                    target_ids = by_record_id.get((warc_path_str, rec.warc_record_id), [])
+                if not target_ids:
+                    target_ids = by_url.get((warc_path_str, rec.url), [])
+                if not target_ids:
+                    continue
+
+                html = rec.body_bytes.decode("utf-8", errors="replace")
+                from_group = normalize_url_for_grouping(rec.url)
+                outlink_groups = extract_outlink_groups(
+                    html,
+                    base_url=rec.url,
+                    from_group=from_group,
+                    max_links=max_links_per_snapshot,
+                )
+                if not outlink_groups:
+                    continue
+
+                impacted_groups.update(outlink_groups)
+
+                for snap_id in target_ids:
+                    for group in outlink_groups:
+                        pending.append(
+                            {
+                                "snapshot_id": snap_id,
+                                "to_normalized_url_group": group,
+                            }
+                        )
+
+                if len(pending) >= batch_size:
+                    session.bulk_insert_mappings(SnapshotOutlink, pending)
+                    if not dry_run:
+                        session.flush()
+                    inserted_rows += len(pending)
+                    pending.clear()
+
+            if limit is not None and processed_records > limit:
+                break
+
+        if pending:
+            session.bulk_insert_mappings(SnapshotOutlink, pending)
+            if not dry_run:
+                session.flush()
+            inserted_rows += len(pending)
+            pending.clear()
+
+        print(f"Inserted {inserted_rows} outlink row(s) for job {job_id}.")
+
+        if update_signals and impacted_groups:
+            recompute_page_signals(session, groups=tuple(impacted_groups))
+
+        if dry_run:
+            session.rollback()
+            print("Dry run complete (rolled back changes).")
+
+
+def cmd_recompute_page_signals(args: argparse.Namespace) -> None:
+    """
+    Rebuild PageSignal rows from SnapshotOutlink edges.
+    """
+    from sqlalchemy import inspect
+
+    from .authority import recompute_page_signals
+
+    dry_run: bool = args.dry_run
+
+    with get_session() as session:
+        inspector = inspect(session.get_bind())
+        if not inspector.has_table("snapshot_outlinks") or not inspector.has_table(
+            "page_signals"
+        ):
+            print(
+                "ERROR: authority tables not found; run 'alembic upgrade head' first.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+
+        updated = recompute_page_signals(session, groups=None)
+        print(f"Recomputed page signals ({updated} change(s)).")
+
+        if dry_run:
+            session.rollback()
+            print("Dry run complete (rolled back changes).")
+
+
 def cmd_list_jobs(args: argparse.Namespace) -> None:
     """
     List recent ArchiveJob rows with optional filters.
@@ -696,6 +1117,121 @@ def build_parser() -> argparse.ArgumentParser:
         help="Insert initial Source rows (hc, phac) into the database if missing.",
     )
     p_seed.set_defaults(func=cmd_seed_sources)
+
+    # backfill-search-vector
+    p_backfill_search = subparsers.add_parser(
+        "backfill-search-vector",
+        help="Backfill Snapshot.search_vector for Postgres full-text search.",
+    )
+    p_backfill_search.add_argument(
+        "--batch-size",
+        type=int,
+        default=5000,
+        help="Rows to update per batch.",
+    )
+    p_backfill_search.add_argument(
+        "--start-id",
+        type=int,
+        default=0,
+        help="Start backfill from snapshot IDs greater than this value.",
+    )
+    p_backfill_search.add_argument(
+        "--job-id",
+        type=int,
+        help="Optional ArchiveJob ID filter (only backfill snapshots for this job).",
+    )
+    p_backfill_search.add_argument(
+        "--force",
+        action="store_true",
+        default=False,
+        help="Recompute vectors even when search_vector is already populated.",
+    )
+    p_backfill_search.set_defaults(func=cmd_backfill_search_vector)
+
+    # refresh-snapshot-metadata
+    p_refresh = subparsers.add_parser(
+        "refresh-snapshot-metadata",
+        help="Refresh title/snippet/language for a job by re-reading its WARCs.",
+    )
+    p_refresh.add_argument(
+        "--job-id",
+        type=int,
+        required=True,
+        help="ArchiveJob ID whose snapshots should be refreshed.",
+    )
+    p_refresh.add_argument(
+        "--batch-size",
+        type=int,
+        default=200,
+        help="Rows to update per DB batch.",
+    )
+    p_refresh.add_argument(
+        "--limit",
+        type=int,
+        help="Optional maximum number of WARC records to process (debugging).",
+    )
+    p_refresh.add_argument(
+        "--dry-run",
+        action="store_true",
+        default=False,
+        help="Compute updates but roll back at the end (no DB changes).",
+    )
+    p_refresh.set_defaults(func=cmd_refresh_snapshot_metadata)
+
+    # backfill-outlinks
+    p_backfill_outlinks = subparsers.add_parser(
+        "backfill-outlinks",
+        help="Backfill SnapshotOutlink edges for a job by re-reading its WARCs.",
+    )
+    p_backfill_outlinks.add_argument(
+        "--job-id",
+        type=int,
+        required=True,
+        help="ArchiveJob ID whose snapshots should have outlinks extracted.",
+    )
+    p_backfill_outlinks.add_argument(
+        "--batch-size",
+        type=int,
+        default=2000,
+        help="Outlink rows to insert per DB batch.",
+    )
+    p_backfill_outlinks.add_argument(
+        "--max-links-per-snapshot",
+        type=int,
+        default=200,
+        help="Maximum number of unique outlink targets to record per snapshot.",
+    )
+    p_backfill_outlinks.add_argument(
+        "--update-signals",
+        action="store_true",
+        default=False,
+        help="Recompute PageSignal rows for affected groups after backfill.",
+    )
+    p_backfill_outlinks.add_argument(
+        "--limit",
+        type=int,
+        help="Optional maximum number of WARC records to process (debugging).",
+    )
+    p_backfill_outlinks.add_argument(
+        "--dry-run",
+        action="store_true",
+        default=False,
+        help="Compute and insert edges but roll back at the end (no DB changes).",
+    )
+    p_backfill_outlinks.set_defaults(func=cmd_backfill_outlinks)
+
+    # recompute-page-signals
+    p_signals = subparsers.add_parser(
+        "recompute-page-signals",
+        help="Rebuild PageSignal rows from SnapshotOutlink edges.",
+    )
+    p_signals.add_argument(
+        "--dry-run",
+        action="store_true",
+        default=False,
+        help="Recompute signals but roll back at the end (no DB changes).",
+    )
+    p_signals.set_defaults(func=cmd_recompute_page_signals)
 
     # list-jobs
     p_list = subparsers.add_parser(

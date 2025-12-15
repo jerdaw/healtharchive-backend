@@ -889,23 +889,44 @@ Public Pydantic models:
     - `q: str | None` – keyword.
     - `source: str | None` – source code (e.g. `"hc"`).
     - `topic: str | None` – topic slug (see `TopicRef.slug`).
-    - `sort: "relevance" | "newest" | None` – sort mode.
-      - Default: `"relevance"` when `q` is present; otherwise `"newest"`.
-    - `includeNon2xx: bool` – include non‑2xx HTTP responses in results (default `false`).
+    - `sort: "relevance" | "newest" | None` – ordering mode.
+    - `view: "snapshots" | "pages" | None` – results grouping mode.
+    - `includeNon2xx: bool` – include non‑2xx HTTP status captures (defaults to `false`).
     - `page: int` – 1‑based page index (default `1`, must be `>= 1`).
     - `pageSize: int` – results per page (default `20`, minimum `1`, maximum `100`).
   - Filters:
     - `Source.code == source.lower()` when `source` set.
     - Joins `Snapshot.topics` / `Topic` when filtering by `topic`.
-    - Keyword filter via `ILIKE` on `title`, `snippet`, and `url`.
-    - By default, excludes non‑2xx responses (unless `includeNon2xx=true`).
+    - By default (`includeNon2xx=false`), filters out snapshots with a known non‑2xx
+      `status_code` (keeps `status_code IS NULL` and `200–299`).
+    - Keyword filter:
+      - On Postgres with `sort="relevance"`: full‑text search (FTS) against
+        `snapshots.search_vector`.
+      - Otherwise: `ILIKE` on `title`, `snippet`, and `url`.
   - Ordering:
-    - If `sort="relevance"` and `q` is present, use a lightweight relevance scoring:
-      title match > URL match > snippet match, then recency.
-    - Otherwise order by `capture_timestamp DESC, id DESC` (newest first).
+    - Default sort:
+      - When `q` is present: `sort="relevance"`.
+      - When `q` is absent: `sort="newest"`.
+	    - `sort="relevance"` (when `q` present):
+	      - On Postgres: uses FTS (`websearch_to_tsquery` + `ts_rank_cd`) against
+	        `snapshots.search_vector`, with small heuristics (phrase-in-title boost,
+	        URL depth/querystring penalties) and an optional authority boost from
+	        `page_signals.inlink_count` (when available).
+	      - On SQLite/other DBs: uses a DB‑agnostic match score (title > URL > snippet),
+	        then (when available) a small authority tie-break from `page_signals`,
+	        then recency.
+    - `sort="newest"`: orders by recency.
+    - When `includeNon2xx=true`, 2xx snapshots are still prioritised ahead of 3xx,
+      unknown, and 4xx/5xx captures.
+  - Grouping:
+    - Default view: `view="snapshots"` (returns individual captures; `total` counts snapshots).
+    - `view="pages"` returns only the **latest** snapshot for each page group
+      (`normalized_url_group`, falling back to `url`), and `total` counts page groups.
   - Pagination semantics:
-    - `total` is the total number of matching snapshots across all pages.
-    - `results` contains at most `pageSize` snapshots for the requested `page`.
+    - `total` is the total number of matching items across all pages (snapshots
+      for `view="snapshots"`, page groups for `view="pages"`).
+    - `results` contains at most `pageSize` snapshots for the requested `page`
+      (in `view="pages"`, these are the latest snapshots for each page group).
     - Requesting a page past the end of the result set returns `200 OK` with `results: []` and `total` unchanged.
     - Supplying an invalid `page` (`< 1`) or `pageSize` (`< 1` or `> 100`) yields `422 Unprocessable Entity` from FastAPI’s validation.
 

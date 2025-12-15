@@ -7,7 +7,7 @@ from fastapi.testclient import TestClient
 
 from ha_backend import db as db_module
 from ha_backend.db import Base, get_engine, get_session
-from ha_backend.models import Snapshot, Source, Topic
+from ha_backend.models import PageSignal, Snapshot, Source, Topic
 
 
 def _init_test_app(tmp_path: Path, monkeypatch):
@@ -110,43 +110,134 @@ def _seed_search_data() -> None:
         session.add_all([s1, s2, s3])
 
 
-def _add_snapshot(
-    *,
-    source_code: str,
-    url: str,
-    title: str,
-    snippet: str,
-    capture_timestamp: datetime,
-    status_code: int,
-) -> int:
-    with get_session() as session:
-        source = session.query(Source).filter(Source.code == source_code).first()
-        assert source is not None
+def _seed_search_quality_data() -> None:
+    """
+    Seed extra snapshots to validate ordering and default quality filters.
+    """
+    _seed_search_data()
 
-        snap = Snapshot(
+    with get_session() as session:
+        hc = session.query(Source).filter(Source.code == "hc").one()
+
+        ts4 = datetime(2025, 4, 1, 12, 0, tzinfo=timezone.utc)
+        s4 = Snapshot(
             job_id=None,
-            source_id=source.id,
-            url=url,
-            normalized_url_group=url,
-            capture_timestamp=capture_timestamp,
+            source_id=hc.id,
+            url="https://www.canada.ca/en/health-canada/updates.html",
+            normalized_url_group="https://www.canada.ca/en/health-canada/updates.html",
+            capture_timestamp=ts4,
             mime_type="text/html",
-            status_code=status_code,
-            title=title,
-            snippet=snippet,
+            status_code=200,
+            title="Latest public health updates",
+            snippet="Bulletin: COVID-19 guidance updates and notices.",
             language="en",
-            warc_path=f"/warcs/{source_code}-extra.warc.gz",
-            warc_record_id=f"{source_code}-extra",
+            warc_path="/warcs/hc-updates.warc.gz",
+            warc_record_id="hc-updates",
         )
-        session.add(snap)
-        session.flush()
-        return int(snap.id)
+
+        ts5 = datetime(2025, 5, 1, 12, 0, tzinfo=timezone.utc)
+        s5 = Snapshot(
+            job_id=None,
+            source_id=hc.id,
+            url="https://www.canada.ca/en/health-canada/missing/covid-19.html",
+            normalized_url_group="https://www.canada.ca/en/health-canada/missing/covid-19.html",
+            capture_timestamp=ts5,
+            mime_type="text/html",
+            status_code=404,
+            title="COVID-19 not found (404)",
+            snippet="Not Found: COVID-19 resource could not be located.",
+            language="en",
+            warc_path="/warcs/hc-missing.warc.gz",
+            warc_record_id="hc-missing",
+        )
+
+        session.add_all([s4, s5])
 
 
-def _get_snapshot_id_by_title(title: str) -> int:
+def _seed_pages_view_data() -> None:
+    """
+    Seed multiple snapshots for the same normalized_url_group to validate view=pages.
+    """
+    _seed_search_data()
+
     with get_session() as session:
-        snap = session.query(Snapshot).filter(Snapshot.title == title).first()
-        assert snap is not None
-        return int(snap.id)
+        hc = session.query(Source).filter(Source.code == "hc").one()
+
+        # A newer capture of the same page as s1.
+        ts4 = datetime(2025, 4, 15, 12, 0, tzinfo=timezone.utc)
+        s4 = Snapshot(
+            job_id=None,
+            source_id=hc.id,
+            url="https://www.canada.ca/en/health-canada/covid19.html",
+            normalized_url_group="https://www.canada.ca/en/health-canada/covid19.html",
+            capture_timestamp=ts4,
+            mime_type="text/html",
+            status_code=200,
+            title="COVID-19 guidance (updated)",
+            snippet="Updated COVID-19 guidance from Health Canada.",
+            language="en",
+            warc_path="/warcs/hc-covid-2.warc.gz",
+            warc_record_id="hc-covid-2",
+        )
+        session.add(s4)
+
+
+def _seed_authority_ranking_data() -> None:
+    """
+    Seed a minimal dataset to validate PageSignal boosts tie-break relevance.
+    """
+    with get_session() as session:
+        hc = Source(
+            code="hc",
+            name="Health Canada",
+            base_url="https://www.canada.ca/en/health-canada.html",
+            description="Health Canada",
+            enabled=True,
+        )
+        session.add(hc)
+        session.flush()
+
+        ts_old = datetime(2025, 1, 1, 12, 0, tzinfo=timezone.utc)
+        ts_new = datetime(2025, 2, 1, 12, 0, tzinfo=timezone.utc)
+
+        authoritative = Snapshot(
+            job_id=None,
+            source_id=hc.id,
+            url="https://example.org/hub",
+            normalized_url_group="https://example.org/hub",
+            capture_timestamp=ts_old,
+            mime_type="text/html",
+            status_code=200,
+            title="COVID-19 hub page",
+            snippet="COVID-19 overview and resources.",
+            language="en",
+            warc_path="/warcs/hub.warc.gz",
+            warc_record_id="hub",
+        )
+        newer = Snapshot(
+            job_id=None,
+            source_id=hc.id,
+            url="https://example.org/updates",
+            normalized_url_group="https://example.org/updates",
+            capture_timestamp=ts_new,
+            mime_type="text/html",
+            status_code=200,
+            title="COVID-19 updates",
+            snippet="COVID-19 updates and notices.",
+            language="en",
+            warc_path="/warcs/updates.warc.gz",
+            warc_record_id="updates",
+        )
+
+        session.add_all([authoritative, newer])
+        session.flush()
+
+        session.add(
+            PageSignal(
+                normalized_url_group="https://example.org/hub",
+                inlink_count=100,
+            )
+        )
 
 
 def test_search_endpoint_basic(tmp_path, monkeypatch) -> None:
@@ -196,6 +287,96 @@ def test_search_filters_by_query(tmp_path, monkeypatch) -> None:
         t["slug"] == "covid-19" and t["label"] == "COVID-19"
         for t in result["topics"]
     )
+
+
+def test_search_default_relevance_sort_and_filters_non_2xx(tmp_path, monkeypatch) -> None:
+    client = _init_test_app(tmp_path, monkeypatch)
+    _seed_search_quality_data()
+
+    resp = client.get("/api/search", params={"q": "COVID-19"})
+    assert resp.status_code == 200
+    data = resp.json()
+
+    # The seeded 404 page should be filtered out by default.
+    assert data["total"] == 2
+    titles = [r["title"] for r in data["results"]]
+    assert titles[0] == "COVID-19 guidance"
+    assert "COVID-19 not found (404)" not in titles
+
+
+def test_search_include_non_2xx_includes_error_pages_but_ranks_lower(
+    tmp_path, monkeypatch
+) -> None:
+    client = _init_test_app(tmp_path, monkeypatch)
+    _seed_search_quality_data()
+
+    resp = client.get(
+        "/api/search", params={"q": "COVID-19", "includeNon2xx": True}
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+
+    assert data["total"] == 3
+    titles = [r["title"] for r in data["results"]]
+    assert titles[0] == "COVID-19 guidance"
+    assert "COVID-19 not found (404)" in titles
+
+
+def test_search_sort_newest(tmp_path, monkeypatch) -> None:
+    client = _init_test_app(tmp_path, monkeypatch)
+    _seed_search_quality_data()
+
+    resp = client.get("/api/search", params={"q": "COVID-19", "sort": "newest"})
+    assert resp.status_code == 200
+    data = resp.json()
+
+    assert data["total"] == 2
+    titles = [r["title"] for r in data["results"]]
+    assert titles[0] == "Latest public health updates"
+
+
+def test_search_view_pages_dedupes_by_normalized_url_group(tmp_path, monkeypatch) -> None:
+    client = _init_test_app(tmp_path, monkeypatch)
+    _seed_pages_view_data()
+
+    resp = client.get("/api/search", params={"view": "pages"})
+    assert resp.status_code == 200
+    data = resp.json()
+
+    # We seeded 4 snapshots but only 3 distinct page groups.
+    assert data["total"] == 3
+    assert len(data["results"]) == 3
+
+    urls = [r["originalUrl"] for r in data["results"]]
+    assert urls.count("https://www.canada.ca/en/health-canada/covid19.html") == 1
+
+
+def test_search_view_pages_returns_latest_snapshot_for_group(tmp_path, monkeypatch) -> None:
+    client = _init_test_app(tmp_path, monkeypatch)
+    _seed_pages_view_data()
+
+    resp = client.get("/api/search", params={"q": "COVID-19", "view": "pages"})
+    assert resp.status_code == 200
+    data = resp.json()
+
+    assert data["total"] == 1
+    assert data["results"][0]["title"] == "COVID-19 guidance (updated)"
+
+
+def test_search_relevance_uses_page_signal_boost_for_tie_breaks(
+    tmp_path, monkeypatch
+) -> None:
+    client = _init_test_app(tmp_path, monkeypatch)
+    _seed_authority_ranking_data()
+
+    resp = client.get("/api/search", params={"q": "COVID-19", "sort": "relevance"})
+    assert resp.status_code == 200
+    data = resp.json()
+
+    assert data["total"] == 2
+    titles = [r["title"] for r in data["results"]]
+    # The authoritative page is older, but should be boosted ahead of the newer one.
+    assert titles[0] == "COVID-19 hub page"
 
 
 def test_search_filters_by_topic_slug(tmp_path, monkeypatch) -> None:
@@ -368,55 +549,3 @@ def test_search_invalid_query_params(tmp_path, monkeypatch) -> None:
 
     resp_bad_topic = client.get("/api/search", params={"topic": "covid 19"})
     assert resp_bad_topic.status_code == 422
-
-
-def test_search_excludes_non_2xx_by_default(tmp_path, monkeypatch) -> None:
-    client = _init_test_app(tmp_path, monkeypatch)
-    _seed_search_data()
-
-    _add_snapshot(
-        source_code="hc",
-        url="https://www.canada.ca/en/health-canada/notfound.html",
-        title="Not Found - Canada.ca",
-        snippet="COVID-19 page missing.",
-        capture_timestamp=datetime(2025, 4, 1, 12, 0, tzinfo=timezone.utc),
-        status_code=404,
-    )
-
-    resp_default = client.get("/api/search", params={"q": "COVID-19"})
-    assert resp_default.status_code == 200
-    data_default = resp_default.json()
-    assert data_default["total"] == 1
-
-    resp_include = client.get(
-        "/api/search",
-        params={"q": "COVID-19", "includeNon2xx": "true"},
-    )
-    assert resp_include.status_code == 200
-    data_include = resp_include.json()
-    assert data_include["total"] == 2
-
-
-def test_search_sort_defaults_to_relevance_when_q_present(tmp_path, monkeypatch) -> None:
-    client = _init_test_app(tmp_path, monkeypatch)
-    _seed_search_data()
-
-    covid_id = _get_snapshot_id_by_title("COVID-19 guidance")
-    newer_id = _add_snapshot(
-        source_code="hc",
-        url="https://www.canada.ca/en/health-canada/press-release.html",
-        title="Press release",
-        snippet="COVID-19 update from Health Canada.",
-        capture_timestamp=datetime(2025, 12, 1, 12, 0, tzinfo=timezone.utc),
-        status_code=200,
-    )
-
-    resp_default = client.get("/api/search", params={"q": "COVID-19"})
-    assert resp_default.status_code == 200
-    data_default = resp_default.json()
-    assert data_default["results"][0]["id"] == covid_id
-
-    resp_newest = client.get("/api/search", params={"q": "COVID-19", "sort": "newest"})
-    assert resp_newest.status_code == 200
-    data_newest = resp_newest.json()
-    assert data_newest["results"][0]["id"] == newer_id
