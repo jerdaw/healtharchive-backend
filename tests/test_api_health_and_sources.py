@@ -129,6 +129,57 @@ def test_sources_endpoint_with_data(tmp_path, monkeypatch) -> None:
     assert "phac" in codes
 
 
+def test_sources_endpoint_excludes_test_source(tmp_path, monkeypatch) -> None:
+    client = _init_test_app(tmp_path, monkeypatch)
+
+    with get_session() as session:
+        test_source = Source(code="test", name="Test Source", enabled=True)
+        hc = Source(code="hc", name="Health Canada", enabled=True)
+        session.add_all([test_source, hc])
+        session.flush()
+
+        ts = datetime(2025, 1, 1, 12, 0, tzinfo=timezone.utc)
+        session.add_all(
+            [
+                Snapshot(
+                    job_id=None,
+                    source_id=test_source.id,
+                    url="https://example.test/test",
+                    normalized_url_group="https://example.test/test",
+                    capture_timestamp=ts,
+                    mime_type="text/html",
+                    status_code=200,
+                    title="Synthetic test snapshot",
+                    snippet="Test snapshot",
+                    language="en",
+                    warc_path="/warcs/test.warc.gz",
+                    warc_record_id="test-1",
+                ),
+                Snapshot(
+                    job_id=None,
+                    source_id=hc.id,
+                    url="https://www.canada.ca/en/health-canada.html",
+                    normalized_url_group="https://www.canada.ca/en/health-canada.html",
+                    capture_timestamp=ts,
+                    mime_type="text/html",
+                    status_code=200,
+                    title="HC Home",
+                    snippet="Health Canada home",
+                    language="en",
+                    warc_path="/warcs/hc1.warc.gz",
+                    warc_record_id="hc-1",
+                ),
+            ]
+        )
+
+    resp = client.get("/api/sources")
+    assert resp.status_code == 200
+    sources = resp.json()
+    codes = {s["sourceCode"] for s in sources}
+    assert "test" not in codes
+    assert "hc" in codes
+
+
 def test_stats_endpoint_with_no_data(tmp_path, monkeypatch) -> None:
     client = _init_test_app(tmp_path, monkeypatch)
 

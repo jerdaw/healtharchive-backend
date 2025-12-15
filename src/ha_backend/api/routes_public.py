@@ -42,6 +42,11 @@ _TABLE_EXISTS_LOCK = Lock()
 _COLUMN_EXISTS_CACHE: dict[tuple[int, str, str], bool] = {}
 _COLUMN_EXISTS_LOCK = Lock()
 
+# We sometimes create synthetic test snapshots/sources for operational
+# verification (e.g., backup restore checks). These should not surface in
+# public browsing/search UI.
+_PUBLIC_EXCLUDED_SOURCE_CODES = {"test"}
+
 
 def _has_table(db: Session, table_name: str) -> bool:
     bind = db.get_bind()
@@ -143,6 +148,7 @@ def _search_snapshots_inner(
             mode = f"{mode}_v2"
 
     query = db.query(Snapshot).join(Source)
+    query = query.filter(~Source.code.in_(_PUBLIC_EXCLUDED_SOURCE_CODES))
 
     if source:
         query = query.filter(Source.code == source.lower())
@@ -752,6 +758,7 @@ def list_sources(db: Session = Depends(get_db)) -> List[SourceSummarySchema]:
             snapshot_agg.c.last_capture,
         )
         .join(snapshot_agg, snapshot_agg.c.source_id == Source.id)
+        .filter(~Source.code.in_(_PUBLIC_EXCLUDED_SOURCE_CODES))
         .order_by(Source.name)
         .all()
     )
