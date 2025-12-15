@@ -321,13 +321,23 @@ def _search_snapshots_inner(
         return (-0.01) * slash_count
 
     def build_archived_penalty() -> Any:
-        if ranking_version == RankingVersion.v2 and ranking_cfg is not None:
-            if ranking_cfg.archived_penalty != 0:
-                return case(
-                    (Snapshot.title.ilike("archived%"), float(ranking_cfg.archived_penalty)),
-                    else_=0.0,
-                )
-        return 0.0
+        if ranking_version != RankingVersion.v2 or ranking_cfg is None:
+            return 0.0
+        if ranking_cfg.archived_penalty == 0:
+            return 0.0
+
+        # Canada.ca often marks pages as archived via title prefixes *or* a banner
+        # in the rendered HTML that ends up in our snippet extraction.
+        snippet_text = func.coalesce(Snapshot.snippet, "")
+        archived_match = or_(
+            Snapshot.title.ilike("archived%"),
+            Snapshot.title.ilike("archive %"),
+            snippet_text.ilike("%we have archived this page%"),
+            snippet_text.ilike("%this page has been archived%"),
+            snippet_text.ilike("%nous avons archivé cette page%"),
+            snippet_text.ilike("%cette page a été archivée%"),
+        )
+        return case((archived_match, float(ranking_cfg.archived_penalty)), else_=0.0)
 
     def build_title_boost() -> Any:
         if not q_clean:
@@ -346,19 +356,19 @@ def _search_snapshots_inner(
             else_=0.0,
         )
 
-    def build_querystring_penalty() -> Any:
+    def build_querystring_penalty(url_expr: Any) -> Any:
         return case(
-            (Snapshot.url.like("%?%"), -0.1),
+            (url_expr.like("%?%"), -0.1),
             else_=0.0,
         )
 
-    def build_tracking_penalty() -> Any:
+    def build_tracking_penalty(url_expr: Any) -> Any:
         return case(
             (
                 or_(
-                    Snapshot.url.ilike("%utm_%"),
-                    Snapshot.url.ilike("%gclid=%"),
-                    Snapshot.url.ilike("%fbclid=%"),
+                    url_expr.ilike("%utm_%"),
+                    url_expr.ilike("%gclid=%"),
+                    url_expr.ilike("%fbclid=%"),
                 ),
                 -0.1,
             ),
@@ -377,14 +387,27 @@ def _search_snapshots_inner(
                 rank = func.ts_rank_cd(vector_expr, tsquery, 32)
             else:
                 rank = func.ts_rank_cd(vector_expr, tsquery)
-            depth_basis = group_key if (ranking_version == RankingVersion.v2 and ranking_cfg is not None) else Snapshot.url
+            depth_basis = (
+                group_key
+                if (ranking_version == RankingVersion.v2 and ranking_cfg is not None)
+                else Snapshot.url
+            )
+            url_penalty_basis = (
+                group_key
+                if (
+                    ranking_version == RankingVersion.v2
+                    and ranking_cfg is not None
+                    and effective_view == SearchView.pages
+                )
+                else Snapshot.url
+            )
             depth_penalty = build_depth_penalty(depth_basis)
             score = (
                 rank
                 + build_title_boost()
                 + build_archived_penalty()
-                + build_querystring_penalty()
-                + build_tracking_penalty()
+                + build_querystring_penalty(url_penalty_basis)
+                + build_tracking_penalty(url_penalty_basis)
                 + depth_penalty
             )
             if use_authority and inlink_count is not None:

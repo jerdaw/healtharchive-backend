@@ -388,23 +388,36 @@ def search_debug(
         )
 
     def build_archived_penalty() -> object:
-        if ranking_version == RankingVersion.v2 and ranking_cfg is not None and ranking_cfg.archived_penalty != 0:
+        if (
+            ranking_version == RankingVersion.v2
+            and ranking_cfg is not None
+            and ranking_cfg.archived_penalty != 0
+        ):
+            snippet_text = func.coalesce(Snapshot.snippet, "")
+            archived_match = or_(
+                Snapshot.title.ilike("archived%"),
+                Snapshot.title.ilike("archive %"),
+                snippet_text.ilike("%we have archived this page%"),
+                snippet_text.ilike("%this page has been archived%"),
+                snippet_text.ilike("%nous avons archivé cette page%"),
+                snippet_text.ilike("%cette page a été archivée%"),
+            )
             return case(
-                (Snapshot.title.ilike("archived%"), float(ranking_cfg.archived_penalty)),
+                (archived_match, float(ranking_cfg.archived_penalty)),
                 else_=0.0,
             )
         return 0.0
 
-    def build_query_penalty() -> object:
-        return case((Snapshot.url.like("%?%"), -0.1), else_=0.0)
+    def build_query_penalty(url_expr: object) -> object:
+        return case((url_expr.like("%?%"), -0.1), else_=0.0)
 
-    def build_tracking_penalty() -> object:
+    def build_tracking_penalty(url_expr: object) -> object:
         return case(
             (
                 or_(
-                    Snapshot.url.ilike("%utm_%"),
-                    Snapshot.url.ilike("%gclid=%"),
-                    Snapshot.url.ilike("%fbclid=%"),
+                    url_expr.ilike("%utm_%"),
+                    url_expr.ilike("%gclid=%"),
+                    url_expr.ilike("%fbclid=%"),
                 ),
                 -0.1,
             ),
@@ -464,8 +477,17 @@ def search_debug(
     rank_text = build_rank_text()
     title_boost = build_title_boost().label("title_boost")
     archived_penalty = build_archived_penalty().label("archived_penalty")
-    query_penalty = build_query_penalty().label("query_penalty")
-    tracking_penalty = build_tracking_penalty().label("tracking_penalty")
+    url_penalty_basis = (
+        group_key
+        if (
+            ranking_version == RankingVersion.v2
+            and ranking_cfg is not None
+            and effective_view == SearchView.pages
+        )
+        else Snapshot.url
+    )
+    query_penalty = build_query_penalty(url_penalty_basis).label("query_penalty")
+    tracking_penalty = build_tracking_penalty(url_penalty_basis).label("tracking_penalty")
     depth_penalty = build_depth_penalty().label("depth_penalty")
     authority_boost = build_authority_boost().label("authority_boost")
     hubness_boost = build_hubness_boost().label("hubness_boost")
