@@ -38,7 +38,7 @@ def _compute_pagerank_scaled(
     out_deg: list[int] = [0 for _ in range(n)]
 
     for from_idx, to_idxs in adjacency.items():
-        if from_idx < 0 or from_idx >= n:
+        if not (0 <= from_idx < n):
             continue
         tos = [t for t in to_idxs if 0 <= t < n and t != from_idx]
         tos = sorted(set(tos))
@@ -76,7 +76,6 @@ def _compute_pagerank_scaled(
         if diff < tol:
             break
 
-    # Scale from sum=1.0 to sum=n (mean ~= 1).
     return {nodes[i]: rank[i] * n for i in range(n)}
 
 
@@ -132,8 +131,12 @@ def _compute_graph_signals(session: Session) -> _GraphSignals:
             if 0 <= to_idx < len(inlink_arr):
                 inlink_arr[to_idx] += 1
 
-    inlink_count: dict[str, int] = {nodes_list[i]: inlink_arr[i] for i in range(len(nodes_list))}
-    outlink_count: dict[str, int] = {nodes_list[i]: outlink_arr[i] for i in range(len(nodes_list))}
+    inlink_count: dict[str, int] = {
+        nodes_list[i]: inlink_arr[i] for i in range(len(nodes_list))
+    }
+    outlink_count: dict[str, int] = {
+        nodes_list[i]: outlink_arr[i] for i in range(len(nodes_list))
+    }
 
     return _GraphSignals(
         inlink_count=inlink_count,
@@ -152,12 +155,13 @@ def recompute_page_signals(
 
     Fields:
     - inlink_count: distinct linking page groups
-    - outlink_count: distinct outgoing page groups
-    - pagerank: scaled PageRank (mean ~= 1)
+    - outlink_count: distinct outgoing page groups (if present)
+    - pagerank: scaled PageRank (mean ~= 1) (if present)
 
-    If groups is None, rebuilds the entire table (deletes existing rows and recomputes pagerank).
+    If groups is None, rebuilds the entire table (deletes existing rows and
+    recomputes pagerank).
     If groups is provided, only updates those groups (and removes rows that no
-    longer have any inlinks or outlinks). Pagerank is not recomputed in this mode.
+    longer have any inlinks; also considers outlinks if outlink_count exists).
 
     Returns the number of PageSignal rows inserted/updated/deleted.
     """
@@ -182,9 +186,9 @@ def recompute_page_signals(
         deleted = session.query(PageSignal).delete(synchronize_session=False) or 0
         inserted = 0
 
-        rows = []
+        rows: list[dict[str, object]] = []
         for group, pr in signals.pagerank_scaled.items():
-            row = {
+            row: dict[str, object] = {
                 "normalized_url_group": group,
                 "inlink_count": int(signals.inlink_count.get(group, 0) or 0),
             }
@@ -214,17 +218,23 @@ def recompute_page_signals(
     )
     inlink_counts = {group: int(inlinks or 0) for group, inlinks in inlink_query.all()}
 
-    outlink_query = (
-        session.query(
-            from_group.label("group"),
-            func.count(func.distinct(SnapshotOutlink.to_normalized_url_group)).label("outlinks"),
+    outlink_counts: dict[str, int] = {}
+    if has_outlink_count:
+        outlink_query = (
+            session.query(
+                from_group.label("group"),
+                func.count(func.distinct(SnapshotOutlink.to_normalized_url_group)).label(
+                    "outlinks"
+                ),
+            )
+            .join(Snapshot, Snapshot.id == SnapshotOutlink.snapshot_id)
+            .filter(SnapshotOutlink.to_normalized_url_group != from_group)
+            .filter(from_group.in_(normalized_groups))
+            .group_by(from_group)
         )
-        .join(Snapshot, Snapshot.id == SnapshotOutlink.snapshot_id)
-        .filter(SnapshotOutlink.to_normalized_url_group != from_group)
-        .filter(from_group.in_(normalized_groups))
-        .group_by(from_group)
-    )
-    outlink_counts = {group: int(outlinks or 0) for group, outlinks in outlink_query.all()}
+        outlink_counts = {
+            group: int(outlinks or 0) for group, outlinks in outlink_query.all()
+        }
 
     existing = (
         session.query(PageSignal)
@@ -236,32 +246,41 @@ def recompute_page_signals(
     touched = 0
     for group in normalized_groups:
         inlinks = inlink_counts.get(group, 0)
-        outlinks = outlink_counts.get(group, 0)
+        outlinks = outlink_counts.get(group, 0) if has_outlink_count else 0
         existing_row = existing_by_group.get(group)
 
-        if inlinks <= 0 and outlinks <= 0:
+        should_delete = inlinks <= 0 if not has_outlink_count else (inlinks <= 0 and outlinks <= 0)
+        if should_delete:
             if existing_row is not None:
                 session.delete(existing_row)
                 touched += 1
             continue
 
         if existing_row is None:
-            session.add(
-                PageSignal(
-                    normalized_url_group=group,
-                    inlink_count=inlinks,
-                    outlink_count=outlinks if has_outlink_count else 0,
-                    pagerank=1.0 if has_pagerank else 0.0,
-                )
+            row = PageSignal(
+                normalized_url_group=group,
+                inlink_count=inlinks,
             )
-            touched += 1
-        else:
-            existing_row.inlink_count = inlinks
             if has_outlink_count:
-                existing_row.outlink_count = outlinks
+                row.outlink_count = outlinks
+            if has_pagerank:
+                row.pagerank = 1.0
+            session.add(row)
+            touched += 1
+            continue
+
+        changed = False
+        if existing_row.inlink_count != inlinks:
+            existing_row.inlink_count = inlinks
+            changed = True
+        if has_outlink_count and getattr(existing_row, "outlink_count", None) != outlinks:
+            existing_row.outlink_count = outlinks
+            changed = True
+        if changed:
             touched += 1
 
     return touched
 
 
 __all__ = ["recompute_page_signals"]
+

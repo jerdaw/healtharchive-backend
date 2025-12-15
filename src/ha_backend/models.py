@@ -3,8 +3,20 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from sqlalchemy import (JSON, Boolean, Column, DateTime, ForeignKey, Integer,
-                        Float, String, Table, Text, UniqueConstraint, text)
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    Column,
+    DateTime,
+    Float,
+    ForeignKey,
+    Integer,
+    String,
+    Table,
+    Text,
+    UniqueConstraint,
+    text,
+)
 from sqlalchemy.dialects import postgresql
 from sqlalchemy.orm import Mapped, deferred, mapped_column, relationship
 from sqlalchemy.sql import func
@@ -277,8 +289,7 @@ class PageSignal(Base):
     """
     Aggregated signals per normalized_url_group, used for relevance ranking.
 
-    This is intentionally simple: we currently track only a link-based signal
-    (inlink_count) derived from SnapshotOutlink edges.
+    Link-based signals derived from SnapshotOutlink edges.
     """
 
     __tablename__ = "page_signals"
