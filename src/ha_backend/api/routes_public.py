@@ -15,8 +15,16 @@ from threading import Lock
 
 from ha_backend.db import get_session
 from ha_backend.indexing.viewer import find_record_for_snapshot
-from ha_backend.models import ArchiveJob, PageSignal, Snapshot, Source, Topic
+from ha_backend.models import ArchiveJob, PageSignal, Snapshot, SnapshotOutlink, Source, Topic
 from ha_backend.search import TS_CONFIG, build_search_vector
+from ha_backend.search_ranking import (
+    QueryMode,
+    RankingVersion,
+    classify_query_mode,
+    get_ranking_config,
+    get_ranking_version,
+    tokenize_query,
+)
 from ha_backend.runtime_metrics import observe_search_request
 
 from .schemas import (
@@ -31,6 +39,9 @@ router = APIRouter()
 
 _TABLE_EXISTS_CACHE: dict[tuple[int, str], bool] = {}
 _TABLE_EXISTS_LOCK = Lock()
+
+_COLUMN_EXISTS_CACHE: dict[tuple[int, str, str], bool] = {}
+_COLUMN_EXISTS_LOCK = Lock()
 
 
 def _has_table(db: Session, table_name: str) -> bool:
@@ -48,6 +59,25 @@ def _has_table(db: Session, table_name: str) -> bool:
 
     with _TABLE_EXISTS_LOCK:
         _TABLE_EXISTS_CACHE[cache_key] = exists
+    return exists
+
+
+def _has_column(db: Session, table_name: str, column_name: str) -> bool:
+    bind = db.get_bind()
+    cache_key = (id(bind), table_name, column_name)
+    with _COLUMN_EXISTS_LOCK:
+        cached = _COLUMN_EXISTS_CACHE.get(cache_key)
+        if cached is not None:
+            return cached
+
+    try:
+        cols = inspect(bind).get_columns(table_name)
+        exists = any(c.get("name") == column_name for c in cols)
+    except Exception:
+        exists = False
+
+    with _COLUMN_EXISTS_LOCK:
+        _COLUMN_EXISTS_CACHE[cache_key] = exists
     return exists
 
 
@@ -71,6 +101,7 @@ def _search_snapshots_inner(
     includeNon2xx: bool,
     page: int,
     pageSize: int,
+    ranking: str | None,
     db: Session,
 ) -> tuple[SearchResponseSchema, str]:
     """
@@ -97,9 +128,21 @@ def _search_snapshots_inner(
     dialect_name = db.get_bind().dialect.name
     use_postgres_fts = dialect_name == "postgresql"
 
+    ranking_version = get_ranking_version(ranking)
+    # For v2 we use different blends depending on query "intent".
+    query_mode = None
+    query_tokens: list[str] = []
+    ranking_cfg = None
+    if ranking_version == RankingVersion.v2 and q_clean:
+        query_mode = classify_query_mode(q_clean)
+        ranking_cfg = get_ranking_config(mode=query_mode)
+        query_tokens = tokenize_query(q_clean)
+
     mode = "newest"
     if effective_sort == SearchSort.relevance and q_clean:
         mode = "relevance_fts" if use_postgres_fts else "relevance_fallback"
+        if ranking_version == RankingVersion.v2:
+            mode = f"{mode}_v2"
 
     query = db.query(Snapshot).join(Source)
 
@@ -163,8 +206,218 @@ def _search_snapshots_inner(
         else_=-1,
     )
 
-    item_query = query
-    if effective_view == SearchView.pages:
+    use_page_signals = (
+        effective_sort == SearchSort.relevance
+        and q_clean is not None
+        and _has_table(db, "page_signals")
+    )
+    use_authority = use_page_signals
+
+    has_outlink_table = _has_table(db, "snapshot_outlinks")
+    has_ps_outlink_count = use_page_signals and _has_column(
+        db, "page_signals", "outlink_count"
+    )
+    has_ps_pagerank = use_page_signals and _has_column(db, "page_signals", "pagerank")
+
+    use_hubness = (
+        ranking_version == RankingVersion.v2
+        and ranking_cfg is not None
+        and query_mode == QueryMode.broad
+        and effective_sort == SearchSort.relevance
+        and q_clean is not None
+        and has_outlink_table
+    )
+
+    inlink_count = None
+    if use_authority:
+        inlink_count = func.coalesce(PageSignal.inlink_count, 0)
+
+    use_pagerank = (
+        ranking_version == RankingVersion.v2
+        and ranking_cfg is not None
+        and query_mode == QueryMode.broad
+        and effective_sort == SearchSort.relevance
+        and q_clean is not None
+        and has_ps_pagerank
+    )
+
+    outlink_count = None
+    if use_hubness:
+        correlated_outlinks = (
+            db.query(func.count(func.distinct(SnapshotOutlink.to_normalized_url_group)))
+            .filter(SnapshotOutlink.snapshot_id == Snapshot.id)
+            .filter(SnapshotOutlink.to_normalized_url_group != group_key)
+            .correlate(Snapshot)
+            .scalar_subquery()
+        )
+        correlated_outlinks = func.coalesce(correlated_outlinks, 0)
+
+        if has_ps_outlink_count:
+            # Use the precomputed per-page outlink_count when available, but fall back
+            # to a correlated per-snapshot count if the page_signals row is missing.
+            outlink_count = func.coalesce(PageSignal.outlink_count, correlated_outlinks)
+        else:
+            outlink_count = correlated_outlinks
+
+    pagerank_value = None
+    if use_pagerank:
+        pagerank_value = func.coalesce(PageSignal.pagerank, 0.0)
+
+    def build_authority_expr() -> Any:
+        if inlink_count is None:
+            return 0.0
+        if ranking_version == RankingVersion.v2 and ranking_cfg is not None:
+            # Postgres and SQLite both support ln() inconsistently; keep ln-based
+            # authority only for Postgres, and use tiering elsewhere.
+            if use_postgres_fts:
+                return float(ranking_cfg.authority_coef) * func.ln(inlink_count + 1)
+            authority_tier = case(
+                (inlink_count >= 100, 3),
+                (inlink_count >= 20, 2),
+                (inlink_count >= 5, 1),
+                else_=0,
+            )
+            return authority_tier
+        # v1 behavior
+        if use_postgres_fts:
+            return 0.05 * func.ln(inlink_count + 1)
+        authority_tier = case(
+            (inlink_count >= 100, 3),
+            (inlink_count >= 20, 2),
+            (inlink_count >= 5, 1),
+            else_=0,
+        )
+        return authority_tier
+
+    def build_hubness_expr() -> Any:
+        if outlink_count is None or ranking_cfg is None or not use_hubness:
+            return 0.0
+        if use_postgres_fts:
+            if ranking_cfg.hubness_coef == 0:
+                return 0.0
+            return float(ranking_cfg.hubness_coef) * func.ln(outlink_count + 1)
+
+        hubness_tier = case(
+            (outlink_count >= 100, 3),
+            (outlink_count >= 20, 2),
+            (outlink_count >= 5, 1),
+            else_=0,
+        )
+        return float(ranking_cfg.hubness_coef) * hubness_tier
+
+    def build_pagerank_expr() -> Any:
+        if pagerank_value is None or ranking_cfg is None or not use_pagerank:
+            return 0.0
+        if ranking_cfg.pagerank_coef == 0:
+            return 0.0
+        if use_postgres_fts:
+            return float(ranking_cfg.pagerank_coef) * func.ln(pagerank_value + 1)
+        return float(ranking_cfg.pagerank_coef) * pagerank_value
+
+    def build_depth_penalty(url_expr: Any) -> Any:
+        slash_count = func.length(url_expr) - func.length(func.replace(url_expr, "/", ""))
+        if ranking_version == RankingVersion.v2 and ranking_cfg is not None:
+            return float(ranking_cfg.depth_coef) * slash_count
+        return (-0.01) * slash_count
+
+    def build_archived_penalty() -> Any:
+        if ranking_version == RankingVersion.v2 and ranking_cfg is not None:
+            if ranking_cfg.archived_penalty != 0:
+                return case(
+                    (Snapshot.title.ilike("archived%"), float(ranking_cfg.archived_penalty)),
+                    else_=0.0,
+                )
+        return 0.0
+
+    def build_title_boost() -> Any:
+        if not q_clean:
+            return 0.0
+        if ranking_version != RankingVersion.v2 or not query_tokens or ranking_cfg is None:
+            return case(
+                (Snapshot.title.ilike(f"%{q_clean}%"), 0.2),
+                else_=0.0,
+            )
+        token_match_exprs = [Snapshot.title.ilike(f"%{t}%") for t in query_tokens]
+        any_match = or_(*token_match_exprs)
+        all_match = and_(*token_match_exprs) if len(token_match_exprs) > 1 else any_match
+        return case(
+            (all_match, float(ranking_cfg.title_all_tokens_boost)),
+            (any_match, float(ranking_cfg.title_any_token_boost)),
+            else_=0.0,
+        )
+
+    def build_querystring_penalty() -> Any:
+        return case(
+            (Snapshot.url.like("%?%"), -0.1),
+            else_=0.0,
+        )
+
+    def build_tracking_penalty() -> Any:
+        return case(
+            (
+                or_(
+                    Snapshot.url.ilike("%utm_%"),
+                    Snapshot.url.ilike("%gclid=%"),
+                    Snapshot.url.ilike("%fbclid=%"),
+                ),
+                -0.1,
+            ),
+            else_=0.0,
+        )
+
+    def build_snapshot_score() -> Any:
+        if effective_sort != SearchSort.relevance or not q_clean:
+            return None
+        if use_postgres_fts and tsquery is not None and vector_expr is not None:
+            if (
+                ranking_version == RankingVersion.v2
+                and query_mode is not None
+                and query_mode != QueryMode.specific
+            ):
+                rank = func.ts_rank_cd(vector_expr, tsquery, 32)
+            else:
+                rank = func.ts_rank_cd(vector_expr, tsquery)
+            depth_basis = group_key if (ranking_version == RankingVersion.v2 and ranking_cfg is not None) else Snapshot.url
+            depth_penalty = build_depth_penalty(depth_basis)
+            score = (
+                rank
+                + build_title_boost()
+                + build_archived_penalty()
+                + build_querystring_penalty()
+                + build_tracking_penalty()
+                + depth_penalty
+            )
+            if use_authority and inlink_count is not None:
+                score = score + build_authority_expr()
+            if use_hubness and outlink_count is not None:
+                score = score + build_hubness_expr()
+            if use_pagerank and pagerank_value is not None:
+                score = score + build_pagerank_expr()
+            return score
+
+        # DB-agnostic fallback: score by field match presence.
+        ilike_pattern = f"%{q_clean}%"
+        title_match_score = case((Snapshot.title.ilike(ilike_pattern), 5), else_=0)
+        url_match_score = case((Snapshot.url.ilike(ilike_pattern), 2), else_=0)
+        snippet_match_score = case((Snapshot.snippet.ilike(ilike_pattern), 1), else_=0)
+        score = title_match_score + url_match_score + snippet_match_score
+
+        if ranking_version == RankingVersion.v2 and ranking_cfg is not None:
+            score = score + build_archived_penalty() + build_depth_penalty(group_key)
+            if use_authority and inlink_count is not None:
+                score = score + build_authority_expr()
+            if use_hubness and outlink_count is not None:
+                score = score + build_hubness_expr()
+            if use_pagerank and pagerank_value is not None:
+                score = score + build_pagerank_expr()
+        else:
+            if use_authority and inlink_count is not None:
+                score = score + build_authority_expr()
+        return score
+
+    snapshot_score = build_snapshot_score()
+
+    def build_item_query_for_pages_v1() -> Any:
         row_number = func.row_number().over(
             partition_by=group_key,
             order_by=(Snapshot.capture_timestamp.desc(), Snapshot.id.desc()),
@@ -173,108 +426,118 @@ def _search_snapshots_inner(
             Snapshot.id.label("id"),
             row_number,
         ).subquery()
-
-        item_query = (
+        return (
             db.query(Snapshot)
             .join(latest_ids_subq, Snapshot.id == latest_ids_subq.c.id)
             .filter(latest_ids_subq.c.rn == 1)
         )
 
-    use_authority = (
-        effective_sort == SearchSort.relevance
-        and q_clean is not None
-        and _has_table(db, "page_signals")
-    )
+    def build_item_query_for_pages_v2() -> Any:
+        if snapshot_score is None:
+            return build_item_query_for_pages_v1()
 
-    inlink_count = None
-    if use_authority:
-        item_query = item_query.outerjoin(
-            PageSignal, PageSignal.normalized_url_group == group_key
+        row_number = func.row_number().over(
+            partition_by=group_key,
+            order_by=(Snapshot.capture_timestamp.desc(), Snapshot.id.desc()),
+        ).label("rn")
+        candidates_query = query
+        if use_page_signals:
+            candidates_query = candidates_query.outerjoin(
+                PageSignal, PageSignal.normalized_url_group == group_key
+            )
+
+        candidates_subq = (
+            candidates_query
+            .with_entities(
+                Snapshot.id.label("id"),
+                group_key.label("group_key"),
+                Snapshot.capture_timestamp.label("capture_timestamp"),
+                row_number,
+                snapshot_score.label("snapshot_score"),
+            )
+            .subquery()
         )
-        inlink_count = func.coalesce(PageSignal.inlink_count, 0)
 
-    ordered = item_query
-    if effective_sort == SearchSort.relevance and q_clean:
-        if use_postgres_fts and tsquery is not None and vector_expr is not None:
-            rank = func.ts_rank_cd(vector_expr, tsquery)
+        group_scores_subq = (
+            db.query(
+                candidates_subq.c.group_key.label("group_key"),
+                func.max(candidates_subq.c.snapshot_score).label("group_score"),
+            )
+            .group_by(candidates_subq.c.group_key)
+            .subquery()
+        )
 
-            title_phrase_boost = case(
-                (Snapshot.title.ilike(f"%{q_clean}%"), 0.2),
-                else_=0.0,
+        latest_ids_subq = (
+            db.query(
+                candidates_subq.c.id.label("id"),
+                candidates_subq.c.group_key.label("group_key"),
+                candidates_subq.c.rn.label("rn"),
             )
-            querystring_penalty = case(
-                (Snapshot.url.like("%?%"), -0.1),
-                else_=0.0,
-            )
-            tracking_penalty = case(
-                (
-                    or_(
-                        Snapshot.url.ilike("%utm_%"),
-                        Snapshot.url.ilike("%gclid=%"),
-                        Snapshot.url.ilike("%fbclid=%"),
-                    ),
-                    -0.1,
-                ),
-                else_=0.0,
-            )
-            slash_count = func.length(Snapshot.url) - func.length(
-                func.replace(Snapshot.url, "/", "")
-            )
-            depth_penalty = (-0.01) * slash_count
+            .subquery()
+        )
 
-            authority_boost = 0.0
-            if inlink_count is not None:
-                authority_boost = 0.05 * func.ln(inlink_count + 1)
-
-            rank_score = (
-                rank
-                + title_phrase_boost
-                + querystring_penalty
-                + tracking_penalty
-                + depth_penalty
-                + authority_boost
+        return (
+            db.query(Snapshot)
+            .join(latest_ids_subq, Snapshot.id == latest_ids_subq.c.id)
+            .join(group_scores_subq, group_scores_subq.c.group_key == latest_ids_subq.c.group_key)
+            .filter(latest_ids_subq.c.rn == 1)
+            .order_by(
+                status_quality.desc(),
+                group_scores_subq.c.group_score.desc(),
+                Snapshot.capture_timestamp.desc(),
+                Snapshot.id.desc(),
             )
-            ordered = ordered.order_by(
+        )
+
+    ordered = query
+    if effective_view == SearchView.pages:
+        if (
+            ranking_version == RankingVersion.v2
+            and effective_sort == SearchSort.relevance
+            and q_clean
+        ):
+            ordered = build_item_query_for_pages_v2()
+        else:
+            item_query = build_item_query_for_pages_v1()
+            if use_page_signals:
+                item_query = item_query.outerjoin(
+                    PageSignal, PageSignal.normalized_url_group == group_key
+                )
+
+            if effective_sort == SearchSort.relevance and q_clean:
+                rank_score = snapshot_score if snapshot_score is not None else 0.0
+                ordered = item_query.order_by(
+                    status_quality.desc(),
+                    rank_score.desc(),
+                    Snapshot.capture_timestamp.desc(),
+                    Snapshot.id.desc(),
+                )
+            else:
+                ordered = item_query.order_by(
+                    status_quality.desc(),
+                    Snapshot.capture_timestamp.desc(),
+                    Snapshot.id.desc(),
+                )
+    else:
+        item_query = query
+        if use_page_signals:
+            item_query = item_query.outerjoin(
+                PageSignal, PageSignal.normalized_url_group == group_key
+            )
+        if effective_sort == SearchSort.relevance and q_clean:
+            rank_score = snapshot_score if snapshot_score is not None else 0.0
+            ordered = item_query.order_by(
                 status_quality.desc(),
                 rank_score.desc(),
                 Snapshot.capture_timestamp.desc(),
                 Snapshot.id.desc(),
             )
         else:
-            ilike_pattern = f"%{q_clean}%"
-            title_match_score = case((Snapshot.title.ilike(ilike_pattern), 5), else_=0)
-            url_match_score = case((Snapshot.url.ilike(ilike_pattern), 2), else_=0)
-            snippet_match_score = case(
-                (Snapshot.snippet.ilike(ilike_pattern), 1), else_=0
+            ordered = item_query.order_by(
+                status_quality.desc(),
+                Snapshot.capture_timestamp.desc(),
+                Snapshot.id.desc(),
             )
-            match_score = title_match_score + url_match_score + snippet_match_score
-            if inlink_count is not None:
-                authority_tier = case(
-                    (inlink_count >= 100, 3),
-                    (inlink_count >= 20, 2),
-                    (inlink_count >= 5, 1),
-                    else_=0,
-                )
-                ordered = ordered.order_by(
-                    status_quality.desc(),
-                    match_score.desc(),
-                    authority_tier.desc(),
-                    Snapshot.capture_timestamp.desc(),
-                    Snapshot.id.desc(),
-                )
-            else:
-                ordered = ordered.order_by(
-                    status_quality.desc(),
-                    match_score.desc(),
-                    Snapshot.capture_timestamp.desc(),
-                    Snapshot.id.desc(),
-                )
-    else:
-        ordered = ordered.order_by(
-            status_quality.desc(),
-            Snapshot.capture_timestamp.desc(),
-            Snapshot.id.desc(),
-        )
 
     items = (
         ordered.options(
@@ -504,6 +767,11 @@ def search_snapshots(
     includeNon2xx: bool = Query(default=False),
     page: int = Query(default=1, ge=1),
     pageSize: int = Query(default=20, ge=1, le=100),
+    ranking: Optional[str] = Query(
+        default=None,
+        description="Ranking version override (v1|v2). Default is controlled by HA_SEARCH_RANKING_VERSION.",
+        pattern=r"^(v1|v2)$",
+    ),
     db: Session = Depends(get_db),
 ) -> SearchResponseSchema:
     """
@@ -522,6 +790,7 @@ def search_snapshots(
             includeNon2xx=includeNon2xx,
             page=page,
             pageSize=pageSize,
+            ranking=ranking,
             db=db,
         )
     except Exception:

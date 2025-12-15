@@ -121,6 +121,7 @@ def index_job(job_id: int) -> int:
                             snippet=snippet,
                             language=language,
                         )
+
                         if use_postgres_fts:
                             from ha_backend.search import build_search_vector
 
@@ -130,12 +131,18 @@ def index_job(job_id: int) -> int:
                                 rec.url,
                             )
 
-                        if has_outlinks and rec.status_code is not None and 200 <= rec.status_code < 300:
+                        if (
+                            has_outlinks
+                            and rec.status_code is not None
+                            and 200 <= rec.status_code < 300
+                        ):
                             outlink_groups = extract_outlink_groups(
                                 html,
                                 base_url=rec.url,
                                 from_group=snapshot.normalized_url_group,
                             )
+                            if snapshot.normalized_url_group:
+                                impacted_groups.add(snapshot.normalized_url_group)
                             for group in outlink_groups:
                                 snapshot.outlinks.append(
                                     SnapshotOutlink(to_normalized_url_group=group)

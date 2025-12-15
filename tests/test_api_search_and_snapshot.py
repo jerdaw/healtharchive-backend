@@ -7,7 +7,7 @@ from fastapi.testclient import TestClient
 
 from ha_backend import db as db_module
 from ha_backend.db import Base, get_engine, get_session
-from ha_backend.models import PageSignal, Snapshot, Source, Topic
+from ha_backend.models import PageSignal, Snapshot, SnapshotOutlink, Source, Topic
 
 
 def _init_test_app(tmp_path: Path, monkeypatch):
@@ -240,6 +240,151 @@ def _seed_authority_ranking_data() -> None:
         )
 
 
+def _seed_pages_view_best_match_ranking_data() -> None:
+    """
+    Seed data that distinguishes v1 vs v2 ranking for view=pages.
+
+    Scenario:
+    - Group A has two matching snapshots:
+      - Older snapshot matches query in title (strong match).
+      - Newer snapshot matches only in snippet (weak match) and is the displayed "latest" snapshot.
+    - Group B has a single matching snapshot that matches only in snippet and is newer than Group A's latest.
+
+    Under v1 pages ranking (latest snapshot scored), Group B should appear first (recency tie-break).
+    Under v2 pages ranking (group scored by best snapshot), Group A should appear first while still
+    returning the latest snapshot for that group.
+    """
+    with get_session() as session:
+        hc = Source(
+            code="hc",
+            name="Health Canada",
+            base_url="https://www.canada.ca/en/health-canada.html",
+            description="Health Canada",
+            enabled=True,
+        )
+        session.add(hc)
+        session.flush()
+
+        ts_old = datetime(2025, 1, 1, 12, 0, tzinfo=timezone.utc)
+        ts_latest_a = datetime(2025, 2, 1, 12, 0, tzinfo=timezone.utc)
+        ts_b = datetime(2025, 3, 1, 12, 0, tzinfo=timezone.utc)
+
+        # Group A: older title match.
+        a1 = Snapshot(
+            job_id=None,
+            source_id=hc.id,
+            url="https://example.org/a",
+            normalized_url_group="https://example.org/a",
+            capture_timestamp=ts_old,
+            mime_type="text/html",
+            status_code=200,
+            title="COVID-19 guidance hub",
+            snippet="General guidance.",
+            language="en",
+            warc_path="/warcs/a1.warc.gz",
+            warc_record_id="a1",
+        )
+        # Group A: newer snippet-only match (display snapshot under view=pages).
+        a2 = Snapshot(
+            job_id=None,
+            source_id=hc.id,
+            url="https://example.org/a",
+            normalized_url_group="https://example.org/a",
+            capture_timestamp=ts_latest_a,
+            mime_type="text/html",
+            status_code=200,
+            title="Latest updates",
+            snippet="COVID-19 update bulletin.",
+            language="en",
+            warc_path="/warcs/a2.warc.gz",
+            warc_record_id="a2",
+        )
+        # Group B: snippet-only match, but newer than Group A's latest.
+        b1 = Snapshot(
+            job_id=None,
+            source_id=hc.id,
+            url="https://example.org/b",
+            normalized_url_group="https://example.org/b",
+            capture_timestamp=ts_b,
+            mime_type="text/html",
+            status_code=200,
+            title="Updates",
+            snippet="COVID-19 bulletin.",
+            language="en",
+            warc_path="/warcs/b1.warc.gz",
+            warc_record_id="b1",
+        )
+
+        session.add_all([a1, a2, b1])
+
+
+def _seed_hubness_ranking_data() -> None:
+    """
+    Seed data to validate v2 "hubness" boost for broad (1-token) queries.
+
+    - Two pages match "covid" equally via title/snippet/url.
+    - The "hub" page has many outlinks and is older.
+    - The "non-hub" page has no outlinks and is newer.
+
+    Under v1 relevance, the newer page should win (tie-break by recency).
+    Under v2 relevance, the hub page should win due to hubness boost.
+    """
+    with get_session() as session:
+        hc = Source(
+            code="hc",
+            name="Health Canada",
+            base_url="https://www.canada.ca/en/health-canada.html",
+            description="Health Canada",
+            enabled=True,
+        )
+        session.add(hc)
+        session.flush()
+
+        ts_old = datetime(2025, 1, 1, 12, 0, tzinfo=timezone.utc)
+        ts_new = datetime(2025, 2, 1, 12, 0, tzinfo=timezone.utc)
+
+        hub = Snapshot(
+            job_id=None,
+            source_id=hc.id,
+            url="https://example.org/covid",
+            normalized_url_group="https://example.org/covid",
+            capture_timestamp=ts_old,
+            mime_type="text/html",
+            status_code=200,
+            title="COVID-19 hub",
+            snippet="COVID-19 overview and resources.",
+            language="en",
+            warc_path="/warcs/hub.warc.gz",
+            warc_record_id="hub",
+        )
+        non_hub = Snapshot(
+            job_id=None,
+            source_id=hc.id,
+            url="https://example.org/covid-updates",
+            normalized_url_group="https://example.org/covid-updates",
+            capture_timestamp=ts_new,
+            mime_type="text/html",
+            status_code=200,
+            title="COVID-19 updates",
+            snippet="COVID-19 overview and resources.",
+            language="en",
+            warc_path="/warcs/updates.warc.gz",
+            warc_record_id="updates",
+        )
+        session.add_all([hub, non_hub])
+        session.flush()
+
+        session.add_all(
+            [
+                SnapshotOutlink(
+                    snapshot_id=hub.id,
+                    to_normalized_url_group=f"https://example.org/child/{i}",
+                )
+                for i in range(60)
+            ]
+        )
+
+
 def test_search_endpoint_basic(tmp_path, monkeypatch) -> None:
     client = _init_test_app(tmp_path, monkeypatch)
     _seed_search_data()
@@ -363,6 +508,33 @@ def test_search_view_pages_returns_latest_snapshot_for_group(tmp_path, monkeypat
     assert data["results"][0]["title"] == "COVID-19 guidance (updated)"
 
 
+def test_search_view_pages_ranking_v2_scores_best_snapshot_for_group(
+    tmp_path, monkeypatch
+) -> None:
+    client = _init_test_app(tmp_path, monkeypatch)
+    _seed_pages_view_best_match_ranking_data()
+
+    # v1 (default): both displayed pages match only in snippet, so tie-break by recency → group B first.
+    resp_v1 = client.get("/api/search", params={"q": "COVID-19", "view": "pages"})
+    assert resp_v1.status_code == 200
+    data_v1 = resp_v1.json()
+    assert data_v1["total"] == 2
+    assert data_v1["results"][0]["originalUrl"] == "https://example.org/b"
+
+    # v2: group A should be boosted because an older snapshot matched in title (max score per group).
+    resp_v2 = client.get(
+        "/api/search",
+        params={"q": "COVID-19", "view": "pages", "ranking": "v2"},
+    )
+    assert resp_v2.status_code == 200
+    data_v2 = resp_v2.json()
+    assert data_v2["total"] == 2
+
+    # The displayed snapshot for group A should still be the latest snapshot in that group (a2).
+    assert data_v2["results"][0]["originalUrl"] == "https://example.org/a"
+    assert data_v2["results"][0]["title"] == "Latest updates"
+
+
 def test_search_relevance_uses_page_signal_boost_for_tie_breaks(
     tmp_path, monkeypatch
 ) -> None:
@@ -377,6 +549,31 @@ def test_search_relevance_uses_page_signal_boost_for_tie_breaks(
     titles = [r["title"] for r in data["results"]]
     # The authoritative page is older, but should be boosted ahead of the newer one.
     assert titles[0] == "COVID-19 hub page"
+
+
+def test_search_ranking_v2_hubness_boosts_hub_pages_for_broad_queries(
+    tmp_path, monkeypatch
+) -> None:
+    client = _init_test_app(tmp_path, monkeypatch)
+    _seed_hubness_ranking_data()
+
+    resp_v1 = client.get(
+        "/api/search",
+        params={"q": "covid", "sort": "relevance", "view": "snapshots", "ranking": "v1"},
+    )
+    assert resp_v1.status_code == 200
+    results_v1 = resp_v1.json()["results"]
+    assert results_v1
+    assert results_v1[0]["originalUrl"] == "https://example.org/covid-updates"
+
+    resp_v2 = client.get(
+        "/api/search",
+        params={"q": "covid", "sort": "relevance", "view": "snapshots", "ranking": "v2"},
+    )
+    assert resp_v2.status_code == 200
+    results_v2 = resp_v2.json()["results"]
+    assert results_v2
+    assert results_v2[0]["originalUrl"] == "https://example.org/covid"
 
 
 def test_search_filters_by_topic_slug(tmp_path, monkeypatch) -> None:

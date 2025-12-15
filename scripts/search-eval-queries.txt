@@ -1,0 +1,72 @@
+# One query per line. Blank lines and comments (#) are ignored.
+#
+# Golden queries used for search quality evaluation.
+#
+# We do not have query logs yet, so this list is intentionally eclectic:
+# - Broad “hub intent” terms
+# - Common refinements (testing, vaccines, isolation)
+# - Named entities and specific medical terms
+# - Non-COVID topics (to avoid overfitting)
+# - A small French smoke-test set (bilingual content; no stemming)
+#
+# Keep it to realization-check size: ~25–50 queries so capture runs stay quick.
+
+# Broad/head queries (hub intent)
+covid
+influenza
+mpox
+measles
+rsv
+food recall
+travel advisory
+mental health
+air quality
+wildfire smoke
+immunization
+vaccines
+
+# Medium intent (common refinements)
+covid vaccine
+covid booster
+mask
+mask guidance
+rapid testing
+testing
+wastewater
+isolation
+quarantine
+symptoms
+treatment
+prevention risks
+
+# Specific intent (named entities, guidance, programs)
+long covid
+post covid condition
+naci
+naci booster
+myocarditis pericarditis
+omicron ventilation
+ventilation filtration
+paxlovid
+nirmatrelvir
+remdesivir
+health infobase
+
+# Regulation / governance / ops
+interim order
+medical devices covid-19
+disinfectants covid-19
+
+# Non-COVID public health topics (overfitting guardrail)
+opioid overdose
+naloxone
+vaping
+cannabis
+antimicrobial resistance
+water advisory
+
+# French smoke tests (bilingual content; no stemming)
+grippe
+variole simienne
+vaccin covid
+sante mentale

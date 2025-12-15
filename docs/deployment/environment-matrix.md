@@ -59,6 +59,7 @@ All backend env vars are read by:
 
 - `src/ha_backend/config.py`
 - `src/ha_backend/api/deps.py`
+- Search ranking selection is controlled by `HA_SEARCH_RANKING_VERSION` (and can be overridden per-request with `ranking=v1|v2` on `/api/search`).
 
 ### 2.1 Local development (typical)
 
@@ -70,6 +71,7 @@ export HEALTHARCHIVE_DATABASE_URL=sqlite:///$(pwd)/.dev-healtharchive.db
 export HEALTHARCHIVE_ARCHIVE_ROOT=$(pwd)/.dev-archive-root
 export HEALTHARCHIVE_ADMIN_TOKEN=localdev-admin
 export HEALTHARCHIVE_LOG_LEVEL=DEBUG
+export HA_SEARCH_RANKING_VERSION=v2
 ```
 
 ### 2.2 Production (current)
@@ -83,6 +85,7 @@ export HEALTHARCHIVE_ARCHIVE_ROOT=/srv/healtharchive/jobs
 export HEALTHARCHIVE_ADMIN_TOKEN=<LONG_RANDOM_SECRET>
 export HEALTHARCHIVE_CORS_ORIGINS=https://healtharchive.ca,https://www.healtharchive.ca,https://healtharchive.vercel.app
 export HEALTHARCHIVE_LOG_LEVEL=INFO
+export HA_SEARCH_RANKING_VERSION=v2
 ```
 
 Notes:

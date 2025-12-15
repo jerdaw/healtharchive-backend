@@ -165,6 +165,10 @@ Key public endpoints (all prefixed with `/api`):
   Full-text style search over snapshots (with filters for `source`, `topic`,
   pagination, etc.).
 
+  Ranking controls:
+  - Default ranking is controlled by `HA_SEARCH_RANKING_VERSION` (`v1` or `v2`).
+  - Per-request override: add `ranking=v1|v2` to `/api/search`.
+
 - `GET /api/snapshot/{id}`  
   Snapshot metadata for a single record.
 
@@ -177,6 +181,7 @@ Admin + observability endpoints (protected by a simple admin token):
 - `GET /api/admin/jobs/{id}` – detailed job info
 - `GET /api/admin/jobs/status-counts` – job counts by status
 - `GET /api/admin/jobs/{id}/snapshots` – list snapshots for a job
+- `GET /api/admin/search-debug` – admin-only search scoring breakdown
 - `GET /metrics` – Prometheus-style metrics (jobs, cleanup_status, snapshots)
 
 Admin endpoints require a token when `HEALTHARCHIVE_ADMIN_TOKEN` is set (see
@@ -199,6 +204,22 @@ uvicorn ha_backend.api:app --reload --port 8001
 ```
 
 Do not commit real secrets in `.env`; use host-managed env vars for staging/prod.
+
+---
+
+## Search evaluation tools
+
+This repo includes lightweight scripts to capture and compare search results:
+
+- Capture a standard query set (v1 vs v2):
+  - `./scripts/search-eval-capture.sh --out-dir /tmp/ha-search-eval --page-size 20 --ranking v1`
+  - `./scripts/search-eval-capture.sh --out-dir /tmp/ha-search-eval --page-size 20 --ranking v2`
+- Diff two capture directories:
+  - `python ./scripts/search-eval-diff.py --a /tmp/ha-search-eval/<TS_A> --b /tmp/ha-search-eval/<TS_B> --top 20`
+
+Docs:
+- `docs/operations/search-quality.md`
+- `docs/operations/search-golden-queries.md`
 
 ### CORS / frontend origins
 
