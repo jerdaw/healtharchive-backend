@@ -11,6 +11,7 @@ This folder contains the canonical documentation for the **HealthArchive backend
    - `development/live-testing.md`
 3. Deployment (how to run it on a server)
    - `deployment/production-single-vps.md` (current production runbook)
+   - `deployment/search-rollout.md` (enable v2 search + rollback)
    - `deployment/hosting-and-live-server-to-dos.md` (deployment checklist + Vercel wiring)
    - `deployment/environment-matrix.md` (cross‑repo env var + host matrix)
    - `deployment/production-rollout-checklist.md` (generic production checklist)
@@ -18,6 +19,7 @@ This folder contains the canonical documentation for the **HealthArchive backend
 4. Operations (how to keep it healthy)
    - `operations/monitoring-and-ci-checklist.md`
    - `operations/search-quality.md` (how to evaluate relevance changes)
+   - `operations/search-golden-queries.md` (curated queries + expectations)
 
 ## Notes
 

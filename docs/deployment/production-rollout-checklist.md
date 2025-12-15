@@ -72,6 +72,13 @@ This:
 - Applies all Alembic migrations to the production DB.
 - Ensures baseline `Source` rows exist (idempotent).
 
+If you have deployed the link-signal schema (tables `snapshot_outlinks` and `page_signals`),
+recompute page signals (includes `pagerank` when present):
+
+```bash
+ha-backend recompute-page-signals
+```
+
 ### 1.3 Start API + worker processes
 
 Configure your process manager to run:
@@ -89,6 +96,14 @@ Configure your process manager to run:
   ```
 
 Both processes must see the same `HEALTHARCHIVE_*` env vars from 1.1.
+
+Optional (recommended): enable the blended search ranking by default:
+
+```bash
+export HA_SEARCH_RANKING_VERSION=v2
+```
+
+Rollback is instant: set `HA_SEARCH_RANKING_VERSION=v1` and restart the API process.
 
 ### 1.4 DNS and TLS for the API
 

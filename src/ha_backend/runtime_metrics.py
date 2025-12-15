@@ -60,9 +60,9 @@ def observe_search_request(*, duration_seconds: float, mode: str, ok: bool) -> N
             m.bucket_le_3 += 1
         m.bucket_le_inf += 1
 
-        if mode == "relevance_fts":
+        if mode.startswith("relevance_fts"):
             m.relevance_fts += 1
-        elif mode == "relevance_fallback":
+        elif mode.startswith("relevance_fallback"):
             m.relevance_fallback += 1
         else:
             m.newest += 1
@@ -109,4 +109,3 @@ def render_search_metrics_prometheus() -> list[str]:
 
 
 __all__ = ["observe_search_request", "render_search_metrics_prometheus"]
-

@@ -68,6 +68,14 @@ To include non‑2xx captures for research/debugging:
 curl -s "https://api.healtharchive.ca/api/search?q=covid&page=1&pageSize=10&sort=relevance&includeNon2xx=true" | python -m json.tool
 ```
 
+To inspect *why* a result ranks where it does (admin-only score breakdown):
+
+```bash
+curl -s "https://api.healtharchive.ca/api/admin/search-debug?q=covid&view=pages&sort=relevance&ranking=v2&pageSize=10" \
+  -H "X-Admin-Token: ${HEALTHARCHIVE_ADMIN_TOKEN}" \
+  | python -m json.tool
+```
+
 ### 3.2 Capture “before/after” snapshots (recommended)
 
 For a small set of key queries (e.g. `covid`, `mpox`, `food recall`), capture
@@ -80,6 +88,14 @@ curl -s "https://api.healtharchive.ca/api/search?q=covid&page=1&pageSize=10&sort
 ```
 
 Keep these captures out of git unless you explicitly want them committed.
+
+For repeatable, multi-query captures, use the helper scripts in `scripts/`:
+
+```bash
+./scripts/search-eval-capture.sh --base-url https://api.healtharchive.ca --out-dir /tmp/ha-search-eval --page-size 20 --ranking v1
+./scripts/search-eval-capture.sh --base-url https://api.healtharchive.ca --out-dir /tmp/ha-search-eval --page-size 20 --ranking v2
+python ./scripts/search-eval-diff.py --a /tmp/ha-search-eval/<TS_A> --b /tmp/ha-search-eval/<TS_B> --top 20
+```
 
 ## 4) Minimal pass/fail checklist for releases
 
@@ -122,7 +138,8 @@ If you have applied the authority schema (tables `snapshot_outlinks` and
 ha-backend backfill-outlinks --job-id <JOB_ID> --update-signals
 ```
 
-To rebuild all authority signals from the full outlink graph:
+To rebuild all link signals from the full outlink graph (includes `inlink_count`,
+`outlink_count`, and `pagerank` when present):
 
 ```bash
 ha-backend recompute-page-signals
