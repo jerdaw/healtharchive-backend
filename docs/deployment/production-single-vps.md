@@ -115,6 +115,7 @@ HEALTHARCHIVE_ARCHIVE_ROOT=/srv/healtharchive/jobs
 HEALTHARCHIVE_ADMIN_TOKEN=<LONG_RANDOM_TOKEN>
 HEALTHARCHIVE_CORS_ORIGINS=https://healtharchive.ca,https://www.healtharchive.ca,https://healtharchive.vercel.app
 HEALTHARCHIVE_LOG_LEVEL=INFO
+HA_SEARCH_RANKING_VERSION=v2
 EOF
 sudo chown root:healtharchive /etc/healtharchive/backend.env
 sudo chmod 640 /etc/healtharchive/backend.env
@@ -126,6 +127,7 @@ Migrate + seed:
 set -a; source /etc/healtharchive/backend.env; set +a
 ./.venv/bin/alembic upgrade head
 ./.venv/bin/ha-backend seed-sources
+./.venv/bin/ha-backend recompute-page-signals
 ```
 
 Systemd services:
