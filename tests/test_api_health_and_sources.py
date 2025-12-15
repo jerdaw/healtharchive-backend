@@ -127,3 +127,87 @@ def test_sources_endpoint_with_data(tmp_path, monkeypatch) -> None:
     codes = {s["sourceCode"] for s in sources}
     assert "hc" in codes
     assert "phac" in codes
+
+
+def test_stats_endpoint_with_no_data(tmp_path, monkeypatch) -> None:
+    client = _init_test_app(tmp_path, monkeypatch)
+
+    resp = client.get("/api/stats")
+    assert resp.status_code == 200
+    body = resp.json()
+
+    assert body["snapshotsTotal"] == 0
+    assert body["pagesTotal"] == 0
+    assert body["sourcesTotal"] == 0
+    assert body["latestCaptureDate"] is None
+
+    assert resp.headers.get("Cache-Control") is not None
+
+
+def test_stats_endpoint_with_data(tmp_path, monkeypatch) -> None:
+    client = _init_test_app(tmp_path, monkeypatch)
+
+    with get_session() as session:
+        hc = Source(code="hc", name="Health Canada", enabled=True)
+        phac = Source(code="phac", name="Public Health Agency of Canada", enabled=True)
+        session.add_all([hc, phac])
+        session.flush()
+
+        ts1 = datetime(2025, 1, 1, 12, 0, tzinfo=timezone.utc)
+        ts2 = datetime(2025, 2, 1, 12, 0, tzinfo=timezone.utc)
+
+        session.add_all(
+            [
+                Snapshot(
+                    job_id=None,
+                    source_id=hc.id,
+                    url="https://www.canada.ca/en/health-canada.html",
+                    normalized_url_group="https://www.canada.ca/en/health-canada.html",
+                    capture_timestamp=ts1,
+                    mime_type="text/html",
+                    status_code=200,
+                    title="HC Home",
+                    snippet="Health Canada home",
+                    language="en",
+                    warc_path="/warcs/hc1.warc.gz",
+                    warc_record_id="hc-1",
+                ),
+                Snapshot(
+                    job_id=None,
+                    source_id=hc.id,
+                    url="https://www.canada.ca/en/health-canada.html?foo=bar",
+                    normalized_url_group="https://www.canada.ca/en/health-canada.html",
+                    capture_timestamp=ts2,
+                    mime_type="text/html",
+                    status_code=200,
+                    title="HC Home Updated",
+                    snippet="Health Canada home updated",
+                    language="en",
+                    warc_path="/warcs/hc2.warc.gz",
+                    warc_record_id="hc-2",
+                ),
+                Snapshot(
+                    job_id=None,
+                    source_id=phac.id,
+                    url="https://www.canada.ca/en/public-health.html",
+                    normalized_url_group=None,
+                    capture_timestamp=ts2,
+                    mime_type="text/html",
+                    status_code=200,
+                    title="PHAC Home",
+                    snippet="PHAC home",
+                    language="en",
+                    warc_path="/warcs/phac1.warc.gz",
+                    warc_record_id="phac-1",
+                ),
+            ]
+        )
+
+    resp = client.get("/api/stats")
+    assert resp.status_code == 200
+    body = resp.json()
+
+    assert body["snapshotsTotal"] == 3
+    assert body["pagesTotal"] == 2
+    assert body["sourcesTotal"] == 2
+    assert body["latestCaptureDate"] == "2025-02-01"
