@@ -158,6 +158,10 @@ Key public endpoints (all prefixed with `/api`):
 - `GET /api/health`  
   Basic health check (`status`, DB connectivity, job and snapshot counts).
 
+- `GET /api/stats`  
+  Lightweight public archive stats for the frontend (snapshot totals, unique page
+  count, source count, latest capture date).
+
 - `GET /api/sources`  
   Per-source summaries derived from indexed snapshots.
 

@@ -55,10 +55,18 @@ class SnapshotDetailSchema(BaseModel):
     statusCode: Optional[int]
 
 
+class ArchiveStatsSchema(BaseModel):
+    snapshotsTotal: int
+    pagesTotal: int
+    sourcesTotal: int
+    latestCaptureDate: Optional[str]
+
+
 __all__ = [
     "TopicRefSchema",
     "SourceSummarySchema",
     "SnapshotSummarySchema",
     "SearchResponseSchema",
     "SnapshotDetailSchema",
+    "ArchiveStatsSchema",
 ]
