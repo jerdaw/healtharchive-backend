@@ -134,6 +134,15 @@ The metrics endpoint exposes, among others:
   healtharchive_jobs_pages_failed_total{source="hc"} 30
   ```
 
+- Search metrics (per-process; reset on restart):
+
+  ```text
+  healtharchive_search_requests_total 123
+  healtharchive_search_errors_total 0
+  healtharchive_search_duration_seconds_bucket{le="0.3"} 100
+  healtharchive_search_mode_total{mode="relevance_fts"} 80
+  ```
+
 ### 2.3 Example alert ideas (Prometheus‑style)
 
 These are **examples**, not full rules, but can guide what you set up:

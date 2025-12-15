@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
@@ -8,12 +9,15 @@ from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import Response
 from fastapi.responses import HTMLResponse, JSONResponse
-from sqlalchemy import and_, case, func, or_
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy import and_, case, func, inspect, or_
+from sqlalchemy.orm import Session, joinedload, load_only
+from threading import Lock
 
 from ha_backend.db import get_session
 from ha_backend.indexing.viewer import find_record_for_snapshot
-from ha_backend.models import ArchiveJob, Snapshot, Source, Topic
+from ha_backend.models import ArchiveJob, PageSignal, Snapshot, Source, Topic
+from ha_backend.search import TS_CONFIG, build_search_vector
+from ha_backend.runtime_metrics import observe_search_request
 
 from .schemas import (
     SearchResponseSchema,
@@ -24,6 +28,319 @@ from .schemas import (
 )
 
 router = APIRouter()
+
+_TABLE_EXISTS_CACHE: dict[tuple[int, str], bool] = {}
+_TABLE_EXISTS_LOCK = Lock()
+
+
+def _has_table(db: Session, table_name: str) -> bool:
+    bind = db.get_bind()
+    cache_key = (id(bind), table_name)
+    with _TABLE_EXISTS_LOCK:
+        cached = _TABLE_EXISTS_CACHE.get(cache_key)
+        if cached is not None:
+            return cached
+
+    try:
+        exists = inspect(bind).has_table(table_name)
+    except Exception:
+        exists = False
+
+    with _TABLE_EXISTS_LOCK:
+        _TABLE_EXISTS_CACHE[cache_key] = exists
+    return exists
+
+
+class SearchSort(str, Enum):
+    relevance = "relevance"
+    newest = "newest"
+
+
+class SearchView(str, Enum):
+    snapshots = "snapshots"
+    pages = "pages"
+
+
+def _search_snapshots_inner(
+    *,
+    q: str | None,
+    source: str | None,
+    topic: str | None,
+    sort: SearchSort | None,
+    view: SearchView | None,
+    includeNon2xx: bool,
+    page: int,
+    pageSize: int,
+    db: Session,
+) -> tuple[SearchResponseSchema, str]:
+    """
+    Implementation for the /api/search route.
+
+    Returns:
+        (response, mode) where mode is one of:
+        - "newest"
+        - "relevance_fts"
+        - "relevance_fallback"
+    """
+    q_clean = q.strip() if q else None
+    if q_clean == "":
+        q_clean = None
+
+    effective_sort = sort
+    if effective_sort is None:
+        effective_sort = SearchSort.relevance if q_clean else SearchSort.newest
+    if effective_sort == SearchSort.relevance and not q_clean:
+        effective_sort = SearchSort.newest
+
+    effective_view = view or SearchView.snapshots
+
+    dialect_name = db.get_bind().dialect.name
+    use_postgres_fts = dialect_name == "postgresql"
+
+    mode = "newest"
+    if effective_sort == SearchSort.relevance and q_clean:
+        mode = "relevance_fts" if use_postgres_fts else "relevance_fallback"
+
+    query = db.query(Snapshot).join(Source)
+
+    if source:
+        query = query.filter(Source.code == source.lower())
+
+    if topic:
+        # Join the topics association once and filter by topic slug.
+        query = query.join(Snapshot.topics).filter(Topic.slug == topic)
+
+    if not includeNon2xx:
+        query = query.filter(
+            or_(
+                Snapshot.status_code.is_(None),
+                and_(
+                    Snapshot.status_code >= 200,
+                    Snapshot.status_code < 300,
+                ),
+            )
+        )
+
+    tsquery = None
+    vector_expr = None
+
+    if q_clean:
+        if use_postgres_fts and effective_sort == SearchSort.relevance:
+            # Postgres full-text search path (preferred in production).
+            #
+            # We store a tsvector in Snapshot.search_vector, but we also fall
+            # back to computing a vector on-the-fly for any rows that have not
+            # yet been backfilled.
+            tsquery = func.websearch_to_tsquery(TS_CONFIG, q_clean)
+            vector_expr = func.coalesce(
+                Snapshot.search_vector,
+                build_search_vector(Snapshot.title, Snapshot.snippet, Snapshot.url),
+            )
+            query = query.filter(vector_expr.op("@@")(tsquery))
+        else:
+            # DB-agnostic fallback: substring match across title/snippet/url.
+            ilike_pattern = f"%{q_clean}%"
+            query = query.filter(
+                or_(
+                    Snapshot.title.ilike(ilike_pattern),
+                    Snapshot.snippet.ilike(ilike_pattern),
+                    Snapshot.url.ilike(ilike_pattern),
+                )
+            )
+
+    group_key = func.coalesce(Snapshot.normalized_url_group, Snapshot.url)
+    if effective_view == SearchView.pages:
+        total = query.with_entities(func.count(func.distinct(group_key))).scalar() or 0
+    else:
+        total = query.with_entities(func.count(Snapshot.id)).scalar() or 0
+
+    offset = (page - 1) * pageSize
+
+    status_quality = case(
+        (Snapshot.status_code.is_(None), 0),
+        (and_(Snapshot.status_code >= 200, Snapshot.status_code < 300), 2),
+        (and_(Snapshot.status_code >= 300, Snapshot.status_code < 400), 1),
+        else_=-1,
+    )
+
+    item_query = query
+    if effective_view == SearchView.pages:
+        row_number = func.row_number().over(
+            partition_by=group_key,
+            order_by=(Snapshot.capture_timestamp.desc(), Snapshot.id.desc()),
+        ).label("rn")
+        latest_ids_subq = query.with_entities(
+            Snapshot.id.label("id"),
+            row_number,
+        ).subquery()
+
+        item_query = (
+            db.query(Snapshot)
+            .join(latest_ids_subq, Snapshot.id == latest_ids_subq.c.id)
+            .filter(latest_ids_subq.c.rn == 1)
+        )
+
+    use_authority = (
+        effective_sort == SearchSort.relevance
+        and q_clean is not None
+        and _has_table(db, "page_signals")
+    )
+
+    inlink_count = None
+    if use_authority:
+        item_query = item_query.outerjoin(
+            PageSignal, PageSignal.normalized_url_group == group_key
+        )
+        inlink_count = func.coalesce(PageSignal.inlink_count, 0)
+
+    ordered = item_query
+    if effective_sort == SearchSort.relevance and q_clean:
+        if use_postgres_fts and tsquery is not None and vector_expr is not None:
+            rank = func.ts_rank_cd(vector_expr, tsquery)
+
+            title_phrase_boost = case(
+                (Snapshot.title.ilike(f"%{q_clean}%"), 0.2),
+                else_=0.0,
+            )
+            querystring_penalty = case(
+                (Snapshot.url.like("%?%"), -0.1),
+                else_=0.0,
+            )
+            tracking_penalty = case(
+                (
+                    or_(
+                        Snapshot.url.ilike("%utm_%"),
+                        Snapshot.url.ilike("%gclid=%"),
+                        Snapshot.url.ilike("%fbclid=%"),
+                    ),
+                    -0.1,
+                ),
+                else_=0.0,
+            )
+            slash_count = func.length(Snapshot.url) - func.length(
+                func.replace(Snapshot.url, "/", "")
+            )
+            depth_penalty = (-0.01) * slash_count
+
+            authority_boost = 0.0
+            if inlink_count is not None:
+                authority_boost = 0.05 * func.ln(inlink_count + 1)
+
+            rank_score = (
+                rank
+                + title_phrase_boost
+                + querystring_penalty
+                + tracking_penalty
+                + depth_penalty
+                + authority_boost
+            )
+            ordered = ordered.order_by(
+                status_quality.desc(),
+                rank_score.desc(),
+                Snapshot.capture_timestamp.desc(),
+                Snapshot.id.desc(),
+            )
+        else:
+            ilike_pattern = f"%{q_clean}%"
+            title_match_score = case((Snapshot.title.ilike(ilike_pattern), 5), else_=0)
+            url_match_score = case((Snapshot.url.ilike(ilike_pattern), 2), else_=0)
+            snippet_match_score = case(
+                (Snapshot.snippet.ilike(ilike_pattern), 1), else_=0
+            )
+            match_score = title_match_score + url_match_score + snippet_match_score
+            if inlink_count is not None:
+                authority_tier = case(
+                    (inlink_count >= 100, 3),
+                    (inlink_count >= 20, 2),
+                    (inlink_count >= 5, 1),
+                    else_=0,
+                )
+                ordered = ordered.order_by(
+                    status_quality.desc(),
+                    match_score.desc(),
+                    authority_tier.desc(),
+                    Snapshot.capture_timestamp.desc(),
+                    Snapshot.id.desc(),
+                )
+            else:
+                ordered = ordered.order_by(
+                    status_quality.desc(),
+                    match_score.desc(),
+                    Snapshot.capture_timestamp.desc(),
+                    Snapshot.id.desc(),
+                )
+    else:
+        ordered = ordered.order_by(
+            status_quality.desc(),
+            Snapshot.capture_timestamp.desc(),
+            Snapshot.id.desc(),
+        )
+
+    items = (
+        ordered.options(
+            load_only(
+                Snapshot.id,
+                Snapshot.url,
+                Snapshot.normalized_url_group,
+                Snapshot.capture_timestamp,
+                Snapshot.mime_type,
+                Snapshot.status_code,
+                Snapshot.title,
+                Snapshot.snippet,
+                Snapshot.language,
+                Snapshot.warc_path,
+                Snapshot.warc_record_id,
+            ),
+            joinedload(Snapshot.source),
+            joinedload(Snapshot.topics),
+        )
+        .offset(offset)
+        .limit(pageSize)
+        .all()
+    )
+
+    results: List[SnapshotSummarySchema] = []
+
+    for snap in items:
+        source_obj = snap.source
+        if source_obj is None:
+            continue
+
+        capture_date = (
+            snap.capture_timestamp.date().isoformat()
+            if isinstance(snap.capture_timestamp, datetime)
+            else str(snap.capture_timestamp)
+        )
+
+        topic_refs = [
+            TopicRefSchema(slug=t.slug, label=t.label)
+            for t in (snap.topics or [])
+        ]
+
+        results.append(
+            SnapshotSummarySchema(
+                id=snap.id,
+                title=snap.title,
+                sourceCode=source_obj.code,
+                sourceName=source_obj.name,
+                language=snap.language,
+                topics=topic_refs,
+                captureDate=capture_date,
+                originalUrl=snap.url,
+                snippet=snap.snippet,
+                rawSnapshotUrl=f"/api/snapshots/raw/{snap.id}",
+            )
+        )
+
+    return (
+        SearchResponseSchema(
+            results=results,
+            total=total,
+            page=page,
+            pageSize=pageSize,
+        ),
+        mode,
+    )
 
 
 def get_db() -> Session:
@@ -173,11 +490,6 @@ def list_topics(db: Session = Depends(get_db)) -> List[TopicRefSchema]:
     return [TopicRefSchema(slug=t.slug, label=t.label) for t in topics]
 
 
-class SearchSort(str, Enum):
-    relevance = "relevance"
-    newest = "newest"
-
-
 @router.get("/search", response_model=SearchResponseSchema)
 def search_snapshots(
     q: Optional[str] = Query(default=None, min_length=1, max_length=256),
@@ -188,129 +500,44 @@ def search_snapshots(
         default=None, min_length=1, max_length=64, pattern=r"^[a-z0-9-]+$"
     ),
     sort: Optional[SearchSort] = Query(default=None),
+    view: Optional[SearchView] = Query(default=None),
     includeNon2xx: bool = Query(default=False),
     page: int = Query(default=1, ge=1),
     pageSize: int = Query(default=20, ge=1, le=100),
     db: Session = Depends(get_db),
 ) -> SearchResponseSchema:
     """
-    Search snapshots by keyword, source, and/or topic with pagination.
-
-    Defaults:
-    - When a query `q` is present, sort defaults to "relevance".
-    - Otherwise sort defaults to "newest".
-    - Non-2xx responses are excluded by default (set includeNon2xx=true to include).
+    Search snapshots by keyword, source, and/or topic with simple pagination.
     """
-    q_clean = q.strip() if q else None
-    if q_clean == "":
-        q_clean = None
+    start_time = time.perf_counter()
+    mode = "newest"
 
-    effective_sort = sort
-    if effective_sort is None:
-        effective_sort = SearchSort.relevance if q_clean else SearchSort.newest
-    if effective_sort == SearchSort.relevance and not q_clean:
-        effective_sort = SearchSort.newest
-
-    query = db.query(Snapshot).join(Source)
-
-    if source:
-        query = query.filter(Source.code == source.lower())
-
-    if topic:
-        # Join the topics association once and filter by topic slug.
-        query = query.join(Snapshot.topics).filter(Topic.slug == topic)
-
-    if not includeNon2xx:
-        query = query.filter(
-            or_(
-                Snapshot.status_code.is_(None),
-                and_(Snapshot.status_code >= 200, Snapshot.status_code < 300),
-            )
+    try:
+        response, mode = _search_snapshots_inner(
+            q=q,
+            source=source,
+            topic=topic,
+            sort=sort,
+            view=view,
+            includeNon2xx=includeNon2xx,
+            page=page,
+            pageSize=pageSize,
+            db=db,
         )
-
-    ilike_pattern = None
-    if q_clean:
-        ilike_pattern = f"%{q_clean}%"
-        query = query.filter(
-            or_(
-                Snapshot.title.ilike(ilike_pattern),
-                Snapshot.snippet.ilike(ilike_pattern),
-                Snapshot.url.ilike(ilike_pattern),
-            )
+    except Exception:
+        observe_search_request(
+            duration_seconds=time.perf_counter() - start_time,
+            mode=mode,
+            ok=False,
         )
+        raise
 
-    total = query.count()
-    offset = (page - 1) * pageSize
-
-    status_quality = case(
-        (Snapshot.status_code.is_(None), 0),
-        (and_(Snapshot.status_code >= 200, Snapshot.status_code < 300), 2),
-        (and_(Snapshot.status_code >= 300, Snapshot.status_code < 400), 1),
-        else_=-1,
+    observe_search_request(
+        duration_seconds=time.perf_counter() - start_time,
+        mode=mode,
+        ok=True,
     )
-
-    order_by = []
-    if includeNon2xx:
-        order_by.append(status_quality.desc())
-
-    if effective_sort == SearchSort.relevance and q_clean and ilike_pattern:
-        match_score = case(
-            (Snapshot.title.ilike(ilike_pattern), 3),
-            (Snapshot.url.ilike(ilike_pattern), 2),
-            (Snapshot.snippet.ilike(ilike_pattern), 1),
-            else_=0,
-        )
-        order_by.append(match_score.desc())
-
-    order_by.extend([Snapshot.capture_timestamp.desc(), Snapshot.id.desc()])
-
-    items = (
-        query.options(joinedload(Snapshot.source), joinedload(Snapshot.topics))
-        .order_by(*order_by)
-        .offset(offset)
-        .limit(pageSize)
-        .all()
-    )
-
-    results: List[SnapshotSummarySchema] = []
-
-    for snap in items:
-        source_obj = snap.source
-        if source_obj is None:
-            continue
-
-        capture_date = (
-            snap.capture_timestamp.date().isoformat()
-            if isinstance(snap.capture_timestamp, datetime)
-            else str(snap.capture_timestamp)
-        )
-
-        topic_refs = [
-            TopicRefSchema(slug=t.slug, label=t.label)
-            for t in (snap.topics or [])
-        ]
-
-        results.append(
-            SnapshotSummarySchema(
-                id=snap.id,
-                title=snap.title,
-                sourceCode=source_obj.code,
-                sourceName=source_obj.name,
-                language=snap.language,
-                topics=topic_refs,
-                captureDate=capture_date,
-                originalUrl=snap.url,
-                snippet=snap.snippet,
-                rawSnapshotUrl=f"/api/snapshots/raw/{snap.id}",
-            )
-        )
-
-    return SearchResponseSchema(
-        results=results,
-        total=total,
-        page=page,
-        pageSize=pageSize,
-    )
+    return response
 
 
 @router.get("/snapshot/{snapshot_id}", response_model=SnapshotDetailSchema)
@@ -323,7 +550,20 @@ def get_snapshot_detail(
     """
     snap = (
         db.query(Snapshot)
-        .options(joinedload(Snapshot.source), joinedload(Snapshot.topics))
+        .options(
+            load_only(
+                Snapshot.id,
+                Snapshot.url,
+                Snapshot.capture_timestamp,
+                Snapshot.mime_type,
+                Snapshot.status_code,
+                Snapshot.title,
+                Snapshot.snippet,
+                Snapshot.language,
+            ),
+            joinedload(Snapshot.source),
+            joinedload(Snapshot.topics),
+        )
         .filter(Snapshot.id == snapshot_id)
         .first()
     )
@@ -366,7 +606,19 @@ def get_snapshot_raw(
     """
     Serve raw HTML content for a snapshot by reading the underlying WARC record.
     """
-    snap = db.get(Snapshot, snapshot_id)
+    snap = (
+        db.query(Snapshot)
+        .options(
+            load_only(
+                Snapshot.id,
+                Snapshot.url,
+                Snapshot.warc_path,
+                Snapshot.warc_record_id,
+            )
+        )
+        .filter(Snapshot.id == snapshot_id)
+        .first()
+    )
     if snap is None:
         raise HTTPException(status_code=404, detail="Snapshot not found")
 
