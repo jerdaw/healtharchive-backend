@@ -45,7 +45,7 @@ This README is intentionally shorter and focused on practical usage.
 │   │   ├── job_registry.py   # Per-source job templates (hc, phac)
 │   │   ├── jobs.py           # Persistent job runner → archive_tool
 │   │   ├── logging_config.py # Shared logging configuration
-│   │   ├── models.py         # ORM models (Source, ArchiveJob, Snapshot, Topic)
+│   │   ├── models.py         # ORM models (Source, ArchiveJob, Snapshot)
 │   │   ├── seeds.py          # Initial Source seeding
 │   │   └── worker/           # Long-running worker loop for queued jobs
 │   └── archive_tool/         # Crawler/orchestrator subpackage, with its own docs
@@ -166,8 +166,8 @@ Key public endpoints (all prefixed with `/api`):
   Per-source summaries derived from indexed snapshots.
 
 - `GET /api/search`  
-  Full-text style search over snapshots (with filters for `source`, `topic`,
-  pagination, etc.).
+  Full-text style search over snapshots (with filters for `source`, pagination,
+  etc.).
 
   Ranking controls:
   - Default ranking is controlled by `HA_SEARCH_RANKING_VERSION` (`v1` or `v2`).

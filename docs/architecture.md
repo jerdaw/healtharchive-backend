@@ -295,16 +295,6 @@ Relationships:
 
 - `job: ArchiveJob | None`
 - `source: Source | None`
-- `topics: List[Topic]` – many‑to‑many via `snapshot_topics`.
-
-### 3.4 Topic
-
-Simple tag used for grouping snapshots by theme (COVID‑19, mpox, etc.).
-
-- `id: int` (PK)
-- `slug: str` – unique, e.g. `"covid-19"`.
-- `label: str` – human‑readable label.
-- `snapshots: List[Snapshot]` – many‑to‑many relation.
 
 ---
 
@@ -814,21 +804,13 @@ Public Pydantic models:
   recordCount: int
   firstCapture: str
   lastCapture: str
-  topics: List[TopicRef]  # distinct topics for this source
   latestRecordId: Optional[int]
-  ```
-
-- `TopicRef` (inline schema used in summaries and snapshots):
-
-  ```python
-  slug: str   # machine-readable topic identifier (used in queries)
-  label: str  # human-readable label shown in the UI
   ```
 
 - `SnapshotSummarySchema` – used by `/api/search`:
 
-  - `id`, `title`, `sourceCode`, `sourceName`, `language`, `topics: List[TopicRef]`,
-    `captureDate`, `originalUrl`, `snippet`, `rawSnapshotUrl`.
+  - `id`, `title`, `sourceCode`, `sourceName`, `language`, `captureDate`,
+    `originalUrl`, `snippet`, `rawSnapshotUrl`.
 
 - `SearchResponseSchema`:
 
@@ -836,7 +818,7 @@ Public Pydantic models:
 
 - `ArchiveStatsSchema` – used by `/api/stats`:
 
-  - `snapshotsTotal`, `pagesTotal`, `sourcesTotal`, `latestCaptureDate`.
+  - `snapshotsTotal`, `pagesTotal`, `sourcesTotal`, `latestCaptureDate`, `latestCaptureAgeDays`.
 
 - `SnapshotDetailSchema` – used by `/api/snapshot/{id}`:
 
@@ -878,35 +860,21 @@ Public Pydantic models:
       "snapshotsTotal": 12345,
       "pagesTotal": 6789,
       "sourcesTotal": 2,
-      "latestCaptureDate": "2025-04-19"
+      "latestCaptureDate": "2025-04-19",
+      "latestCaptureAgeDays": 3
     }
     ```
 
 - `GET /api/sources`:
 
   - Aggregates `Snapshot` by `source_id`:
-    - Counts, first/last capture dates, distinct topics, latest snapshot ID.
-
-- `GET /api/topics`:
-
-  - Returns the canonical list of topics that can be used for filters and UIs.
-  - Response: an array of objects with the shape:
-
-    ```json
-    [
-      { "slug": "covid-19", "label": "COVID-19" },
-      { "slug": "influenza", "label": "Influenza" }
-    ]
-    ```
-
-  - Topics are sorted by `label` in ascending order.
+    - Counts, first/last capture dates, latest snapshot ID.
 
 - `GET /api/search`:
 
   - Query params:
     - `q: str | None` – keyword.
     - `source: str | None` – source code (e.g. `"hc"`).
-    - `topic: str | None` – topic slug (see `TopicRef.slug`).
     - `sort: "relevance" | "newest" | None` – ordering mode.
     - `view: "snapshots" | "pages" | None` – results grouping mode.
     - `includeNon2xx: bool` – include non‑2xx HTTP status captures (defaults to `false`).
@@ -914,7 +882,6 @@ Public Pydantic models:
     - `pageSize: int` – results per page (default `20`, minimum `1`, maximum `100`).
   - Filters:
     - `Source.code == source.lower()` when `source` set.
-    - Joins `Snapshot.topics` / `Topic` when filtering by `topic`.
     - By default (`includeNon2xx=false`), filters out snapshots with a known non‑2xx
       `status_code` (keeps `status_code IS NULL` and `200–299`).
     - Keyword filter:
@@ -950,7 +917,7 @@ Public Pydantic models:
 
 - `GET /api/snapshot/{id}`:
 
-  - Loads `Snapshot` + `Source` + topics.
+  - Loads `Snapshot` + `Source`.
   - Returns `SnapshotDetailSchema`.
   - 404 if snapshot or source missing.
 

@@ -140,6 +140,7 @@ def test_stats_endpoint_with_no_data(tmp_path, monkeypatch) -> None:
     assert body["pagesTotal"] == 0
     assert body["sourcesTotal"] == 0
     assert body["latestCaptureDate"] is None
+    assert body["latestCaptureAgeDays"] is None
 
     assert resp.headers.get("Cache-Control") is not None
 
@@ -211,3 +212,10 @@ def test_stats_endpoint_with_data(tmp_path, monkeypatch) -> None:
     assert body["pagesTotal"] == 2
     assert body["sourcesTotal"] == 2
     assert body["latestCaptureDate"] == "2025-02-01"
+    assert body["latestCaptureAgeDays"] == max(
+        0,
+        (
+            datetime.now(timezone.utc).date()
+            - datetime(2025, 2, 1, tzinfo=timezone.utc).date()
+        ).days,
+    )

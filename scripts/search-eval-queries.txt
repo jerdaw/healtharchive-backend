@@ -6,7 +6,7 @@
 # - Broad “hub intent” terms
 # - Common refinements (testing, vaccines, isolation)
 # - Named entities and specific medical terms
-# - Non-COVID topics (to avoid overfitting)
+# - Non-COVID queries (to avoid overfitting)
 # - A small French smoke-test set (bilingual content; no stemming)
 #
 # Keep it to realization-check size: ~25–50 queries so capture runs stay quick.
@@ -57,7 +57,7 @@ interim order
 medical devices covid-19
 disinfectants covid-19
 
-# Non-COVID public health topics (overfitting guardrail)
+# Non-COVID public health queries (overfitting guardrail)
 opioid overdose
 naloxone
 vaping

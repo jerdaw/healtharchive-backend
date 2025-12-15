@@ -5,7 +5,7 @@ from pathlib import Path
 
 from ha_backend import db as db_module
 from ha_backend.db import Base, get_engine, get_session
-from ha_backend.models import ArchiveJob, Snapshot, Source, Topic
+from ha_backend.models import ArchiveJob, Snapshot, Source
 from ha_backend.seeds import seed_sources
 
 
@@ -44,7 +44,7 @@ def test_seed_sources_idempotent(tmp_path, monkeypatch) -> None:
 
 def test_model_roundtrip_relationships(tmp_path, monkeypatch) -> None:
     """
-    Basic round-trip test for Source, ArchiveJob, Snapshot, Topic relationships.
+    Basic round-trip test for Source, ArchiveJob, Snapshot relationships.
     """
     _init_test_db(tmp_path, monkeypatch)
 
@@ -84,11 +84,7 @@ def test_model_roundtrip_relationships(tmp_path, monkeypatch) -> None:
             warc_path="/warcs/test.warc.gz",
             warc_record_id="record-1",
         )
-
-        topic = Topic(slug="example-topic", label="Example Topic")
-        snapshot.topics.append(topic)
-
-        session.add_all([snapshot, topic])
+        session.add(snapshot)
 
     # New session to exercise relationship loading.
     with get_session() as session:
@@ -109,5 +105,3 @@ def test_model_roundtrip_relationships(tmp_path, monkeypatch) -> None:
             == captured_at
         )
         assert loaded_snapshot.source is loaded_source
-        assert loaded_snapshot.topics
-        assert loaded_snapshot.topics[0].slug == "example-topic"

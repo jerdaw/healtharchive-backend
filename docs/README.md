@@ -20,6 +20,7 @@ This folder contains the canonical documentation for the **HealthArchive backend
    - `operations/monitoring-and-ci-checklist.md`
    - `operations/search-quality.md` (how to evaluate relevance changes)
    - `operations/search-golden-queries.md` (curated queries + expectations)
+   - `operations/legacy-crawl-imports.md` (import legacy WARCs from old ZIM crawl dirs)
 
 ## Notes
 

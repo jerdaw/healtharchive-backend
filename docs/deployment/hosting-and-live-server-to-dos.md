@@ -434,13 +434,13 @@ On **production** (`https://healtharchive.ca`) and the Vercel domain
      - A small “Backend unreachable” banner may appear when diagnostics are enabled.
 
 2. Try filtering:
-   - Choose a source and topic, e.g. `source=hc`, `topic=covid-19`.
-   - URL updates with `?source=hc&topic=covid-19`.
+   - Choose a source, e.g. `source=hc`.
+   - URL updates with `?source=hc`.
    - Results list changes accordingly (when live snapshots exist).
 
 3. Navigate to `/archive/browse-by-source`:
    - With backend up:
-     - Cards should show real record counts and topics from `/api/sources`.
+     - Cards should show real record counts from `/api/sources`.
    - If the backend is unreachable:
      - “Backend unavailable” callout appears and demo summaries are shown.
 
