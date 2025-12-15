@@ -546,6 +546,7 @@ def cmd_backfill_outlinks(args: argparse.Namespace) -> None:
 
                 html = rec.body_bytes.decode("utf-8", errors="replace")
                 from_group = normalize_url_for_grouping(rec.url)
+                impacted_groups.add(from_group)
                 outlink_groups = extract_outlink_groups(
                     html,
                     base_url=rec.url,

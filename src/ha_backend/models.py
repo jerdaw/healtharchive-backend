@@ -4,7 +4,7 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 from sqlalchemy import (JSON, Boolean, Column, DateTime, ForeignKey, Integer,
-                        String, Table, Text, UniqueConstraint, text)
+                        Float, String, Table, Text, UniqueConstraint, text)
 from sqlalchemy.dialects import postgresql
 from sqlalchemy.orm import Mapped, deferred, mapped_column, relationship
 from sqlalchemy.sql import func
@@ -286,6 +286,19 @@ class PageSignal(Base):
     normalized_url_group: Mapped[str] = mapped_column(Text, primary_key=True)
     inlink_count: Mapped[int] = mapped_column(
         Integer,
+        nullable=False,
+        server_default=text("0"),
+    )
+    outlink_count: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        server_default=text("0"),
+    )
+    pagerank: Mapped[float] = mapped_column(
+        # Stored as a scaled PageRank where the mean is ~1.0 across nodes.
+        # (i.e. sum(pagerank) ~= number_of_nodes).
+        # This makes it easier to use in ranking formulas without tiny numbers.
+        Float().with_variant(postgresql.DOUBLE_PRECISION(), "postgresql"),
         nullable=False,
         server_default=text("0"),
     )

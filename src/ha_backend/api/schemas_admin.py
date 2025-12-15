@@ -74,10 +74,63 @@ class JobStatusCountsSchema(BaseModel):
     counts: Dict[str, int]
 
 
+class SearchDebugItemSchema(BaseModel):
+    id: int
+    title: Optional[str]
+    sourceCode: str
+    sourceName: str
+    language: Optional[str]
+    captureTimestamp: datetime
+    statusCode: Optional[int]
+    originalUrl: str
+    normalizedUrlGroup: Optional[str]
+
+    # Signals (raw)
+    inlinkCount: Optional[int]
+    outlinkCount: Optional[int]
+    pagerank: Optional[float]
+
+    # Score breakdown (components)
+    rankText: Optional[float]
+    titleBoost: float
+    archivedPenalty: float
+    queryPenalty: float
+    trackingPenalty: float
+    depthPenalty: float
+    authorityBoost: float
+    hubnessBoost: float
+    pagerankBoost: float
+
+    totalScore: Optional[float]
+
+    # pages view only
+    groupScore: Optional[float] = None
+    bestSnapshotId: Optional[int] = None
+
+
+class SearchDebugResponseSchema(BaseModel):
+    results: List[SearchDebugItemSchema]
+    total: int
+    page: int
+    pageSize: int
+
+    dialect: str
+    mode: str
+    view: str
+    sort: str
+    rankingVersion: str
+    queryMode: Optional[str]
+    usedPageSignals: bool
+    usedSnapshotOutlinks: bool
+    usedPagerank: bool
+
+
 __all__ = [
     "JobSummarySchema",
     "JobDetailSchema",
     "JobSnapshotSummarySchema",
     "JobListResponseSchema",
     "JobStatusCountsSchema",
+    "SearchDebugItemSchema",
+    "SearchDebugResponseSchema",
 ]
