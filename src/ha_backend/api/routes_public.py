@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -14,7 +14,7 @@ from threading import Lock
 
 from ha_backend.db import get_session
 from ha_backend.indexing.viewer import find_record_for_snapshot
-from ha_backend.models import ArchiveJob, PageSignal, Snapshot, SnapshotOutlink, Source, Topic
+from ha_backend.models import ArchiveJob, PageSignal, Snapshot, SnapshotOutlink, Source
 from ha_backend.search import TS_CONFIG, build_search_vector
 from ha_backend.search_ranking import (
     QueryMode,
@@ -32,7 +32,6 @@ from .schemas import (
     SnapshotDetailSchema,
     SnapshotSummarySchema,
     SourceSummarySchema,
-    TopicRefSchema,
 )
 
 router = APIRouter()
@@ -95,7 +94,6 @@ def _search_snapshots_inner(
     *,
     q: str | None,
     source: str | None,
-    topic: str | None,
     sort: SearchSort | None,
     view: SearchView | None,
     includeNon2xx: bool,
@@ -148,10 +146,6 @@ def _search_snapshots_inner(
 
     if source:
         query = query.filter(Source.code == source.lower())
-
-    if topic:
-        # Join the topics association once and filter by topic slug.
-        query = query.join(Snapshot.topics).filter(Topic.slug == topic)
 
     if not includeNon2xx:
         query = query.filter(
@@ -578,7 +572,6 @@ def _search_snapshots_inner(
                 Snapshot.warc_record_id,
             ),
             joinedload(Snapshot.source),
-            joinedload(Snapshot.topics),
         )
         .offset(offset)
         .limit(pageSize)
@@ -598,11 +591,6 @@ def _search_snapshots_inner(
             else str(snap.capture_timestamp)
         )
 
-        topic_refs = [
-            TopicRefSchema(slug=t.slug, label=t.label)
-            for t in (snap.topics or [])
-        ]
-
         results.append(
             SnapshotSummarySchema(
                 id=snap.id,
@@ -610,7 +598,6 @@ def _search_snapshots_inner(
                 sourceCode=source_obj.code,
                 sourceName=source_obj.name,
                 language=snap.language,
-                topics=topic_refs,
                 captureDate=capture_date,
                 originalUrl=(
                     snap.normalized_url_group
@@ -719,15 +706,25 @@ def get_archive_stats(response: Response, db: Session = Depends(get_db)) -> Arch
     )
 
     latest_capture_ts = db.query(func.max(Snapshot.capture_timestamp)).scalar()
-    latest_capture_date = (
-        latest_capture_ts.date().isoformat() if latest_capture_ts else None
-    )
+    latest_capture_date: Optional[str] = None
+    latest_capture_age_days: Optional[int] = None
+    if latest_capture_ts:
+        if isinstance(latest_capture_ts, datetime) and latest_capture_ts.tzinfo:
+            latest_capture_date_obj = latest_capture_ts.astimezone(timezone.utc).date()
+        else:
+            latest_capture_date_obj = latest_capture_ts.date()
+
+        latest_capture_date = latest_capture_date_obj.isoformat()
+
+        today = datetime.now(timezone.utc).date()
+        latest_capture_age_days = max(0, (today - latest_capture_date_obj).days)
 
     return ArchiveStatsSchema(
         snapshotsTotal=snapshots_total,
         pagesTotal=pages_total,
         sourcesTotal=sources_total,
         latestCaptureDate=latest_capture_date,
+        latestCaptureAgeDays=latest_capture_age_days,
     )
 
 
@@ -773,19 +770,6 @@ def list_sources(db: Session = Depends(get_db)) -> List[SourceSummarySchema]:
             latest_snapshot[0] if latest_snapshot else None
         )
 
-        # Distinct topics (slug + label, if any)
-        topic_rows = (
-            db.query(Topic.slug, Topic.label)
-            .join(Topic.snapshots)
-            .filter(Snapshot.source_id == source.id)
-            .distinct()
-            .order_by(Topic.label)
-            .all()
-        )
-        topics = [
-            TopicRefSchema(slug=slug, label=label) for (slug, label) in topic_rows
-        ]
-
         summaries.append(
             SourceSummarySchema(
                 sourceCode=source.code,
@@ -801,7 +785,6 @@ def list_sources(db: Session = Depends(get_db)) -> List[SourceSummarySchema]:
                     if isinstance(last_capture, datetime)
                     else str(last_capture)
                 ),
-                topics=topics,
                 latestRecordId=latest_record_id,
             )
         )
@@ -809,27 +792,11 @@ def list_sources(db: Session = Depends(get_db)) -> List[SourceSummarySchema]:
     return summaries
 
 
-@router.get("/topics", response_model=List[TopicRefSchema])
-def list_topics(db: Session = Depends(get_db)) -> List[TopicRefSchema]:
-    """
-    Return the canonical list of topics (slug + label), sorted by label.
-    """
-    topics = (
-        db.query(Topic)
-        .order_by(Topic.label)
-        .all()
-    )
-    return [TopicRefSchema(slug=t.slug, label=t.label) for t in topics]
-
-
 @router.get("/search", response_model=SearchResponseSchema)
 def search_snapshots(
     q: Optional[str] = Query(default=None, min_length=1, max_length=256),
     source: Optional[str] = Query(
         default=None, min_length=1, max_length=16, pattern=r"^[a-z0-9-]+$"
-    ),
-    topic: Optional[str] = Query(
-        default=None, min_length=1, max_length=64, pattern=r"^[a-z0-9-]+$"
     ),
     sort: Optional[SearchSort] = Query(default=None),
     view: Optional[SearchView] = Query(default=None),
@@ -844,7 +811,7 @@ def search_snapshots(
     db: Session = Depends(get_db),
 ) -> SearchResponseSchema:
     """
-    Search snapshots by keyword, source, and/or topic with simple pagination.
+    Search snapshots by keyword and/or source with simple pagination.
     """
     start_time = time.perf_counter()
     mode = "newest"
@@ -853,7 +820,6 @@ def search_snapshots(
         response, mode = _search_snapshots_inner(
             q=q,
             source=source,
-            topic=topic,
             sort=sort,
             view=view,
             includeNon2xx=includeNon2xx,
@@ -900,7 +866,6 @@ def get_snapshot_detail(
                 Snapshot.language,
             ),
             joinedload(Snapshot.source),
-            joinedload(Snapshot.topics),
         )
         .filter(Snapshot.id == snapshot_id)
         .first()
@@ -915,18 +880,12 @@ def get_snapshot_detail(
         else str(snap.capture_timestamp)
     )
 
-    topic_refs = [
-        TopicRefSchema(slug=t.slug, label=t.label)
-        for t in (snap.topics or [])
-    ]
-
     return SnapshotDetailSchema(
         id=snap.id,
         title=snap.title,
         sourceCode=snap.source.code,
         sourceName=snap.source.name,
         language=snap.language,
-        topics=topic_refs,
         captureDate=capture_date,
         originalUrl=snap.url,
         snippet=snap.snippet,

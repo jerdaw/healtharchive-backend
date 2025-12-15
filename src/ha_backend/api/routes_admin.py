@@ -7,7 +7,7 @@ from sqlalchemy import Float, Integer, and_, case, cast, func, inspect, literal,
 from sqlalchemy.orm import Session, joinedload, load_only
 
 from ha_backend.db import get_session
-from ha_backend.models import ArchiveJob, PageSignal, Snapshot, SnapshotOutlink, Source, Topic
+from ha_backend.models import ArchiveJob, PageSignal, Snapshot, SnapshotOutlink, Source
 from ha_backend.search import TS_CONFIG, build_search_vector
 from ha_backend.search_ranking import (
     QueryMode,
@@ -234,7 +234,6 @@ def _has_column(db: Session, table_name: str, column_name: str) -> bool:
 def search_debug(
     q: Optional[str] = Query(default=None, min_length=1, max_length=256),
     source: Optional[str] = Query(default=None, min_length=1, max_length=16),
-    topic: Optional[str] = Query(default=None, min_length=1, max_length=64),
     sort: Optional[SearchSort] = Query(default=None),
     view: Optional[SearchView] = Query(default=None),
     includeNon2xx: bool = Query(default=False),
@@ -281,8 +280,6 @@ def search_debug(
     query = db.query(Snapshot).join(Source)
     if source:
         query = query.filter(Source.code == source.lower())
-    if topic:
-        query = query.join(Snapshot.topics).filter(Topic.slug == topic)
 
     if not includeNon2xx:
         query = query.filter(

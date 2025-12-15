@@ -70,7 +70,6 @@ When you add/modify functionality, you should:
   * `Source` – logical content origin (e.g., `"hc"`, `"phac"`).
   * `ArchiveJob` – a crawl job and its lifecycle (`queued`, `running`, `completed`, `failed`, `indexed`, `index_failed`, etc.).
   * `Snapshot` – a single captured page with URL, capture timestamp, WARC path, language, etc.
-  * `Topic` – tag objects with `slug` and `label`, many-to-many with `Snapshot`.
 
 If you change models:
 
@@ -157,8 +156,7 @@ Public routes (for the frontend):
 
 * `GET /api/health` – status and basic stats.
 * `GET /api/sources` – summarized counts by source.
-* `GET /api/topics` – canonical topic list (`slug` + `label`).
-* `GET /api/search` – paginated search with `q`, `source`, `topic`, `page`, `pageSize`.
+* `GET /api/search` – paginated search with `q`, `source`, `page`, `pageSize`.
 * `GET /api/snapshot/{id}` – metadata for one snapshot.
 * `GET /api/snapshots/raw/{id}` – raw HTML replay.
 
@@ -173,7 +171,7 @@ When you add/modify endpoints:
 * Maintain existing query semantics:
 
   * `page >= 1`, `1 <= pageSize <= 100`, etc.
-  * Filtering by `source` and `topic` using `Source.code` and `Topic.slug`.
+  * Filtering by `source` using `Source.code`.
 * Update the relevant Pydantic schemas and tests accordingly.
 
 ---
@@ -234,7 +232,7 @@ When you change behavior:
   * Expose `/api/admin/**` or `/metrics` publicly.
 * Be cautious with:
 
-  * ORM model changes (`ArchiveJob`, `Snapshot`, `Source`, `Topic`).
+  * ORM model changes (`ArchiveJob`, `Snapshot`, `Source`).
   * CORS configuration in `ha_backend/api/__init__.py`.
   * Anything under `src/archive_tool/**` beyond doc updates.
 

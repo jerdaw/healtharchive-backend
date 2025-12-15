@@ -217,10 +217,6 @@ class Snapshot(TimestampMixin, Base):
 
     job: Mapped[Optional[ArchiveJob]] = relationship(back_populates="snapshots")
     source: Mapped[Optional[Source]] = relationship(back_populates="snapshots")
-    topics: Mapped[List["Topic"]] = relationship(
-        secondary="snapshot_topics",
-        back_populates="snapshots",
-    )
     outlinks: Mapped[List["SnapshotOutlink"]] = relationship(
         back_populates="snapshot",
         cascade="all, delete-orphan",
@@ -228,31 +224,6 @@ class Snapshot(TimestampMixin, Base):
 
     def __repr__(self) -> str:
         return f"<Snapshot id={self.id!r} url={self.url!r}>"
-
-
-class Topic(TimestampMixin, Base):
-    """
-    Topic/tag used to annotate snapshots (COVID-19, mpox, etc.).
-    """
-
-    __tablename__ = "topics"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    slug: Mapped[str] = mapped_column(
-        String(100),
-        nullable=False,
-        unique=True,
-        index=True,
-    )
-    label: Mapped[str] = mapped_column(String(255), nullable=False)
-
-    snapshots: Mapped[List[Snapshot]] = relationship(
-        secondary="snapshot_topics",
-        back_populates="topics",
-    )
-
-    def __repr__(self) -> str:
-        return f"<Topic id={self.id!r} slug={self.slug!r}>"
 
 
 class SnapshotOutlink(TimestampMixin, Base):
@@ -321,20 +292,10 @@ class PageSignal(Base):
     )
 
 
-snapshot_topics = Table(
-    "snapshot_topics",
-    Base.metadata,
-    Column("snapshot_id", ForeignKey("snapshots.id"), primary_key=True),
-    Column("topic_id", ForeignKey("topics.id"), primary_key=True),
-)
-
-
 __all__ = [
     "Source",
     "ArchiveJob",
     "Snapshot",
     "SnapshotOutlink",
-    "Topic",
     "PageSignal",
-    "snapshot_topics",
 ]

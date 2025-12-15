@@ -28,7 +28,7 @@ We do not have query logs yet, so this list is a **curated approximation** of:
 - Broad hub intent (1–2 terms).
 - Common refinements (testing, vaccines, isolation).
 - Specific named entities (NACI, antivirals).
-- A few non-COVID topics (to avoid overfitting).
+- A few non-COVID queries (to avoid overfitting).
 - A small French “smoke test” set for bilingual content.
 
 ### 2.1 Broad “head” queries (hub intent)
@@ -75,7 +75,7 @@ We do not have query logs yet, so this list is a **curated approximation** of:
 - `remdesivir`
 - `health infobase`
 
-### 2.4 Non-COVID topics (overfitting guardrail)
+### 2.4 Non-COVID queries (overfitting guardrail)
 
 - `opioid overdose`
 - `naloxone`

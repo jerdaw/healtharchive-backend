@@ -7,7 +7,7 @@ from fastapi.testclient import TestClient
 
 from ha_backend import db as db_module
 from ha_backend.db import Base, get_engine, get_session
-from ha_backend.models import PageSignal, Snapshot, SnapshotOutlink, Source, Topic
+from ha_backend.models import PageSignal, Snapshot, SnapshotOutlink, Source
 
 
 def _init_test_app(tmp_path: Path, monkeypatch):
@@ -31,7 +31,7 @@ def _init_test_app(tmp_path: Path, monkeypatch):
 
 def _seed_search_data() -> None:
     """
-    Seed a few sources, topics, and snapshots for search tests.
+    Seed a few sources and snapshots for search tests.
     """
     with get_session() as session:
         hc = Source(
@@ -49,11 +49,6 @@ def _seed_search_data() -> None:
             enabled=True,
         )
         session.add_all([hc, phac])
-        session.flush()
-
-        topic_covid = Topic(slug="covid-19", label="COVID-19")
-        topic_flu = Topic(slug="flu", label="Influenza")
-        session.add_all([topic_covid, topic_flu])
         session.flush()
 
         ts1 = datetime(2025, 1, 1, 12, 0, tzinfo=timezone.utc)
@@ -74,7 +69,6 @@ def _seed_search_data() -> None:
             warc_path="/warcs/hc-covid.warc.gz",
             warc_record_id="hc-covid",
         )
-        s1.topics.append(topic_covid)
 
         s2 = Snapshot(
             job_id=None,
@@ -90,7 +84,6 @@ def _seed_search_data() -> None:
             warc_path="/warcs/phac-flu.warc.gz",
             warc_record_id="phac-flu",
         )
-        s2.topics.append(topic_flu)
 
         s3 = Snapshot(
             job_id=None,
@@ -398,11 +391,7 @@ def test_search_endpoint_basic(tmp_path, monkeypatch) -> None:
     assert data["total"] == 3
     assert len(data["results"]) == 3
     first_result = data["results"][0]
-    assert isinstance(first_result["topics"], list)
-    if first_result["topics"]:
-        first_topic = first_result["topics"][0]
-        assert "slug" in first_topic
-        assert "label" in first_topic
+    assert "topics" not in first_result
 
 
 def test_search_filters_by_source(tmp_path, monkeypatch) -> None:
@@ -428,10 +417,7 @@ def test_search_filters_by_query(tmp_path, monkeypatch) -> None:
     assert data["total"] == 1
     result = data["results"][0]
     assert "COVID-19 guidance" in result["title"]
-    assert any(
-        t["slug"] == "covid-19" and t["label"] == "COVID-19"
-        for t in result["topics"]
-    )
+    assert "topics" not in result
 
 
 def test_search_default_relevance_sort_and_filters_non_2xx(tmp_path, monkeypatch) -> None:
@@ -626,34 +612,6 @@ def test_search_ranking_v2_hubness_boosts_hub_pages_for_broad_queries(
     assert results_v2[0]["originalUrl"] == "https://example.org/covid"
 
 
-def test_search_filters_by_topic_slug(tmp_path, monkeypatch) -> None:
-    client = _init_test_app(tmp_path, monkeypatch)
-    _seed_search_data()
-
-    resp = client.get("/api/search", params={"topic": "covid-19"})
-    assert resp.status_code == 200
-    data = resp.json()
-
-    assert data["total"] == 1
-    result = data["results"][0]
-    assert any(
-        t["slug"] == "covid-19" and t["label"] == "COVID-19"
-        for t in result["topics"]
-    )
-
-
-def test_search_returns_empty_for_unknown_topic_slug(tmp_path, monkeypatch) -> None:
-    client = _init_test_app(tmp_path, monkeypatch)
-    _seed_search_data()
-
-    resp = client.get("/api/search", params={"topic": "non-existent-topic"})
-    assert resp.status_code == 200
-    data = resp.json()
-
-    assert data["total"] == 0
-    assert data["results"] == []
-
-
 def test_snapshot_detail_endpoint(tmp_path, monkeypatch) -> None:
     client = _init_test_app(tmp_path, monkeypatch)
     _seed_search_data()
@@ -669,14 +627,10 @@ def test_snapshot_detail_endpoint(tmp_path, monkeypatch) -> None:
     assert body["id"] == snap_id
     assert body["originalUrl"]
     assert body["sourceCode"] in {"hc", "phac"}
-    assert isinstance(body["topics"], list)
-    if body["topics"]:
-        first_topic = body["topics"][0]
-        assert "slug" in first_topic
-        assert "label" in first_topic
+    assert "topics" not in body
 
 
-def test_sources_endpoint_topics_shape(tmp_path, monkeypatch) -> None:
+def test_sources_endpoint_shape(tmp_path, monkeypatch) -> None:
     client = _init_test_app(tmp_path, monkeypatch)
     _seed_search_data()
 
@@ -687,11 +641,10 @@ def test_sources_endpoint_topics_shape(tmp_path, monkeypatch) -> None:
     assert isinstance(data, list)
     assert data
     for source in data:
-        assert "topics" in source
-        assert isinstance(source["topics"], list)
-        for topic in source["topics"]:
-            assert "slug" in topic
-            assert "label" in topic
+        assert source["sourceCode"] in {"hc", "phac"}
+        assert isinstance(source["recordCount"], int)
+        assert isinstance(source["firstCapture"], str)
+        assert isinstance(source["lastCapture"], str)
 
 
 def test_snapshot_detail_not_found(tmp_path, monkeypatch) -> None:
@@ -699,24 +652,6 @@ def test_snapshot_detail_not_found(tmp_path, monkeypatch) -> None:
 
     resp = client.get("/api/snapshot/9999")
     assert resp.status_code == 404
-
-
-def test_topics_endpoint(tmp_path, monkeypatch) -> None:
-    client = _init_test_app(tmp_path, monkeypatch)
-    _seed_search_data()
-
-    resp = client.get("/api/topics")
-    assert resp.status_code == 200
-    data = resp.json()
-
-    # We seeded two topics: COVID-19 and Influenza.
-    slugs = {t["slug"] for t in data}
-    labels = {t["label"] for t in data}
-
-    assert "covid-19" in slugs
-    assert "flu" in slugs
-    assert "COVID-19" in labels
-    assert "Influenza" in labels
 
 
 def test_search_pagination_defaults(tmp_path, monkeypatch) -> None:
@@ -790,9 +725,6 @@ def test_search_invalid_query_params(tmp_path, monkeypatch) -> None:
     resp_long_q = client.get("/api/search", params={"q": long_q})
     assert resp_long_q.status_code == 422
 
-    # source and topic must match slug regex.
+    # source must match slug regex.
     resp_bad_source = client.get("/api/search", params={"source": "HC!"})
     assert resp_bad_source.status_code == 422
-
-    resp_bad_topic = client.get("/api/search", params={"topic": "covid 19"})
-    assert resp_bad_topic.status_code == 422

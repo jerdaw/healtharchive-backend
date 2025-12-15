@@ -5,18 +5,12 @@ from typing import List, Optional
 from pydantic import BaseModel
 
 
-class TopicRefSchema(BaseModel):
-    slug: str
-    label: str
-
-
 class SourceSummarySchema(BaseModel):
     sourceCode: str
     sourceName: str
     recordCount: int
     firstCapture: str
     lastCapture: str
-    topics: List[TopicRefSchema]
     latestRecordId: Optional[int]
 
 
@@ -26,7 +20,6 @@ class SnapshotSummarySchema(BaseModel):
     sourceCode: str
     sourceName: str
     language: Optional[str]
-    topics: List[TopicRefSchema]
     captureDate: str
     originalUrl: str
     snippet: Optional[str]
@@ -46,7 +39,6 @@ class SnapshotDetailSchema(BaseModel):
     sourceCode: str
     sourceName: str
     language: Optional[str]
-    topics: List[TopicRefSchema]
     captureDate: str
     originalUrl: str
     snippet: Optional[str]
@@ -60,10 +52,10 @@ class ArchiveStatsSchema(BaseModel):
     pagesTotal: int
     sourcesTotal: int
     latestCaptureDate: Optional[str]
+    latestCaptureAgeDays: Optional[int]
 
 
 __all__ = [
-    "TopicRefSchema",
     "SourceSummarySchema",
     "SnapshotSummarySchema",
     "SearchResponseSchema",

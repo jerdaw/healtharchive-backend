@@ -213,7 +213,7 @@ With the production backend and frontend deployed:
    https://healtharchive.ca/archive/browse-by-source
    ```
 
-   - Cards should show real counts/topics from `/api/sources`.
+   - Cards should show real counts from `/api/sources`.
 
 ### 3.2 Snapshot viewer
 
