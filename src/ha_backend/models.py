@@ -4,8 +4,9 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 from sqlalchemy import (JSON, Boolean, Column, DateTime, ForeignKey, Integer,
-                        String, Table, Text, text)
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+                        String, Table, Text, UniqueConstraint, text)
+from sqlalchemy.dialects import postgresql
+from sqlalchemy.orm import Mapped, deferred, mapped_column, relationship
 from sqlalchemy.sql import func
 
 from .db import Base
@@ -190,6 +191,13 @@ class Snapshot(TimestampMixin, Base):
     snippet: Mapped[Optional[str]] = mapped_column(Text)
     language: Mapped[Optional[str]] = mapped_column(String(16))
 
+    # Postgres FTS tsvector (falls back to TEXT on SQLite).
+    search_vector: Mapped[Optional[str]] = deferred(
+        mapped_column(
+            Text().with_variant(postgresql.TSVECTOR(), "postgresql"),
+        )
+    )
+
     warc_path: Mapped[str] = mapped_column(Text, nullable=False)
     warc_record_id: Mapped[Optional[str]] = mapped_column(String(255))
     raw_snapshot_path: Mapped[Optional[str]] = mapped_column(Text)
@@ -200,6 +208,10 @@ class Snapshot(TimestampMixin, Base):
     topics: Mapped[List["Topic"]] = relationship(
         secondary="snapshot_topics",
         back_populates="snapshots",
+    )
+    outlinks: Mapped[List["SnapshotOutlink"]] = relationship(
+        back_populates="snapshot",
+        cascade="all, delete-orphan",
     )
 
     def __repr__(self) -> str:
@@ -231,6 +243,60 @@ class Topic(TimestampMixin, Base):
         return f"<Topic id={self.id!r} slug={self.slug!r}>"
 
 
+class SnapshotOutlink(TimestampMixin, Base):
+    """
+    Outgoing link edge from a snapshot's (main) content to another page group.
+    """
+
+    __tablename__ = "snapshot_outlinks"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    snapshot_id: Mapped[int] = mapped_column(
+        ForeignKey("snapshots.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    to_normalized_url_group: Mapped[str] = mapped_column(
+        Text,
+        nullable=False,
+        index=True,
+    )
+
+    snapshot: Mapped[Snapshot] = relationship(back_populates="outlinks")
+
+    __table_args__ = (
+        UniqueConstraint(
+            "snapshot_id",
+            "to_normalized_url_group",
+            name="uq_snapshot_outlinks_snapshot_to",
+        ),
+    )
+
+
+class PageSignal(Base):
+    """
+    Aggregated signals per normalized_url_group, used for relevance ranking.
+
+    This is intentionally simple: we currently track only a link-based signal
+    (inlink_count) derived from SnapshotOutlink edges.
+    """
+
+    __tablename__ = "page_signals"
+
+    normalized_url_group: Mapped[str] = mapped_column(Text, primary_key=True)
+    inlink_count: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        server_default=text("0"),
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+        onupdate=func.now(),
+    )
+
+
 snapshot_topics = Table(
     "snapshot_topics",
     Base.metadata,
@@ -243,6 +309,8 @@ __all__ = [
     "Source",
     "ArchiveJob",
     "Snapshot",
+    "SnapshotOutlink",
     "Topic",
+    "PageSignal",
     "snapshot_topics",
 ]

@@ -3,15 +3,18 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
+from sqlalchemy import inspect
 from sqlalchemy.orm import Session
 
+from ha_backend.authority import recompute_page_signals
 from ha_backend.db import get_session
 from ha_backend.indexing.mapping import record_to_snapshot
 from ha_backend.indexing.text_extraction import (detect_language, extract_text,
+                                                 extract_outlink_groups,
                                                  extract_title, make_snippet)
 from ha_backend.indexing.warc_discovery import discover_warcs_for_job
 from ha_backend.indexing.warc_reader import iter_html_records
-from ha_backend.models import ArchiveJob, Snapshot
+from ha_backend.models import ArchiveJob, Snapshot, SnapshotOutlink
 
 logger = logging.getLogger("healtharchive.indexing")
 
@@ -32,6 +35,12 @@ def index_job(job_id: int) -> int:
     """
     with get_session() as session:
         job = _load_job(session, job_id)
+        use_postgres_fts = session.get_bind().dialect.name == "postgresql"
+
+        inspector = inspect(session.get_bind())
+        has_outlinks = inspector.has_table("snapshot_outlinks")
+        has_page_signals = inspector.has_table("page_signals")
+        use_authority = has_outlinks and has_page_signals
 
         if job.source is None:
             raise ValueError(
@@ -66,6 +75,25 @@ def index_job(job_id: int) -> int:
         logger.info(
             "Starting indexing for job %s (%d WARC file(s))", job_id, len(warc_paths)
         )
+
+        impacted_groups: set[str] = set()
+        if has_outlinks:
+            # Capture the set of groups affected by removing the old outlinks,
+            # so PageSignal counts can be kept in sync after re-indexing.
+            existing_groups = (
+                session.query(SnapshotOutlink.to_normalized_url_group)
+                .join(Snapshot, Snapshot.id == SnapshotOutlink.snapshot_id)
+                .filter(Snapshot.job_id == job.id)
+                .distinct()
+                .all()
+            )
+            impacted_groups.update({g for (g,) in existing_groups if g})
+
+            snapshot_ids_subq = session.query(Snapshot.id).filter(Snapshot.job_id == job.id)
+            session.query(SnapshotOutlink).filter(
+                SnapshotOutlink.snapshot_id.in_(snapshot_ids_subq)
+            ).delete(synchronize_session=False)
+
         session.query(Snapshot).filter(Snapshot.job_id == job.id).delete(
             synchronize_session=False
         )
@@ -93,6 +121,27 @@ def index_job(job_id: int) -> int:
                             snippet=snippet,
                             language=language,
                         )
+                        if use_postgres_fts:
+                            from ha_backend.search import build_search_vector
+
+                            snapshot.search_vector = build_search_vector(
+                                title,
+                                snippet,
+                                rec.url,
+                            )
+
+                        if has_outlinks and rec.status_code is not None and 200 <= rec.status_code < 300:
+                            outlink_groups = extract_outlink_groups(
+                                html,
+                                base_url=rec.url,
+                                from_group=snapshot.normalized_url_group,
+                            )
+                            for group in outlink_groups:
+                                snapshot.outlinks.append(
+                                    SnapshotOutlink(to_normalized_url_group=group)
+                                )
+                            impacted_groups.update(outlink_groups)
+
                         session.add(snapshot)
                         n_snapshots += 1
 
@@ -109,6 +158,11 @@ def index_job(job_id: int) -> int:
 
             job.indexed_page_count = n_snapshots
             job.status = "indexed"
+
+            if use_authority and impacted_groups:
+                session.flush()
+                recompute_page_signals(session, groups=tuple(impacted_groups))
+
             logger.info(
                 "Indexing for job %s completed successfully with %d snapshot(s).",
                 job_id,

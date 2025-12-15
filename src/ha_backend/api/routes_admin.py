@@ -4,7 +4,7 @@ from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, load_only
 
 from ha_backend.db import get_session
 from ha_backend.models import ArchiveJob, Snapshot, Source
@@ -174,6 +174,16 @@ def list_job_snapshots(
     """
     snapshots = (
         db.query(Snapshot)
+        .options(
+            load_only(
+                Snapshot.id,
+                Snapshot.url,
+                Snapshot.capture_timestamp,
+                Snapshot.status_code,
+                Snapshot.language,
+                Snapshot.title,
+            )
+        )
         .filter(Snapshot.job_id == job_id)
         .order_by(Snapshot.capture_timestamp.desc(), Snapshot.id.desc())
         .offset(offset)
