@@ -612,7 +612,11 @@ def _search_snapshots_inner(
                 language=snap.language,
                 topics=topic_refs,
                 captureDate=capture_date,
-                originalUrl=snap.url,
+                originalUrl=(
+                    snap.normalized_url_group
+                    if (effective_view == SearchView.pages and snap.normalized_url_group)
+                    else snap.url
+                ),
                 snippet=snap.snippet,
                 rawSnapshotUrl=f"/api/snapshots/raw/{snap.id}",
             )
