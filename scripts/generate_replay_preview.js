@@ -10,6 +10,7 @@
  *   node /ha-scripts/generate_replay_preview.js \
  *     --url "https://replay.healtharchive.ca/job-1/..." \
  *     --out "/out/source-hc-job-1.png" \
+ *     --format jpeg --quality 80 \
  *     --width 1000 --height 540 --timeout-ms 45000
  */
 
@@ -30,6 +31,8 @@ function intValue(flag, fallback) {
 
 const url = argValue("--url");
 const outPath = argValue("--out");
+const requestedFormat = argValue("--format");
+const quality = intValue("--quality", 80);
 const width = intValue("--width", 1000);
 const height = intValue("--height", 540);
 const timeoutMs = intValue("--timeout-ms", 45000);
@@ -69,7 +72,26 @@ async function main() {
     // Ignore JS evaluation failures.
   }
 
-  await page.screenshot({ path: outPath, type: "png", fullPage: false });
+  const normalizedFormat = (() => {
+    const raw = (requestedFormat || "").trim().toLowerCase();
+    if (raw === "png") return "png";
+    if (raw === "jpeg" || raw === "jpg") return "jpeg";
+    const lowerOut = outPath.toLowerCase();
+    if (lowerOut.endsWith(".jpg") || lowerOut.endsWith(".jpeg")) return "jpeg";
+    return "png";
+  })();
+
+  const screenshotOpts = { path: outPath, fullPage: false };
+  if (normalizedFormat === "jpeg") {
+    const boundedQuality = Math.min(95, Math.max(20, quality));
+    await page.screenshot({
+      ...screenshotOpts,
+      type: "jpeg",
+      quality: boundedQuality,
+    });
+  } else {
+    await page.screenshot({ ...screenshotOpts, type: "png" });
+  }
   await browser.close();
 }
 
@@ -78,4 +100,3 @@ main().catch((err) => {
   console.error(err);
   process.exit(1);
 });
-

@@ -1119,8 +1119,8 @@ def cmd_replay_generate_previews(args: argparse.Namespace) -> None:
       /api/sources/{source_code}/preview?jobId=<id>
 
     This command uses a Playwright Docker image to render each source's
-    `entryBrowseUrl` and take a small PNG screenshot. The URL is loaded with
-    `#ha_nobanner=1` so the pywb banner is not captured.
+    `entryBrowseUrl` and take a small screenshot (JPEG by default). The URL is
+    loaded with `#ha_nobanner=1` so the pywb banner is not captured.
     """
     from urllib.parse import urlsplit, urlunsplit
 
@@ -1186,9 +1186,22 @@ def cmd_replay_generate_previews(args: argparse.Namespace) -> None:
     height = args.height
     timeout_ms = args.timeout_ms
     settle_ms = args.settle_ms
+    output_format = args.format
+    jpeg_quality = args.jpeg_quality
 
     if width < 200 or height < 200:
         print("ERROR: --width/--height must be >= 200.", file=sys.stderr)
+        sys.exit(1)
+
+    format_normalized = (output_format or "").strip().lower()
+    if format_normalized not in {"jpeg", "jpg", "png"}:
+        print("ERROR: --format must be 'jpeg' or 'png'.", file=sys.stderr)
+        sys.exit(1)
+    if format_normalized == "jpg":
+        format_normalized = "jpeg"
+
+    if jpeg_quality < 20 or jpeg_quality > 95:
+        print("ERROR: --jpeg-quality must be between 20 and 95.", file=sys.stderr)
         sys.exit(1)
 
     def should_use_host_network(url: str) -> bool:
@@ -1210,7 +1223,10 @@ def cmd_replay_generate_previews(args: argparse.Namespace) -> None:
     print(f"Playwright image: {image}")
     print(f"Viewport:         {width}x{height}")
     print(f"Timeout:          {timeout_ms}ms")
+    print(f"Format:           {format_normalized}")
     print("")
+
+    supported_exts = (".webp", ".jpg", ".jpeg", ".png")
 
     for source in sources:
         browse_url = source.entryBrowseUrl
@@ -1229,15 +1245,24 @@ def cmd_replay_generate_previews(args: argparse.Namespace) -> None:
             continue
 
         job_id = int(match.group(1))
-        filename = f"source-{source.sourceCode}-job-{job_id}.png"
-        output_path = preview_dir / filename
-
-        if output_path.exists() and not args.overwrite:
+        base_name = f"source-{source.sourceCode}-job-{job_id}"
+        existing = next(
+            (
+                preview_dir / f"{base_name}{ext}"
+                for ext in supported_exts
+                if (preview_dir / f"{base_name}{ext}").exists()
+            ),
+            None,
+        )
+        if existing is not None and not args.overwrite:
             skipped += 1
             print(
-                f"- {source.sourceCode}: exists ({filename}); use --overwrite to regenerate"
+                f"- {source.sourceCode}: exists ({existing.name}); use --overwrite to regenerate"
             )
             continue
+
+        ext = ".jpg" if format_normalized == "jpeg" else ".png"
+        filename = f"{base_name}{ext}"
 
         parts = urlsplit(browse_url)
         screenshot_url = urlunsplit(
@@ -1261,6 +1286,10 @@ def cmd_replay_generate_previews(args: argparse.Namespace) -> None:
                 screenshot_url,
                 "--out",
                 f"/out/{filename}",
+                "--format",
+                format_normalized,
+                "--quality",
+                str(jpeg_quality),
                 "--width",
                 str(width),
                 "--height",
@@ -1780,7 +1809,19 @@ def build_parser() -> argparse.ArgumentParser:
         "--overwrite",
         action="store_true",
         default=False,
-        help="Regenerate previews even when the cached PNG already exists.",
+        help="Regenerate previews even when a cached preview already exists.",
+    )
+    p_replay_previews.add_argument(
+        "--format",
+        choices=["jpeg", "png"],
+        default="jpeg",
+        help="Image format to generate (default: jpeg).",
+    )
+    p_replay_previews.add_argument(
+        "--jpeg-quality",
+        type=int,
+        default=80,
+        help="JPEG quality (20-95). Only used when --format=jpeg.",
     )
     p_replay_previews.add_argument(
         "--playwright-image",

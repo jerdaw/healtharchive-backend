@@ -30,6 +30,7 @@ from ha_backend.runtime_metrics import observe_search_request
 
 from .schemas import (
     ArchiveStatsSchema,
+    ReplayResolveSchema,
     SearchResponseSchema,
     SnapshotDetailSchema,
     SnapshotSummarySchema,
@@ -112,6 +113,144 @@ def _normalize_url_group(value: str) -> Optional[str]:
         return None
     path = parts.path or "/"
     return urlunsplit((scheme, netloc, path, "", ""))
+
+
+_REPLAY_PREVIEW_FORMATS: tuple[tuple[str, str], ...] = (
+    (".webp", "image/webp"),
+    (".jpg", "image/jpeg"),
+    (".jpeg", "image/jpeg"),
+    (".png", "image/png"),
+)
+
+
+def _find_replay_preview_file(
+    preview_dir: Path, source_code: str, job_id: int
+) -> Optional[tuple[Path, str]]:
+    """
+    Return the first matching preview file path + media type.
+
+    We allow multiple formats so operators can migrate to more efficient image
+    encodings without changing the public API contract.
+    """
+    base = f"source-{source_code}-job-{job_id}"
+    for ext, media_type in _REPLAY_PREVIEW_FORMATS:
+        candidate = preview_dir / f"{base}{ext}"
+        if candidate.exists():
+            return candidate, media_type
+    return None
+
+
+def _strip_url_fragment(value: str) -> str:
+    trimmed = value.strip()
+    hash_idx = trimmed.find("#")
+    if hash_idx == -1:
+        return trimmed
+    return trimmed[:hash_idx]
+
+
+def _parse_timestamp14(value: str) -> Optional[datetime]:
+    raw = value.strip()
+    if len(raw) != 14 or not raw.isdigit():
+        return None
+    try:
+        year = int(raw[0:4])
+        month = int(raw[4:6])
+        day = int(raw[6:8])
+        hour = int(raw[8:10])
+        minute = int(raw[10:12])
+        second = int(raw[12:14])
+        return datetime(year, month, day, hour, minute, second, tzinfo=timezone.utc)
+    except ValueError:
+        return None
+
+
+def _candidate_resolve_urls(original_url: str) -> List[str]:
+    cleaned = _strip_url_fragment(original_url)
+    if not cleaned:
+        return []
+
+    seeded = cleaned
+    if not (seeded.startswith("http://") or seeded.startswith("https://")):
+        seeded = f"https://{seeded}"
+
+    try:
+        parts = urlsplit(seeded)
+    except Exception:
+        return [seeded]
+
+    scheme = parts.scheme.lower() if parts.scheme else "https"
+    netloc = parts.netloc.lower()
+    path = parts.path
+    query = parts.query
+
+    host, sep, port = netloc.partition(":")
+    if not host:
+        return [seeded]
+
+    scheme_variants = {scheme}
+    if scheme == "https":
+        scheme_variants.add("http")
+    elif scheme == "http":
+        scheme_variants.add("https")
+
+    host_variants = {host}
+    if host.startswith("www."):
+        host_variants.add(host[len("www.") :])
+    else:
+        host_variants.add(f"www.{host}")
+
+    if path == "":
+        path_variants = {"", "/"}
+    elif path == "/":
+        path_variants = {"/", ""}
+    else:
+        path_variants = {path}
+        if path.endswith("/"):
+            path_variants.add(path.rstrip("/"))
+        else:
+            path_variants.add(f"{path}/")
+
+    candidates: set[str] = set()
+    for scheme_value in scheme_variants:
+        for host_value in host_variants:
+            netloc_value = f"{host_value}{sep}{port}" if port else host_value
+            for path_value in path_variants:
+                candidates.add(
+                    urlunsplit((scheme_value, netloc_value, path_value, query, ""))
+                )
+
+    return sorted(candidates)
+
+
+def _select_best_replay_candidate(
+    rows: List[tuple[int, str, Any, Optional[int]]],
+    anchor: Optional[datetime],
+) -> Optional[tuple[int, str, Any, Optional[int]]]:
+    best: Optional[tuple[int, str, Any, Optional[int]]] = None
+    best_key: Optional[tuple] = None
+
+    anchor_ts = anchor.timestamp() if anchor else None
+
+    for snap_id, snap_url, capture_ts, status_code in rows:
+        quality = _status_quality(status_code)
+
+        ts_value = 0.0
+        if isinstance(capture_ts, datetime):
+            dt = capture_ts
+            if dt.tzinfo:
+                dt = dt.astimezone(timezone.utc)
+            else:
+                dt = dt.replace(tzinfo=timezone.utc)
+            ts_value = dt.timestamp()
+
+        diff = abs(ts_value - anchor_ts) if anchor_ts is not None else 0.0
+
+        key = (quality, -diff, ts_value, snap_id)
+        if best_key is None or key > best_key:
+            best_key = key
+            best = (snap_id, snap_url, capture_ts, status_code)
+
+    return best
 
 
 def _candidate_entry_groups(base_url: Optional[str]) -> List[str]:
@@ -1077,11 +1216,8 @@ def list_sources(db: Session = Depends(get_db)) -> List[SourceSummarySchema]:
 
         preview_dir = get_replay_preview_dir()
         if preview_dir is not None and entry_job_id:
-            candidate_preview = preview_dir / f"source-{source.code}-job-{entry_job_id}.png"
-            if candidate_preview.exists():
-                entry_preview_url = (
-                    f"/api/sources/{source.code}/preview?jobId={entry_job_id}"
-                )
+            if _find_replay_preview_file(preview_dir, source.code, entry_job_id):
+                entry_preview_url = f"/api/sources/{source.code}/preview?jobId={entry_job_id}"
 
         summaries.append(
             SourceSummarySchema(
@@ -1158,8 +1294,89 @@ def list_source_editions(
         .all()
     )
 
+    entry_groups = _candidate_entry_groups(source.base_url)
+    host_variants = _candidate_entry_hosts(source.base_url)
+    replay_enabled = bool(get_replay_base_url())
+
     editions: List[SourceEditionSchema] = []
     for job_id, job_name, record_count, first_capture, last_capture in rows:
+        entry_browse_url: Optional[str] = None
+        if replay_enabled and job_id:
+            entry_url: Optional[str] = None
+            entry_ts: Any = None
+
+            if entry_groups:
+                entry_status_quality = case(
+                    (Snapshot.status_code.is_(None), 0),
+                    (
+                        and_(Snapshot.status_code >= 200, Snapshot.status_code < 300),
+                        2,
+                    ),
+                    (
+                        and_(Snapshot.status_code >= 300, Snapshot.status_code < 400),
+                        1,
+                    ),
+                    else_=-1,
+                )
+                entry_snapshot = (
+                    db.query(Snapshot.url, Snapshot.capture_timestamp)
+                    .filter(Snapshot.source_id == source.id)
+                    .filter(Snapshot.job_id == job_id)
+                    .filter(Snapshot.normalized_url_group.in_(entry_groups))
+                    .order_by(
+                        entry_status_quality.desc(),
+                        Snapshot.capture_timestamp.desc(),
+                        Snapshot.id.desc(),
+                    )
+                    .first()
+                )
+                if entry_snapshot:
+                    entry_url, entry_ts = entry_snapshot
+
+            if entry_url is None and host_variants:
+                host_filters = []
+                for host in host_variants:
+                    for scheme in ("https", "http"):
+                        prefix = f"{scheme}://{host}"
+                        host_filters.append(Snapshot.url.ilike(f"{prefix}/%"))
+                        host_filters.append(Snapshot.url == prefix)
+                        host_filters.append(Snapshot.url == f"{prefix}/")
+
+                if host_filters:
+                    candidates = (
+                        db.query(
+                            Snapshot.id,
+                            Snapshot.url,
+                            Snapshot.capture_timestamp,
+                            Snapshot.status_code,
+                        )
+                        .filter(Snapshot.source_id == source.id)
+                        .filter(Snapshot.job_id == job_id)
+                        .filter(or_(*host_filters))
+                        .order_by(Snapshot.capture_timestamp.desc(), Snapshot.id.desc())
+                        .limit(500)
+                        .all()
+                    )
+
+                    best: Optional[tuple] = None
+                    best_key: Optional[tuple] = None
+                    for cand_id, cand_url, cand_ts, cand_status in candidates:
+                        key = _entry_candidate_key(
+                            snapshot_id=cand_id,
+                            url=cand_url,
+                            capture_timestamp=cand_ts,
+                            status_code=cand_status,
+                        )
+                        if best_key is None or key > best_key:
+                            best_key = key
+                            best = (cand_url, cand_ts)
+
+                    if best is not None:
+                        entry_url, entry_ts = best
+
+            if entry_url is not None:
+                entry_browse_url = _build_browse_url(job_id, entry_url, entry_ts)
+
         editions.append(
             SourceEditionSchema(
                 jobId=job_id,
@@ -1175,6 +1392,7 @@ def list_source_editions(
                     if isinstance(last_capture, datetime)
                     else str(last_capture)
                 ),
+                entryBrowseUrl=entry_browse_url,
             )
         )
 
@@ -1206,15 +1424,109 @@ def get_source_preview(
     if not source:
         raise HTTPException(status_code=404, detail="Source not found")
 
-    candidate = preview_dir / f"source-{normalized_code}-job-{jobId}.png"
-    if not candidate.exists():
+    resolved = _find_replay_preview_file(preview_dir, normalized_code, jobId)
+    if resolved is None:
         raise HTTPException(status_code=404, detail="Preview not found")
+
+    candidate, media_type = resolved
 
     headers = {
         # Previews are derived artifacts; cache aggressively but allow refresh.
-        "Cache-Control": "public, max-age=3600",
+        "Cache-Control": "public, max-age=86400, stale-while-revalidate=604800",
     }
-    return FileResponse(candidate, media_type="image/png", headers=headers)
+    return FileResponse(candidate, media_type=media_type, headers=headers)
+
+
+@router.get("/replay/resolve", response_model=ReplayResolveSchema)
+def resolve_replay_url(
+    jobId: int = Query(..., ge=1),
+    url: str = Query(..., min_length=1, max_length=4096),
+    timestamp: Optional[str] = Query(default=None, pattern=r"^\d{14}$"),
+    db: Session = Depends(get_db),
+) -> ReplayResolveSchema:
+    """
+    Resolve a replay URL within a specific job (pywb collection).
+
+    Used by the frontend edition-switching UI to determine whether the current
+    original URL exists in another job, and if so, which capture timestamp to
+    replay.
+    """
+    cleaned_url = _strip_url_fragment(url)
+    if not cleaned_url:
+        raise HTTPException(status_code=400, detail="URL is required")
+
+    job = (
+        db.query(ArchiveJob.id)
+        .filter(ArchiveJob.id == jobId)
+        .filter(ArchiveJob.status == "indexed")
+        .first()
+    )
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    anchor_dt: Optional[datetime] = None
+    if timestamp is not None:
+        anchor_dt = _parse_timestamp14(timestamp)
+        if anchor_dt is None:
+            raise HTTPException(
+                status_code=400, detail="timestamp must be a 14-digit UTC value"
+            )
+
+    candidate_urls = _candidate_resolve_urls(cleaned_url)
+    if not candidate_urls:
+        return ReplayResolveSchema(found=False)
+
+    rows = (
+        db.query(Snapshot.id, Snapshot.url, Snapshot.capture_timestamp, Snapshot.status_code)
+        .filter(Snapshot.job_id == jobId)
+        .filter(Snapshot.url.in_(candidate_urls))
+        .all()
+    )
+    best = _select_best_replay_candidate(rows, anchor_dt)
+
+    if best is None:
+        group_candidates: set[str] = set(_candidate_entry_groups(cleaned_url))
+
+        try:
+            parts = urlsplit(cleaned_url)
+        except Exception:
+            parts = None
+
+        if parts is not None:
+            path = parts.path or ""
+            if path not in ("", "/") and path.endswith("/"):
+                group_candidates.update(_candidate_entry_groups(cleaned_url.rstrip("/")))
+            elif path not in ("", "/") and not path.endswith("/"):
+                group_candidates.update(_candidate_entry_groups(f"{cleaned_url}/"))
+
+        if group_candidates:
+            group_rows = (
+                db.query(
+                    Snapshot.id,
+                    Snapshot.url,
+                    Snapshot.capture_timestamp,
+                    Snapshot.status_code,
+                )
+                .filter(Snapshot.job_id == jobId)
+                .filter(Snapshot.normalized_url_group.in_(sorted(group_candidates)))
+                .order_by(Snapshot.capture_timestamp.desc(), Snapshot.id.desc())
+                .limit(250)
+                .all()
+            )
+            best = _select_best_replay_candidate(group_rows, anchor_dt)
+
+    if best is None:
+        return ReplayResolveSchema(found=False)
+
+    snap_id, resolved_url, capture_ts, _status = best
+
+    return ReplayResolveSchema(
+        found=True,
+        snapshotId=snap_id,
+        captureTimestamp=_format_capture_timestamp(capture_ts),
+        resolvedUrl=resolved_url,
+        browseUrl=_build_browse_url(jobId, resolved_url, capture_ts),
+    )
 
 
 @router.get("/search", response_model=SearchResponseSchema)
