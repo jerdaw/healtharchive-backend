@@ -15,6 +15,7 @@ explaining it to new operators.
 - **Provider / size:** Hetzner Cloud, `cx33` (Cost-Optimized, 4 vCPU / 8GB RAM / 80GB SSD)
 - **Region:** Nuremberg (cost-optimized not available in US-East at the time)
 - **Public services:** `api.healtharchive.ca` on 80/443 via Caddy
+- **Replay (optional):** `replay.healtharchive.ca` via Caddy → pywb (see `deployment/replay-service-pywb.md`)
 - **Private-only:** SSH on Tailscale (`tailscale0`), no public port 22
 - **Storage:**
   - `/srv/healtharchive/jobs` – archive root (WARCs / job outputs)
@@ -173,6 +174,21 @@ Verify:
 ```bash
 curl -i https://api.healtharchive.ca/api/health
 ```
+
+---
+
+## 5.1) Optional: replay service (pywb)
+
+Full-fidelity browsing (CSS/JS/images) requires a replay engine. If you want
+“click links and stay inside the archived backup”, deploy pywb behind Caddy:
+
+- Runbook: `deployment/replay-service-pywb.md`
+
+Operational warning:
+
+- `ha-backend cleanup-job --mode temp` removes temp dirs **including WARCs**.
+  Replay depends on WARCs staying on disk, so do not run cleanup for any job
+  you intend to keep replayable.
 
 ---
 

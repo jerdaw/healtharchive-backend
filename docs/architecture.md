@@ -1164,6 +1164,13 @@ Implementation notes:
        - `cleaned_at = now`
        - `state_file_path = None`
 
+Operational warning:
+
+- `cleanup-job --mode temp` will delete WARCs if they live under the job’s
+  `.tmp*` directory (common for legacy imports and some crawl layouts).
+  If you intend to serve the job via replay (pywb), do not run cleanup for that
+  job — replay depends on WARCs remaining on disk.
+
 > **Caution:** This cleanup removes WARCs stored under `.tmp*` directories,
 > consistent with `archive_tool`’s own `--cleanup` behavior. In v1 you should
 > only run it once you have:
