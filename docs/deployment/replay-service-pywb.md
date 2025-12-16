@@ -277,8 +277,11 @@ To reduce confusion, you can inject a small HealthArchive banner into pywb’s
 Implementation notes:
 
 - The banner is inserted only for non-framed replay (our default).
-- The provided script intentionally hides itself when embedded in an iframe
-  (so it does not duplicate the HealthArchive wrapper banner).
+- When replay is embedded in an iframe, the banner UI is hidden (so it does not
+  duplicate the HealthArchive wrapper header).
+- When embedded, the script still emits lightweight `postMessage` events with
+  the current replay URL/timestamp so the HealthArchive frontend can support
+  edition switching while you browse.
 - Users can dismiss it via the **Hide** button (stored in `localStorage` on the
   replay origin).
 

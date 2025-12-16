@@ -351,6 +351,116 @@ def test_sources_endpoint_excludes_test_source(tmp_path, monkeypatch) -> None:
     assert "hc" in codes
 
 
+def test_source_editions_endpoint_lists_indexed_jobs_sorted_by_recency(
+    tmp_path, monkeypatch
+) -> None:
+    client = _init_test_app(tmp_path, monkeypatch)
+
+    with get_session() as session:
+        hc = Source(
+            code="hc",
+            name="Health Canada",
+            base_url="https://www.canada.ca/en/health-canada.html",
+            description="Health Canada",
+            enabled=True,
+        )
+        session.add(hc)
+        session.flush()
+
+        older_job = ArchiveJob(
+            source_id=hc.id,
+            name="legacy-hc-older",
+            output_dir="/srv/healtharchive/jobs/imports/legacy-hc-older",
+            status="indexed",
+        )
+        newer_job = ArchiveJob(
+            source_id=hc.id,
+            name="legacy-hc-newer",
+            output_dir="/srv/healtharchive/jobs/imports/legacy-hc-newer",
+            status="indexed",
+        )
+        not_indexed_job = ArchiveJob(
+            source_id=hc.id,
+            name="legacy-hc-not-indexed",
+            output_dir="/srv/healtharchive/jobs/imports/legacy-hc-not-indexed",
+            status="completed",
+        )
+        session.add_all([older_job, newer_job, not_indexed_job])
+        session.flush()
+
+        older_job_id = older_job.id
+        newer_job_id = newer_job.id
+
+        older_ts = datetime(2025, 1, 10, 12, 0, tzinfo=timezone.utc)
+        newer_ts = datetime(2025, 2, 10, 12, 0, tzinfo=timezone.utc)
+        ignored_ts = datetime(2025, 3, 10, 12, 0, tzinfo=timezone.utc)
+
+        session.add_all(
+            [
+                Snapshot(
+                    job_id=older_job.id,
+                    source_id=hc.id,
+                    url="https://www.canada.ca/en/health-canada.html",
+                    normalized_url_group="https://www.canada.ca/en/health-canada.html",
+                    capture_timestamp=older_ts,
+                    mime_type="text/html",
+                    status_code=200,
+                    title="HC Home (older)",
+                    snippet="HC home older",
+                    language="en",
+                    warc_path="/warcs/hc-older.warc.gz",
+                    warc_record_id="hc-older",
+                ),
+                Snapshot(
+                    job_id=newer_job.id,
+                    source_id=hc.id,
+                    url="https://www.canada.ca/en/health-canada.html",
+                    normalized_url_group="https://www.canada.ca/en/health-canada.html",
+                    capture_timestamp=newer_ts,
+                    mime_type="text/html",
+                    status_code=200,
+                    title="HC Home (newer)",
+                    snippet="HC home newer",
+                    language="en",
+                    warc_path="/warcs/hc-newer.warc.gz",
+                    warc_record_id="hc-newer",
+                ),
+                Snapshot(
+                    job_id=not_indexed_job.id,
+                    source_id=hc.id,
+                    url="https://www.canada.ca/en/health-canada.html",
+                    normalized_url_group="https://www.canada.ca/en/health-canada.html",
+                    capture_timestamp=ignored_ts,
+                    mime_type="text/html",
+                    status_code=200,
+                    title="HC Home (ignored)",
+                    snippet="HC home ignored",
+                    language="en",
+                    warc_path="/warcs/hc-ignored.warc.gz",
+                    warc_record_id="hc-ignored",
+                ),
+            ]
+        )
+
+    resp = client.get("/api/sources/hc/editions")
+    assert resp.status_code == 200
+    editions = resp.json()
+
+    assert [e["jobId"] for e in editions] == [newer_job_id, older_job_id]
+    assert editions[0]["jobName"] == "legacy-hc-newer"
+    assert editions[0]["recordCount"] == 1
+    assert editions[0]["firstCapture"] == "2025-02-10"
+    assert editions[0]["lastCapture"] == "2025-02-10"
+
+
+def test_source_editions_endpoint_returns_404_for_missing_source(
+    tmp_path, monkeypatch
+) -> None:
+    client = _init_test_app(tmp_path, monkeypatch)
+    resp = client.get("/api/sources/does-not-exist/editions")
+    assert resp.status_code == 404
+
+
 def test_stats_endpoint_with_no_data(tmp_path, monkeypatch) -> None:
     client = _init_test_app(tmp_path, monkeypatch)
 
