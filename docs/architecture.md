@@ -1131,7 +1131,7 @@ These fields are exposed through:
 
 ### 10.2 CLI command: cleanup-job
 
-`ha-backend cleanup-job --id JOB_ID [--mode temp]`
+`ha-backend cleanup-job --id JOB_ID [--mode temp] [--force]`
 
 Implementation notes:
 
@@ -1142,27 +1142,31 @@ Implementation notes:
 
   1. Load the `ArchiveJob` by ID.
   2. If job is missing → error, exit 1.
-  3. If `job.status` is **not** one of:
+  3. If replay is enabled globally (`HEALTHARCHIVE_REPLAY_BASE_URL` is set) and
+     `--force` is **not** provided:
+     - Refuse cleanup and exit 1.
+     - Rationale: `--mode temp` can delete WARCs required for replay.
+  4. If `job.status` is **not** one of:
      - `"indexed"` – indexing completed successfully, or
      - `"index_failed"` – indexing failed and you have decided not to retry,
      then refuse cleanup and exit 1.
      - This ensures we don’t delete temp dirs while a job might still be
        resumed or indexing is in progress.
-  4. Validate `output_dir` exists and is a directory.
-  5. Use `archive_tool.state.CrawlState(output_dir, initial_workers=1)` to
+  5. Validate `output_dir` exists and is a directory.
+  6. Use `archive_tool.state.CrawlState(output_dir, initial_workers=1)` to
      instantiate state and locate the state file.
-  6. Use `state.get_temp_dir_paths()` to get known temp dirs; fall back to
+  7. Use `state.get_temp_dir_paths()` to get known temp dirs; fall back to
      `find_latest_temp_dir_fallback` if none are tracked.
-  7. If neither temp dirs nor the state file exist:
+  8. If neither temp dirs nor the state file exist:
      - Print a message that there is nothing to clean up and **do not** change
        `cleanup_status` or `cleaned_at`.
-  8. Otherwise (if temp dirs and/or state file exist):
+  9. Otherwise (if temp dirs and/or state file exist):
      - Call `cleanup_temp_dirs(temp_dirs, state.state_file_path)`:
        - Deletes `.tmp*` directories and the `.archive_state.json`.
      - Update job:
-       - `cleanup_status = "temp_cleaned"`
-       - `cleaned_at = now`
-       - `state_file_path = None`
+        - `cleanup_status = "temp_cleaned"`
+        - `cleaned_at = now`
+        - `state_file_path = None`
 
 Operational warning:
 
@@ -1170,6 +1174,8 @@ Operational warning:
   `.tmp*` directory (common for legacy imports and some crawl layouts).
   If you intend to serve the job via replay (pywb), do not run cleanup for that
   job — replay depends on WARCs remaining on disk.
+  If replay is enabled globally, you must pass `--force` to run cleanup; treat
+  this as an emergency override.
 
 > **Caution:** This cleanup removes WARCs stored under `.tmp*` directories,
 > consistent with `archive_tool`’s own `--cleanup` behavior. In v1 you should
@@ -1222,8 +1228,10 @@ All commands are available via the `ha-backend` entrypoint.
   - `retry-job --id ID` – mark:
     - `failed` jobs as `retryable` (for another crawl).
     - `index_failed` jobs as `completed` (for re-indexing).
-  - `cleanup-job --id ID [--mode temp]` – cleanup temp dirs/state for jobs in
+  - `cleanup-job --id ID [--mode temp] [--force]` – cleanup temp dirs/state for jobs in
     status `indexed` or `index_failed`.
+  - `replay-index-job --id ID` – create/refresh the pywb collection + CDX index
+    for a job (so snapshots can be browsed via replay).
   - `start-worker [--poll-interval N] [--once]` – start the worker loop.
 
 ---

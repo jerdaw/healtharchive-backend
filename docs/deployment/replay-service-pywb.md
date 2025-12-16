@@ -78,6 +78,9 @@ If you run cleanup on a replayable job, replay will break.
 
 **Operational rule for now:** do not run `cleanup-job --mode temp` for any job you want replayable.
 
+When replay is enabled (backend env var `HEALTHARCHIVE_REPLAY_BASE_URL` is set),
+`cleanup-job --mode temp` will refuse to run unless you pass `--force`.
+
 This rule is repeated in:
 
 - `docs/deployment/production-single-vps.md`
@@ -262,11 +265,57 @@ Public check (from your laptop):
 curl -I https://replay.healtharchive.ca/ | head
 ```
 
+## 5.1) Optional: HealthArchive banner on direct replay pages
+
+The HealthArchive frontend provides the primary replay UX via `/snapshot/<id>`
+and `/browse/<id>` (header, navigation, disclaimers). Users may still open
+`replay.healtharchive.ca` directly in a new tab.
+
+To reduce confusion, you can inject a small HealthArchive banner into pywb’s
+**non-framed** replay HTML using pywb’s `custom_banner.html` hook.
+
+Implementation notes:
+
+- The banner is inserted only for non-framed replay (our default).
+- The provided script intentionally hides itself when embedded in an iframe
+  (so it does not duplicate the HealthArchive wrapper banner).
+- Users can dismiss it via the **Hide** button (stored in `localStorage` on the
+  replay origin).
+
+Deploy on the VPS:
+
+```bash
+sudo mkdir -p /srv/healtharchive/replay/templates
+sudo install -o hareplay -g healtharchive -m 0640 \
+  /opt/healtharchive-backend/docs/deployment/pywb/custom_banner.html \
+  /srv/healtharchive/replay/templates/custom_banner.html
+
+sudo systemctl restart healtharchive-replay.service
+```
+
 ## 6) Create a collection and index a job’s WARCs (no copying)
 
 pywb’s `wb-manager` requires WARC files to exist *in* the collection’s `archive/`
 directory. We avoid duplicating data by placing **symlinks** to the real WARC
 files (mounted read-only at `/warcs` in the container).
+
+### 6.0 Recommended: use the backend CLI (one command per job)
+
+If the backend and pywb run on the same VPS, you can make a job replayable via:
+
+```bash
+sudo systemd-run --wait --pipe \
+  --property=EnvironmentFile=/etc/healtharchive/backend.env \
+  /opt/healtharchive-backend/.venv/bin/ha-backend replay-index-job --id 1
+```
+
+Dry-run (prints actions without changes):
+
+```bash
+sudo systemd-run --wait --pipe \
+  --property=EnvironmentFile=/etc/healtharchive/backend.env \
+  /opt/healtharchive-backend/.venv/bin/ha-backend replay-index-job --id 1 --dry-run
+```
 
 ### 6.1 Initialize collection for job 1
 
@@ -339,6 +388,8 @@ Once the CIHR legacy WARCs are imported and indexed as an `ArchiveJob` (see
 `docs/operations/legacy-crawl-imports.md`), repeat the same steps with that job
 ID:
 
+- Recommended:
+  - `ha-backend replay-index-job --id <id>`
 - `wb-manager init job-<id>`
 - Symlink that job’s WARCs into `/srv/healtharchive/replay/collections/job-<id>/archive/`
 - `wb-manager reindex job-<id>`
