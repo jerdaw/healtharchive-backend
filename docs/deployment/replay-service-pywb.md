@@ -425,6 +425,30 @@ HEALTHARCHIVE_REPLAY_BASE_URL=https://replay.healtharchive.ca
 
 Then restart the backend service.
 
+### 8.1 Edition switching (v2: “preserve current page across backups”)
+
+HealthArchive supports switching “editions” (jobs) while keeping you on the
+same original URL when possible.
+
+This is implemented as:
+
+- `GET /api/sources/{sourceCode}/editions`
+  - lists replayable jobs (editions) for the source, including each job’s
+    `entryBrowseUrl` (a good fallback when a specific page wasn’t captured).
+- `POST /api/replay/resolve`
+  - input: `{ "jobId": <id>, "url": "<original_url>", "timestamp14": "YYYYMMDDhhmmss" | null }`
+  - output: a best-effort `browseUrl` for the selected job if a capture exists
+    (or `found=false` when it does not).
+
+The frontend relies on lightweight `postMessage` events emitted by the replay
+banner template (see “Optional: HealthArchive banner on direct replay pages”
+above) to learn the **current original URL** while the user clicks around
+inside replay.
+
+Frontend-side details and verification are documented in:
+
+- `healtharchive-frontend/docs/deployment/verification.md`
+
 Frontend verification (recommended):
 
 - See `healtharchive-frontend/docs/deployment/verification.md` for the end-to-end
