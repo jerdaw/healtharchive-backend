@@ -165,9 +165,17 @@ Key public endpoints (all prefixed with `/api`):
 - `GET /api/sources`  
   Per-source summaries derived from indexed snapshots.
 
+  When `HEALTHARCHIVE_REPLAY_BASE_URL` is set, the response also includes:
+  - `entryRecordId` – a “best effort” entry-point snapshot ID for browsing a source
+  - `entryBrowseUrl` – a timestamp-locked replay URL for that entry point
+
 - `GET /api/search`  
   Full-text style search over snapshots (with filters for `source`, pagination,
   etc.).
+
+  When `HEALTHARCHIVE_REPLAY_BASE_URL` is set, each result may include:
+  - `jobId` + `captureTimestamp` – used to lock replay to a specific capture
+  - `browseUrl` – a timestamp-locked replay URL for browsing within the backup
 
   Ranking controls:
   - Default ranking is controlled by `HA_SEARCH_RANKING_VERSION` (`v1` or `v2`).
@@ -175,6 +183,9 @@ Key public endpoints (all prefixed with `/api`):
 
 - `GET /api/snapshot/{id}`  
   Snapshot metadata for a single record.
+
+  When `HEALTHARCHIVE_REPLAY_BASE_URL` is set, this includes a `browseUrl`
+  suitable for embedding a replay engine (pywb) for full-fidelity browsing.
 
 - `GET /api/snapshots/raw/{id}`  
   Returns the archived HTML document for embedding in the frontend.

@@ -12,10 +12,12 @@ It is intentionally written so a future operator (or LLM) can follow it without 
 - Wayback‑style replay from the project’s **WARC files**
 - Natural browsing: links stay inside replay, and captured assets (CSS/JS/images) load from the archive when present
 
-**What this does not provide (yet)**
+**What this does not provide**
 
-- Frontend integration (“Browse this backup” buttons, iframe wrapper, source cards).
-  That work lives in the frontend/backend feature implementation plan (separate phase).
+- Guaranteed completeness. If a page depends on third‑party CSS/JS/images that were
+  not captured into the WARCs, those assets will still be missing at replay time.
+- A custom replay UI in pywb itself. HealthArchive provides the primary browsing
+  experience via the frontend wrapper pages (see “Backend wiring” below).
 
 ## 1) Core decisions (contract)
 
@@ -362,3 +364,11 @@ HEALTHARCHIVE_REPLAY_BASE_URL=https://replay.healtharchive.ca
 ```
 
 Then restart the backend service.
+
+Frontend verification (recommended):
+
+- See `healtharchive-frontend/docs/deployment/verification.md` for the end-to-end
+  checks that confirm:
+  - snapshot pages embed replay correctly, and
+  - `/browse/<snapshotId>` provides a full-screen browsing wrapper with a
+    persistent HealthArchive banner above the replay iframe.
