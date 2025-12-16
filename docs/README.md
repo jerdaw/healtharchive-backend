@@ -19,6 +19,7 @@ This folder contains the canonical documentation for the **HealthArchive backend
    - `deployment/staging-rollout-checklist.md` (optional future staging)
 4. Operations (how to keep it healthy)
    - `operations/monitoring-and-ci-checklist.md`
+   - `operations/replay-and-preview-automation-plan.md` (design-only plan for future automation + guardrails)
    - `operations/search-quality.md` (how to evaluate relevance changes)
    - `operations/search-golden-queries.md` (curated queries + expectations)
    - `operations/legacy-crawl-imports.md` (import legacy WARCs from old ZIM crawl dirs)
