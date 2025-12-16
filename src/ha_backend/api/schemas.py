@@ -21,9 +21,12 @@ class SnapshotSummarySchema(BaseModel):
     sourceName: str
     language: Optional[str]
     captureDate: str
+    captureTimestamp: Optional[str]
+    jobId: Optional[int]
     originalUrl: str
     snippet: Optional[str]
     rawSnapshotUrl: Optional[str]
+    browseUrl: Optional[str]
 
 
 class SearchResponseSchema(BaseModel):
@@ -40,9 +43,12 @@ class SnapshotDetailSchema(BaseModel):
     sourceName: str
     language: Optional[str]
     captureDate: str
+    captureTimestamp: Optional[str]
+    jobId: Optional[int]
     originalUrl: str
     snippet: Optional[str]
     rawSnapshotUrl: Optional[str]
+    browseUrl: Optional[str]
     mimeType: Optional[str]
     statusCode: Optional[int]
 

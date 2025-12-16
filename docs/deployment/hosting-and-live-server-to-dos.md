@@ -273,6 +273,8 @@ Checklist for each non‑dev environment:
   - Use the `ha-backend cleanup-job --id JOB_ID --mode temp` command for this
     cleanup; it removes `.tmp*` directories and `.archive_state.json` but
     leaves the main job directory and any final ZIMs.
+  - If you are using replay (pywb) for a job, do not run `cleanup-job --mode temp`
+    for that job — replay depends on the WARCs remaining on disk.
 - [ ] For larger deployments, consider:
   - Keeping a simple inventory of jobs (via `/api/admin/jobs` and metrics) so
     you know roughly how many indexed jobs you have and how big `jobs/` is.

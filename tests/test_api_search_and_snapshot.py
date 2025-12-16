@@ -7,7 +7,7 @@ from fastapi.testclient import TestClient
 
 from ha_backend import db as db_module
 from ha_backend.db import Base, get_engine, get_session
-from ha_backend.models import PageSignal, Snapshot, SnapshotOutlink, Source
+from ha_backend.models import ArchiveJob, PageSignal, Snapshot, SnapshotOutlink, Source
 
 
 def _init_test_app(tmp_path: Path, monkeypatch):
@@ -378,6 +378,52 @@ def _seed_hubness_ranking_data() -> None:
         )
 
 
+def _seed_replay_browse_url_data() -> int:
+    """
+    Seed a single snapshot with a job_id so browseUrl can be constructed.
+
+    Returns the created snapshot id.
+    """
+    with get_session() as session:
+        hc = Source(
+            code="hc",
+            name="Health Canada",
+            base_url="https://canada.ca/en/health-canada.html",
+            description="Health Canada",
+            enabled=True,
+        )
+        session.add(hc)
+        session.flush()
+
+        job = ArchiveJob(
+            source_id=hc.id,
+            name="legacy-hc-2025-04-21",
+            output_dir="/srv/healtharchive/jobs/imports/legacy-hc-2025-04-21",
+            status="indexed",
+        )
+        session.add(job)
+        session.flush()
+
+        ts = datetime(2025, 4, 18, 12, 1, 0, tzinfo=timezone.utc)
+        snap = Snapshot(
+            job_id=job.id,
+            source_id=hc.id,
+            url="https://canada.ca/en/health-canada.html",
+            normalized_url_group="https://canada.ca/en/health-canada.html",
+            capture_timestamp=ts,
+            mime_type="text/html",
+            status_code=200,
+            title="Health Canada",
+            snippet="Health Canada landing page.",
+            language="en",
+            warc_path="/warcs/hc-home.warc.gz",
+            warc_record_id="hc-home",
+        )
+        session.add(snap)
+        session.flush()
+        return snap.id
+
+
 def test_search_endpoint_basic(tmp_path, monkeypatch) -> None:
     client = _init_test_app(tmp_path, monkeypatch)
     _seed_search_data()
@@ -628,6 +674,31 @@ def test_snapshot_detail_endpoint(tmp_path, monkeypatch) -> None:
     assert body["originalUrl"]
     assert body["sourceCode"] in {"hc", "phac"}
     assert "topics" not in body
+
+
+def test_snapshot_detail_includes_browse_url_when_replay_configured(
+    tmp_path, monkeypatch
+) -> None:
+    monkeypatch.setenv("HEALTHARCHIVE_REPLAY_BASE_URL", "https://replay.healtharchive.ca/")
+    client = _init_test_app(tmp_path, monkeypatch)
+    snap_id = _seed_replay_browse_url_data()
+
+    resp = client.get(f"/api/snapshot/{snap_id}")
+    assert resp.status_code == 200
+    body = resp.json()
+
+    assert body["jobId"] is not None
+    assert body["captureTimestamp"] == "2025-04-18T12:01:00+00:00"
+    assert (
+        body["browseUrl"]
+        == "https://replay.healtharchive.ca/job-1/https://canada.ca/en/health-canada.html"
+    )
+
+    resp2 = client.get("/api/search")
+    assert resp2.status_code == 200
+    data = resp2.json()
+    assert data["results"]
+    assert data["results"][0]["browseUrl"].startswith("https://replay.healtharchive.ca/job-")
 
 
 def test_sources_endpoint_shape(tmp_path, monkeypatch) -> None:

@@ -12,6 +12,7 @@ from sqlalchemy import and_, case, func, inspect, or_
 from sqlalchemy.orm import Session, joinedload, load_only
 from threading import Lock
 
+from ha_backend.config import get_replay_base_url
 from ha_backend.db import get_session
 from ha_backend.indexing.viewer import find_record_for_snapshot
 from ha_backend.models import ArchiveJob, PageSignal, Snapshot, SnapshotOutlink, Source
@@ -46,6 +47,35 @@ _COLUMN_EXISTS_LOCK = Lock()
 # verification (e.g., backup restore checks). These should not surface in
 # public browsing/search UI.
 _PUBLIC_EXCLUDED_SOURCE_CODES = {"test"}
+
+
+def _format_capture_timestamp(value: Any) -> Optional[str]:
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        if value.tzinfo:
+            return value.astimezone(timezone.utc).isoformat()
+        # Treat naive datetimes as UTC for API consistency (SQLite often
+        # round-trips timezone-aware values as naive).
+        return value.replace(tzinfo=timezone.utc).isoformat()
+    return str(value)
+
+
+def _build_browse_url(job_id: Optional[int], original_url: str) -> Optional[str]:
+    base = get_replay_base_url()
+    if not base or not job_id:
+        return None
+
+    normalized = original_url.strip()
+    if not normalized:
+        return None
+
+    # Do not append a trailing "/" here. If the original URL contains a query
+    # string, adding "/" would modify it (because the browser would treat it as
+    # part of the *outer* URL's query). pywb accepts the timegate form without
+    # a trailing slash, eg:
+    #   /job-1/https://example.com/path?x=y
+    return f"{base}/job-{job_id}/{normalized}"
 
 
 def _has_table(db: Session, table_name: str) -> bool:
@@ -566,6 +596,7 @@ def _search_snapshots_inner(
         ordered.options(
             load_only(
                 Snapshot.id,
+                Snapshot.job_id,
                 Snapshot.url,
                 Snapshot.normalized_url_group,
                 Snapshot.capture_timestamp,
@@ -597,6 +628,12 @@ def _search_snapshots_inner(
             else str(snap.capture_timestamp)
         )
 
+        original_url = (
+            snap.normalized_url_group
+            if (effective_view == SearchView.pages and snap.normalized_url_group)
+            else snap.url
+        )
+
         results.append(
             SnapshotSummarySchema(
                 id=snap.id,
@@ -605,13 +642,12 @@ def _search_snapshots_inner(
                 sourceName=source_obj.name,
                 language=snap.language,
                 captureDate=capture_date,
-                originalUrl=(
-                    snap.normalized_url_group
-                    if (effective_view == SearchView.pages and snap.normalized_url_group)
-                    else snap.url
-                ),
+                captureTimestamp=_format_capture_timestamp(snap.capture_timestamp),
+                jobId=snap.job_id,
+                originalUrl=original_url,
                 snippet=snap.snippet,
                 rawSnapshotUrl=f"/api/snapshots/raw/{snap.id}",
+                browseUrl=_build_browse_url(snap.job_id, original_url),
             )
         )
 
@@ -864,6 +900,7 @@ def get_snapshot_detail(
         .options(
             load_only(
                 Snapshot.id,
+                Snapshot.job_id,
                 Snapshot.url,
                 Snapshot.capture_timestamp,
                 Snapshot.mime_type,
@@ -894,9 +931,12 @@ def get_snapshot_detail(
         sourceName=snap.source.name,
         language=snap.language,
         captureDate=capture_date,
+        captureTimestamp=_format_capture_timestamp(snap.capture_timestamp),
+        jobId=snap.job_id,
         originalUrl=snap.url,
         snippet=snap.snippet,
         rawSnapshotUrl=f"/api/snapshots/raw/{snap.id}",
+        browseUrl=_build_browse_url(snap.job_id, snap.url),
         mimeType=snap.mime_type,
         statusCode=snap.status_code,
     )

@@ -72,6 +72,7 @@ export HEALTHARCHIVE_ARCHIVE_ROOT=$(pwd)/.dev-archive-root
 export HEALTHARCHIVE_ADMIN_TOKEN=localdev-admin
 export HEALTHARCHIVE_LOG_LEVEL=DEBUG
 export HA_SEARCH_RANKING_VERSION=v2
+export HEALTHARCHIVE_REPLAY_BASE_URL=http://127.0.0.1:8090
 ```
 
 ### 2.2 Production (current)
@@ -86,12 +87,15 @@ export HEALTHARCHIVE_ADMIN_TOKEN=<LONG_RANDOM_SECRET>
 export HEALTHARCHIVE_CORS_ORIGINS=https://healtharchive.ca,https://www.healtharchive.ca,https://healtharchive.vercel.app
 export HEALTHARCHIVE_LOG_LEVEL=INFO
 export HA_SEARCH_RANKING_VERSION=v2
+export HEALTHARCHIVE_REPLAY_BASE_URL=https://replay.healtharchive.ca
 ```
 
 Notes:
 
 - `HEALTHARCHIVE_ADMIN_TOKEN` should be a long random secret stored in a secret
   manager (e.g., Bitwarden + server env), **never committed**.
+- `HEALTHARCHIVE_REPLAY_BASE_URL` enables `browseUrl` fields in `/api/search`
+  and `/api/snapshot/{id}` so the frontend can embed the replay service.
 - In `production` (and `staging`), if the admin token is missing, admin/metrics
   endpoints fail closed (HTTP 500) instead of being left open.
 - `HEALTHARCHIVE_CORS_ORIGINS` should be kept as narrow as possible; it controls

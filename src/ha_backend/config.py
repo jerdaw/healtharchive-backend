@@ -20,6 +20,18 @@ REPO_ROOT = Path(__file__).resolve().parents[2]  # src/ha_backend -> src -> repo
 # archive_tool package (archive_tool.main:main via pyproject.toml).
 DEFAULT_ARCHIVE_TOOL_CMD = "archive-tool"
 
+# === Replay (pywb) integration ===
+
+# Base URL for the replay service (pywb), used to construct public browse URLs
+# for snapshots when the replay service is deployed.
+#
+# Example:
+#   HEALTHARCHIVE_REPLAY_BASE_URL=https://replay.healtharchive.ca
+#
+# If unset, the API will omit browse URLs and clients should fall back to the
+# raw snapshot HTML endpoint.
+DEFAULT_REPLAY_BASE_URL = ""
+
 
 @dataclass
 class ArchiveToolConfig:
@@ -99,3 +111,23 @@ def get_cors_origins() -> List[str]:
         if origins:
             return origins
     return DEFAULT_CORS_ORIGINS
+
+
+def get_replay_base_url() -> str | None:
+    """
+    Return the configured replay base URL for generating public browse links.
+
+    Reads HEALTHARCHIVE_REPLAY_BASE_URL and normalizes it by:
+    - trimming whitespace
+    - stripping any trailing slashes
+    - defaulting to https:// if the scheme is omitted
+    """
+    raw = os.environ.get("HEALTHARCHIVE_REPLAY_BASE_URL", DEFAULT_REPLAY_BASE_URL)
+    raw = raw.strip()
+    if not raw:
+        return None
+
+    if not (raw.startswith("http://") or raw.startswith("https://")):
+        raw = f"https://{raw}"
+
+    return raw.rstrip("/")

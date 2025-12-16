@@ -628,6 +628,10 @@ This:
 > **Caution:** This removes temp crawl artifacts (including WARCs) under
 > `.tmp*` for that job. Only run it once you are satisfied with indexing and
 > any ZIMs/exports.
+>
+> If you are using the replay service (pywb) to serve this job’s WARCs, do not
+> run `cleanup-job --mode temp` for that job — replay depends on the WARCs
+> remaining on disk.
 
 ---
 
