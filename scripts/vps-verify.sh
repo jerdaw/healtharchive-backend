@@ -119,11 +119,8 @@ curl_head() {
 curl_json_summary() {
   local url="$1"
   local label="$2"
-  echo
-  echo "HINT: ${label}"
-  echo "$ curl -sS \"${url}\""
-  curl -sS --max-time 20 "$url" \
-    | "${PYTHON_BIN}" -c '
+  local py
+  py="$(cat <<'PY'
 import json
 import sys
 
@@ -137,20 +134,25 @@ print(f"type={type(data).__name__}")
 if isinstance(data, dict):
   keys = sorted(list(data.keys()))
   print(f"keys={keys}")
-  # Common health payload
   if "status" in data:
-    print(f"status={data.get(\"status\")}")
-  if "checks" in data and isinstance(data["checks"], dict):
-    checks = data["checks"]
-    jobs = checks.get("jobs", {})
-    snaps = checks.get("snapshots", {})
+    print(f"status={data.get('status')}")
+  checks = data.get("checks")
+  if isinstance(checks, dict):
+    jobs = checks.get("jobs")
     if isinstance(jobs, dict):
-      print(f"checks.jobs.indexed={jobs.get(\"indexed\")}")
+      print(f"checks.jobs.indexed={jobs.get('indexed')}")
+    snaps = checks.get("snapshots")
     if isinstance(snaps, dict):
-      print(f"checks.snapshots.total={snaps.get(\"total\")}")
+      print(f"checks.snapshots.total={snaps.get('total')}")
 elif isinstance(data, list):
   print(f"len={len(data)}")
-'
+PY
+)"
+  echo
+  echo "HINT: ${label}"
+  echo "$ curl -sS \"${url}\""
+  curl -sS --max-time 20 "$url" \
+    | "${PYTHON_BIN}" -c "$py"
 }
 
 echo "HealthArchive VPS verification (safe, read-only)"
@@ -255,10 +257,7 @@ PY
 )"
 
 if [[ -n "${SOURCE_WITH_ENTRY_BROWSE_URL}" ]]; then
-  echo "HINT: Testing editions for sourceCode='${SOURCE_WITH_ENTRY_BROWSE_URL}'"
-  echo "$ curl -sS \"${API_LOCAL}/api/sources/${SOURCE_WITH_ENTRY_BROWSE_URL}/editions\""
-  curl -sS --max-time 25 "${API_LOCAL}/api/sources/${SOURCE_WITH_ENTRY_BROWSE_URL}/editions" \
-    | "${PYTHON_BIN}" -c '
+  py="$(cat <<'PY'
 import json
 import sys
 
@@ -278,23 +277,27 @@ for ed in data[:5]:
     continue
   job_id = ed.get("jobId")
   name = ed.get("jobName")
-  first = ed.get("firstCaptureTimestamp")
-  last = ed.get("lastCaptureTimestamp")
+  record_count = ed.get("recordCount")
+  first = ed.get("firstCapture")
+  last = ed.get("lastCapture")
   entry = ed.get("entryBrowseUrl")
-  print(f"- jobId={job_id} name={name!r}")
-  print(f"  first={first} last={last}")
+
+  print(f"- jobId={job_id} name={name!r} recordCount={record_count}")
+  print(f"  firstCapture={first} lastCapture={last}")
   print(f"  entryBrowseUrl_present={'yes' if isinstance(entry, str) and entry else 'no'}")
-'
+PY
+)"
+  echo "HINT: Testing editions for sourceCode='${SOURCE_WITH_ENTRY_BROWSE_URL}'"
+  echo "$ curl -sS \"${API_LOCAL}/api/sources/${SOURCE_WITH_ENTRY_BROWSE_URL}/editions\""
+  curl -sS --max-time 25 "${API_LOCAL}/api/sources/${SOURCE_WITH_ENTRY_BROWSE_URL}/editions" \
+    | "${PYTHON_BIN}" -c "$py"
 else
   echo "WARN: No sources with entryBrowseUrl found; editions check skipped."
 fi
 
 section "8) Search payload includes browseUrl/jobId (first source with entryBrowseUrl)"
 if [[ -n "${SOURCE_WITH_ENTRY_BROWSE_URL}" ]]; then
-  echo "HINT: Fetching a single result to confirm browseUrl/jobId fields are populated."
-  echo "$ curl -sS \"${API_LOCAL}/api/search?pageSize=1&source=${SOURCE_WITH_ENTRY_BROWSE_URL}\""
-  curl -sS --max-time 25 "${API_LOCAL}/api/search?pageSize=1&source=${SOURCE_WITH_ENTRY_BROWSE_URL}" \
-    | "${PYTHON_BIN}" -c '
+  py="$(cat <<'PY'
 import json
 import sys
 
@@ -304,17 +307,26 @@ except Exception as e:
   print(f"ERROR: failed to parse JSON: {e}")
   sys.exit(0)
 
-results = payload.get("results") if isinstance(payload, dict) else None
+if not isinstance(payload, dict):
+  print("ERROR: expected a JSON object")
+  sys.exit(0)
+
+results = payload.get("results")
 if not isinstance(results, list) or not results:
   print("WARN: no search results returned")
   sys.exit(0)
 
 r0 = results[0] if isinstance(results[0], dict) else {}
-print(f"first_result.captureTimestamp={r0.get(\"captureTimestamp\")}")
-print(f"first_result.jobId={r0.get(\"jobId\")}")
-print(f"first_result.browseUrl={r0.get(\"browseUrl\")}")
-print(f"first_result.url={r0.get(\"url\")}")
-'
+print(f"first_result.captureTimestamp={r0.get('captureTimestamp')}")
+print(f"first_result.jobId={r0.get('jobId')}")
+print(f"first_result.browseUrl={r0.get('browseUrl')}")
+print(f"first_result.url={r0.get('url')}")
+PY
+)"
+  echo "HINT: Fetching a single result to confirm browseUrl/jobId fields are populated."
+  echo "$ curl -sS \"${API_LOCAL}/api/search?pageSize=1&source=${SOURCE_WITH_ENTRY_BROWSE_URL}\""
+  curl -sS --max-time 25 "${API_LOCAL}/api/search?pageSize=1&source=${SOURCE_WITH_ENTRY_BROWSE_URL}" \
+    | "${PYTHON_BIN}" -c "$py"
 else
   echo "WARN: No source available for search test."
 fi
