@@ -139,15 +139,15 @@ if isinstance(data, dict):
   print(f"keys={keys}")
   # Common health payload
   if "status" in data:
-    print(f"status={data.get('status')}")
+    print(f"status={data.get(\"status\")}")
   if "checks" in data and isinstance(data["checks"], dict):
     checks = data["checks"]
     jobs = checks.get("jobs", {})
     snaps = checks.get("snapshots", {})
     if isinstance(jobs, dict):
-      print(f"checks.jobs.indexed={jobs.get('indexed')}")
+      print(f"checks.jobs.indexed={jobs.get(\"indexed\")}")
     if isinstance(snaps, dict):
-      print(f"checks.snapshots.total={snaps.get('total')}")
+      print(f"checks.snapshots.total={snaps.get(\"total\")}")
 elif isinstance(data, list):
   print(f"len={len(data)}")
 '
@@ -258,7 +258,7 @@ if [[ -n "${SOURCE_WITH_ENTRY_BROWSE_URL}" ]]; then
   echo "HINT: Testing editions for sourceCode='${SOURCE_WITH_ENTRY_BROWSE_URL}'"
   echo "$ curl -sS \"${API_LOCAL}/api/sources/${SOURCE_WITH_ENTRY_BROWSE_URL}/editions\""
   curl -sS --max-time 25 "${API_LOCAL}/api/sources/${SOURCE_WITH_ENTRY_BROWSE_URL}/editions" \
-    | "${PYTHON_BIN}" - <<'PY'
+    | "${PYTHON_BIN}" -c '
 import json
 import sys
 
@@ -284,7 +284,7 @@ for ed in data[:5]:
   print(f"- jobId={job_id} name={name!r}")
   print(f"  first={first} last={last}")
   print(f"  entryBrowseUrl_present={'yes' if isinstance(entry, str) and entry else 'no'}")
-PY
+'
 else
   echo "WARN: No sources with entryBrowseUrl found; editions check skipped."
 fi
@@ -310,10 +310,10 @@ if not isinstance(results, list) or not results:
   sys.exit(0)
 
 r0 = results[0] if isinstance(results[0], dict) else {}
-print(f"first_result.captureTimestamp={r0.get('captureTimestamp')}")
-print(f"first_result.jobId={r0.get('jobId')}")
-print(f"first_result.browseUrl={r0.get('browseUrl')}")
-print(f"first_result.url={r0.get('url')}")
+print(f"first_result.captureTimestamp={r0.get(\"captureTimestamp\")}")
+print(f"first_result.jobId={r0.get(\"jobId\")}")
+print(f"first_result.browseUrl={r0.get(\"browseUrl\")}")
+print(f"first_result.url={r0.get(\"url\")}")
 '
 else
   echo "WARN: No source available for search test."
