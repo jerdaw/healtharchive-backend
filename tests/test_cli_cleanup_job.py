@@ -142,3 +142,67 @@ def test_cleanup_job_rejects_non_indexed_status(tmp_path, monkeypatch) -> None:
         assert job is not None
         assert job.status == "running"
         assert job.cleanup_status == "none"
+
+
+def test_cleanup_job_refuses_temp_when_replay_enabled_without_force(
+    tmp_path, monkeypatch
+) -> None:
+    _init_test_db(tmp_path, monkeypatch)
+    job_id = _seed_indexed_job(tmp_path)
+
+    # When replay is enabled, cleanup-job should refuse by default because
+    # temp cleanup deletes WARCs required for replay.
+    monkeypatch.setenv("HEALTHARCHIVE_REPLAY_BASE_URL", "https://replay.example.test")
+
+    with get_session() as session:
+        job = session.get(ArchiveJob, job_id)
+        assert job is not None
+        output_dir = Path(job.output_dir)
+        temp_dir = next(output_dir.glob(".tmp*"))
+        state_path = output_dir / ".archive_state.json"
+        assert temp_dir.is_dir()
+        assert state_path.is_file()
+
+    parser = cli_module.build_parser()
+    args = parser.parse_args(["cleanup-job", "--id", str(job_id)])
+
+    try:
+        args.func(args)
+    except SystemExit:
+        pass
+
+    # Paths should remain.
+    assert temp_dir.is_dir()
+    assert state_path.is_file()
+
+
+def test_cleanup_job_allows_temp_with_force_when_replay_enabled(
+    tmp_path, monkeypatch
+) -> None:
+    _init_test_db(tmp_path, monkeypatch)
+    job_id = _seed_indexed_job(tmp_path)
+
+    monkeypatch.setenv("HEALTHARCHIVE_REPLAY_BASE_URL", "https://replay.example.test")
+
+    with get_session() as session:
+        job = session.get(ArchiveJob, job_id)
+        assert job is not None
+        output_dir = Path(job.output_dir)
+        temp_dir = next(output_dir.glob(".tmp*"))
+        state_path = output_dir / ".archive_state.json"
+        assert temp_dir.is_dir()
+        assert state_path.is_file()
+
+    parser = cli_module.build_parser()
+    args = parser.parse_args(["cleanup-job", "--id", str(job_id), "--force"])
+
+    stdout = StringIO()
+    old_stdout = sys.stdout
+    try:
+        sys.stdout = stdout
+        args.func(args)
+    finally:
+        sys.stdout = old_stdout
+
+    assert not temp_dir.exists()
+    assert not state_path.exists()
