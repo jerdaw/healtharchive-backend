@@ -275,6 +275,9 @@ Checklist for each non‑dev environment:
     leaves the main job directory and any final ZIMs.
   - If you are using replay (pywb) for a job, do not run `cleanup-job --mode temp`
     for that job — replay depends on the WARCs remaining on disk.
+  - If replay is enabled globally (`HEALTHARCHIVE_REPLAY_BASE_URL` is set),
+    `cleanup-job --mode temp` will refuse unless you pass `--force`. Treat
+    `--force` as an emergency override (it can break replay by deleting WARCs).
 - [ ] For larger deployments, consider:
   - Keeping a simple inventory of jobs (via `/api/admin/jobs` and metrics) so
     you know roughly how many indexed jobs you have and how big `jobs/` is.

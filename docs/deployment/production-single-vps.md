@@ -189,6 +189,8 @@ Operational warning:
 - `ha-backend cleanup-job --mode temp` removes temp dirs **including WARCs**.
   Replay depends on WARCs staying on disk, so do not run cleanup for any job
   you intend to keep replayable.
+  If replay is enabled globally (`HEALTHARCHIVE_REPLAY_BASE_URL` is set),
+  `cleanup-job --mode temp` will refuse unless you pass `--force`.
 
 ---
 
