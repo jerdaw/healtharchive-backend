@@ -62,7 +62,9 @@ def _format_capture_timestamp(value: Any) -> Optional[str]:
     return str(value)
 
 
-def _build_browse_url(job_id: Optional[int], original_url: str) -> Optional[str]:
+def _build_browse_url(
+    job_id: Optional[int], original_url: str, capture_timestamp: Any = None
+) -> Optional[str]:
     base = get_replay_base_url()
     if not base or not job_id:
         return None
@@ -71,11 +73,23 @@ def _build_browse_url(job_id: Optional[int], original_url: str) -> Optional[str]
     if not normalized:
         return None
 
+    ts_value: Optional[str] = None
+    if isinstance(capture_timestamp, datetime):
+        dt = capture_timestamp
+        if dt.tzinfo:
+            dt = dt.astimezone(timezone.utc)
+        else:
+            dt = dt.replace(tzinfo=timezone.utc)
+        ts_value = dt.strftime("%Y%m%d%H%M%S")
+
     # Do not append a trailing "/" here. If the original URL contains a query
     # string, adding "/" would modify it (because the browser would treat it as
     # part of the *outer* URL's query). pywb accepts the timegate form without
     # a trailing slash, eg:
     #   /job-1/https://example.com/path?x=y
+    if ts_value:
+        return f"{base}/job-{job_id}/{ts_value}/{normalized}"
+
     return f"{base}/job-{job_id}/{normalized}"
 
 
@@ -141,6 +155,95 @@ def _candidate_entry_groups(base_url: Optional[str]) -> List[str]:
             candidates.add(urlunsplit((scheme_value, netloc_value, path, "", "")))
 
     return sorted(candidates)
+
+
+def _candidate_entry_hosts(base_url: Optional[str]) -> List[str]:
+    """
+    Return hostname variants (www/no-www) for a Source.base_url.
+    """
+    if not base_url:
+        return []
+
+    raw = base_url.strip()
+    if not raw:
+        return []
+    if not (raw.startswith("http://") or raw.startswith("https://")):
+        raw = f"https://{raw}"
+
+    try:
+        parts = urlsplit(raw)
+    except Exception:
+        return []
+
+    netloc = (parts.netloc or "").lower()
+    host = netloc.partition(":")[0]
+    if not host:
+        return []
+
+    variants = {host}
+    if host.startswith("www."):
+        variants.add(host[len("www.") :])
+    else:
+        variants.add(f"www.{host}")
+
+    return sorted(variants)
+
+
+def _status_quality(status_code: Optional[int]) -> int:
+    if status_code is None:
+        return 0
+    if 200 <= status_code < 300:
+        return 2
+    if 300 <= status_code < 400:
+        return 1
+    return -1
+
+
+def _entry_candidate_key(
+    *,
+    snapshot_id: int,
+    url: str,
+    capture_timestamp: Any,
+    status_code: Optional[int],
+) -> tuple:
+    """
+    Sort key for choosing an entry-point page for a source when the configured
+    baseUrl wasn't captured exactly.
+    """
+    quality = _status_quality(status_code)
+
+    try:
+        parts = urlsplit(url)
+        path = parts.path or "/"
+        has_query = 1 if parts.query else 0
+    except Exception:
+        path = "/"
+        has_query = 0
+
+    is_root = 1 if path in ("", "/") else 0
+    depth = 0 if is_root else path.strip("/").count("/") + 1
+    path_len = len(path)
+
+    ts_score = 0.0
+    if isinstance(capture_timestamp, datetime):
+        dt = capture_timestamp
+        if dt.tzinfo:
+            dt = dt.astimezone(timezone.utc)
+        else:
+            dt = dt.replace(tzinfo=timezone.utc)
+        ts_score = dt.timestamp()
+
+    # Prefer: 2xx > 3xx > None > other, root-like pages, shallower/shorter
+    # paths, no query strings, and finally newer captures.
+    return (
+        quality,
+        is_root,
+        -depth,
+        -path_len,
+        -has_query,
+        ts_score,
+        snapshot_id,
+    )
 
 
 def _has_table(db: Session, table_name: str) -> bool:
@@ -712,7 +815,9 @@ def _search_snapshots_inner(
                 originalUrl=original_url,
                 snippet=snap.snippet,
                 rawSnapshotUrl=f"/api/snapshots/raw/{snap.id}",
-                browseUrl=_build_browse_url(snap.job_id, original_url),
+                browseUrl=_build_browse_url(
+                    snap.job_id, original_url, snap.capture_timestamp
+                ),
             )
         )
 
@@ -896,7 +1001,13 @@ def list_sources(db: Session = Depends(get_db)) -> List[SourceSummarySchema]:
                 else_=-1,
             )
             entry_snapshot = (
-                db.query(Snapshot.id, Snapshot.job_id, Snapshot.url)
+                db.query(
+                    Snapshot.id,
+                    Snapshot.job_id,
+                    Snapshot.url,
+                    Snapshot.capture_timestamp,
+                    Snapshot.status_code,
+                )
                 .filter(Snapshot.source_id == source.id)
                 .filter(Snapshot.normalized_url_group.in_(entry_groups))
                 .order_by(
@@ -908,7 +1019,57 @@ def list_sources(db: Session = Depends(get_db)) -> List[SourceSummarySchema]:
             )
             if entry_snapshot:
                 entry_record_id = entry_snapshot[0]
-                entry_browse_url = _build_browse_url(entry_snapshot[1], entry_snapshot[2])
+                entry_browse_url = _build_browse_url(
+                    entry_snapshot[1], entry_snapshot[2], entry_snapshot[3]
+                )
+
+        # If the exact baseUrl wasn't captured, fall back to a "reasonable"
+        # entry point on the same host (avoid third-party pages being treated as
+        # the source homepage).
+        if entry_record_id is None and source.base_url:
+            host_variants = _candidate_entry_hosts(source.base_url)
+            host_filters = []
+            for host in host_variants:
+                for scheme in ("https", "http"):
+                    prefix = f"{scheme}://{host}"
+                    host_filters.append(Snapshot.url.ilike(f"{prefix}/%"))
+                    host_filters.append(Snapshot.url == prefix)
+                    host_filters.append(Snapshot.url == f"{prefix}/")
+
+            if host_filters:
+                candidates = (
+                    db.query(
+                        Snapshot.id,
+                        Snapshot.job_id,
+                        Snapshot.url,
+                        Snapshot.capture_timestamp,
+                        Snapshot.status_code,
+                    )
+                    .filter(Snapshot.source_id == source.id)
+                    .filter(or_(*host_filters))
+                    .order_by(Snapshot.capture_timestamp.desc(), Snapshot.id.desc())
+                    .limit(500)
+                    .all()
+                )
+
+                best: Optional[tuple] = None
+                best_key: Optional[tuple] = None
+                for cand_id, cand_job_id, cand_url, cand_ts, cand_status in candidates:
+                    key = _entry_candidate_key(
+                        snapshot_id=cand_id,
+                        url=cand_url,
+                        capture_timestamp=cand_ts,
+                        status_code=cand_status,
+                    )
+                    if best_key is None or key > best_key:
+                        best_key = key
+                        best = (cand_id, cand_job_id, cand_url, cand_ts)
+
+                if best is not None:
+                    entry_record_id, entry_job_id, entry_url, entry_ts = best
+                    entry_browse_url = _build_browse_url(
+                        entry_job_id, entry_url, entry_ts
+                    )
 
         summaries.append(
             SourceSummarySchema(
@@ -1037,7 +1198,7 @@ def get_snapshot_detail(
         originalUrl=snap.url,
         snippet=snap.snippet,
         rawSnapshotUrl=f"/api/snapshots/raw/{snap.id}",
-        browseUrl=_build_browse_url(snap.job_id, snap.url),
+        browseUrl=_build_browse_url(snap.job_id, snap.url, snap.capture_timestamp),
         mimeType=snap.mime_type,
         statusCode=snap.status_code,
     )
