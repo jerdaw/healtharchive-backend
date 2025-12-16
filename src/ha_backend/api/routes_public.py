@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+from urllib.parse import urlsplit, urlunsplit
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from fastapi.responses import HTMLResponse, JSONResponse
@@ -76,6 +77,70 @@ def _build_browse_url(job_id: Optional[int], original_url: str) -> Optional[str]
     # a trailing slash, eg:
     #   /job-1/https://example.com/path?x=y
     return f"{base}/job-{job_id}/{normalized}"
+
+
+def _normalize_url_group(value: str) -> Optional[str]:
+    """
+    Normalize a URL the same way Snapshot.normalized_url_group is computed.
+    """
+    raw = value.strip()
+    if not raw:
+        return None
+    try:
+        parts = urlsplit(raw)
+    except Exception:
+        return None
+
+    scheme = parts.scheme.lower()
+    netloc = parts.netloc.lower()
+    if not scheme or not netloc:
+        return None
+    path = parts.path or "/"
+    return urlunsplit((scheme, netloc, path, "", ""))
+
+
+def _candidate_entry_groups(base_url: Optional[str]) -> List[str]:
+    """
+    Build a small set of normalized_url_group candidates for a Source.base_url.
+
+    We include common scheme and www/no-www variants because archived URLs may
+    differ slightly from the configured base URL.
+    """
+    if not base_url:
+        return []
+
+    canonical = _normalize_url_group(base_url)
+    if not canonical:
+        return []
+
+    parts = urlsplit(canonical)
+    scheme = parts.scheme
+    netloc = parts.netloc
+    path = parts.path or "/"
+
+    host, sep, port = netloc.partition(":")
+    if not host:
+        return [canonical]
+
+    scheme_variants = {scheme}
+    if scheme == "https":
+        scheme_variants.add("http")
+    elif scheme == "http":
+        scheme_variants.add("https")
+
+    host_variants = {host}
+    if host.startswith("www."):
+        host_variants.add(host[len("www.") :])
+    else:
+        host_variants.add(f"www.{host}")
+
+    candidates: set[str] = set()
+    for scheme_value in scheme_variants:
+        for host_value in host_variants:
+            netloc_value = f"{host_value}{sep}{port}" if port else host_value
+            candidates.add(urlunsplit((scheme_value, netloc_value, path, "", "")))
+
+    return sorted(candidates)
 
 
 def _has_table(db: Session, table_name: str) -> bool:
@@ -813,10 +878,44 @@ def list_sources(db: Session = Depends(get_db)) -> List[SourceSummarySchema]:
             latest_snapshot[0] if latest_snapshot else None
         )
 
+        entry_record_id: Optional[int] = None
+        entry_browse_url: Optional[str] = None
+
+        entry_groups = _candidate_entry_groups(source.base_url)
+        if entry_groups:
+            entry_status_quality = case(
+                (Snapshot.status_code.is_(None), 0),
+                (
+                    and_(Snapshot.status_code >= 200, Snapshot.status_code < 300),
+                    2,
+                ),
+                (
+                    and_(Snapshot.status_code >= 300, Snapshot.status_code < 400),
+                    1,
+                ),
+                else_=-1,
+            )
+            entry_snapshot = (
+                db.query(Snapshot.id, Snapshot.job_id, Snapshot.url)
+                .filter(Snapshot.source_id == source.id)
+                .filter(Snapshot.normalized_url_group.in_(entry_groups))
+                .order_by(
+                    entry_status_quality.desc(),
+                    Snapshot.capture_timestamp.desc(),
+                    Snapshot.id.desc(),
+                )
+                .first()
+            )
+            if entry_snapshot:
+                entry_record_id = entry_snapshot[0]
+                entry_browse_url = _build_browse_url(entry_snapshot[1], entry_snapshot[2])
+
         summaries.append(
             SourceSummarySchema(
                 sourceCode=source.code,
                 sourceName=source.name,
+                baseUrl=source.base_url,
+                description=source.description,
                 recordCount=record_count or 0,
                 firstCapture=(
                     first_capture.date().isoformat()
@@ -829,6 +928,8 @@ def list_sources(db: Session = Depends(get_db)) -> List[SourceSummarySchema]:
                     else str(last_capture)
                 ),
                 latestRecordId=latest_record_id,
+                entryRecordId=entry_record_id,
+                entryBrowseUrl=entry_browse_url,
             )
         )
 

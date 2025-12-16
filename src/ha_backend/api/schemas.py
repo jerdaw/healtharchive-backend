@@ -8,10 +8,14 @@ from pydantic import BaseModel
 class SourceSummarySchema(BaseModel):
     sourceCode: str
     sourceName: str
+    baseUrl: Optional[str] = None
+    description: Optional[str] = None
     recordCount: int
     firstCapture: str
     lastCapture: str
     latestRecordId: Optional[int]
+    entryRecordId: Optional[int] = None
+    entryBrowseUrl: Optional[str] = None
 
 
 class SnapshotSummarySchema(BaseModel):
