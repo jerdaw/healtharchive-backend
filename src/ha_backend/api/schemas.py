@@ -25,6 +25,15 @@ class SourceEditionSchema(BaseModel):
     recordCount: int
     firstCapture: str
     lastCapture: str
+    entryBrowseUrl: Optional[str] = None
+
+
+class ReplayResolveSchema(BaseModel):
+    found: bool
+    snapshotId: Optional[int] = None
+    captureTimestamp: Optional[str] = None
+    resolvedUrl: Optional[str] = None
+    browseUrl: Optional[str] = None
 
 
 class SnapshotSummarySchema(BaseModel):
@@ -77,6 +86,7 @@ class ArchiveStatsSchema(BaseModel):
 __all__ = [
     "SourceSummarySchema",
     "SourceEditionSchema",
+    "ReplayResolveSchema",
     "SnapshotSummarySchema",
     "SearchResponseSchema",
     "SnapshotDetailSchema",

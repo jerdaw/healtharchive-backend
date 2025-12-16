@@ -435,6 +435,29 @@ def test_source_preview_endpoint_serves_cached_image(tmp_path, monkeypatch) -> N
     assert resp.headers.get("cache-control") is not None
 
 
+def test_source_preview_endpoint_serves_jpeg_when_available(
+    tmp_path, monkeypatch
+) -> None:
+    preview_dir = tmp_path / "previews"
+    preview_dir.mkdir(parents=True, exist_ok=True)
+    monkeypatch.setenv("HEALTHARCHIVE_REPLAY_PREVIEW_DIR", str(preview_dir))
+
+    client = _init_test_app(tmp_path, monkeypatch)
+
+    with get_session() as session:
+        hc = Source(code="hc", name="Health Canada", enabled=True)
+        session.add(hc)
+        session.flush()
+
+    file_path = preview_dir / "source-hc-job-1.jpg"
+    file_path.write_bytes(b"\xff\xd8\xff\xe0")
+
+    resp = client.get("/api/sources/hc/preview", params={"jobId": 1})
+    assert resp.status_code == 200
+    assert resp.headers["content-type"].startswith("image/jpeg")
+    assert resp.headers.get("cache-control") is not None
+
+
 def test_source_editions_endpoint_lists_indexed_jobs_sorted_by_recency(
     tmp_path, monkeypatch
 ) -> None:
@@ -535,6 +558,186 @@ def test_source_editions_endpoint_lists_indexed_jobs_sorted_by_recency(
     assert editions[0]["recordCount"] == 1
     assert editions[0]["firstCapture"] == "2025-02-10"
     assert editions[0]["lastCapture"] == "2025-02-10"
+
+
+def test_source_editions_endpoint_includes_entry_browse_url_when_replay_enabled(
+    tmp_path, monkeypatch
+) -> None:
+    monkeypatch.setenv(
+        "HEALTHARCHIVE_REPLAY_BASE_URL", "https://replay.healtharchive.ca"
+    )
+    client = _init_test_app(tmp_path, monkeypatch)
+
+    with get_session() as session:
+        hc = Source(
+            code="hc",
+            name="Health Canada",
+            base_url="https://www.canada.ca/en/health-canada.html",
+            enabled=True,
+        )
+        session.add(hc)
+        session.flush()
+
+        job = ArchiveJob(
+            source_id=hc.id,
+            name="legacy-hc",
+            output_dir="/srv/healtharchive/jobs/imports/legacy-hc",
+            status="indexed",
+        )
+        session.add(job)
+        session.flush()
+
+        ts = datetime(2025, 4, 18, 12, 0, tzinfo=timezone.utc)
+        session.add(
+            Snapshot(
+                job_id=job.id,
+                source_id=hc.id,
+                url="https://www.canada.ca/en/health-canada.html",
+                normalized_url_group="https://www.canada.ca/en/health-canada.html",
+                capture_timestamp=ts,
+                mime_type="text/html",
+                status_code=200,
+                title="Health Canada",
+                snippet="HC home",
+                language="en",
+                warc_path="/warcs/hc-home.warc.gz",
+                warc_record_id="hc-home",
+            )
+        )
+
+        job_id = job.id
+
+    resp = client.get("/api/sources/hc/editions")
+    assert resp.status_code == 200
+    editions = resp.json()
+
+    assert editions
+    assert editions[0]["jobId"] == job_id
+    assert (
+        editions[0]["entryBrowseUrl"]
+        == f"https://replay.healtharchive.ca/job-{job_id}/20250418120000/https://www.canada.ca/en/health-canada.html"
+    )
+
+
+def test_replay_resolve_endpoint_finds_capture_across_www_variants(
+    tmp_path, monkeypatch
+) -> None:
+    monkeypatch.setenv(
+        "HEALTHARCHIVE_REPLAY_BASE_URL", "https://replay.healtharchive.ca"
+    )
+    client = _init_test_app(tmp_path, monkeypatch)
+
+    with get_session() as session:
+        hc = Source(code="hc", name="Health Canada", enabled=True)
+        session.add(hc)
+        session.flush()
+
+        job = ArchiveJob(
+            source_id=hc.id,
+            name="legacy-hc",
+            output_dir="/srv/healtharchive/jobs/imports/legacy-hc",
+            status="indexed",
+        )
+        session.add(job)
+        session.flush()
+
+        ts = datetime(2025, 4, 18, 23, 22, 34, tzinfo=timezone.utc)
+        snapshot = Snapshot(
+            job_id=job.id,
+            source_id=hc.id,
+            url="https://www.canada.ca/en/health-canada.html",
+            normalized_url_group="https://www.canada.ca/en/health-canada.html",
+            capture_timestamp=ts,
+            mime_type="text/html",
+            status_code=200,
+            title="Health Canada",
+            snippet="HC home",
+            language="en",
+            warc_path="/warcs/hc-home.warc.gz",
+            warc_record_id="hc-home",
+        )
+        session.add(snapshot)
+        session.flush()
+
+        job_id = job.id
+        snap_id = snapshot.id
+
+    resp = client.get(
+        "/api/replay/resolve",
+        params={
+            "jobId": job_id,
+            "url": "https://canada.ca/en/health-canada.html",
+            "timestamp": "20250418232234",
+        },
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["found"] is True
+    assert body["snapshotId"] == snap_id
+    assert body["resolvedUrl"] == "https://www.canada.ca/en/health-canada.html"
+    assert (
+        body["browseUrl"]
+        == f"https://replay.healtharchive.ca/job-{job_id}/20250418232234/https://www.canada.ca/en/health-canada.html"
+    )
+
+
+def test_replay_resolve_endpoint_falls_back_to_url_group_match(
+    tmp_path, monkeypatch
+) -> None:
+    monkeypatch.setenv(
+        "HEALTHARCHIVE_REPLAY_BASE_URL", "https://replay.healtharchive.ca"
+    )
+    client = _init_test_app(tmp_path, monkeypatch)
+
+    with get_session() as session:
+        src = Source(code="hc", name="Health Canada", enabled=True)
+        session.add(src)
+        session.flush()
+
+        job = ArchiveJob(
+            source_id=src.id,
+            name="legacy-hc",
+            output_dir="/srv/healtharchive/jobs/imports/legacy-hc",
+            status="indexed",
+        )
+        session.add(job)
+        session.flush()
+
+        ts = datetime(2025, 4, 21, 12, 50, 48, tzinfo=timezone.utc)
+        snapshot = Snapshot(
+            job_id=job.id,
+            source_id=src.id,
+            url="https://www.canada.ca/en/health-canada.html",
+            normalized_url_group="https://www.canada.ca/en/health-canada.html",
+            capture_timestamp=ts,
+            mime_type="text/html",
+            status_code=200,
+            title="Health Canada",
+            snippet="HC home",
+            language="en",
+            warc_path="/warcs/hc-home.warc.gz",
+            warc_record_id="hc-home",
+        )
+        session.add(snapshot)
+        session.flush()
+
+        job_id = job.id
+
+    resp = client.get(
+        "/api/replay/resolve",
+        params={
+            "jobId": job_id,
+            "url": "https://www.canada.ca/en/health-canada.html?utm_source=test",
+        },
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["found"] is True
+    assert body["resolvedUrl"] == "https://www.canada.ca/en/health-canada.html"
+    assert (
+        body["browseUrl"]
+        == f"https://replay.healtharchive.ca/job-{job_id}/20250421125048/https://www.canada.ca/en/health-canada.html"
+    )
 
 
 def test_source_editions_endpoint_returns_404_for_missing_source(
