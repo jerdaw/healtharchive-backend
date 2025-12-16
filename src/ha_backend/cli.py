@@ -7,7 +7,7 @@ from typing import Sequence
 
 from sqlalchemy import text
 
-from .config import get_archive_tool_config, get_database_config
+from .config import get_archive_tool_config, get_database_config, get_replay_base_url
 from .db import get_engine, get_session
 from .indexing import index_job
 from .job_registry import create_job_for_source
@@ -846,6 +846,10 @@ def cmd_cleanup_job(args: argparse.Namespace) -> None:
     output directory and any final ZIM in place. The underlying helpers
     (CrawlState, cleanup_temp_dirs) live in the in-repo ``archive_tool``
     package and should be kept in sync with this command.
+
+    Safety: When HEALTHARCHIVE_REPLAY_BASE_URL is set (replay is enabled),
+    this command refuses to run in 'temp' mode unless --force is provided,
+    because deleting temp dirs also deletes WARCs required for replay.
     """
     from datetime import datetime, timezone
     from pathlib import Path
@@ -862,6 +866,15 @@ def cmd_cleanup_job(args: argparse.Namespace) -> None:
     if mode != "temp":
         print(
             f"Unsupported cleanup mode {mode!r}; only 'temp' is currently supported.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    if get_replay_base_url() and not args.force:
+        print(
+            "Refusing to run cleanup-job --mode temp because replay is enabled "
+            "(HEALTHARCHIVE_REPLAY_BASE_URL is set). This mode deletes WARCs "
+            "needed for replay. Re-run with --force to override.",
             file=sys.stderr,
         )
         sys.exit(1)
@@ -911,6 +924,181 @@ def cmd_cleanup_job(args: argparse.Namespace) -> None:
         job.cleanup_status = "temp_cleaned"
         job.cleaned_at = datetime.now(timezone.utc)
         job.state_file_path = None
+
+
+def cmd_replay_index_job(args: argparse.Namespace) -> None:
+    """
+    Create or refresh a pywb replay collection for an existing ArchiveJob.
+
+    This command:
+    - discovers WARCs for the job using the same discovery logic as indexing
+    - creates stable symlinks under the pywb collection's archive directory
+    - runs `wb-manager reindex` inside the configured replay container
+
+    It is designed for the production deployment described in
+    `docs/deployment/replay-service-pywb.md`.
+    """
+    from pathlib import Path
+
+    from .indexing.warc_discovery import discover_warcs_for_job
+    from .models import ArchiveJob as ORMArchiveJob
+
+    job_id = args.id
+    dry_run = args.dry_run
+
+    container_name = args.container
+    collection_name = args.collection or f"job-{job_id}"
+
+    collections_dir = Path(args.collections_dir).expanduser()
+    warcs_host_root = Path(args.warcs_host_root).expanduser()
+
+    warcs_container_root = args.warcs_container_root.strip()
+    if not warcs_container_root:
+        warcs_container_root = "/warcs"
+    warcs_container_root = warcs_container_root.rstrip("/")
+    if not warcs_container_root.startswith("/"):
+        warcs_container_root = f"/{warcs_container_root}"
+
+    limit_warcs = args.limit_warcs
+    if limit_warcs is not None and limit_warcs < 1:
+        print("ERROR: --limit-warcs must be >= 1.", file=sys.stderr)
+        sys.exit(1)
+
+    with get_session() as session:
+        job = session.get(ORMArchiveJob, job_id)
+        if job is None:
+            print(f"ERROR: Job {job_id} not found.", file=sys.stderr)
+            sys.exit(1)
+
+        output_dir = Path(job.output_dir).resolve()
+        if not output_dir.is_dir():
+            print(
+                f"ERROR: Output directory {output_dir} does not exist or is not a directory.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+
+        warc_paths = discover_warcs_for_job(job)
+
+    if not warc_paths:
+        print(
+            f"ERROR: No WARCs discovered for job {job_id}. "
+            "Ensure the job output dir contains a .tmp*/collections/crawl-*/archive layout.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    if limit_warcs is not None:
+        warc_paths = warc_paths[:limit_warcs]
+
+    collection_root = collections_dir / collection_name
+    archive_dir = collection_root / "archive"
+    indexes_dir = collection_root / "indexes"
+
+    def run_docker(args_list: list[str]) -> None:
+        result = subprocess.run(  # nosec: B603 - operator-controlled CLI invocation
+            args_list,
+            text=True,
+            capture_output=True,
+        )
+        if result.returncode != 0:
+            if result.stdout:
+                print(result.stdout)
+            if result.stderr:
+                print(result.stderr, file=sys.stderr)
+            sys.exit(result.returncode)
+
+    print("Replay indexing – plan")
+    print("----------------------")
+    print(f"Job ID:           {job_id}")
+    print(f"Collection:       {collection_name}")
+    print(f"Discovered WARCs: {len(warc_paths)}")
+    print(f"Collections dir:  {collections_dir}")
+    print(f"Archive dir:      {archive_dir}")
+    print(f"Container:        {container_name}")
+    print(f"WARCs host root:  {warcs_host_root}")
+    print(f"WARCs in container: {warcs_container_root}")
+    print("")
+
+    if dry_run:
+        print("Dry run: no filesystem changes and no docker commands will run.")
+        print("")
+
+    if not dry_run:
+        collections_dir.mkdir(parents=True, exist_ok=True)
+
+        if not collection_root.exists():
+            print(f"Initializing collection via wb-manager: {collection_name}")
+            run_docker(
+                ["docker", "exec", container_name, "wb-manager", "init", collection_name]
+            )
+
+        archive_dir.mkdir(parents=True, exist_ok=True)
+        indexes_dir.mkdir(parents=True, exist_ok=True)
+
+    # Remove existing stable WARC links for idempotency.
+    existing_links = sorted(archive_dir.glob("warc-*"))
+    if existing_links:
+        print(
+            f"Removing {len(existing_links)} existing WARC link(s) from {archive_dir}"
+        )
+    for path in existing_links:
+        if dry_run:
+            print(f"  would remove {path}")
+            continue
+        if path.is_dir():
+            print(
+                f"ERROR: Unexpected directory in archive dir: {path}",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+        path.unlink()
+
+    host_root_resolved = warcs_host_root.resolve()
+    if not host_root_resolved.is_dir():
+        print(
+            f"ERROR: WARCs host root {host_root_resolved} does not exist or is not a directory.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    print(f"Linking {len(warc_paths)} WARC(s) into {archive_dir}")
+    for idx, host_warc_path in enumerate(warc_paths, start=1):
+        suffix = "".join(host_warc_path.suffixes) or host_warc_path.suffix
+        link_name = f"warc-{idx:06d}{suffix}"
+
+        resolved_warc = host_warc_path.resolve()
+        try:
+            rel = resolved_warc.relative_to(host_root_resolved)
+        except ValueError:
+            print(
+                f"ERROR: WARC path {resolved_warc} is not under host root {host_root_resolved}. "
+                "Use --warcs-host-root/--warcs-container-root to configure path translation.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+
+        target_in_container = str(Path(warcs_container_root) / rel)
+        link_path = archive_dir / link_name
+
+        if dry_run:
+            print(f"  would link {link_path} -> {target_in_container}")
+            continue
+
+        link_path.symlink_to(target_in_container)
+
+    if dry_run:
+        print("")
+        print(
+            f"Would run: docker exec {container_name} wb-manager reindex {collection_name}"
+        )
+        return
+
+    print("Rebuilding pywb CDX index (wb-manager reindex)...")
+    run_docker(
+        ["docker", "exec", container_name, "wb-manager", "reindex", collection_name]
+    )
+    print("Replay indexing complete.")
 
 
 def cmd_register_job_dir(args: argparse.Namespace) -> None:
@@ -1315,7 +1503,64 @@ def build_parser() -> argparse.ArgumentParser:
         default="temp",
         help="Cleanup mode (currently only 'temp' is supported).",
     )
+    p_cleanup.add_argument(
+        "--force",
+        action="store_true",
+        default=False,
+        help=(
+            "Override safety checks (for example: allow temp cleanup even when "
+            "replay is enabled)."
+        ),
+    )
     p_cleanup.set_defaults(func=cmd_cleanup_job)
+
+    # replay-index-job
+    p_replay_index = subparsers.add_parser(
+        "replay-index-job",
+        help="Make a job replayable by creating a pywb collection and CDX index.",
+    )
+    p_replay_index.add_argument(
+        "--id",
+        type=int,
+        required=True,
+        help="ArchiveJob ID to index for replay.",
+    )
+    p_replay_index.add_argument(
+        "--collection",
+        help="Override the pywb collection name (default: job-<id>).",
+    )
+    p_replay_index.add_argument(
+        "--container",
+        default="healtharchive-replay",
+        help="Docker container name for the replay service.",
+    )
+    p_replay_index.add_argument(
+        "--collections-dir",
+        default="/srv/healtharchive/replay/collections",
+        help="Host path to the pywb collections directory.",
+    )
+    p_replay_index.add_argument(
+        "--warcs-host-root",
+        default="/srv/healtharchive/jobs",
+        help="Host path that contains WARCs and is mounted into the replay container.",
+    )
+    p_replay_index.add_argument(
+        "--warcs-container-root",
+        default="/warcs",
+        help="Container path where --warcs-host-root is mounted.",
+    )
+    p_replay_index.add_argument(
+        "--limit-warcs",
+        type=int,
+        help="For debugging: only link the first N discovered WARCs.",
+    )
+    p_replay_index.add_argument(
+        "--dry-run",
+        action="store_true",
+        default=False,
+        help="Print actions without changing the filesystem or running docker.",
+    )
+    p_replay_index.set_defaults(func=cmd_replay_index_job)
 
     # start-worker
     p_worker = subparsers.add_parser(
