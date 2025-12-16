@@ -123,7 +123,7 @@ curl_json_summary() {
   echo "HINT: ${label}"
   echo "$ curl -sS \"${url}\""
   curl -sS --max-time 20 "$url" \
-    | "${PYTHON_BIN}" - <<'PY'
+    | "${PYTHON_BIN}" -c '
 import json
 import sys
 
@@ -150,37 +150,7 @@ if isinstance(data, dict):
       print(f"checks.snapshots.total={snaps.get('total')}")
 elif isinstance(data, list):
   print(f"len={len(data)}")
-PY
-}
-
-pick_first_nonnull() {
-  local url="$1"
-  local json_field="$2"
-  curl -sS --max-time 20 "$url" \
-    | "${PYTHON_BIN}" - <<PY
-import json
-import sys
-
-field = ${json_field!r}
-try:
-  data = json.load(sys.stdin)
-except Exception:
-  print("")
-  sys.exit(0)
-
-if not isinstance(data, list):
-  print("")
-  sys.exit(0)
-
-for item in data:
-  if not isinstance(item, dict):
-    continue
-  val = item.get(field)
-  if isinstance(val, str) and val.strip():
-    print(val.strip())
-    sys.exit(0)
-print("")
-PY
+'
 }
 
 echo "HealthArchive VPS verification (safe, read-only)"
@@ -215,12 +185,10 @@ echo
 echo "HINT: This prints a compact table of sources (first ${MAX_SOURCES})."
 echo "$ curl -sS \"${API_LOCAL}/api/sources\" | ${PYTHON_BIN} (summary)"
 curl -sS --max-time 25 "${API_LOCAL}/api/sources" \
-  | "${PYTHON_BIN}" - <<PY
+  | MAX_SOURCES="${MAX_SOURCES}" "${PYTHON_BIN}" -c '
 import json
 import sys
-from datetime import datetime
-
-max_sources = int("${MAX_SOURCES}")
+import os
 
 try:
   data = json.load(sys.stdin)
@@ -231,6 +199,8 @@ except Exception as e:
 if not isinstance(data, list):
   print("ERROR: expected a JSON list")
   sys.exit(0)
+
+max_sources = int(os.environ.get("MAX_SOURCES") or "8")
 
 def short_date(s: str | None) -> str:
   if not s:
@@ -253,7 +223,7 @@ for i, src in enumerate(data[:max_sources]):
 print()
 with_entry = [s for s in data if isinstance(s, dict) and (s.get("entryBrowseUrl") or "").strip()]
 print(f"HINT: sources_with_entryBrowseUrl={len(with_entry)}")
-PY
+'
 
 section "7) Editions endpoint (first source with entryBrowseUrl)"
 SOURCE_WITH_ENTRY_BROWSE_URL="$(
@@ -324,7 +294,7 @@ if [[ -n "${SOURCE_WITH_ENTRY_BROWSE_URL}" ]]; then
   echo "HINT: Fetching a single result to confirm browseUrl/jobId fields are populated."
   echo "$ curl -sS \"${API_LOCAL}/api/search?pageSize=1&source=${SOURCE_WITH_ENTRY_BROWSE_URL}\""
   curl -sS --max-time 25 "${API_LOCAL}/api/search?pageSize=1&source=${SOURCE_WITH_ENTRY_BROWSE_URL}" \
-    | "${PYTHON_BIN}" - <<'PY'
+    | "${PYTHON_BIN}" -c '
 import json
 import sys
 
@@ -344,7 +314,7 @@ print(f"first_result.captureTimestamp={r0.get('captureTimestamp')}")
 print(f"first_result.jobId={r0.get('jobId')}")
 print(f"first_result.browseUrl={r0.get('browseUrl')}")
 print(f"first_result.url={r0.get('url')}")
-PY
+'
 else
   echo "WARN: No source available for search test."
 fi
@@ -449,4 +419,3 @@ run_sh "curl -sS --max-time 20 \"${FRONTEND_PUBLIC}/archive\" | grep -n \"Browse
 
 echo
 echo "DONE. If something looks off, paste this entire output into chat."
-
