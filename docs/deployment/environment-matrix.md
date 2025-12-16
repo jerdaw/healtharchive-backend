@@ -73,6 +73,7 @@ export HEALTHARCHIVE_ADMIN_TOKEN=localdev-admin
 export HEALTHARCHIVE_LOG_LEVEL=DEBUG
 export HA_SEARCH_RANKING_VERSION=v2
 export HEALTHARCHIVE_REPLAY_BASE_URL=http://127.0.0.1:8090
+export HEALTHARCHIVE_REPLAY_PREVIEW_DIR=$(pwd)/.dev-replay-previews
 ```
 
 ### 2.2 Production (current)
@@ -88,6 +89,7 @@ export HEALTHARCHIVE_CORS_ORIGINS=https://healtharchive.ca,https://www.healtharc
 export HEALTHARCHIVE_LOG_LEVEL=INFO
 export HA_SEARCH_RANKING_VERSION=v2
 export HEALTHARCHIVE_REPLAY_BASE_URL=https://replay.healtharchive.ca
+export HEALTHARCHIVE_REPLAY_PREVIEW_DIR=/srv/healtharchive/replay/previews
 ```
 
 Notes:

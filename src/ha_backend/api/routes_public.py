@@ -8,12 +8,12 @@ from typing import Any, Dict, List, Optional
 from urllib.parse import urlsplit, urlunsplit
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
 from sqlalchemy import and_, case, func, inspect, or_
 from sqlalchemy.orm import Session, joinedload, load_only
 from threading import Lock
 
-from ha_backend.config import get_replay_base_url
+from ha_backend.config import get_replay_base_url, get_replay_preview_dir
 from ha_backend.db import get_session
 from ha_backend.indexing.viewer import find_record_for_snapshot
 from ha_backend.models import ArchiveJob, PageSignal, Snapshot, SnapshotOutlink, Source
@@ -985,7 +985,9 @@ def list_sources(db: Session = Depends(get_db)) -> List[SourceSummarySchema]:
         )
 
         entry_record_id: Optional[int] = None
+        entry_job_id: Optional[int] = None
         entry_browse_url: Optional[str] = None
+        entry_preview_url: Optional[str] = None
 
         entry_groups = _candidate_entry_groups(source.base_url)
         if entry_groups:
@@ -1020,8 +1022,9 @@ def list_sources(db: Session = Depends(get_db)) -> List[SourceSummarySchema]:
             )
             if entry_snapshot:
                 entry_record_id = entry_snapshot[0]
+                entry_job_id = entry_snapshot[1]
                 entry_browse_url = _build_browse_url(
-                    entry_snapshot[1], entry_snapshot[2], entry_snapshot[3]
+                    entry_job_id, entry_snapshot[2], entry_snapshot[3]
                 )
 
         # If the exact baseUrl wasn't captured, fall back to a "reasonable"
@@ -1072,6 +1075,14 @@ def list_sources(db: Session = Depends(get_db)) -> List[SourceSummarySchema]:
                         entry_job_id, entry_url, entry_ts
                     )
 
+        preview_dir = get_replay_preview_dir()
+        if preview_dir is not None and entry_job_id:
+            candidate_preview = preview_dir / f"source-{source.code}-job-{entry_job_id}.png"
+            if candidate_preview.exists():
+                entry_preview_url = (
+                    f"/api/sources/{source.code}/preview?jobId={entry_job_id}"
+                )
+
         summaries.append(
             SourceSummarySchema(
                 sourceCode=source.code,
@@ -1092,6 +1103,7 @@ def list_sources(db: Session = Depends(get_db)) -> List[SourceSummarySchema]:
                 latestRecordId=latest_record_id,
                 entryRecordId=entry_record_id,
                 entryBrowseUrl=entry_browse_url,
+                entryPreviewUrl=entry_preview_url,
             )
         )
 
@@ -1167,6 +1179,42 @@ def list_source_editions(
         )
 
     return editions
+
+
+@router.get("/sources/{source_code}/preview")
+def get_source_preview(
+    source_code: str,
+    jobId: int = Query(..., ge=1),
+    db: Session = Depends(get_db),
+) -> Response:
+    """
+    Return a cached preview image for a source's replay homepage.
+
+    These previews are generated out-of-band (e.g. via an operator script) and
+    stored on disk under HEALTHARCHIVE_REPLAY_PREVIEW_DIR.
+    """
+    preview_dir = get_replay_preview_dir()
+    if preview_dir is None:
+        raise HTTPException(status_code=404, detail="Preview images not configured")
+
+    normalized_code = source_code.strip().lower()
+    if not normalized_code or normalized_code in _PUBLIC_EXCLUDED_SOURCE_CODES:
+        raise HTTPException(status_code=404, detail="Source not found")
+
+    # Validate the source exists to avoid advertising previews for unknown codes.
+    source = db.query(Source.id).filter(Source.code == normalized_code).first()
+    if not source:
+        raise HTTPException(status_code=404, detail="Source not found")
+
+    candidate = preview_dir / f"source-{normalized_code}-job-{jobId}.png"
+    if not candidate.exists():
+        raise HTTPException(status_code=404, detail="Preview not found")
+
+    headers = {
+        # Previews are derived artifacts; cache aggressively but allow refresh.
+        "Cache-Control": "public, max-age=3600",
+    }
+    return FileResponse(candidate, media_type="image/png", headers=headers)
 
 
 @router.get("/search", response_model=SearchResponseSchema)

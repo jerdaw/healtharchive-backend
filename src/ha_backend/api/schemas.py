@@ -16,6 +16,7 @@ class SourceSummarySchema(BaseModel):
     latestRecordId: Optional[int]
     entryRecordId: Optional[int] = None
     entryBrowseUrl: Optional[str] = None
+    entryPreviewUrl: Optional[str] = None
 
 
 class SourceEditionSchema(BaseModel):

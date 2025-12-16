@@ -351,6 +351,90 @@ def test_sources_endpoint_excludes_test_source(tmp_path, monkeypatch) -> None:
     assert "hc" in codes
 
 
+def test_sources_advertises_preview_url_when_cached_preview_exists(
+    tmp_path, monkeypatch
+) -> None:
+    preview_dir = tmp_path / "previews"
+    preview_dir.mkdir(parents=True, exist_ok=True)
+    monkeypatch.setenv("HEALTHARCHIVE_REPLAY_PREVIEW_DIR", str(preview_dir))
+
+    client = _init_test_app(tmp_path, monkeypatch)
+
+    with get_session() as session:
+        hc = Source(
+            code="hc",
+            name="Health Canada",
+            base_url="https://www.canada.ca/en/health-canada.html",
+            description="Health Canada",
+            enabled=True,
+        )
+        session.add(hc)
+        session.flush()
+
+        job = ArchiveJob(
+            source_id=hc.id,
+            name="legacy-hc-2025-04",
+            output_dir="/srv/healtharchive/jobs/imports/legacy-hc-2025-04",
+            status="indexed",
+        )
+        session.add(job)
+        session.flush()
+
+        ts = datetime(2025, 4, 18, 12, 0, tzinfo=timezone.utc)
+        snapshot = Snapshot(
+            job_id=job.id,
+            source_id=hc.id,
+            url="https://www.canada.ca/en/health-canada.html",
+            normalized_url_group="https://www.canada.ca/en/health-canada.html",
+            capture_timestamp=ts,
+            mime_type="text/html",
+            status_code=200,
+            title="Health Canada",
+            snippet="HC home",
+            language="en",
+            warc_path="/warcs/hc-home.warc.gz",
+            warc_record_id="hc-home",
+        )
+        session.add(snapshot)
+        session.flush()
+
+        preview_path = preview_dir / f"source-hc-job-{job.id}.png"
+        preview_path.write_bytes(b"\x89PNG\r\n\x1a\n")
+
+        job_id = job.id
+
+    resp = client.get("/api/sources")
+    assert resp.status_code == 200
+    sources = resp.json()
+    hc_payload = next(s for s in sources if s["sourceCode"] == "hc")
+
+    assert (
+        hc_payload["entryPreviewUrl"]
+        == f"/api/sources/hc/preview?jobId={job_id}"
+    )
+
+
+def test_source_preview_endpoint_serves_cached_image(tmp_path, monkeypatch) -> None:
+    preview_dir = tmp_path / "previews"
+    preview_dir.mkdir(parents=True, exist_ok=True)
+    monkeypatch.setenv("HEALTHARCHIVE_REPLAY_PREVIEW_DIR", str(preview_dir))
+
+    client = _init_test_app(tmp_path, monkeypatch)
+
+    with get_session() as session:
+        hc = Source(code="hc", name="Health Canada", enabled=True)
+        session.add(hc)
+        session.flush()
+
+    file_path = preview_dir / "source-hc-job-1.png"
+    file_path.write_bytes(b"\x89PNG\r\n\x1a\n")
+
+    resp = client.get("/api/sources/hc/preview", params={"jobId": 1})
+    assert resp.status_code == 200
+    assert resp.headers["content-type"].startswith("image/png")
+    assert resp.headers.get("cache-control") is not None
+
+
 def test_source_editions_endpoint_lists_indexed_jobs_sorted_by_recency(
     tmp_path, monkeypatch
 ) -> None:

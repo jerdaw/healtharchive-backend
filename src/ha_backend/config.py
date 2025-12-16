@@ -32,6 +32,16 @@ DEFAULT_ARCHIVE_TOOL_CMD = "archive-tool"
 # raw snapshot HTML endpoint.
 DEFAULT_REPLAY_BASE_URL = ""
 
+# Directory where pre-rendered replay preview images are stored.
+#
+# These images are used by the frontend to show lightweight “homepage preview”
+# tiles without embedding iframes. They are intentionally generated offline (or
+# on-demand by an operator script) and served as static files by the API.
+#
+# Example (prod):
+#   HEALTHARCHIVE_REPLAY_PREVIEW_DIR=/srv/healtharchive/replay/previews
+DEFAULT_REPLAY_PREVIEW_DIR = ""
+
 
 @dataclass
 class ArchiveToolConfig:
@@ -131,3 +141,16 @@ def get_replay_base_url() -> str | None:
         raw = f"https://{raw}"
 
     return raw.rstrip("/")
+
+
+def get_replay_preview_dir() -> Path | None:
+    """
+    Return the configured directory containing replay preview images.
+
+    If unset, the API will not advertise preview image URLs.
+    """
+    raw = os.environ.get("HEALTHARCHIVE_REPLAY_PREVIEW_DIR", DEFAULT_REPLAY_PREVIEW_DIR)
+    raw = raw.strip()
+    if not raw:
+        return None
+    return Path(raw)
