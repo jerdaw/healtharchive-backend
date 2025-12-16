@@ -216,7 +216,87 @@ def test_sources_entry_record_prefers_base_url_over_latest_snapshot(
     assert hc_payload["entryRecordId"] == entry_id
     assert (
         hc_payload["entryBrowseUrl"]
-        == f"https://replay.healtharchive.ca/job-{job_id}/https://www.canada.ca/en/health-canada.html"
+        == f"https://replay.healtharchive.ca/job-{job_id}/20250401120000/https://www.canada.ca/en/health-canada.html"
+    )
+
+
+def test_sources_entry_record_falls_back_to_first_party_host_when_base_url_missing(
+    tmp_path, monkeypatch
+) -> None:
+    monkeypatch.setenv("HEALTHARCHIVE_REPLAY_BASE_URL", "https://replay.healtharchive.ca")
+    client = _init_test_app(tmp_path, monkeypatch)
+
+    with get_session() as session:
+        cihr = Source(
+            code="cihr",
+            name="Canadian Institutes of Health Research",
+            base_url="https://cihr-irsc.gc.ca/",
+            description="CIHR",
+            enabled=True,
+        )
+        session.add(cihr)
+        session.flush()
+
+        job = ArchiveJob(
+            source_id=cihr.id,
+            name="legacy-cihr-2025-04",
+            output_dir="/srv/healtharchive/jobs/imports/legacy-cihr-2025-04",
+            status="indexed",
+        )
+        session.add(job)
+        session.flush()
+
+        entry_ts = datetime(2025, 4, 10, 12, 34, 56, tzinfo=timezone.utc)
+        latest_ts = datetime(2025, 4, 10, 12, 40, 0, tzinfo=timezone.utc)
+
+        entry_snapshot = Snapshot(
+            job_id=job.id,
+            source_id=cihr.id,
+            url="https://cihr-irsc.gc.ca/e/193.html",
+            normalized_url_group="https://cihr-irsc.gc.ca/e/193.html",
+            capture_timestamp=entry_ts,
+            mime_type="text/html",
+            status_code=200,
+            title="CIHR",
+            snippet="CIHR home",
+            language="en",
+            warc_path="/warcs/cihr-home.warc.gz",
+            warc_record_id="cihr-home",
+        )
+
+        # A newer third-party capture should not be treated as the source entry.
+        latest_snapshot = Snapshot(
+            job_id=job.id,
+            source_id=cihr.id,
+            url="https://cihr.tt.omtrdc.net/rest/v1/delivery?client=cihr",
+            normalized_url_group="https://cihr.tt.omtrdc.net/rest/v1/delivery",
+            capture_timestamp=latest_ts,
+            mime_type="text/html",
+            status_code=200,
+            title="Analytics",
+            snippet="Third-party analytics endpoint",
+            language="en",
+            warc_path="/warcs/cihr-analytics.warc.gz",
+            warc_record_id="cihr-analytics",
+        )
+
+        session.add_all([entry_snapshot, latest_snapshot])
+        session.flush()
+
+        entry_id = entry_snapshot.id
+        latest_id = latest_snapshot.id
+        job_id = job.id
+
+    resp = client.get("/api/sources")
+    assert resp.status_code == 200
+    sources = resp.json()
+    cihr_payload = next(s for s in sources if s["sourceCode"] == "cihr")
+
+    assert cihr_payload["latestRecordId"] == latest_id
+    assert cihr_payload["entryRecordId"] == entry_id
+    assert (
+        cihr_payload["entryBrowseUrl"]
+        == f"https://replay.healtharchive.ca/job-{job_id}/20250410123456/https://cihr-irsc.gc.ca/e/193.html"
     )
 
 
