@@ -61,6 +61,10 @@ Example (latest capture):
 https://replay.healtharchive.ca/job-1/https://www.canada.ca/en/health-canada.html
 ```
 
+Note: HealthArchive’s public API generates **timestamp-locked** replay URLs for
+snapshots (the `<timestamp>` form) so the viewer stays anchored to the capture
+time as you navigate within the backup.
+
 ### 1.3 Retention warning: replay depends on WARCs staying on disk
 
 Replay reads from the WARC files referenced by each job.
