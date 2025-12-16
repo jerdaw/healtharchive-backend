@@ -632,6 +632,10 @@ This:
 > If you are using the replay service (pywb) to serve this job’s WARCs, do not
 > run `cleanup-job --mode temp` for that job — replay depends on the WARCs
 > remaining on disk.
+>
+> If replay is enabled globally (`HEALTHARCHIVE_REPLAY_BASE_URL` is set),
+> `cleanup-job --mode temp` will refuse unless you pass `--force`. Treat
+> `--force` as an emergency override (it can break replay by deleting WARCs).
 
 ---
 

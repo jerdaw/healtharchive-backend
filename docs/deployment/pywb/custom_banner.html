@@ -1,0 +1,253 @@
+<!--
+HealthArchive custom replay banner for pywb (non-framed replay).
+
+Deploy by copying this file to:
+  /srv/healtharchive/replay/templates/custom_banner.html
+
+Then restart the replay service:
+  sudo systemctl restart healtharchive-replay.service
+-->
+
+<style id="ha-replay-banner-css">
+  #ha-replay-banner {
+    position: sticky;
+    top: 0;
+    z-index: 2147483647;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.55rem 0.75rem;
+    background: rgba(255, 255, 255, 0.92);
+    border-bottom: 1px solid rgba(15, 23, 42, 0.14);
+    color: #111827;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI",
+      sans-serif;
+    font-size: 12px;
+    line-height: 1.35;
+    -webkit-font-smoothing: antialiased;
+    backdrop-filter: blur(10px);
+  }
+
+  #ha-replay-banner * {
+    box-sizing: border-box;
+  }
+
+  #ha-replay-banner a {
+    color: #2563eb;
+    text-decoration: none;
+    font-weight: 600;
+  }
+
+  #ha-replay-banner a:hover {
+    color: #1d4ed8;
+    text-decoration: underline;
+  }
+
+  #ha-replay-banner .ha-replay-left {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    min-width: 0;
+  }
+
+  #ha-replay-banner .ha-replay-brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-weight: 700;
+    color: inherit;
+  }
+
+  #ha-replay-banner .ha-replay-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.16rem 0.5rem;
+    border-radius: 999px;
+    background: rgba(37, 99, 235, 0.1);
+    border: 1px solid rgba(37, 99, 235, 0.25);
+    color: #1d4ed8;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  #ha-replay-banner .ha-replay-center {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+  }
+
+  #ha-replay-banner .ha-replay-meta {
+    color: rgba(17, 24, 39, 0.8);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  #ha-replay-banner .ha-replay-disclaimer {
+    color: rgba(17, 24, 39, 0.72);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  #ha-replay-banner .ha-replay-right {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-shrink: 0;
+  }
+
+  #ha-replay-banner button {
+    appearance: none;
+    border: 1px solid rgba(15, 23, 42, 0.16);
+    background: rgba(255, 255, 255, 0.65);
+    color: inherit;
+    border-radius: 0.5rem;
+    padding: 0.25rem 0.5rem;
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  #ha-replay-banner button:hover {
+    background: rgba(255, 255, 255, 0.95);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    #ha-replay-banner {
+      background: rgba(24, 26, 27, 0.92);
+      border-bottom-color: rgba(54, 59, 61, 0.9);
+      color: #e8e6e3;
+    }
+
+    #ha-replay-banner a {
+      color: #388fed;
+    }
+
+    #ha-replay-banner a:hover {
+      color: #4693ef;
+    }
+
+    #ha-replay-banner .ha-replay-pill {
+      background: rgba(56, 143, 237, 0.16);
+      border-color: rgba(56, 143, 237, 0.32);
+      color: #dbeafe;
+    }
+
+    #ha-replay-banner .ha-replay-meta,
+    #ha-replay-banner .ha-replay-disclaimer {
+      color: rgba(232, 230, 227, 0.78);
+    }
+
+    #ha-replay-banner button {
+      border-color: rgba(54, 59, 61, 0.9);
+      background: rgba(24, 26, 27, 0.7);
+    }
+
+    #ha-replay-banner button:hover {
+      background: rgba(24, 26, 27, 0.95);
+    }
+  }
+
+  @media (max-width: 780px) {
+    #ha-replay-banner .ha-replay-center {
+      display: none;
+    }
+  }
+</style>
+
+<script id="ha-replay-banner-js">
+  (function () {
+    // Only show the banner when replay is opened directly, not when embedded
+    // inside the HealthArchive wrapper iframe.
+    try {
+      if (window !== window.top) return;
+    } catch (e) {
+      // If we can't access window.top, assume we're embedded and skip.
+      return;
+    }
+
+    var STORAGE_KEY = "haReplayBannerDismissed";
+    try {
+      if (localStorage.getItem(STORAGE_KEY) === "1") return;
+    } catch (e) {
+      // Ignore storage failures.
+    }
+
+    function formatTimestamp(ts) {
+      if (!ts || typeof ts !== "string" || ts.length < 8) return null;
+      var year = Number(ts.slice(0, 4));
+      var month = Number(ts.slice(4, 6));
+      var day = Number(ts.slice(6, 8));
+      if (!year || !month || !day) return null;
+      var d = new Date(Date.UTC(year, month - 1, day));
+      if (isNaN(d.getTime())) return null;
+      return d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+    }
+
+    function buildMeta() {
+      var wb = window.wbinfo || {};
+      var parts = [];
+      if (wb.coll) parts.push("Backup: " + wb.coll);
+      var capture = formatTimestamp(wb.timestamp);
+      if (capture) parts.push("Captured: " + capture);
+      return parts.join(" \u00b7 ");
+    }
+
+    function inject() {
+      if (!document.body) return;
+
+      var banner = document.getElementById("ha-replay-banner");
+      if (banner) return;
+
+      banner = document.createElement("div");
+      banner.id = "ha-replay-banner";
+      banner.setAttribute("role", "region");
+      banner.setAttribute("aria-label", "HealthArchive replay notice");
+
+      banner.innerHTML =
+        '<div class="ha-replay-left">' +
+        '  <a class="ha-replay-brand" href="https://www.healtharchive.ca/" target="_blank" rel="noreferrer">HealthArchive.ca</a>' +
+        '  <span class="ha-replay-pill">Archived replay</span>' +
+        "</div>" +
+        '<div class="ha-replay-center">' +
+        '  <div class="ha-replay-meta" id="ha-replay-meta"></div>' +
+        '  <div class="ha-replay-disclaimer">Independent archival snapshot \u00b7 Not an official government website \u00b7 Content may be outdated</div>' +
+        "</div>" +
+        '<div class="ha-replay-right">' +
+        '  <a href="https://www.healtharchive.ca/archive" target="_blank" rel="noreferrer">Browse</a>' +
+        '  <button type="button" id="ha-replay-hide" aria-label="Hide this banner">Hide</button>' +
+        "</div>";
+
+      document.body.insertBefore(banner, document.body.firstChild);
+
+      var metaEl = document.getElementById("ha-replay-meta");
+      if (metaEl) {
+        var meta = buildMeta();
+        metaEl.textContent = meta || "";
+      }
+
+      var hideBtn = document.getElementById("ha-replay-hide");
+      if (hideBtn) {
+        hideBtn.addEventListener("click", function () {
+          try {
+            localStorage.setItem(STORAGE_KEY, "1");
+          } catch (e) {}
+          var el = document.getElementById("ha-replay-banner");
+          if (el && el.parentNode) el.parentNode.removeChild(el);
+        });
+      }
+    }
+
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", inject, { once: true });
+    } else {
+      inject();
+    }
+  })();
+</script>
+
