@@ -1,381 +1,453 @@
 # Replay + Preview Automation (Plan Only)
 
-This document is a **design + risk assessment** for automating the “replayability” workflow in HealthArchive.
+Status: **design draft** (no automation implemented).
 
-It contains **no code**. The goal is to outline *what* we might automate, *where* it should live, *how* it should behave, and the **guardrails + edge cases** required so we can iterate on the plan safely before implementing anything.
+This document is a **thorough, safety-first plan** for automating the operational steps that make HealthArchive “feel like a real site archive”:
 
-## Scope: what we are (and are not) automating
+- pywb replay is kept up-to-date for each indexed crawl job (“edition”).
+- cached homepage preview images exist for the `/archive` source cards.
+- drift is detected and repaired safely (or surfaced clearly when it can’t be repaired).
 
-**In scope**
+It intentionally contains **no implementation code**. The goal is to agree on the *what/where/how/why*, guardrails, and edge cases before we build anything.
 
-- Making an indexed `ArchiveJob` replayable in pywb (`job-<id>` collection + CDX index).
-- Generating cached homepage preview images used by the `/archive` source cards.
-- Safe “reconciliation” automation (detect drift between DB jobs and replay/previews; repair it).
-- Operational guardrails (avoid deleting replay WARCs; safe retries; throttling; locks).
-- Monitoring and alerting for replay-specific failure modes.
+Related runbooks and context:
 
-**Out of scope (for now)**
+- Replay runbook: `docs/deployment/replay-service-pywb.md`
+- Production VPS runbook: `docs/deployment/production-single-vps.md`
+- Legacy imports: `docs/operations/legacy-crawl-imports.md`
+- Architecture overview: `docs/architecture.md`
 
-- Automated crawling / job scheduling (crawl frequency, queue management).
-- Any destructive cleanup automation (deleting WARCs / temp dirs) without a dedicated retention design.
-- Anything that would require secrets to be printed to logs or output.
-- CI/CD changes (GitHub Actions, deployment pipelines) beyond documenting what we’d want.
+---
 
-## Current reality (baseline)
+## 0) What “done” means for automation (high level)
 
-### Replay “replayable job” definition
+Automation is considered “successful” when:
 
-We consider a job replayable if:
+1. For every `ArchiveJob` with `status=indexed`, replay is *eventually* available at `https://replay.healtharchive.ca/job-<id>/...` (or we can point to a specific reason why it isn’t).
+2. For every source shown on `/archive`, a cached preview image is *eventually* available for the latest edition (or we can point to a specific reason why it isn’t).
+3. The system is **safe-by-default**:
+   - read-only / dry-run modes exist,
+   - destructive operations are excluded (cleanup),
+   - retries are bounded and don’t spam,
+   - concurrency is controlled,
+   - we can disable automation instantly without affecting core API availability.
 
-1. The job is `status=indexed` in the DB (snapshots exist and are queryable), **and**
-2. A corresponding pywb collection exists: `job-<id>`, **and**
-3. pywb has an up-to-date CDX index for that collection (typically `indexes/index.cdxj`), **and**
-4. The WARCs referenced by that job remain accessible on disk (replay depends on this).
+---
 
-### Existing primitives we can build automation around
+## 1) Scope: what we will and will not automate (yet)
 
-- Backend CLI:
-  - `ha-backend replay-index-job --id <id>` (creates/refreshes the pywb collection + symlinks + CDX index).
-  - `ha-backend cleanup-job --mode temp` has a guardrail: refuses unless `--force` when replay is enabled.
-- API contracts used by the frontend:
-  - `GET /api/sources` includes `entryBrowseUrl` and optional `entryPreviewUrl`.
-  - `GET /api/sources/{code}/editions` returns per-job edition metadata + entry URL.
-  - `GET /api/replay/resolve` supports “edition switching” by resolving captures in another job.
-  - `GET /api/sources/{code}/preview?jobId=<id>` serves cached images from `HEALTHARCHIVE_REPLAY_PREVIEW_DIR`.
-- Preview naming convention (served by the API):
-  - `source-<sourceCode>-job-<jobId>.webp|.jpg|.jpeg|.png`
+### In scope
 
-## Design principles (non-negotiable)
+- **Replay indexing**: making `job-<id>` collections replayable (symlinks + CDX index).
+- **Preview generation**: producing cached preview images for the `/archive` source cards.
+- **Reconciliation**: a periodic “repair drift” process that converges the system to correctness.
+- **Observability**: basic monitoring/alerting for replay/previews.
+- **Guardrails**: locks, refusal rules, throttling, idempotency, backoff.
 
-### Safety-first
+### Out of scope (for now)
 
-- Automation must be **read-only by default** and require explicit enablement.
-- Any step that can break production browsing must be behind:
-  - a feature flag, and/or
-  - a dry-run mode, and/or
-  - a conservative allowlist (e.g., “only jobs newer than X”, “only these sources”).
+- Crawl scheduling / job creation automation (e.g., monthly crawls).
+- Any “automatic cleanup” that deletes WARCs or temp dirs without a retention policy.
+- CI/CD pipeline automation (PR checks, deployment pipelines) beyond documentation.
+- Anything that requires printing secrets or env files in logs or scripts.
+
+---
+
+## 2) Terminology (shared language)
+
+- **Job**: `ArchiveJob` row in the DB. An indexed job corresponds to captured WARCs + `Snapshot` rows.
+- **Edition**: a user-facing term for a job’s backup (one job → one edition).
+- **Collection**: pywb collection name. We use `job-<id>` for a job’s collection.
+- **Replay indexed**: pywb has a CDX index for `job-<id>` and can serve captures from that job’s WARCs.
+- **Preview**: a cached image (PNG/JPEG/WebP) used in the `/archive` source cards.
+- **Drift**: DB says job is indexed, but replay/preview state doesn’t match (missing index, missing WARCs, stale preview, etc.).
+
+---
+
+## 3) Current reality (constraints we must respect)
+
+### Replay depends on WARCs staying on disk
+
+Replay reads from job WARCs on disk. If WARCs are deleted, replay will break even if the DB still has snapshots.
+
+- Guardrail already exists: `ha-backend cleanup-job --mode temp` refuses unless `--force` when replay is enabled.
+- Operational posture: treat WARC retention as “critical state” until we design cold storage replay.
+
+### pywb deployment and permissions matter
+
+On the VPS (per `docs/deployment/replay-service-pywb.md`):
+
+- pywb runs in Docker as container `healtharchive-replay`
+- exposed locally at `127.0.0.1:8090`
+- WARCs are mounted read-only at `/warcs` (host `/srv/healtharchive/jobs`)
+- replay state is mounted read-write at `/webarchive` (host `/srv/healtharchive/replay`)
+- container runs without Linux capabilities (`--cap-drop=ALL`) → file permissions must be correct; “root in container” can’t bypass them.
+
+### Preview files are served by the backend API
+
+The backend supports cached preview images via:
+
+- `GET /api/sources/{source_code}/preview?jobId=<id>`
+
+Files are expected in:
+
+- `HEALTHARCHIVE_REPLAY_PREVIEW_DIR`
+- naming convention: `source-<code>-job-<jobId>.webp|.jpg|.jpeg|.png`
+
+The frontend expects `entryPreviewUrl` to be present in `GET /api/sources` once previews exist.
+
+---
+
+## 4) Non-negotiable design principles
+
+### Safety-first defaults
+
+- All automation must support **dry-run** mode.
+- All automation must support **allowlists**:
+  - allowlist by source code (`hc`, `cihr`, …)
+  - allowlist by job id range or “newest N”
+- All automation must refuse to run when required dependencies aren’t healthy (docker down, pywb missing, disk low, etc.).
 
 ### Idempotency
 
-Every automated job should be safe to run repeatedly:
+Every action must be safe to re-run:
 
-- Re-running “make replayable” should converge to the same state.
-- Re-running “generate preview” should overwrite atomically and not leave partial files.
-- Partial failure should be retryable without manual cleanup.
+- “Make replayable” can run repeatedly; it should converge to correct symlinks + index.
+- “Generate preview” can run repeatedly; it should be atomic and overwrite safely.
 
-### Decoupling from the crawl/index critical path
+### Isolation from user traffic
 
-The replayability pipeline can be expensive (CDX reindexing, preview rendering).
+Automation must never run on:
 
-We should avoid coupling it tightly to:
+- an API request path,
+- a frontend request path,
+- or any flow that could block interactive user browsing.
 
-- the worker’s indexing loop, and
-- any user-facing request path.
+It must run as a background process (manual trigger, timer, or separate worker queue).
 
-Prefer **post-processing** or **reconciliation** loops that can be paused without breaking the core API.
+### Observability
 
-### Observability and auditability
+Automation must produce:
 
-Automation should produce:
+- machine-readable status (“OK / needs work / blocked”) per job and per source,
+- actionable error messages (without secrets),
+- backoff to avoid repeated failures.
 
-- clear “what happened” logs (no secrets),
-- a way to see “which jobs are replayable / not replayable and why”,
-- metrics/health signals suitable for alerting.
+---
 
-## Automation candidate A: replay indexing (pywb collections + CDX)
+## 5) Automation candidate A — Replay indexing (pywb collections + CDX)
 
-### What needs to happen
+### 5.1 Desired end state
 
-For each indexed job `id`:
+For each job `id` where `ArchiveJob.status == indexed`:
 
-1. Ensure pywb collection `job-<id>` exists (`wb-manager init`).
-2. Ensure stable symlinks exist under:
-   - `/srv/healtharchive/replay/collections/job-<id>/archive/`
-   - pointing to container-visible WARC paths under `/warcs/...` (host `/srv/healtharchive/jobs/...`).
-3. Run `wb-manager reindex job-<id>` to build/update CDXJ.
+- A pywb collection exists: `/srv/healtharchive/replay/collections/job-<id>/...`
+- The collection contains symlinks in `archive/` pointing to `/warcs/...` WARC paths (container-visible).
+- `indexes/index.cdxj` exists and corresponds to the current WARC set.
+- A basic replay check succeeds for the job’s entry URL:
+  - timegate form: `https://replay.healtharchive.ca/job-<id>/<original_url>`
+  - (optional) CDX query returns at least one record for the entry URL.
 
-We already encapsulate this as:
+### 5.2 Where this automation should live (options)
 
-- `ha-backend replay-index-job --id <id>`
+**Option A1: Reconciler timer (recommended first)**
 
-### Where the automation should live (options)
+- A periodic process that looks at “desired jobs” vs “replay-ready jobs” and repairs drift.
 
-#### Option A1: “Reconciler” (recommended first)
+Why this is the best first automation:
 
-A periodic process (systemd timer) that reconciles desired vs actual state:
+- decoupled from crawl/indexing,
+- can be disabled instantly,
+- can backfill older jobs,
+- naturally repairs operator mistakes (deleted collections/indexes).
 
-- Desired set: all `ArchiveJob.status=indexed` (possibly filtered by source or age).
-- Actual state: pywb collection + CDX index exists and matches the job’s current WARC set.
+**Option A2: Worker hook (later, only if needed)**
 
-Pros:
+- After indexing completes, automatically trigger replay indexing.
 
-- Safest. You can pause/disable without impacting indexing.
-- Can backfill old jobs.
-- Naturally handles drift (someone deletes collection/index; replay breaks; reconciler fixes).
+Risk:
 
-Cons:
+- couples two heavy operations (index + replay indexing),
+- increases failure surface in the worker loop,
+- needs robust retry/backoff to avoid wedging jobs.
 
-- Can take time to “catch up” after a job finishes indexing (runs on a schedule).
+### 5.3 Required guardrails
 
-#### Option A2: Worker hook (not recommended as the first automation)
+**Concurrency**
 
-After `index_job(job_id)` completes successfully, enqueue a replay-index step.
+- Global lock: only one replay indexing operation at a time.
+- Per-job lock: prevent two reindex attempts for the same `job-<id>`.
 
-Pros:
+Implementation decision (when we code):
 
-- Fast availability: replay becomes usable immediately after indexing finishes.
+- Prefer `flock`-based lock files under `/srv/healtharchive/replay/.locks/`.
+  - simple, visible, and resilient across process crashes.
 
-Cons:
+**Eligibility rules (must be true to proceed)**
 
-- Raises complexity in the worker loop and failure semantics.
-- If replay indexing fails, you need a robust retry/backoff mechanism to avoid wedging the worker.
+- Job exists and is `status=indexed`.
+- WARC discovery finds >= 1 `.warc.gz` file.
+- pywb container is running (or is startable).
+- The process has:
+  - write access to `/srv/healtharchive/replay/collections/…`
+  - permission to run `docker exec` for `wb-manager`.
 
-#### Option A3: Manual-but-assisted (intermediate step)
+**Refusal rules (stop early, report why)**
 
-No automation, but improve operator flow:
+- Disk below a configured threshold (to prevent filling the VPS root disk).
+- WARCs are missing / unreadable (likely cleanup ran) → mark job “replay blocked: missing data”.
+- pywb container exists but is unhealthy (restarts / crashes repeatedly).
 
-- add a runbook checklist and one “replay all missing” command,
-- keep it explicitly human-triggered during early operations.
+**Resource control**
 
-### Guardrails required
+- Cap “jobs per run” (e.g., 1–2 per run initially).
+- Optionally run with `nice` and/or `ionice` if indexing impacts API latency.
 
-#### Concurrency locks
+**Failure handling**
 
-- Ensure only one replay-index runs at a time globally, or at least per job.
-- Avoid multiple processes attempting to reindex the same collection concurrently.
+- Classify failures into a small set:
+  - “blocked” (needs human action: missing WARCs, permissions)
+  - “retryable” (transient: docker restart, pywb busy)
+  - “internal” (bug: unexpected exception)
+- Exponential backoff for retryable failures (and a ceiling).
+- Suppress repeated identical errors from spamming journald.
 
-Implementation ideas (choose one when coding):
+### 5.4 State tracking (how we know what’s done)
 
-- lockfile (e.g., `/srv/healtharchive/replay/.locks/replay-index-job-<id>.lock`)
-- `flock` wrapper around the command
-- database-level “in-progress” marker row (more complex but centralized)
+We need to know:
 
-#### Job eligibility and refusal rules
+- which jobs are already replay indexed,
+- whether their replay index matches their current WARC list,
+- and when we last attempted/failed.
 
-- Only run on jobs with:
-  - `ArchiveJob.status == indexed`
-  - a non-null `output_dir`
-  - WARC discovery finds at least 1 WARC
-- Refuse when:
-  - replay service/container isn’t running,
-  - WARC files are missing/unreadable (likely cleanup ran),
-  - disk is critically low (avoid filling root and killing services).
+Two viable designs:
 
-#### Throttling and resource caps
+**A) Filesystem marker (minimal, first iteration)**
 
-CDX indexing for large jobs can be CPU/disk heavy. Automation must:
-
-- enforce `nice` / `ionice` if needed,
-- cap concurrency to 1,
-- optionally cap maximum jobs per run.
-
-#### Failure handling and retries
-
-- On failure, record an error state somewhere (see “state tracking”).
-- Use exponential backoff.
-- Avoid infinite loops (e.g., “fail 1000 times per hour”).
-- Don’t spam logs on persistent failures.
-
-### State tracking (how do we know what’s done?)
-
-We need an explicit definition of “replay indexed for job `<id>`” that is safe under drift.
-
-Minimum viable approach (filesystem-based):
-
-- Treat `.../collections/job-<id>/indexes/index.cdxj` existence as “indexed”.
-- Additionally write a small metadata marker (e.g., `replay-index.meta.json`) that includes:
-  - job id
-  - timestamp
-  - number of WARCs linked
-  - a hash of the WARC path list (so changes trigger reindex)
-
-More robust approach (DB-based):
-
-- Add DB fields (or a small table) to track:
-  - `replay_indexed_at`
-  - `replay_index_status` (`ok|error|in_progress`)
-  - `replay_index_error` (truncated message)
-  - `replay_index_warc_hash`
-
-We should prefer DB-based once we commit to automation, because it makes:
-
-- dashboards and API reporting easier,
-- reconciliation queries cheap and safe.
-
-### Edge cases to explicitly handle
-
-- **WARCs were deleted** after indexing (cleanup ran): DB still has snapshots but replay is broken.
-  - Automation should detect “WARCs missing” and mark job as “replay unavailable (data missing)”.
-- **Job reindexed / imported again**: the WARC set can change (new files, different paths).
-  - Automation should reindex if the warc-list hash changes.
-- **Permissions drift**: pywb runs without Linux capabilities; “root in container” can’t bypass perms.
-  - Automation must verify group readability before reindexing to avoid long failures.
-- **Disk full**: CDX indexes can be large (hundreds of MB).
-  - Automation should refuse when below a threshold.
-- **Container restarts mid-index**:
-  - Ensure retries don’t corrupt state; reindex should be repeatable.
-- **Very large jobs**:
-  - Consider splitting indexing schedule windows; consider alternative indexing strategies later.
-
-## Automation candidate B: cached source preview generation
-
-### What needs to happen
-
-For each source `code` and for each “current edition” job id:
-
-- Render `entryBrowseUrl` (a replay URL) in a headless browser and capture a screenshot.
-- Strip the replay banner from the screenshot (already supported by our preview script).
-- Save image as `source-<code>-job-<id>.png` or `.webp` (preferred long-term).
-- Write atomically:
-  - save to `...tmp` then `rename()` to final filename.
-
-### Where the automation should live (options)
-
-#### Option B1: On-demand operator command (recommended first)
-
-You run it when needed (e.g., after a new job is indexed + replay indexed).
+- After successful replay indexing, write a small JSON marker file into the collection:
+  - `collections/job-<id>/replay-index.meta.json`
+  - includes:
+    - `jobId`
+    - `indexedAt`
+    - `warcCount`
+    - `warcListHash` (hash of sorted WARC paths)
+    - `pywbVersion` (optional)
 
 Pros:
 
-- Zero background load.
-- Easy to stop if a page causes Playwright issues.
+- doesn’t require DB migrations,
+- works even if DB is temporarily unavailable (but replay indexing requires DB anyway).
 
 Cons:
 
-- Manual step.
+- harder to report status through APIs/admin dashboards,
+- harder to query across jobs.
 
-#### Option B2: Scheduled “preview refresh” timer
+**B) DB state (preferred once we implement automation seriously)**
 
-Run daily/weekly:
-
-- fetch `/api/sources` (local)
-- generate previews for any missing `source-*-job-*.{png,webp}` files
-- optionally refresh previews for newest jobs only
+- Add DB fields or a dedicated table to track replay indexing state.
 
 Pros:
 
-- Simple and decoupled.
+- easy observability (admin endpoints, metrics),
+- easier to reconcile at scale,
+- can store retry counts and next-attempt timestamps.
 
 Cons:
 
-- Playwright runs can be heavy.
+- requires migration and careful rollout.
 
-#### Option B3: Triggered after replay indexing completes
+### 5.5 Edge cases to explicitly handle
 
-Pros:
+- **WARCs deleted after indexing**: DB says “indexed”, replay 404s.
+  - Detect via WARC discovery read failures.
+  - Mark “blocked: missing WARCs”; do not retry aggressively.
+- **Permissions drift**: pywb cannot read WARCs due to chmod/chown changes.
+  - Detect by trying to `stat`/open a sample WARC (host) or via pywb reindex failure.
+  - Mark “blocked: permissions”; provide a runbook to fix.
+- **Job re-imported / WARC set changes**: new WARCs added or paths differ.
+  - Detect via `warcListHash` change; reindex.
+- **Disk pressure**: CDX can be large.
+  - Refuse below threshold; alert.
+- **pywb container restart during reindex**:
+  - Reindex is rerunnable; ensure partial index doesn’t block future runs.
 
-- Previews become available quickly.
+---
 
-Cons:
+## 6) Automation candidate B — Cached source preview generation
 
-- Couples two expensive operations; increases failure surface.
+### 6.1 Desired end state
 
-### Guardrails required
+For each source code shown on `/archive`:
 
-- **Timeouts**: replay pages can be slow; must time out and continue.
-- **Banner exclusion**:
-  - always load with `#ha_nobanner=1`, *and* remove banner element in-page as a fallback.
-- **Rate limiting**:
-  - avoid generating previews for many sources at once during peak hours.
-- **Safety**:
-  - do not follow third-party navigation (only the given replay URL).
-- **Output validation**:
-  - ensure output file size is “reasonable” (not 0 bytes).
+- For the “current edition” job id (latest by capture date):
+  - a preview file exists in `HEALTHARCHIVE_REPLAY_PREVIEW_DIR` named:
+    - `source-<code>-job-<jobId>.webp` (preferred), or
+    - a supported fallback format.
+- The backend returns `entryPreviewUrl` in `GET /api/sources`.
+- The frontend displays the image without embedding live iframes.
 
-### Edge cases
+### 6.2 Where this automation should live (options)
 
-- Pages that never settle due to long-running scripts.
-- Missing captures for the entry page (replay 404).
-- Heavy animations causing blurry screenshot (consider “wait settle” delay).
-- Different aspect ratios for different sites; pick a fixed viewport that works for most.
+**Option B1: On-demand operator command (recommended first)**
 
-## Automation candidate C: reconciliation loop (“keep reality correct”)
+- Run it manually after a job becomes replayable, or when you want to refresh thumbnails.
 
-This is the automation pattern that reduces operational burden without requiring perfect event triggers.
+Why:
 
-### Desired outcomes
+- preview generation is inherently flaky (dynamic pages, timeouts),
+- it’s easy to overwhelm the VPS if automated too aggressively.
 
-- Every `indexed` job *eventually* becomes replayable, or we have a clear “why not”.
-- Every “source card” *eventually* has a preview image, or we have a clear “why not”.
+**Option B2: Scheduled refresh timer (later)**
 
-### Reconciler checklist per run
+- Daily/weekly, only for “latest edition per source”.
 
-For each source:
+Guardrail:
 
-- Fetch editions (`/api/sources/{code}/editions`) and pick “latest edition” by `lastCapture`.
-- Ensure replay exists for that edition:
-  - ensure `entryBrowseUrl` works (optional lightweight HTTP check).
-- Ensure preview exists:
-  - check for `source-<code>-job-<id>.*` in preview dir.
+- cap number of previews per run,
+- run during off-peak hours.
 
-For each job:
+### 6.3 Guardrails required
 
-- If job is indexed but missing replay index marker, run `replay-index-job`.
-- If it repeatedly fails, stop retrying frequently and surface the error.
+- Always generate using a replay URL with `#ha_nobanner=1` so the screenshot matches the underlying site.
+- Strict timeouts + “continue on failure”.
+- Atomic writes:
+  - write to `*.tmp` then `rename()` to final name.
+- Validate output:
+  - file exists and size > minimum threshold.
+- Rate limiting:
+  - cap to N previews per run.
 
-### Guardrails
+### 6.4 Edge cases
 
-- Run at low frequency to start (e.g., hourly or daily).
-- Hard cap “jobs processed per run”.
-- “Never run two reconciliers simultaneously” lock.
+- replay entry URL 404s (job not replay indexed yet, or missing WARCs).
+- replay loads but page never settles (long-running scripts).
+- some pages are heavy and render inconsistently; use fixed viewport and a small settle delay.
 
-## Automation candidate D: monitoring + alerting
+---
 
-Replay introduces new failure modes that can be detected cheaply:
+## 7) Automation candidate C — Reconciliation loop (“converge to correctness”)
 
-- Replay origin down (pywb service stopped).
-- Replay origin not embeddable (headers misconfigured).
-- “BrowseUrl” generation breaks (backend env missing; code regression).
-- Replay returns 404 for a known entry page (WARCs missing or index missing).
+This is the safest automation pattern: a background process that continuously closes the gap between “desired” and “actual” state.
 
-Suggested monitors (external):
+### 7.1 Inputs and outputs
+
+**Inputs**
+
+- DB jobs and snapshots (`ArchiveJob`, `Snapshot`, `Source`)
+- filesystem state:
+  - pywb collections under `/srv/healtharchive/replay/collections`
+  - preview files under `HEALTHARCHIVE_REPLAY_PREVIEW_DIR`
+
+**Outputs**
+
+- replay indexing performed for some jobs (via CLI)
+- preview generation performed for some sources (optional, depending on enablement)
+- status reporting (logs + metrics)
+
+### 7.2 Reconciler modes (must exist when implemented)
+
+- `dry-run`: compute and print planned actions only.
+- `apply`: perform actions.
+
+### 7.3 Recommended initial algorithm (when we implement)
+
+1. Acquire a global lock (refuse if already running).
+2. Query for `ArchiveJob.status=indexed` ordered newest-first.
+3. For each job (up to a max-per-run):
+   - if job is not replay indexed (marker/state missing or warc hash changed):
+     - run replay indexing step
+4. For each source (optional, up to a max-per-run):
+   - determine latest edition job id (from `/api/sources/{code}/editions` or DB query)
+   - if preview missing for that job id:
+     - generate preview
+5. Emit a summary report.
+
+### 7.4 Guardrails
+
+- allowlist sources for early rollouts
+- max jobs per run
+- max previews per run
+- backoff on failures
+- refuse when disk low
+
+---
+
+## 8) Automation candidate D — Monitoring + alerting (replay-aware)
+
+Replay introduces new failure modes that standard API health checks won’t catch.
+
+### 8.1 Recommended monitors
+
+External (cheap, stable):
 
 - `GET https://api.healtharchive.ca/api/health` (already)
-- `GET https://replay.healtharchive.ca/` (should be 200)
-- `HEAD https://replay.healtharchive.ca/` (should be 200)
-- A single known replay entry URL:
+- `GET https://replay.healtharchive.ca/` (200)
+- `HEAD https://replay.healtharchive.ca/` (200)
+- One “known good” replay entry URL per major source (200):
   - `https://replay.healtharchive.ca/job-1/.../https://www.canada.ca/en/health-canada.html`
 
-Suggested internal (optional):
+Internal (optional):
 
-- Systemd timers that log a one-line “OK/FAIL” heartbeat.
+- systemd timer that checks:
+  - pywb container is running
+  - disk usage below a safe threshold
+  - replay CDX exists for newest job
 
-## Rollout strategy (how we implement safely)
+### 8.2 Alert playbook (what to do when it breaks)
 
-1. **Document-only** (this file): agree on semantics and guardrails.
-2. Implement a reconciler in **dry-run** mode:
-   - prints what it *would* do, never executes.
-3. Enable on **one source** (allowlist), low frequency.
-4. Add metrics/logging and error backoff.
-5. Expand allowlist gradually.
-6. Remember: “working once” is not stable. Run through failure scenarios intentionally.
+- Replay origin down:
+  - check `healtharchive-replay.service` status/logs
+  - check docker health
+- Replay 404 for a known entry URL:
+  - check that the job’s WARCs still exist
+  - check that `replay-index-job` was run and index exists
+- Preview missing:
+  - run preview generation manually for latest job
 
-## “Do not automate yet” warning: cleanup and retention
+---
 
-Cleanup is the most dangerous automation.
+## 9) Rollout strategy (methodical and safe)
 
-Before we automate any cleanup, we need a clear policy:
+1. Agree on this document.
+2. Implement reconciler in `dry-run` mode only.
+3. Run it manually and review output.
+4. Enable `apply` mode for a single allowlisted source.
+5. Add backoff and failure classification.
+6. Only after it’s stable:
+   - consider enabling for all sources,
+   - consider adding preview generation to the reconciler,
+   - (optionally) consider a worker hook if needed.
+
+---
+
+## 10) Do not automate cleanup until retention is designed
+
+Cleanup is the highest-risk automation.
+
+Before we automate any cleanup, we need a separate retention design:
 
 - Which jobs must remain replayable and for how long?
-- Where do “cold” WARCs go (NAS/object storage) and how do we replay them?
-- Can we move WARCs out of temp dirs so `cleanup-job` can safely delete temp state?
+- Where do “cold” WARCs live (NAS/object storage)?
+- How do we replay cold WARCs without copying huge data back to the VPS?
+- Can we move WARCs out of temp dirs so “cleanup temp state” is safe?
 
-Until that policy exists:
+Until then:
 
 - Keep cleanup manual and conservative.
-- Use the existing CLI guardrail (`cleanup-job` refuses unless `--force` when replay is enabled).
+- Rely on the existing CLI guardrail (`cleanup-job` refuses unless `--force` when replay is enabled).
 
-## Appendix: minimal operator playbooks (manual, safe)
+---
+
+## Appendix A — Manual operator playbook (current, safe)
 
 When a new job is indexed:
 
 1. Make it replayable:
-   - run `ha-backend replay-index-job --id <id>`
+   - `ha-backend replay-index-job --id <id>`
 2. (Optional) Generate preview:
-   - render `entryBrowseUrl` with the existing Playwright tooling
-   - save `source-<code>-job-<id>.png` in `HEALTHARCHIVE_REPLAY_PREVIEW_DIR`
-3. Verify in browser:
-   - `/snapshot/<id>`
-   - `/browse/<id>`
-   - `/archive` source cards
+   - produce `source-<code>-job-<id>.{webp,png,jpg}` in `HEALTHARCHIVE_REPLAY_PREVIEW_DIR`
+3. Verify:
+   - `/snapshot/<id>` and `/browse/<id>`
+   - `/archive` source cards show preview and deep browsing works
 
