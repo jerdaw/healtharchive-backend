@@ -236,6 +236,15 @@ archived URL for edition switching.
       return;
     }
 
+    // Allow the banner UI to be disabled for screenshot generation or debugging.
+    // We use a fragment flag (not a query param) because replay URLs already
+    // embed the original URL and its query string.
+    try {
+      if (/ha_nobanner/i.test(window.location.hash || "")) return;
+    } catch (e) {
+      // Ignore location access failures.
+    }
+
     var STORAGE_KEY = "haReplayBannerDismissed";
     try {
       if (localStorage.getItem(STORAGE_KEY) === "1") return;

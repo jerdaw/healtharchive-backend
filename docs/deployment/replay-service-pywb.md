@@ -296,6 +296,12 @@ sudo install -o hareplay -g healtharchive -m 0640 \
 sudo systemctl restart healtharchive-replay.service
 ```
 
+Note: the banner can be disabled for screenshot generation by adding a fragment:
+
+```
+...#ha_nobanner=1
+```
+
 ## 6) Create a collection and index a job’s WARCs (no copying)
 
 pywb’s `wb-manager` requires WARC files to exist *in* the collection’s `archive/`
@@ -426,3 +432,64 @@ Frontend verification (recommended):
   - snapshot pages embed replay correctly, and
   - `/browse/<snapshotId>` provides a full-screen browsing wrapper with a
     persistent HealthArchive banner above the replay iframe.
+
+## 9) Cached source preview images (optional, recommended)
+
+The frontend `/archive` page can show a lightweight “homepage preview” tile for
+each source’s latest replayable backup.
+
+To avoid rendering live iframes on every page load, these previews are served as
+cached static PNGs generated out-of-band.
+
+### 9.1 Configure preview directory (VPS)
+
+Choose a directory on the VPS:
+
+- Recommended: `/srv/healtharchive/replay/previews`
+
+Create it with the same ownership model as the replay volume:
+
+```bash
+sudo mkdir -p /srv/healtharchive/replay/previews
+sudo chown -R hareplay:healtharchive /srv/healtharchive/replay/previews
+sudo chmod 2770 /srv/healtharchive/replay/previews
+```
+
+In `/etc/healtharchive/backend.env`, set:
+
+```bash
+HEALTHARCHIVE_REPLAY_PREVIEW_DIR=/srv/healtharchive/replay/previews
+```
+
+Then restart the API:
+
+```bash
+sudo systemctl restart healtharchive-api
+```
+
+### 9.2 Generate previews (VPS)
+
+Generate (or refresh) previews for all sources with:
+
+```bash
+sudo systemd-run --wait --pipe \
+  --property=EnvironmentFile=/etc/healtharchive/backend.env \
+  /opt/healtharchive-backend/.venv/bin/ha-backend replay-generate-previews
+```
+
+This uses a Playwright container to screenshot each source’s `entryBrowseUrl`
+(with `#ha_nobanner=1` so the pywb banner is not captured).
+
+### 9.3 Verify previews are available
+
+1) Confirm `/api/sources` advertises `entryPreviewUrl` where available:
+
+```bash
+curl -s https://api.healtharchive.ca/api/sources | python3 -m json.tool | rg entryPreviewUrl
+```
+
+2) Confirm an individual preview serves as an image:
+
+```bash
+curl -I "https://api.healtharchive.ca/api/sources/hc/preview?jobId=1" | head
+```

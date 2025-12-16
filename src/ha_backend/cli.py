@@ -1,13 +1,21 @@
 from __future__ import annotations
 
 import argparse
+import re
 import subprocess  # nosec: B404 - controlled CLI invocation of external tool
 import sys
+from pathlib import Path
 from typing import Sequence
 
 from sqlalchemy import text
 
-from .config import get_archive_tool_config, get_database_config, get_replay_base_url
+from .config import (
+    REPO_ROOT,
+    get_archive_tool_config,
+    get_database_config,
+    get_replay_base_url,
+    get_replay_preview_dir,
+)
 from .db import get_engine, get_session
 from .indexing import index_job
 from .job_registry import create_job_for_source
@@ -1101,6 +1109,202 @@ def cmd_replay_index_job(args: argparse.Namespace) -> None:
     print("Replay indexing complete.")
 
 
+def cmd_replay_generate_previews(args: argparse.Namespace) -> None:
+    """
+    Generate cached replay preview images for source entry pages.
+
+    Previews are stored on disk under HEALTHARCHIVE_REPLAY_PREVIEW_DIR and
+    served by the public API at:
+
+      /api/sources/{source_code}/preview?jobId=<id>
+
+    This command uses a Playwright Docker image to render each source's
+    `entryBrowseUrl` and take a small PNG screenshot. The URL is loaded with
+    `#ha_nobanner=1` so the pywb banner is not captured.
+    """
+    from urllib.parse import urlsplit, urlunsplit
+
+    from .api.routes_public import list_sources
+
+    preview_dir = get_replay_preview_dir()
+    if preview_dir is None:
+        print(
+            "ERROR: HEALTHARCHIVE_REPLAY_PREVIEW_DIR is not set. "
+            "Configure a preview directory before generating previews.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    preview_dir = preview_dir.expanduser().resolve()
+
+    script_path = (REPO_ROOT / "scripts" / "generate_replay_preview.js").resolve()
+    if not script_path.is_file():
+        print(
+            f"ERROR: Missing preview generator script at {script_path}",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    if preview_dir.exists() and not preview_dir.is_dir():
+        print(
+            f"ERROR: Preview path {preview_dir} exists but is not a directory.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    if not preview_dir.exists():
+        if args.dry_run:
+            print(f"Would create preview directory: {preview_dir}")
+        else:
+            preview_dir.mkdir(parents=True, exist_ok=True)
+
+    requested_sources: list[str] = []
+    if args.source:
+        requested_sources = [code.strip().lower() for code in args.source if code.strip()]
+
+    with get_session() as session:
+        sources = list_sources(db=session)
+
+    if requested_sources:
+        wanted = set(requested_sources)
+        sources = [source for source in sources if source.sourceCode in wanted]
+        found = {source.sourceCode for source in sources}
+        missing = sorted(wanted - found)
+        if missing:
+            print(
+                "WARNING: Requested source code(s) not found (or excluded from public API): "
+                + ", ".join(missing),
+                file=sys.stderr,
+            )
+
+    if not sources:
+        print("No sources selected; nothing to generate.")
+        return
+
+    image = args.playwright_image
+    width = args.width
+    height = args.height
+    timeout_ms = args.timeout_ms
+    settle_ms = args.settle_ms
+
+    if width < 200 or height < 200:
+        print("ERROR: --width/--height must be >= 200.", file=sys.stderr)
+        sys.exit(1)
+
+    def should_use_host_network(url: str) -> bool:
+        if args.network == "host":
+            return True
+        if args.network == "bridge":
+            return False
+        parts = urlsplit(url)
+        host = (parts.hostname or "").lower()
+        return host in {"127.0.0.1", "localhost"}
+
+    failures: list[str] = []
+    generated = 0
+    skipped = 0
+
+    print("Replay preview generation")
+    print("------------------------")
+    print(f"Preview dir:      {preview_dir}")
+    print(f"Playwright image: {image}")
+    print(f"Viewport:         {width}x{height}")
+    print(f"Timeout:          {timeout_ms}ms")
+    print("")
+
+    for source in sources:
+        browse_url = source.entryBrowseUrl
+        if not browse_url:
+            skipped += 1
+            print(f"- {source.sourceCode}: skipping (no entryBrowseUrl)")
+            continue
+
+        match = re.search(r"/job-(\d+)(?:/|$)", browse_url)
+        if not match:
+            skipped += 1
+            print(
+                f"- {source.sourceCode}: skipping (could not parse job id from entryBrowseUrl)",
+                file=sys.stderr,
+            )
+            continue
+
+        job_id = int(match.group(1))
+        filename = f"source-{source.sourceCode}-job-{job_id}.png"
+        output_path = preview_dir / filename
+
+        if output_path.exists() and not args.overwrite:
+            skipped += 1
+            print(
+                f"- {source.sourceCode}: exists ({filename}); use --overwrite to regenerate"
+            )
+            continue
+
+        parts = urlsplit(browse_url)
+        screenshot_url = urlunsplit(
+            (parts.scheme, parts.netloc, parts.path, parts.query, "ha_nobanner=1")
+        )
+
+        docker_cmd = ["docker", "run", "--rm"]
+        if should_use_host_network(screenshot_url):
+            docker_cmd.extend(["--network", "host"])
+
+        docker_cmd.extend(
+            [
+                "-v",
+                f"{script_path}:/ha-scripts/generate_replay_preview.js:ro",
+                "-v",
+                f"{preview_dir}:/out:rw",
+                image,
+                "node",
+                "/ha-scripts/generate_replay_preview.js",
+                "--url",
+                screenshot_url,
+                "--out",
+                f"/out/{filename}",
+                "--width",
+                str(width),
+                "--height",
+                str(height),
+                "--timeout-ms",
+                str(timeout_ms),
+                "--settle-ms",
+                str(settle_ms),
+            ]
+        )
+
+        if args.dry_run:
+            generated += 1
+            print(f"- {source.sourceCode}: would generate {filename}")
+            continue
+
+        print(f"- {source.sourceCode}: generating {filename}...")
+        result = subprocess.run(  # nosec: B603 - operator-controlled docker invocation
+            docker_cmd,
+            text=True,
+            capture_output=True,
+        )
+        if result.returncode != 0:
+            failures.append(source.sourceCode)
+            print(
+                f"  ERROR: preview generation failed for {source.sourceCode} (exit {result.returncode})",
+                file=sys.stderr,
+            )
+            if result.stdout:
+                print(result.stdout)
+            if result.stderr:
+                print(result.stderr, file=sys.stderr)
+            continue
+
+        generated += 1
+
+    print("")
+    print(f"Generated: {generated}")
+    print(f"Skipped:   {skipped}")
+    if failures:
+        print(f"Failed:    {len(failures)} ({', '.join(failures)})", file=sys.stderr)
+        sys.exit(1)
+
+
 def cmd_register_job_dir(args: argparse.Namespace) -> None:
     """
     Attach an ArchiveJob row to an existing archive_tool output directory.
@@ -1561,6 +1765,65 @@ def build_parser() -> argparse.ArgumentParser:
         help="Print actions without changing the filesystem or running docker.",
     )
     p_replay_index.set_defaults(func=cmd_replay_index_job)
+
+    # replay-generate-previews
+    p_replay_previews = subparsers.add_parser(
+        "replay-generate-previews",
+        help="Generate cached replay preview images for source entry pages.",
+    )
+    p_replay_previews.add_argument(
+        "--source",
+        nargs="+",
+        help="Limit preview generation to one or more source codes (e.g. hc cihr).",
+    )
+    p_replay_previews.add_argument(
+        "--overwrite",
+        action="store_true",
+        default=False,
+        help="Regenerate previews even when the cached PNG already exists.",
+    )
+    p_replay_previews.add_argument(
+        "--playwright-image",
+        default="mcr.microsoft.com/playwright:v1.50.1-jammy",
+        help="Docker image used to render pages and capture screenshots.",
+    )
+    p_replay_previews.add_argument(
+        "--network",
+        choices=["auto", "host", "bridge"],
+        default="auto",
+        help="Docker network mode (auto uses host networking when replay base is localhost).",
+    )
+    p_replay_previews.add_argument(
+        "--width",
+        type=int,
+        default=1000,
+        help="Viewport width for the preview screenshot.",
+    )
+    p_replay_previews.add_argument(
+        "--height",
+        type=int,
+        default=540,
+        help="Viewport height for the preview screenshot.",
+    )
+    p_replay_previews.add_argument(
+        "--timeout-ms",
+        type=int,
+        default=45000,
+        help="Navigation timeout in milliseconds.",
+    )
+    p_replay_previews.add_argument(
+        "--settle-ms",
+        type=int,
+        default=1200,
+        help="Additional delay after load (milliseconds) before taking a screenshot.",
+    )
+    p_replay_previews.add_argument(
+        "--dry-run",
+        action="store_true",
+        default=False,
+        help="Print actions without creating files or running docker.",
+    )
+    p_replay_previews.set_defaults(func=cmd_replay_generate_previews)
 
     # start-worker
     p_worker = subparsers.add_parser(
