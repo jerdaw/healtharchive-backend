@@ -7,7 +7,7 @@ from fastapi.testclient import TestClient
 
 from ha_backend import db as db_module
 from ha_backend.db import Base, get_engine, get_session
-from ha_backend.models import Snapshot, Source
+from ha_backend.models import ArchiveJob, Snapshot, Source
 
 
 def _init_test_app(tmp_path: Path, monkeypatch):
@@ -127,6 +127,97 @@ def test_sources_endpoint_with_data(tmp_path, monkeypatch) -> None:
     codes = {s["sourceCode"] for s in sources}
     assert "hc" in codes
     assert "phac" in codes
+
+    hc_payload = next(s for s in sources if s["sourceCode"] == "hc")
+    assert hc_payload["baseUrl"] == "https://www.canada.ca/en/health-canada.html"
+    assert hc_payload["description"] == "Health Canada"
+    assert hc_payload["entryRecordId"] == hc_payload["latestRecordId"]
+
+    phac_payload = next(s for s in sources if s["sourceCode"] == "phac")
+    assert phac_payload["baseUrl"] == "https://www.canada.ca/en/public-health.html"
+    assert phac_payload["description"] == "PHAC"
+    assert phac_payload["entryRecordId"] == phac_payload["latestRecordId"]
+
+
+def test_sources_entry_record_prefers_base_url_over_latest_snapshot(
+    tmp_path, monkeypatch
+) -> None:
+    monkeypatch.setenv(
+        "HEALTHARCHIVE_REPLAY_BASE_URL", "https://replay.healtharchive.ca/"
+    )
+    client = _init_test_app(tmp_path, monkeypatch)
+
+    with get_session() as session:
+        hc = Source(
+            code="hc",
+            name="Health Canada",
+            base_url="https://www.canada.ca/en/health-canada.html",
+            description="Health Canada",
+            enabled=True,
+        )
+        session.add(hc)
+        session.flush()
+
+        job = ArchiveJob(
+            source_id=hc.id,
+            name="job-1",
+            output_dir="/srv/healtharchive/jobs/imports/job-1",
+            status="indexed",
+        )
+        session.add(job)
+        session.flush()
+
+        entry_ts = datetime(2025, 4, 1, 12, 0, tzinfo=timezone.utc)
+        latest_ts = datetime(2025, 4, 1, 12, 5, tzinfo=timezone.utc)
+
+        entry_snapshot = Snapshot(
+            job_id=job.id,
+            source_id=hc.id,
+            url="https://www.canada.ca/en/health-canada.html",
+            normalized_url_group="https://www.canada.ca/en/health-canada.html",
+            capture_timestamp=entry_ts,
+            mime_type="text/html",
+            status_code=200,
+            title="Health Canada",
+            snippet="HC home",
+            language="en",
+            warc_path="/warcs/hc-home.warc.gz",
+            warc_record_id="hc-home",
+        )
+
+        latest_snapshot = Snapshot(
+            job_id=job.id,
+            source_id=hc.id,
+            url="https://canada.demdex.net/dest5.html?d_nsid=0",
+            normalized_url_group="https://canada.demdex.net/dest5.html",
+            capture_timestamp=latest_ts,
+            mime_type="text/html",
+            status_code=200,
+            title="Adobe DTM destination",
+            snippet="Analytics placeholder page",
+            language="en",
+            warc_path="/warcs/hc-analytics.warc.gz",
+            warc_record_id="hc-analytics",
+        )
+
+        session.add_all([entry_snapshot, latest_snapshot])
+        session.flush()
+
+        entry_id = entry_snapshot.id
+        latest_id = latest_snapshot.id
+        job_id = job.id
+
+    resp = client.get("/api/sources")
+    assert resp.status_code == 200
+    sources = resp.json()
+    hc_payload = next(s for s in sources if s["sourceCode"] == "hc")
+
+    assert hc_payload["latestRecordId"] == latest_id
+    assert hc_payload["entryRecordId"] == entry_id
+    assert (
+        hc_payload["entryBrowseUrl"]
+        == f"https://replay.healtharchive.ca/job-{job_id}/https://www.canada.ca/en/health-canada.html"
+    )
 
 
 def test_sources_endpoint_excludes_test_source(tmp_path, monkeypatch) -> None:

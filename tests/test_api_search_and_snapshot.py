@@ -713,9 +713,13 @@ def test_sources_endpoint_shape(tmp_path, monkeypatch) -> None:
     assert data
     for source in data:
         assert source["sourceCode"] in {"hc", "phac"}
+        assert isinstance(source.get("baseUrl"), (str, type(None)))
+        assert isinstance(source.get("description"), (str, type(None)))
         assert isinstance(source["recordCount"], int)
         assert isinstance(source["firstCapture"], str)
         assert isinstance(source["lastCapture"], str)
+        assert isinstance(source.get("entryRecordId"), (int, type(None)))
+        assert isinstance(source.get("entryBrowseUrl"), (str, type(None)))
 
 
 def test_snapshot_detail_not_found(tmp_path, monkeypatch) -> None:
