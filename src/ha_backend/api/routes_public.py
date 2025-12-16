@@ -33,6 +33,7 @@ from .schemas import (
     SearchResponseSchema,
     SnapshotDetailSchema,
     SnapshotSummarySchema,
+    SourceEditionSchema,
     SourceSummarySchema,
 )
 
@@ -1095,6 +1096,77 @@ def list_sources(db: Session = Depends(get_db)) -> List[SourceSummarySchema]:
         )
 
     return summaries
+
+
+@router.get(
+    "/sources/{source_code}/editions", response_model=List[SourceEditionSchema]
+)
+def list_source_editions(
+    source_code: str, db: Session = Depends(get_db)
+) -> List[SourceEditionSchema]:
+    """
+    Return replayable "editions" (ArchiveJobs) for a source.
+
+    Each indexed ArchiveJob becomes a discrete edition in the replay service
+    (`job-<id>` collection). The frontend uses this to power edition switching.
+    """
+    normalized_code = source_code.strip().lower()
+    if not normalized_code or normalized_code in _PUBLIC_EXCLUDED_SOURCE_CODES:
+        raise HTTPException(status_code=404, detail="Source not found")
+
+    source = db.query(Source).filter(Source.code == normalized_code).first()
+    if not source:
+        raise HTTPException(status_code=404, detail="Source not found")
+
+    job_agg = (
+        db.query(
+            Snapshot.job_id.label("job_id"),
+            func.count(Snapshot.id).label("record_count"),
+            func.min(Snapshot.capture_timestamp).label("first_capture"),
+            func.max(Snapshot.capture_timestamp).label("last_capture"),
+        )
+        .filter(Snapshot.source_id == source.id)
+        .filter(Snapshot.job_id.isnot(None))
+        .group_by(Snapshot.job_id)
+        .subquery()
+    )
+
+    rows = (
+        db.query(
+            ArchiveJob.id,
+            ArchiveJob.name,
+            job_agg.c.record_count,
+            job_agg.c.first_capture,
+            job_agg.c.last_capture,
+        )
+        .join(job_agg, job_agg.c.job_id == ArchiveJob.id)
+        .filter(ArchiveJob.source_id == source.id)
+        .filter(ArchiveJob.status == "indexed")
+        .order_by(job_agg.c.last_capture.desc(), ArchiveJob.id.desc())
+        .all()
+    )
+
+    editions: List[SourceEditionSchema] = []
+    for job_id, job_name, record_count, first_capture, last_capture in rows:
+        editions.append(
+            SourceEditionSchema(
+                jobId=job_id,
+                jobName=job_name,
+                recordCount=int(record_count or 0),
+                firstCapture=(
+                    first_capture.date().isoformat()
+                    if isinstance(first_capture, datetime)
+                    else str(first_capture)
+                ),
+                lastCapture=(
+                    last_capture.date().isoformat()
+                    if isinstance(last_capture, datetime)
+                    else str(last_capture)
+                ),
+            )
+        )
+
+    return editions
 
 
 @router.get("/search", response_model=SearchResponseSchema)

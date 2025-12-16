@@ -18,6 +18,14 @@ class SourceSummarySchema(BaseModel):
     entryBrowseUrl: Optional[str] = None
 
 
+class SourceEditionSchema(BaseModel):
+    jobId: int
+    jobName: str
+    recordCount: int
+    firstCapture: str
+    lastCapture: str
+
+
 class SnapshotSummarySchema(BaseModel):
     id: int
     title: Optional[str]
@@ -67,6 +75,7 @@ class ArchiveStatsSchema(BaseModel):
 
 __all__ = [
     "SourceSummarySchema",
+    "SourceEditionSchema",
     "SnapshotSummarySchema",
     "SearchResponseSchema",
     "SnapshotDetailSchema",

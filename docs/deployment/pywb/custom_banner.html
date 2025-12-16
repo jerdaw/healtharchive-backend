@@ -6,6 +6,10 @@ Deploy by copying this file to:
 
 Then restart the replay service:
   sudo systemctl restart healtharchive-replay.service
+
+Note: This template also sends lightweight postMessage events when replay is
+embedded inside HealthArchive (iframe) so the frontend can track the current
+archived URL for edition switching.
 -->
 
 <style id="ha-replay-banner-css">
@@ -162,10 +166,71 @@ Then restart the replay service:
 
 <script id="ha-replay-banner-js">
   (function () {
+    var MESSAGE_TYPE = "haReplayNavigation";
+
+    function isEmbedded() {
+      try {
+        return window !== window.top;
+      } catch (e) {
+        // If we can't access window.top, assume we're embedded.
+        return true;
+      }
+    }
+
+    function sendReplayNavigation() {
+      if (!isEmbedded()) return;
+
+      var wb = window.wbinfo || {};
+      var payload = {
+        type: MESSAGE_TYPE,
+        coll: wb.coll || null,
+        timestamp: wb.timestamp || null,
+        url: wb.url || null,
+        topUrl: wb.top_url || null,
+      };
+
+      var key = String(payload.coll) + "|" + String(payload.timestamp) + "|" + String(payload.url);
+      if (sendReplayNavigation._lastKey === key) return;
+      sendReplayNavigation._lastKey = key;
+
+      try {
+        window.parent.postMessage(payload, "*");
+      } catch (e) {
+        // Ignore cross-origin messaging failures.
+      }
+    }
+
+    if (isEmbedded()) {
+      sendReplayNavigation();
+
+      window.addEventListener("pageshow", sendReplayNavigation);
+      window.addEventListener("hashchange", sendReplayNavigation);
+      window.addEventListener("popstate", sendReplayNavigation);
+
+      try {
+        var origPushState = history.pushState;
+        var origReplaceState = history.replaceState;
+
+        history.pushState = function () {
+          var result = origPushState.apply(this, arguments);
+          setTimeout(sendReplayNavigation, 0);
+          return result;
+        };
+
+        history.replaceState = function () {
+          var result = origReplaceState.apply(this, arguments);
+          setTimeout(sendReplayNavigation, 0);
+          return result;
+        };
+      } catch (e) {
+        // Ignore history patching failures.
+      }
+    }
+
     // Only show the banner when replay is opened directly, not when embedded
     // inside the HealthArchive wrapper iframe.
     try {
-      if (window !== window.top) return;
+      if (isEmbedded()) return;
     } catch (e) {
       // If we can't access window.top, assume we're embedded and skip.
       return;
@@ -250,4 +315,3 @@ Then restart the replay service:
     }
   })();
 </script>
-
