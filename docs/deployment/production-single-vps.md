@@ -117,6 +117,12 @@ HEALTHARCHIVE_ADMIN_TOKEN=<LONG_RANDOM_TOKEN>
 HEALTHARCHIVE_CORS_ORIGINS=https://healtharchive.ca,https://www.healtharchive.ca,https://healtharchive.vercel.app
 HEALTHARCHIVE_LOG_LEVEL=INFO
 HA_SEARCH_RANKING_VERSION=v2
+
+# Optional: replay integration (pywb). Enables `browseUrl` fields in the public API.
+# HEALTHARCHIVE_REPLAY_BASE_URL=https://replay.healtharchive.ca
+
+# Optional: cached replay preview images (homepage thumbnails for /archive cards).
+# HEALTHARCHIVE_REPLAY_PREVIEW_DIR=/srv/healtharchive/replay/previews
 EOF
 sudo chown root:healtharchive /etc/healtharchive/backend.env
 sudo chmod 640 /etc/healtharchive/backend.env
@@ -191,6 +197,13 @@ Operational warning:
   you intend to keep replayable.
   If replay is enabled globally (`HEALTHARCHIVE_REPLAY_BASE_URL` is set),
   `cleanup-job --mode temp` will refuse unless you pass `--force`.
+
+Optional UX improvement:
+
+- If `HEALTHARCHIVE_REPLAY_PREVIEW_DIR` is configured, the API can serve cached
+  PNG “homepage previews” used by the frontend on `/archive`.
+  See `deployment/replay-service-pywb.md` (“Cached source preview images”) for
+  the generation command.
 
 ---
 
