@@ -1787,12 +1787,15 @@ def get_snapshot_raw(
   #ha-replay-banner .ha-replay-disclaimer {{
     color: rgba(15, 23, 42, 0.55);
     overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
     max-width: 100%;
+    white-space: normal;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
   }}
 
-  #ha-replay-banner a {{
+  #ha-replay-banner a,
+  #ha-replay-banner button {{
     appearance: none;
     border: 1px solid transparent;
     background: transparent;
@@ -1810,7 +1813,8 @@ def get_snapshot_raw(
     justify-content: center;
   }}
 
-  #ha-replay-banner a:hover {{
+  #ha-replay-banner a:hover,
+  #ha-replay-banner button:hover {{
     color: rgba(15, 23, 42, 0.95);
     transform: translateY(-1px);
     background: rgba(148, 163, 184, 0.16);
@@ -1848,9 +1852,29 @@ def get_snapshot_raw(
       <a class="ha-replay-link" href="{snapshot_details_url}" rel="noreferrer">Snapshot details</a>
       {("<a class=\"ha-replay-link\" href=\"" + replay_url + "\" rel=\"noreferrer\">Replay</a>") if replay_url else ""}
       <a class="ha-replay-link" href="{snapshot_json_url}" rel="noreferrer">Metadata JSON</a>
+      <button type="button" class="ha-replay-link" id="ha-replay-hide" aria-label="Hide this banner">Hide</button>
     </div>
   </div>
 </div>
+<script>
+  (function () {{
+    try {{
+      var STORAGE_KEY = "haReplayBannerDismissed";
+      if (localStorage.getItem(STORAGE_KEY) === "1") {{
+        var el = document.getElementById("ha-replay-banner");
+        if (el && el.parentNode) el.parentNode.removeChild(el);
+        return;
+      }}
+      var hideBtn = document.getElementById("ha-replay-hide");
+      if (!hideBtn) return;
+      hideBtn.addEventListener("click", function () {{
+        try {{ localStorage.setItem(STORAGE_KEY, "1"); }} catch (e) {{}}
+        var el = document.getElementById("ha-replay-banner");
+        if (el && el.parentNode) el.parentNode.removeChild(el);
+      }});
+    }} catch (e) {{}}
+  }})();
+</script>
 """
 
     # Try to inject after the first <body ...> tag to avoid breaking <head> content.
