@@ -10,6 +10,12 @@ Then restart the replay service:
 Note: This template also sends lightweight postMessage events when replay is
 embedded inside HealthArchive (iframe) so the frontend can track the current
 archived URL for edition switching.
+
+Implementation note:
+- pywb rewrites absolute `href="https://..."` links inside replayed pages.
+  To keep "Back to HealthArchive" and related links working (including
+  right-click / middle-click open-in-new-tab), this banner generates a `blob:`
+  URL that immediately redirects the browser to the real HealthArchive URL.
 -->
 
 <style id="ha-replay-banner-css">
