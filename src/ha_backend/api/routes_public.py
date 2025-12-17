@@ -4,6 +4,7 @@ import time
 from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
+import re
 from typing import Any, Dict, List, Optional
 from urllib.parse import urlsplit, urlunsplit
 
@@ -1656,7 +1657,9 @@ def get_snapshot_raw(
         .options(
             load_only(
                 Snapshot.id,
+                Snapshot.job_id,
                 Snapshot.url,
+                Snapshot.capture_timestamp,
                 Snapshot.warc_path,
                 Snapshot.warc_record_id,
             )
@@ -1693,6 +1696,150 @@ def get_snapshot_raw(
             status_code=500,
             detail="Failed to decode archived HTML content",
         )
+
+    replay_url = _build_browse_url(snap.job_id, snap.url, snap.capture_timestamp, snap.id)
+    snapshot_details_url = f"https://www.healtharchive.ca/snapshot/{snap.id}"
+    snapshot_json_url = f"https://api.healtharchive.ca/api/snapshot/{snap.id}"
+
+    banner = f"""
+<style id="ha-raw-banner-css">
+  #ha-raw-banner {{
+    position: sticky;
+    top: 0;
+    z-index: 2147483647;
+    border-bottom: 1px solid rgba(148, 163, 184, 0.35);
+    background-color: rgba(255, 255, 255, 0.9);
+    background-color: color-mix(in srgb, rgba(255, 255, 255, 0.9) 82%, transparent);
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
+    font-size: 0.85rem;
+    line-height: 1.2;
+    -webkit-font-smoothing: antialiased;
+    backdrop-filter: blur(10px) saturate(1.1);
+    box-shadow: 0 8px 16px rgba(15, 23, 42, 0.04);
+  }}
+
+  #ha-raw-banner::after {{
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: -23px;
+    height: 27px;
+    pointer-events: none;
+    background: linear-gradient(
+      to bottom,
+      rgba(15, 23, 42, 0.02) 0%,
+      rgba(15, 23, 42, 0) 100%
+    );
+  }}
+
+  #ha-raw-banner * {{
+    box-sizing: border-box;
+  }}
+
+  #ha-raw-banner .ha-raw-inner {{
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.6rem 1.25rem;
+  }}
+
+  #ha-raw-banner .ha-raw-left,
+  #ha-raw-banner .ha-raw-right {{
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    flex-shrink: 0;
+  }}
+
+  #ha-raw-banner .ha-raw-pill {{
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.18rem 0.6rem;
+    border-radius: 999px;
+    background: rgba(37, 99, 235, 0.1);
+    border: 1px solid rgba(37, 99, 235, 0.25);
+    color: #2563eb;
+    font-weight: 650;
+    white-space: nowrap;
+  }}
+
+  #ha-raw-banner .ha-raw-center {{
+    flex: 1;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: rgba(15, 23, 42, 0.62);
+  }}
+
+  #ha-raw-banner a {{
+    appearance: none;
+    border: 1px solid transparent;
+    background: transparent;
+    color: rgba(15, 23, 42, 0.72);
+    border-radius: 999px;
+    padding: 0.3rem 0.85rem;
+    font: inherit;
+    font-weight: 550;
+    cursor: pointer;
+    line-height: 1;
+    text-decoration: none;
+    transition: background 120ms ease, transform 120ms ease;
+  }}
+
+  #ha-raw-banner a:hover {{
+    color: rgba(15, 23, 42, 0.95);
+    transform: translateY(-1px);
+    background: rgba(148, 163, 184, 0.16);
+    text-decoration: none;
+  }}
+
+  #ha-raw-banner .ha-raw-primary {{
+    background-color: #2563eb;
+    color: #ffffff;
+    box-shadow: 0 10px 24px rgba(37, 99, 235, 0.35);
+  }}
+
+  #ha-raw-banner .ha-raw-primary:hover {{
+    background-color: #1d4ed8;
+    color: #ffffff;
+  }}
+
+  @media (max-width: 780px) {{
+    #ha-raw-banner .ha-raw-center {{
+      display: none;
+    }}
+  }}
+</style>
+<div id="ha-raw-banner" role="region" aria-label="HealthArchive raw snapshot notice">
+  <div class="ha-raw-inner">
+    <div class="ha-raw-left">
+      <a class="ha-raw-primary" href="https://www.healtharchive.ca/archive" rel="noreferrer">\u2190 HealthArchive.ca</a>
+      <span class="ha-raw-pill">Raw HTML</span>
+    </div>
+    <div class="ha-raw-center">Debug view \u00b7 Archived HTML as stored (may be incomplete/outdated)</div>
+    <div class="ha-raw-right">
+      <a href="{snapshot_details_url}" rel="noreferrer">Snapshot details</a>
+      {"<a href=\"" + replay_url + "\" rel=\"noreferrer\">Replay</a>" if replay_url else ""}
+      <a href="{snapshot_json_url}" rel="noreferrer">Metadata JSON</a>
+    </div>
+  </div>
+</div>
+"""
+
+    # Try to inject after the first <body ...> tag to avoid breaking <head> content.
+    try:
+        match = re.search(r"<body\\b[^>]*>", html, flags=re.IGNORECASE)
+        if match:
+            insert_at = match.end()
+            html = html[:insert_at] + banner + html[insert_at:]
+        else:
+            html = banner + html
+    except Exception:
+        html = banner + html
 
     return HTMLResponse(content=html, media_type="text/html")
 
