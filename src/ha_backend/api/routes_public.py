@@ -65,7 +65,10 @@ def _format_capture_timestamp(value: Any) -> Optional[str]:
 
 
 def _build_browse_url(
-    job_id: Optional[int], original_url: str, capture_timestamp: Any = None
+    job_id: Optional[int],
+    original_url: str,
+    capture_timestamp: Any = None,
+    snapshot_id: Optional[int] = None,
 ) -> Optional[str]:
     base = get_replay_base_url()
     if not base or not job_id:
@@ -89,10 +92,11 @@ def _build_browse_url(
     # part of the *outer* URL's query). pywb accepts the timegate form without
     # a trailing slash, eg:
     #   /job-1/https://example.com/path?x=y
+    suffix = f"#ha_snapshot={snapshot_id}" if snapshot_id else ""
     if ts_value:
-        return f"{base}/job-{job_id}/{ts_value}/{normalized}"
+        return f"{base}/job-{job_id}/{ts_value}/{normalized}{suffix}"
 
-    return f"{base}/job-{job_id}/{normalized}"
+    return f"{base}/job-{job_id}/{normalized}{suffix}"
 
 
 def _normalize_url_group(value: str) -> Optional[str]:
@@ -956,7 +960,7 @@ def _search_snapshots_inner(
                 snippet=snap.snippet,
                 rawSnapshotUrl=f"/api/snapshots/raw/{snap.id}",
                 browseUrl=_build_browse_url(
-                    snap.job_id, original_url, snap.capture_timestamp
+                    snap.job_id, original_url, snap.capture_timestamp, snap.id
                 ),
             )
         )
@@ -1163,7 +1167,7 @@ def list_sources(db: Session = Depends(get_db)) -> List[SourceSummarySchema]:
                 entry_record_id = entry_snapshot[0]
                 entry_job_id = entry_snapshot[1]
                 entry_browse_url = _build_browse_url(
-                    entry_job_id, entry_snapshot[2], entry_snapshot[3]
+                    entry_job_id, entry_snapshot[2], entry_snapshot[3], entry_record_id
                 )
 
         # If the exact baseUrl wasn't captured, fall back to a "reasonable"
@@ -1211,7 +1215,7 @@ def list_sources(db: Session = Depends(get_db)) -> List[SourceSummarySchema]:
                 if best is not None:
                     entry_record_id, entry_job_id, entry_url, entry_ts = best
                     entry_browse_url = _build_browse_url(
-                        entry_job_id, entry_url, entry_ts
+                        entry_job_id, entry_url, entry_ts, entry_record_id
                     )
 
         preview_dir = get_replay_preview_dir()
@@ -1304,6 +1308,7 @@ def list_source_editions(
         if replay_enabled and job_id:
             entry_url: Optional[str] = None
             entry_ts: Any = None
+            entry_snapshot_id: Optional[int] = None
 
             if entry_groups:
                 entry_status_quality = case(
@@ -1319,7 +1324,7 @@ def list_source_editions(
                     else_=-1,
                 )
                 entry_snapshot = (
-                    db.query(Snapshot.url, Snapshot.capture_timestamp)
+                    db.query(Snapshot.id, Snapshot.url, Snapshot.capture_timestamp)
                     .filter(Snapshot.source_id == source.id)
                     .filter(Snapshot.job_id == job_id)
                     .filter(Snapshot.normalized_url_group.in_(entry_groups))
@@ -1331,7 +1336,7 @@ def list_source_editions(
                     .first()
                 )
                 if entry_snapshot:
-                    entry_url, entry_ts = entry_snapshot
+                    entry_snapshot_id, entry_url, entry_ts = entry_snapshot
 
             if entry_url is None and host_variants:
                 host_filters = []
@@ -1369,13 +1374,15 @@ def list_source_editions(
                         )
                         if best_key is None or key > best_key:
                             best_key = key
-                            best = (cand_url, cand_ts)
+                            best = (cand_id, cand_url, cand_ts)
 
                     if best is not None:
-                        entry_url, entry_ts = best
+                        entry_snapshot_id, entry_url, entry_ts = best
 
             if entry_url is not None:
-                entry_browse_url = _build_browse_url(job_id, entry_url, entry_ts)
+                entry_browse_url = _build_browse_url(
+                    job_id, entry_url, entry_ts, entry_snapshot_id
+                )
 
         editions.append(
             SourceEditionSchema(
@@ -1525,7 +1532,7 @@ def resolve_replay_url(
         snapshotId=snap_id,
         captureTimestamp=_format_capture_timestamp(capture_ts),
         resolvedUrl=resolved_url,
-        browseUrl=_build_browse_url(jobId, resolved_url, capture_ts),
+        browseUrl=_build_browse_url(jobId, resolved_url, capture_ts, snap_id),
     )
 
 
@@ -1630,7 +1637,7 @@ def get_snapshot_detail(
         originalUrl=snap.url,
         snippet=snap.snippet,
         rawSnapshotUrl=f"/api/snapshots/raw/{snap.id}",
-        browseUrl=_build_browse_url(snap.job_id, snap.url, snap.capture_timestamp),
+        browseUrl=_build_browse_url(snap.job_id, snap.url, snap.capture_timestamp, snap.id),
         mimeType=snap.mime_type,
         statusCode=snap.status_code,
     )
