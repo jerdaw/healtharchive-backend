@@ -1122,6 +1122,7 @@ def cmd_replay_generate_previews(args: argparse.Namespace) -> None:
     `entryBrowseUrl` and take a small screenshot (JPEG by default). The URL is
     loaded with `#ha_nobanner=1` so the pywb banner is not captured.
     """
+    import shlex
     from urllib.parse import urlsplit, urlunsplit
 
     from .api.routes_public import list_sources
@@ -1189,6 +1190,28 @@ def cmd_replay_generate_previews(args: argparse.Namespace) -> None:
     output_format = args.format
     jpeg_quality = args.jpeg_quality
 
+    def parse_playwright_npm_version(image_name: str) -> str:
+        """
+        Best-effort extraction of the Playwright npm version from the Docker image tag.
+
+        Example: mcr.microsoft.com/playwright:v1.50.1-jammy -> 1.50.1
+        """
+        match = re.search(r":v(\d+\.\d+\.\d+)(?:-|$)", image_name)
+        if match:
+            return match.group(1)
+        return "1.50.1"
+
+    playwright_npm_version = parse_playwright_npm_version(image)
+
+    # Cache Playwright's node module install across runs so we don't re-download
+    # it for every screenshot container invocation.
+    node_cache_dir = (preview_dir.parent / ".preview-node").resolve()
+    if not node_cache_dir.exists():
+        if args.dry_run:
+            print(f"Would create node cache directory: {node_cache_dir}")
+        else:
+            node_cache_dir.mkdir(parents=True, exist_ok=True)
+
     if width < 200 or height < 200:
         print("ERROR: --width/--height must be >= 200.", file=sys.stderr)
         sys.exit(1)
@@ -1224,6 +1247,7 @@ def cmd_replay_generate_previews(args: argparse.Namespace) -> None:
     print(f"Viewport:         {width}x{height}")
     print(f"Timeout:          {timeout_ms}ms")
     print(f"Format:           {format_normalized}")
+    print(f"Playwright npm:   {playwright_npm_version} (cached under {node_cache_dir.name}/)")
     print("")
 
     supported_exts = (".webp", ".jpg", ".jpeg", ".png")
@@ -1273,31 +1297,54 @@ def cmd_replay_generate_previews(args: argparse.Namespace) -> None:
         if should_use_host_network(screenshot_url):
             docker_cmd.extend(["--network", "host"])
 
+        node_args = [
+            "node",
+            "/ha-scripts/generate_replay_preview.js",
+            "--url",
+            screenshot_url,
+            "--out",
+            f"/out/{filename}",
+            "--format",
+            format_normalized,
+            "--quality",
+            str(jpeg_quality),
+            "--width",
+            str(width),
+            "--height",
+            str(height),
+            "--timeout-ms",
+            str(timeout_ms),
+            "--settle-ms",
+            str(settle_ms),
+        ]
+
+        node_cmd = " ".join(shlex.quote(part) for part in node_args)
+        install_cmd = (
+            "set -euo pipefail; "
+            f"if [ ! -d node_modules/playwright ]; then "
+            "npm init -y >/dev/null 2>&1; "
+            'npm install --silent --no-progress --no-audit --no-fund '
+            f"playwright@{shlex.quote(playwright_npm_version)}; "
+            "fi; "
+            f"{node_cmd}"
+        )
+
         docker_cmd.extend(
             [
+                "-e",
+                "PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1",
                 "-v",
                 f"{script_path}:/ha-scripts/generate_replay_preview.js:ro",
                 "-v",
                 f"{preview_dir}:/out:rw",
+                "-v",
+                f"{node_cache_dir}:/ha-node:rw",
+                "-w",
+                "/ha-node",
                 image,
-                "node",
-                "/ha-scripts/generate_replay_preview.js",
-                "--url",
-                screenshot_url,
-                "--out",
-                f"/out/{filename}",
-                "--format",
-                format_normalized,
-                "--quality",
-                str(jpeg_quality),
-                "--width",
-                str(width),
-                "--height",
-                str(height),
-                "--timeout-ms",
-                str(timeout_ms),
-                "--settle-ms",
-                str(settle_ms),
+                "bash",
+                "-lc",
+                install_cmd,
             ]
         )
 

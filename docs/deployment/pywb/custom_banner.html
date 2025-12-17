@@ -110,8 +110,8 @@ archived URL for edition switching.
     border: 1px solid rgba(15, 23, 42, 0.16);
     background: rgba(255, 255, 255, 0.65);
     color: inherit;
-    border-radius: 0.5rem;
-    padding: 0.25rem 0.5rem;
+    border-radius: 999px;
+    padding: 0.25rem 0.7rem;
     font: inherit;
     font-weight: 600;
     cursor: pointer;
@@ -119,6 +119,26 @@ archived URL for edition switching.
 
   #ha-replay-banner button:hover {
     background: rgba(255, 255, 255, 0.95);
+  }
+
+  #ha-replay-banner .ha-replay-brand {
+    appearance: none;
+    border: none;
+    background: transparent;
+    padding: 0;
+    margin: 0;
+    font: inherit;
+    font-weight: 800;
+    color: #11588f;
+    cursor: pointer;
+  }
+
+  #ha-replay-banner .ha-replay-brand:hover {
+    text-decoration: underline;
+  }
+
+  #ha-replay-banner .ha-replay-action-link {
+    color: #1d4ed8;
   }
 
   @media (prefers-color-scheme: dark) {
@@ -154,6 +174,14 @@ archived URL for edition switching.
 
     #ha-replay-banner button:hover {
       background: rgba(24, 26, 27, 0.95);
+    }
+
+    #ha-replay-banner .ha-replay-brand {
+      color: #6bb6ff;
+    }
+
+    #ha-replay-banner .ha-replay-action-link {
+      color: #dbeafe;
     }
   }
 
@@ -285,7 +313,7 @@ archived URL for edition switching.
 
       banner.innerHTML =
         '<div class="ha-replay-left">' +
-        '  <a class="ha-replay-brand" href="https://www.healtharchive.ca/" target="_blank" rel="noreferrer">HealthArchive.ca</a>' +
+        '  <button type="button" class="ha-replay-brand" data-ha-url="https://www.healtharchive.ca/">HealthArchive.ca</button>' +
         '  <span class="ha-replay-pill">Archived replay</span>' +
         "</div>" +
         '<div class="ha-replay-center">' +
@@ -293,7 +321,7 @@ archived URL for edition switching.
         '  <div class="ha-replay-disclaimer">Independent archival snapshot \u00b7 Not an official government website \u00b7 Content may be outdated</div>' +
         "</div>" +
         '<div class="ha-replay-right">' +
-        '  <a href="https://www.healtharchive.ca/archive" target="_blank" rel="noreferrer">Browse</a>' +
+        '  <button type="button" class="ha-replay-action-link" data-ha-url="https://www.healtharchive.ca/archive">Browse</button>' +
         '  <button type="button" id="ha-replay-hide" aria-label="Hide this banner">Hide</button>' +
         "</div>";
 
@@ -315,6 +343,20 @@ archived URL for edition switching.
           if (el && el.parentNode) el.parentNode.removeChild(el);
         });
       }
+
+      // Avoid pywb rewriting our "escape hatch" navigation by using buttons with
+      // explicit JS navigation (instead of <a href="...">).
+      try {
+        banner.querySelectorAll("[data-ha-url]").forEach(function (el) {
+          el.addEventListener("click", function (event) {
+            event.preventDefault();
+            event.stopPropagation();
+            var dest = el.getAttribute("data-ha-url");
+            if (!dest) return;
+            window.location.href = dest;
+          });
+        });
+      } catch (e) {}
     }
 
     if (document.readyState === "loading") {
