@@ -130,6 +130,9 @@ Notes:
 - `CREATE EXTENSION` may require elevated DB privileges on some hosts.
 - If `pg_trgm` is unavailable, search still works (FTS + substring fallback), but
   the fuzzy similarity fallback is disabled.
+- The fuzzy fallback is intentionally conservative for performance: it uses
+  pg_trgm *word* similarity (not whole-field similarity) and tuned thresholds to
+  avoid huge candidate sets on broad queries.
 
 ### 5.2 Refresh snippets/titles from WARCs (in place)
 
