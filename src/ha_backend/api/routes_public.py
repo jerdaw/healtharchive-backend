@@ -10,7 +10,7 @@ from urllib.parse import urlsplit, urlunsplit
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
-from sqlalchemy import and_, case, func, inspect, or_
+from sqlalchemy import and_, case, func, inspect, or_, text
 from sqlalchemy.orm import Session, joinedload, load_only
 from threading import Lock
 
@@ -27,6 +27,18 @@ from ha_backend.search_ranking import (
     get_ranking_version,
     tokenize_query,
 )
+from ha_backend.search_query import (
+    And as BoolAnd,
+    Not as BoolNot,
+    Or as BoolOr,
+    QueryNode as BoolNode,
+    QueryParseError,
+    Term as BoolTerm,
+    iter_positive_terms,
+    looks_like_advanced_query,
+    parse_query,
+)
+from ha_backend.url_normalization import normalize_url_for_grouping
 from ha_backend.runtime_metrics import observe_search_request
 
 from .schemas import (
@@ -47,10 +59,38 @@ _TABLE_EXISTS_LOCK = Lock()
 _COLUMN_EXISTS_CACHE: dict[tuple[int, str, str], bool] = {}
 _COLUMN_EXISTS_LOCK = Lock()
 
+_PG_TRGM_EXISTS_CACHE: dict[int, bool] = {}
+_PG_TRGM_EXISTS_LOCK = Lock()
+
 # We sometimes create synthetic test snapshots/sources for operational
 # verification (e.g., backup restore checks). These should not surface in
 # public browsing/search UI.
 _PUBLIC_EXCLUDED_SOURCE_CODES = {"test"}
+
+
+def _has_pg_trgm(db: Session) -> bool:
+    bind = db.get_bind()
+    if bind.dialect.name != "postgresql":
+        return False
+
+    cache_key = id(bind)
+    with _PG_TRGM_EXISTS_LOCK:
+        cached = _PG_TRGM_EXISTS_CACHE.get(cache_key)
+    if cached is not None:
+        return cached
+
+    exists = False
+    try:
+        row = db.execute(
+            text("SELECT 1 FROM pg_extension WHERE extname = 'pg_trgm' LIMIT 1")
+        ).first()
+        exists = row is not None
+    except Exception:
+        exists = False
+
+    with _PG_TRGM_EXISTS_LOCK:
+        _PG_TRGM_EXISTS_CACHE[cache_key] = exists
+    return exists
 
 
 def _format_capture_timestamp(value: Any) -> Optional[str]:
@@ -104,20 +144,7 @@ def _normalize_url_group(value: str) -> Optional[str]:
     """
     Normalize a URL the same way Snapshot.normalized_url_group is computed.
     """
-    raw = value.strip()
-    if not raw:
-        return None
-    try:
-        parts = urlsplit(raw)
-    except Exception:
-        return None
-
-    scheme = parts.scheme.lower()
-    netloc = parts.netloc.lower()
-    if not scheme or not netloc:
-        return None
-    path = parts.path or "/"
-    return urlunsplit((scheme, netloc, path, "", ""))
+    return normalize_url_for_grouping(value)
 
 
 _REPLAY_PREVIEW_FORMATS: tuple[tuple[str, str], ...] = (
@@ -151,6 +178,127 @@ def _strip_url_fragment(value: str) -> str:
     if hash_idx == -1:
         return trimmed
     return trimmed[:hash_idx]
+
+
+def _strip_url_query_and_fragment(value: str) -> str:
+    trimmed = value.strip()
+    if not trimmed:
+        return ""
+    q_idx = trimmed.find("?")
+    hash_idx = trimmed.find("#")
+    cut = len(trimmed)
+    if q_idx != -1:
+        cut = min(cut, q_idx)
+    if hash_idx != -1:
+        cut = min(cut, hash_idx)
+    return trimmed[:cut]
+
+
+def _escape_like(value: str) -> str:
+    """
+    Escape LIKE wildcards so user input is treated as a literal substring.
+    """
+    return (
+        value.replace("\\", "\\\\")
+        .replace("%", "\\%")
+        .replace("_", "\\_")
+    )
+
+
+_URL_QUERY_PREFIX_RE = re.compile(r"^url:\s*", re.IGNORECASE)
+_URL_SCHEME_RE = re.compile(r"^[a-z][a-z0-9+.-]*://", re.IGNORECASE)
+
+
+def _looks_like_url_query(value: str) -> bool:
+    raw = value.strip()
+    if not raw:
+        return False
+    if " " in raw or "\n" in raw or "\t" in raw:
+        return False
+    if "://" in raw:
+        return True
+
+    lower = raw.lower()
+    if lower.startswith("www."):
+        return True
+
+    if "/" in raw:
+        head = raw.split("/", 1)[0]
+        return "." in head
+
+    return "." in raw
+
+
+def _expand_url_search_variants(normalized_url: str) -> list[str]:
+    """
+    Expand a normalized URL into a small set of commonly equivalent variants.
+
+    This is intentionally conservative: we currently only vary scheme (http/https)
+    and the presence of a leading "www." hostname.
+    """
+    try:
+        parts = urlsplit(normalized_url)
+    except Exception:
+        return [normalized_url]
+
+    scheme = parts.scheme.lower()
+    netloc = parts.netloc.lower()
+    path = parts.path or "/"
+
+    scheme_variants = {scheme}
+    if scheme == "https":
+        scheme_variants.add("http")
+    elif scheme == "http":
+        scheme_variants.add("https")
+
+    host, sep, port = netloc.partition(":")
+    host_variants = {host}
+    if host.startswith("www."):
+        host_variants.add(host[len("www.") :])
+    else:
+        host_variants.add(f"www.{host}")
+
+    suffix = f"{sep}{port}" if port else ""
+    netloc_variants = {f"{h}{suffix}" for h in host_variants if h}
+
+    urls: set[str] = set()
+    for scheme_value in scheme_variants:
+        for netloc_value in netloc_variants:
+            urls.add(urlunsplit((scheme_value, netloc_value, path, "", "")))
+    return sorted(urls)
+
+
+def _extract_url_search_targets(q_clean: str) -> list[str] | None:
+    raw = q_clean.strip()
+    if not raw:
+        return None
+
+    explicit = False
+    m = _URL_QUERY_PREFIX_RE.match(raw)
+    if m:
+        explicit = True
+        raw = raw[m.end() :].strip()
+
+    if not raw:
+        return None
+    if not _looks_like_url_query(raw):
+        return None
+
+    candidate = raw
+    if not _URL_SCHEME_RE.match(candidate):
+        candidate = f"https://{candidate.lstrip('/')}"
+
+    normalized = normalize_url_for_grouping(candidate)
+    if not normalized:
+        stripped = _strip_url_query_and_fragment(candidate)
+        if not _URL_SCHEME_RE.match(stripped):
+            stripped = f"https://{stripped.lstrip('/')}"
+        normalized = normalize_url_for_grouping(stripped)
+
+    if not normalized:
+        return None
+
+    return _expand_url_search_variants(normalized)
 
 
 def _parse_timestamp14(value: str) -> Optional[datetime]:
@@ -458,15 +606,41 @@ def _search_snapshots_inner(
         - "newest"
         - "relevance_fts"
         - "relevance_fallback"
+        - "relevance_fuzzy"
+        - "boolean"
+        - "url"
     """
-    q_clean = q.strip() if q else None
-    if q_clean == "":
-        q_clean = None
+    raw_q = q.strip() if q else None
+    if raw_q == "":
+        raw_q = None
+
+    url_search_targets: list[str] | None = (
+        _extract_url_search_targets(raw_q) if raw_q else None
+    )
+    boolean_query: BoolNode | None = None
+
+    q_filter = raw_q
+    q_rank = raw_q
+    phrase_query = raw_q
+    if url_search_targets:
+        q_filter = None
+        q_rank = None
+        phrase_query = None
+    elif raw_q and looks_like_advanced_query(raw_q):
+        try:
+            boolean_query = parse_query(raw_q)
+        except QueryParseError:
+            boolean_query = None
+        else:
+            q_filter = None
+            phrase_query = None
+            positive_terms = [t.text for t in iter_positive_terms(boolean_query) if t.text]
+            q_rank = " ".join(positive_terms).strip() or None
 
     effective_sort = sort
     if effective_sort is None:
-        effective_sort = SearchSort.relevance if q_clean else SearchSort.newest
-    if effective_sort == SearchSort.relevance and not q_clean:
+        effective_sort = SearchSort.relevance if (q_filter or q_rank) else SearchSort.newest
+    if effective_sort == SearchSort.relevance and not (q_filter or q_rank):
         effective_sort = SearchSort.newest
 
     effective_view = view or SearchView.snapshots
@@ -474,30 +648,32 @@ def _search_snapshots_inner(
     dialect_name = db.get_bind().dialect.name
     use_postgres_fts = dialect_name == "postgresql"
 
+    rank_text = q_filter or q_rank
+
     ranking_version = get_ranking_version(ranking)
     # For v2 we use different blends depending on query "intent".
     query_mode = None
     query_tokens: list[str] = []
     ranking_cfg = None
-    if ranking_version == RankingVersion.v2 and q_clean:
-        query_mode = classify_query_mode(q_clean)
+    if ranking_version == RankingVersion.v2 and rank_text:
+        query_mode = classify_query_mode(rank_text)
         ranking_cfg = get_ranking_config(mode=query_mode)
-        query_tokens = tokenize_query(q_clean)
+        query_tokens = tokenize_query(rank_text)
 
-    mode = "newest"
-    if effective_sort == SearchSort.relevance and q_clean:
-        mode = "relevance_fts" if use_postgres_fts else "relevance_fallback"
-        if ranking_version == RankingVersion.v2:
-            mode = f"{mode}_v2"
+    match_tokens: list[str] = []
+    if rank_text:
+        match_tokens = [t for t in tokenize_query(rank_text) if len(t) >= 3]
+        if not match_tokens:
+            match_tokens = [rank_text]
 
-    query = db.query(Snapshot).join(Source)
-    query = query.filter(~Source.code.in_(_PUBLIC_EXCLUDED_SOURCE_CODES))
+    base_query = db.query(Snapshot).join(Source)
+    base_query = base_query.filter(~Source.code.in_(_PUBLIC_EXCLUDED_SOURCE_CODES))
 
     if source:
-        query = query.filter(Source.code == source.lower())
+        base_query = base_query.filter(Source.code == source.lower())
 
     if not includeNon2xx:
-        query = query.filter(
+        base_query = base_query.filter(
             or_(
                 Snapshot.status_code.is_(None),
                 and_(
@@ -507,38 +683,176 @@ def _search_snapshots_inner(
             )
         )
 
+    def strip_query_fragment_expr(url_expr: Any) -> Any:
+        if dialect_name == "postgresql":
+            return func.regexp_replace(url_expr, r"[?#].*$", "")
+        if dialect_name == "sqlite":
+            q_pos = func.instr(url_expr, "?")
+            hash_pos = func.instr(url_expr, "#")
+            cut_pos = case(
+                (and_(q_pos > 0, hash_pos > 0), func.min(q_pos, hash_pos)),
+                (q_pos > 0, q_pos),
+                (hash_pos > 0, hash_pos),
+                else_=0,
+            )
+            return case(
+                (cut_pos > 0, func.substr(url_expr, 1, cut_pos - 1)),
+                else_=url_expr,
+            )
+        return url_expr
+
+    group_key = func.coalesce(
+        Snapshot.normalized_url_group,
+        strip_query_fragment_expr(Snapshot.url),
+    )
+
+    def compute_total(query: Any) -> int:
+        if effective_view == SearchView.pages:
+            return query.with_entities(func.count(func.distinct(group_key))).scalar() or 0
+        return query.with_entities(func.count(Snapshot.id)).scalar() or 0
+
+    query = base_query
     tsquery = None
     vector_expr = None
+    score_override = None
+    search_mode: str | None = None
 
-    if q_clean:
-        if use_postgres_fts and effective_sort == SearchSort.relevance:
-            # Postgres full-text search path (preferred in production).
-            #
-            # We store a tsvector in Snapshot.search_vector, but we also fall
-            # back to computing a vector on-the-fly for any rows that have not
-            # yet been backfilled.
-            tsquery = func.websearch_to_tsquery(TS_CONFIG, q_clean)
-            vector_expr = func.coalesce(
-                Snapshot.search_vector,
-                build_search_vector(Snapshot.title, Snapshot.snippet, Snapshot.url),
-            )
-            query = query.filter(vector_expr.op("@@")(tsquery))
-        else:
-            # DB-agnostic fallback: substring match across title/snippet/url.
-            ilike_pattern = f"%{q_clean}%"
-            query = query.filter(
+    def apply_substring_filter(qry: Any) -> Any:
+        tokens = match_tokens[:8]
+        token_filters = []
+        for token in tokens:
+            pattern = f"%{token}%"
+            token_filters.append(
                 or_(
-                    Snapshot.title.ilike(ilike_pattern),
-                    Snapshot.snippet.ilike(ilike_pattern),
-                    Snapshot.url.ilike(ilike_pattern),
+                    Snapshot.title.ilike(pattern),
+                    Snapshot.snippet.ilike(pattern),
+                    Snapshot.url.ilike(pattern),
                 )
             )
+        return qry.filter(and_(*token_filters)) if token_filters else qry
 
-    group_key = func.coalesce(Snapshot.normalized_url_group, Snapshot.url)
-    if effective_view == SearchView.pages:
-        total = query.with_entities(func.count(func.distinct(group_key))).scalar() or 0
+    def apply_fts_filter(qry: Any) -> Any:
+        nonlocal tsquery, vector_expr
+        assert q_filter is not None
+        tsquery = func.websearch_to_tsquery(TS_CONFIG, q_filter)
+        vector_expr = func.coalesce(
+            Snapshot.search_vector,
+            build_search_vector(Snapshot.title, Snapshot.snippet, Snapshot.url),
+        )
+        return qry.filter(vector_expr.op("@@")(tsquery))
+
+    def apply_fuzzy_filter(qry: Any) -> Any:
+        nonlocal score_override
+        assert q_filter is not None
+        if not _has_pg_trgm(db):
+            return qry.filter(text("0=1"))
+
+        title_expr = func.coalesce(Snapshot.title, "")
+        snippet_expr = func.coalesce(Snapshot.snippet, "")
+
+        title_sim = func.similarity(title_expr, q_filter)
+        url_sim = func.similarity(Snapshot.url, q_filter)
+        snippet_sim = func.similarity(snippet_expr, q_filter)
+
+        score_override = func.greatest(
+            title_sim,
+            0.8 * url_sim,
+            0.4 * snippet_sim,
+        )
+
+        # Use pg_trgm's similarity operator as the candidate filter so indexes
+        # can be used when available; order by the explicit similarity score.
+        return qry.filter(
+            or_(
+                title_expr.op("%")(q_filter),
+                Snapshot.url.op("%")(q_filter),
+                snippet_expr.op("%")(q_filter),
+            )
+        )
+
+    if url_search_targets:
+        query = query.filter(group_key.in_(url_search_targets))
+        total = compute_total(query)
+        search_mode = "url"
+    elif boolean_query:
+        def build_term_expr(term: BoolTerm) -> Any:
+            text_value = term.text.strip()
+            if not text_value:
+                return text("1=1")
+            escaped = _escape_like(text_value)
+            pattern = f"%{escaped}%"
+
+            title_expr = func.coalesce(Snapshot.title, "")
+            snippet_expr = func.coalesce(Snapshot.snippet, "")
+            url_expr = Snapshot.url
+            group_expr = func.coalesce(Snapshot.normalized_url_group, "")
+
+            def match(expr: Any) -> Any:
+                return expr.ilike(pattern, escape="\\")
+
+            if term.field == "title":
+                return match(title_expr)
+            if term.field == "snippet":
+                return match(snippet_expr)
+            if term.field == "url":
+                return or_(match(url_expr), match(group_expr))
+            return or_(match(title_expr), match(snippet_expr), match(url_expr))
+
+        def build_expr(node: BoolNode) -> Any:
+            if isinstance(node, BoolTerm):
+                return build_term_expr(node)
+            if isinstance(node, BoolNot):
+                return ~build_expr(node.child)
+            if isinstance(node, BoolAnd):
+                return and_(*(build_expr(c) for c in node.children))
+            if isinstance(node, BoolOr):
+                return or_(*(build_expr(c) for c in node.children))
+            return text("1=1")
+
+        query = query.filter(build_expr(boolean_query))
+        total = compute_total(query)
+        search_mode = "boolean"
+    elif q_filter:
+        # Prefer Postgres FTS for relevance ordering, but fall back to substring
+        # matching (and then fuzzy matching) when FTS yields no results.
+        if use_postgres_fts and effective_sort == SearchSort.relevance:
+            query = apply_fts_filter(query)
+            total = compute_total(query)
+            search_mode = "relevance_fts"
+
+            if total == 0:
+                tsquery = None
+                vector_expr = None
+                score_override = None
+                query = apply_substring_filter(base_query)
+                total = compute_total(query)
+                search_mode = "relevance_fallback"
+
+                if total == 0 and len(q_filter) >= 4 and _has_pg_trgm(db):
+                    query = apply_fuzzy_filter(base_query)
+                    total = compute_total(query)
+                    search_mode = "relevance_fuzzy" if total > 0 else search_mode
+        else:
+            query = apply_substring_filter(query)
+            total = compute_total(query)
+            search_mode = "relevance_fallback" if effective_sort == SearchSort.relevance else "newest"
+
+            if total == 0 and use_postgres_fts and len(q_filter) >= 4 and _has_pg_trgm(db):
+                score_override = None
+                query = apply_fuzzy_filter(base_query)
+                total = compute_total(query)
+                if total > 0:
+                    search_mode = (
+                        "relevance_fuzzy"
+                        if effective_sort == SearchSort.relevance
+                        else "newest_fuzzy"
+                    )
     else:
-        total = query.with_entities(func.count(Snapshot.id)).scalar() or 0
+        total = compute_total(query)
+
+    mode = search_mode or "newest"
+    if ranking_version == RankingVersion.v2 and mode.startswith("relevance"):
+        mode = f"{mode}_v2"
 
     offset = (page - 1) * pageSize
 
@@ -551,7 +865,7 @@ def _search_snapshots_inner(
 
     use_page_signals = (
         effective_sort == SearchSort.relevance
-        and q_clean is not None
+        and rank_text is not None
         and _has_table(db, "page_signals")
     )
     use_authority = use_page_signals
@@ -567,7 +881,7 @@ def _search_snapshots_inner(
         and ranking_cfg is not None
         and query_mode == QueryMode.broad
         and effective_sort == SearchSort.relevance
-        and q_clean is not None
+        and rank_text is not None
         and has_outlink_table
     )
 
@@ -580,7 +894,7 @@ def _search_snapshots_inner(
         and ranking_cfg is not None
         and query_mode == QueryMode.broad
         and effective_sort == SearchSort.relevance
-        and q_clean is not None
+        and rank_text is not None
         and has_ps_pagerank
     )
 
@@ -683,11 +997,11 @@ def _search_snapshots_inner(
         return case((archived_match, float(ranking_cfg.archived_penalty)), else_=0.0)
 
     def build_title_boost() -> Any:
-        if not q_clean:
+        if not rank_text:
             return 0.0
         if ranking_version != RankingVersion.v2 or not query_tokens or ranking_cfg is None:
             return case(
-                (Snapshot.title.ilike(f"%{q_clean}%"), 0.2),
+                (Snapshot.title.ilike(f"%{rank_text}%"), 0.2),
                 else_=0.0,
             )
         token_match_exprs = [Snapshot.title.ilike(f"%{t}%") for t in query_tokens]
@@ -719,8 +1033,22 @@ def _search_snapshots_inner(
         )
 
     def build_snapshot_score() -> Any:
-        if effective_sort != SearchSort.relevance or not q_clean:
+        if effective_sort != SearchSort.relevance or not rank_text:
             return None
+        if score_override is not None:
+            score = score_override
+            if ranking_version == RankingVersion.v2 and ranking_cfg is not None:
+                score = score + build_archived_penalty() + build_depth_penalty(group_key)
+                if use_authority and inlink_count is not None:
+                    score = score + build_authority_expr()
+                if use_hubness and outlink_count is not None:
+                    score = score + build_hubness_expr()
+                if use_pagerank and pagerank_value is not None:
+                    score = score + build_pagerank_expr()
+            else:
+                if use_authority and inlink_count is not None:
+                    score = score + build_authority_expr()
+            return score
         if use_postgres_fts and tsquery is not None and vector_expr is not None:
             if (
                 ranking_version == RankingVersion.v2
@@ -762,11 +1090,25 @@ def _search_snapshots_inner(
             return score
 
         # DB-agnostic fallback: score by field match presence.
-        ilike_pattern = f"%{q_clean}%"
-        title_match_score = case((Snapshot.title.ilike(ilike_pattern), 5), else_=0)
-        url_match_score = case((Snapshot.url.ilike(ilike_pattern), 2), else_=0)
-        snippet_match_score = case((Snapshot.snippet.ilike(ilike_pattern), 1), else_=0)
-        score = title_match_score + url_match_score + snippet_match_score
+        tokens = match_tokens[:8]
+        title_hits = sum(
+            (case((Snapshot.title.ilike(f"%{t}%"), 1), else_=0) for t in tokens),
+            0,
+        )
+        url_hits = sum(
+            (case((Snapshot.url.ilike(f"%{t}%"), 1), else_=0) for t in tokens),
+            0,
+        )
+        snippet_hits = sum(
+            (case((Snapshot.snippet.ilike(f"%{t}%"), 1), else_=0) for t in tokens),
+            0,
+        )
+        phrase_boost = (
+            case((Snapshot.title.ilike(f"%{phrase_query}%"), 2), else_=0)
+            if phrase_query
+            else 0
+        )
+        score = 3 * title_hits + 2 * url_hits + snippet_hits + phrase_boost
 
         if ranking_version == RankingVersion.v2 and ranking_cfg is not None:
             score = score + build_archived_penalty() + build_depth_penalty(group_key)
@@ -860,7 +1202,7 @@ def _search_snapshots_inner(
         if (
             ranking_version == RankingVersion.v2
             and effective_sort == SearchSort.relevance
-            and q_clean
+            and rank_text
         ):
             ordered = build_item_query_for_pages_v2()
         else:
@@ -870,7 +1212,7 @@ def _search_snapshots_inner(
                     PageSignal, PageSignal.normalized_url_group == group_key
                 )
 
-            if effective_sort == SearchSort.relevance and q_clean:
+            if effective_sort == SearchSort.relevance and rank_text:
                 rank_score = snapshot_score if snapshot_score is not None else 0.0
                 ordered = item_query.order_by(
                     status_quality.desc(),
@@ -890,7 +1232,7 @@ def _search_snapshots_inner(
             item_query = item_query.outerjoin(
                 PageSignal, PageSignal.normalized_url_group == group_key
             )
-        if effective_sort == SearchSort.relevance and q_clean:
+        if effective_sort == SearchSort.relevance and rank_text:
             rank_score = snapshot_score if snapshot_score is not None else 0.0
             ordered = item_query.order_by(
                 status_quality.desc(),
@@ -942,10 +1284,14 @@ def _search_snapshots_inner(
         )
 
         original_url = (
-            snap.normalized_url_group
-            if (effective_view == SearchView.pages and snap.normalized_url_group)
-            else snap.url
+            snap.url
         )
+        if effective_view == SearchView.pages:
+            original_url = (
+                snap.normalized_url_group
+                or normalize_url_for_grouping(snap.url)
+                or _strip_url_query_and_fragment(snap.url)
+            )
 
         results.append(
             SnapshotSummarySchema(

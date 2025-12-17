@@ -884,10 +884,20 @@ Public Pydantic models:
     - `Source.code == source.lower()` when `source` set.
     - By default (`includeNon2xx=false`), filters out snapshots with a known non‑2xx
       `status_code` (keeps `status_code IS NULL` and `200–299`).
-    - Keyword filter:
-      - On Postgres with `sort="relevance"`: full‑text search (FTS) against
-        `snapshots.search_vector`.
-      - Otherwise: `ILIKE` on `title`, `snippet`, and `url`.
+    - Keyword filter / query intent:
+      - URL lookup: when `q` looks like a URL (or starts with `url:`), treat it as
+        a *page* lookup and filter by the normalized URL group (with a small set of
+        common scheme/`www.` variants).
+      - Boolean/field syntax: when `q` contains `AND`/`OR`/`NOT`, parentheses, `-term`,
+        or `title:`/`snippet:`/`url:` prefixes, parse it and apply a boolean filter
+        using case-insensitive substring matching.
+      - Plain text:
+        - On Postgres with `sort="relevance"`: full‑text search (FTS) against
+          `snapshots.search_vector`.
+          - If FTS yields no results, fall back to tokenized substring matching.
+          - If that still yields no results and `pg_trgm` is available, fall back to
+            trigram similarity for fuzzy matching.
+        - Otherwise: tokenized substring matching on `title`, `snippet`, and `url`.
   - Ordering:
     - Default sort:
       - When `q` is present: `sort="relevance"`.
@@ -906,7 +916,8 @@ Public Pydantic models:
   - Grouping:
     - Default view: `view="snapshots"` (returns individual captures; `total` counts snapshots).
     - `view="pages"` returns only the **latest** snapshot for each page group
-      (`normalized_url_group`, falling back to `url`), and `total` counts page groups.
+      (`normalized_url_group`, falling back to `url` with query/fragment stripped), and
+      `total` counts page groups.
   - Pagination semantics:
     - `total` is the total number of matching items across all pages (snapshots
       for `view="snapshots"`, page groups for `view="pages"`).
