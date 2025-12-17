@@ -764,26 +764,41 @@ def _search_snapshots_inner(
         title_expr = func.coalesce(Snapshot.title, "")
         snippet_expr = func.coalesce(Snapshot.snippet, "")
 
-        # Prefer word_similarity over similarity for fuzzy matching: it is much
-        # better for short, misspelled queries against longer titles/snippets
-        # (e.g. "influensa" should match "Flu (influenza): ...").
-        title_sim = func.word_similarity(title_expr, q_filter)
-        url_sim = func.word_similarity(Snapshot.url, q_filter)
-        snippet_sim = func.word_similarity(snippet_expr, q_filter)
+        # Lower trigram similarity threshold for the fuzzy fallback.
+        #
+        # Notes:
+        # - `%` uses pg_trgm.similarity_threshold (default is often too strict for
+        #   misspellings like "influensa" / "coronovirus").
+        # - `SET LOCAL` scopes this to the current transaction so pooled
+        #   connections don't carry the setting across requests.
+        if dialect_name == "postgresql":
+            db.execute(text("SET LOCAL pg_trgm.similarity_threshold = 0.12"))
+
+        url_expr = Snapshot.url
+        group_expr = func.coalesce(Snapshot.normalized_url_group, "")
+
+        title_sim = func.similarity(title_expr, q_filter)
+        url_sim = func.similarity(url_expr, q_filter)
+        group_sim = func.similarity(group_expr, q_filter)
+        snippet_sim = func.similarity(snippet_expr, q_filter)
 
         score_override = func.greatest(
             title_sim,
-            0.8 * url_sim,
+            0.8 * func.greatest(url_sim, group_sim),
             0.4 * snippet_sim,
         )
 
-        # Use pg_trgm's word-similarity operator as the candidate filter so
-        # trigram indexes can be used when available.
+        # Use pg_trgm's similarity operator (%) as the candidate filter so
+        # trigram GIN indexes can be used.
+        #
+        # We intentionally do not include snippet in the candidate filter since
+        # it is long and can drastically increase candidate counts for broad
+        # terms; snippet similarity still contributes to ranking.
         return qry.filter(
             or_(
-                title_expr.op("<%")(q_filter),
-                Snapshot.url.op("<%")(q_filter),
-                snippet_expr.op("<%")(q_filter),
+                title_expr.op("%")(q_filter),
+                url_expr.op("%")(q_filter),
+                group_expr.op("%")(q_filter),
             )
         )
 
