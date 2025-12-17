@@ -23,7 +23,7 @@ archived URL for edition switching.
     font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI",
       sans-serif;
     font-size: 0.85rem;
-    line-height: 1.2;
+    line-height: 1.25;
     -webkit-font-smoothing: antialiased;
     backdrop-filter: blur(10px) saturate(1.1);
     box-shadow: 0 8px 16px rgba(15, 23, 42, 0.04);
@@ -53,7 +53,7 @@ archived URL for edition switching.
     align-items: center;
     justify-content: space-between;
     gap: 0.75rem;
-    padding: 0.6rem 1.25rem;
+    padding: 0.8rem 1.25rem;
   }
 
   #ha-replay-banner .ha-replay-left,
@@ -81,25 +81,29 @@ archived URL for edition switching.
     flex: 1;
     min-width: 0;
     display: flex;
-    align-items: baseline;
-    gap: 0.65rem;
-    white-space: nowrap;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.2rem;
     overflow: hidden;
   }
 
   #ha-replay-banner .ha-replay-meta {
     color: rgba(15, 23, 42, 0.7);
     overflow: hidden;
-    overflow: hidden;
     text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 100%;
   }
 
   #ha-replay-banner .ha-replay-disclaimer {
     color: rgba(15, 23, 42, 0.55);
     overflow: hidden;
     text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 100%;
   }
 
+  #ha-replay-banner a,
   #ha-replay-banner button {
     appearance: none;
     border: 1px solid transparent;
@@ -111,16 +115,23 @@ archived URL for edition switching.
     font-weight: 550;
     cursor: pointer;
     line-height: 1;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
   }
 
+  #ha-replay-banner a,
   #ha-replay-banner button {
     transition: background 120ms ease, border-color 120ms ease, transform 120ms ease;
   }
 
+  #ha-replay-banner a:hover,
   #ha-replay-banner button:hover {
     color: rgba(15, 23, 42, 0.95);
     transform: translateY(-1px);
     background: rgba(148, 163, 184, 0.16);
+    text-decoration: none;
   }
 
   #ha-replay-banner .ha-replay-brand {
@@ -347,18 +358,18 @@ archived URL for edition switching.
       banner.innerHTML =
         '<div class="ha-replay-inner">' +
         '  <div class="ha-replay-left">' +
-        '    <button type="button" class="ha-replay-action-link" data-ha-action="browse" aria-label="Back to HealthArchive.ca">\u2190 HealthArchive.ca</button>' +
+        '    <a class="ha-replay-action-link" data-ha-action="browse" href="#" aria-label="Back to HealthArchive.ca">\u2190 HealthArchive.ca</a>' +
         '    <span class="ha-replay-pill" aria-label="Archived replay notice">Archived replay</span>' +
         "  </div>" +
         '  <div class="ha-replay-center">' +
         '    <div class="ha-replay-meta" id="ha-replay-meta"></div>' +
-        '    <div class="ha-replay-disclaimer">Independent archive \u00b7 Not a government website \u00b7 Content may be outdated</div>' +
+        '    <div class="ha-replay-disclaimer">Independent archive \u00b7 Not an official government website \u00b7 Content may be outdated</div>' +
         "  </div>" +
         '  <div class="ha-replay-right" id="ha-replay-actions">' +
         (snapshotId
-          ? '    <button type="button" class="ha-replay-link" data-ha-action="details">Snapshot details</button>' +
-            '    <button type="button" class="ha-replay-link" data-ha-action="raw">Raw HTML</button>' +
-            '    <button type="button" class="ha-replay-link" data-ha-action="json">Metadata JSON</button>' +
+          ? '    <a class="ha-replay-link" data-ha-action="details" href="#">Snapshot details</a>' +
+            '    <a class="ha-replay-link" data-ha-action="raw" href="#">Raw HTML</a>' +
+            '    <a class="ha-replay-link" data-ha-action="json" href="#">Metadata JSON</a>' +
             '    <span class="ha-replay-divider" aria-hidden="true"></span>'
           : "") +
         '    <button type="button" id="ha-replay-hide" class="ha-replay-link" aria-label="Hide this banner">Hide</button>' +
@@ -400,13 +411,57 @@ archived URL for edition switching.
           routes.json = apiBase + "/api/snapshot/" + snapshotId;
         }
 
+        function makeRedirectBlobUrl(dest) {
+          try {
+            var html =
+              "<!doctype html><meta charset=utf-8>" +
+              "<meta name=referrer content=no-referrer>" +
+              "<title>Redirecting…</title>" +
+              "<script>location.replace(" +
+              JSON.stringify(dest) +
+              ")</script>" +
+              "<p>Redirecting to <a href=" +
+              JSON.stringify(dest) +
+              ">" +
+              dest +
+              "</a>…</p>";
+            return URL.createObjectURL(new Blob([html], { type: "text/html" }));
+          } catch (e) {
+            return dest;
+          }
+        }
+
+        var blobCache = {};
+
         banner.querySelectorAll("[data-ha-action]").forEach(function (el) {
+          var action = el.getAttribute("data-ha-action");
+          var dest = routes[action];
+          if (!dest) return;
+
+          // Set a stable href so right-click / middle-click open-in-new-tab works.
+          // Use a blob redirect URL to avoid pywb rewriting the destination.
+          var blobUrl = blobCache[dest] || (blobCache[dest] = makeRedirectBlobUrl(dest));
+          try {
+            if (el.tagName && el.tagName.toLowerCase() === "a") {
+              el.setAttribute("href", blobUrl);
+              el.setAttribute("data-ha-dest", dest);
+            }
+          } catch (e) {}
+
           el.addEventListener("click", function (event) {
+            // Only intercept plain left-click; allow ctrl/cmd/middle clicks to
+            // open in a new tab using the href.
+            if (
+              event.button !== 0 ||
+              event.metaKey ||
+              event.ctrlKey ||
+              event.shiftKey ||
+              event.altKey
+            ) {
+              return;
+            }
             event.preventDefault();
             event.stopPropagation();
-            var action = el.getAttribute("data-ha-action");
-            var dest = routes[action];
-            if (!dest) return;
             window.location.href = dest;
           });
         });
