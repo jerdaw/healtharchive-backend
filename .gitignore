@@ -33,6 +33,7 @@ healtharchive.db
 .dev-healtharchive.db
 .dev-archive-root/
 .dev-replay-previews/
+.preview-node/
 tmp-test.warc.gz
 
 # Additional dev DBs / scratch artifacts

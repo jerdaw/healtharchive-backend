@@ -463,7 +463,7 @@ The frontend `/archive` page can show a lightweight “homepage preview” tile 
 each source’s latest replayable backup.
 
 To avoid rendering live iframes on every page load, these previews are served as
-cached static PNGs generated out-of-band.
+cached static images generated out-of-band.
 
 ### 9.1 Configure preview directory (VPS)
 
@@ -503,6 +503,11 @@ sudo systemd-run --wait --pipe \
 
 This uses a Playwright container to screenshot each source’s `entryBrowseUrl`
 (with `#ha_nobanner=1` so the pywb banner is not captured).
+
+Note: The generator caches Playwright’s Node.js dependencies under
+`<preview_dir_parent>/.preview-node/`. If you point `HEALTHARCHIVE_REPLAY_PREVIEW_DIR`
+at a path inside your repo for local testing, ensure `.preview-node/` is ignored
+by git (it is in `.gitignore`).
 
 ### 9.3 Verify previews are available
 
