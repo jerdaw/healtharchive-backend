@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import re
 import subprocess  # nosec: B404 - controlled CLI invocation of external tool
 import sys
@@ -912,36 +913,48 @@ def cmd_cleanup_job(args: argparse.Namespace) -> None:
     """
     Cleanup temporary directories and state for a completed/indexed job.
 
-    Currently only 'temp' mode is supported, which removes archive_tool's
-    temp dirs (including WARCs) and the state file, but leaves the job
-    output directory and any final ZIM in place. The underlying helpers
-    (CrawlState, cleanup_temp_dirs) live in the in-repo ``archive_tool``
-    package and should be kept in sync with this command.
+    Modes:
+
+    - `temp`: legacy cleanup that deletes `.tmp*` directories and the state
+      file. This can delete WARCs required for replay.
+    - `temp-nonwarc`: safe cleanup that preserves WARCs by consolidating them
+      into `<output_dir>/warcs/` before deleting `.tmp*`. This mode is designed
+      to keep replay and snapshot viewing working.
+
+    The underlying helpers (CrawlState, cleanup_temp_dirs) live in the in-repo
+    ``archive_tool`` package and should be kept in sync with this command.
 
     Safety: When HEALTHARCHIVE_REPLAY_BASE_URL is set (replay is enabled),
-    this command refuses to run in 'temp' mode unless --force is provided,
-    because deleting temp dirs also deletes WARCs required for replay.
+    this command refuses to run in `temp` mode unless --force is provided,
+    because deleting temp dirs also deletes WARCs required for replay. The
+    `temp-nonwarc` mode is allowed because it preserves WARCs.
     """
     from datetime import datetime, timezone
     from pathlib import Path
 
-    from archive_tool.state import CrawlState
-    from archive_tool.utils import (cleanup_temp_dirs,
-                                    find_latest_temp_dir_fallback)
+    import shutil
 
+    from archive_tool.state import CrawlState
+    from archive_tool.utils import find_all_warc_files, find_latest_temp_dir_fallback
+
+    from .archive_storage import (build_warc_path_mapping, consolidate_warcs,
+                                  get_job_provenance_dir, get_job_warcs_dir,
+                                  snapshot_crawl_configs, snapshot_state_file)
     from .models import ArchiveJob as ORMArchiveJob
+    from .models import Snapshot
 
     job_id = args.id
     mode = args.mode
+    dry_run = bool(getattr(args, "dry_run", False))
 
-    if mode != "temp":
+    if mode not in ("temp", "temp-nonwarc"):
         print(
-            f"Unsupported cleanup mode {mode!r}; only 'temp' is currently supported.",
+            f"Unsupported cleanup mode {mode!r}; expected 'temp' or 'temp-nonwarc'.",
             file=sys.stderr,
         )
         sys.exit(1)
 
-    if get_replay_base_url() and not args.force:
+    if mode == "temp" and get_replay_base_url() and not args.force:
         print(
             "Refusing to run cleanup-job --mode temp because replay is enabled "
             "(HEALTHARCHIVE_REPLAY_BASE_URL is set). This mode deletes WARCs "
@@ -972,16 +985,50 @@ def cmd_cleanup_job(args: argparse.Namespace) -> None:
             )
             sys.exit(1)
 
-        # Discover temp dirs via CrawlState and archive_tool utils.
+        # Discover temp dirs via CrawlState and a glob fallback.
         state = CrawlState(output_dir, initial_workers=1)
         temp_dirs = state.get_temp_dir_paths()
-        if not temp_dirs:
-            latest = find_latest_temp_dir_fallback(output_dir)
-            if latest is not None:
-                temp_dirs = [latest]
+        temp_dir_candidates = sorted([p for p in output_dir.glob(".tmp*") if p.is_dir()])
+        # Merge candidates while preserving order.
+        seen_dirs: set[Path] = set()
+        merged_temp_dirs: list[Path] = []
+        for p in list(temp_dirs) + list(temp_dir_candidates):
+            p = p.resolve()
+            if p in seen_dirs:
+                continue
+            seen_dirs.add(p)
+            merged_temp_dirs.append(p)
+        temp_dirs = merged_temp_dirs
 
         had_state_file = state.state_file_path.exists()
 
+        if mode == "temp":
+            if not temp_dirs and not had_state_file:
+                print(
+                    f"No temp dirs or state file discovered for job {job.id}; "
+                    "nothing to cleanup.",
+                    file=sys.stderr,
+                )
+                return
+
+            if dry_run:
+                print("Dry run: would delete temp dirs and state file:")
+                for d in temp_dirs:
+                    print(f"  - {d}")
+                if had_state_file:
+                    print(f"  - {state.state_file_path}")
+                return
+
+            from archive_tool.utils import cleanup_temp_dirs
+
+            cleanup_temp_dirs(temp_dirs, state.state_file_path)
+            job.cleanup_status = "temp_cleaned"
+            job.cleaned_at = datetime.now(timezone.utc)
+            job.state_file_path = None
+            return
+
+        # mode == "temp-nonwarc": consolidate WARCs to a stable dir, preserve provenance,
+        # then delete `.tmp*` directories.
         if not temp_dirs and not had_state_file:
             print(
                 f"No temp dirs or state file discovered for job {job.id}; "
@@ -990,12 +1037,307 @@ def cmd_cleanup_job(args: argparse.Namespace) -> None:
             )
             return
 
-        cleanup_temp_dirs(temp_dirs, state.state_file_path)
+        stable_warcs_dir = get_job_warcs_dir(output_dir)
+        stable_present = stable_warcs_dir.is_dir() and (
+            any(stable_warcs_dir.rglob("*.warc.gz")) or any(stable_warcs_dir.rglob("*.warc"))
+        )
 
-        job.cleanup_status = "temp_cleaned"
+        # Determine whether this job's snapshots still reference `.tmp*` WARC paths.
+        tmp_ref_count = (
+            session.query(Snapshot.id)
+            .filter(Snapshot.job_id == job.id)
+            .filter(Snapshot.warc_path.like("%/.tmp%"))
+            .count()
+        )
+
+        # If stable WARCs are missing, consolidate them from `.tmp*` first.
+        source_warcs: list[Path] = []
+        if not stable_present:
+            source_warcs = find_all_warc_files(temp_dirs) if temp_dirs else []
+            if not source_warcs:
+                print(
+                    "ERROR: No WARCs discovered under .tmp* directories, and no stable warcs/ directory exists. "
+                    "Refusing temp-nonwarc cleanup because it would likely break replay.",
+                    file=sys.stderr,
+                )
+                sys.exit(1)
+
+        if dry_run:
+            print("Dry run: temp-nonwarc cleanup plan")
+            print(f"Job ID:            {job.id}")
+            print(f"Output dir:        {output_dir}")
+            print(f"Stable WARCs dir:  {stable_warcs_dir} (present={int(stable_present)})")
+            if not stable_present:
+                print(f"Would consolidate: {len(source_warcs)} WARC(s)")
+            print(f"Snapshots w/ .tmp WARCs: {tmp_ref_count}")
+            print(f"Would rewrite Snapshot.warc_path: {int(tmp_ref_count > 0)}")
+            print(f"Would preserve provenance under: {get_job_provenance_dir(output_dir)}")
+            print("Would delete temp dirs:")
+            for d in temp_dirs:
+                print(f"  - {d}")
+            if had_state_file:
+                print(f"  - {state.state_file_path} (would copy to provenance then delete)")
+            return
+
+        if not stable_present:
+            consolidate_warcs(
+                output_dir=output_dir,
+                source_warc_paths=source_warcs,
+                allow_copy_fallback=False,
+                dry_run=False,
+            )
+
+        # Rewrite Snapshot.warc_path values to point at stable WARCs before deleting temp dirs.
+        if tmp_ref_count > 0:
+            mapping = build_warc_path_mapping(output_dir)
+            if not mapping:
+                print(
+                    f"ERROR: Missing or empty WARC manifest at {stable_warcs_dir / 'manifest.json'}; "
+                    "cannot rewrite snapshot paths; refusing cleanup.",
+                    file=sys.stderr,
+                )
+                sys.exit(1)
+
+            distinct_paths = (
+                session.query(Snapshot.warc_path)
+                .filter(Snapshot.job_id == job.id)
+                .distinct()
+                .all()
+            )
+            warc_paths_in_db = sorted({p for (p,) in distinct_paths if p})
+            updated = 0
+            for old_path in warc_paths_in_db:
+                new_path = mapping.get(str(Path(old_path).resolve()))
+                if not new_path or old_path == new_path:
+                    continue
+                updated += (
+                    session.query(Snapshot)
+                    .filter(Snapshot.job_id == job.id, Snapshot.warc_path == old_path)
+                    .update({Snapshot.warc_path: new_path}, synchronize_session=False)
+                )
+
+            if updated:
+                session.flush()
+
+            # Refuse to delete temp dirs if any snapshot still references a `.tmp*` WARC path.
+            remaining_tmp_refs = (
+                session.query(Snapshot.id)
+                .filter(Snapshot.job_id == job.id)
+                .filter(Snapshot.warc_path.like("%/.tmp%"))
+                .limit(1)
+                .all()
+            )
+            if remaining_tmp_refs:
+                print(
+                    "ERROR: Some snapshots still reference WARCs under `.tmp*` after consolidation. "
+                    "Refusing to delete temp dirs. Re-run indexing for this job or investigate the WARC manifest.",
+                    file=sys.stderr,
+                )
+                sys.exit(1)
+
+        provenance_dir = get_job_provenance_dir(output_dir)
+        snapshot_state_file(output_dir, dest_dir=provenance_dir, dry_run=False)
+        snapshot_crawl_configs(
+            temp_dirs,
+            output_dir=output_dir,
+            dest_dir=provenance_dir,
+            dry_run=False,
+        )
+
+        # Delete the original state file to avoid stale references to removed temp dirs;
+        # we preserved a copy under provenance/.
+        if state.state_file_path.exists():
+            try:
+                state.state_file_path.unlink()
+            except OSError:
+                pass
+
+        for d in temp_dirs:
+            if d.is_dir() and d.name.startswith(".tmp"):
+                shutil.rmtree(d)
+
+        job.cleanup_status = "temp_nonwarc_cleaned"
         job.cleaned_at = datetime.now(timezone.utc)
-        job.state_file_path = None
 
+        prov_state_path = provenance_dir / "archive_state.json"
+        job.state_file_path = str(prov_state_path) if prov_state_path.is_file() else None
+
+
+def cmd_consolidate_warcs(args: argparse.Namespace) -> None:
+    """
+    Consolidate a job's WARCs into a stable `<output_dir>/warcs/` directory.
+
+    This creates hardlinks by default (no extra disk usage) and writes a
+    `warcs/manifest.json` mapping of original `.tmp*` WARC paths to stable
+    filenames.
+    """
+    from pathlib import Path
+
+    from archive_tool.utils import find_all_warc_files
+
+    from .archive_storage import build_warc_path_mapping, consolidate_warcs
+    from .indexing.warc_discovery import discover_temp_warcs_for_job
+    from .models import ArchiveJob as ORMArchiveJob
+    from .models import Snapshot
+
+    job_id: int = args.id
+    dry_run: bool = bool(args.dry_run)
+    allow_copy: bool = bool(args.allow_copy)
+    rewrite_paths: bool = bool(args.rewrite_snapshot_paths)
+
+    with get_session() as session:
+        job = session.get(ORMArchiveJob, job_id)
+        if job is None:
+            print(f"ERROR: Job {job_id} not found.", file=sys.stderr)
+            sys.exit(1)
+
+        output_dir = Path(job.output_dir).resolve()
+        if not output_dir.is_dir():
+            print(
+                f"ERROR: Output directory {output_dir} does not exist or is not a directory.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+
+        temp_dirs = sorted([p for p in output_dir.glob(".tmp*") if p.is_dir()])
+        source_warcs = find_all_warc_files(temp_dirs) if temp_dirs else []
+        if not source_warcs:
+            # Fallback to state-based discovery (may find temp dirs not present in glob for edge cases).
+            source_warcs = discover_temp_warcs_for_job(job)
+
+        if not source_warcs:
+            print("No `.tmp*` WARCs discovered; nothing to consolidate.")
+            return
+
+        result = consolidate_warcs(
+            output_dir=output_dir,
+            source_warc_paths=source_warcs,
+            allow_copy_fallback=allow_copy,
+            dry_run=dry_run,
+        )
+
+        print("WARC consolidation")
+        print("------------------")
+        print(f"Job ID:           {job.id}")
+        print(f"Output dir:       {output_dir}")
+        print(f"Stable WARCs dir: {result.warcs_dir}")
+        print(f"Manifest:         {result.manifest_path}")
+        print(f"Source WARCs:     {len(source_warcs)}")
+        print(f"Stable WARCs:     {len(result.stable_warcs)}")
+        print(f"Created:          {result.created}")
+        print(f"Reused:           {result.reused}")
+        if dry_run:
+            print("")
+            print("Dry run: no files were created and no DB rows were updated.")
+            return
+
+        if rewrite_paths:
+            mapping = build_warc_path_mapping(output_dir)
+            if not mapping:
+                print(
+                    "ERROR: WARC manifest missing or empty; cannot rewrite snapshot paths.",
+                    file=sys.stderr,
+                )
+                sys.exit(1)
+
+            distinct_paths = (
+                session.query(Snapshot.warc_path)
+                .filter(Snapshot.job_id == job.id)
+                .distinct()
+                .all()
+            )
+            warc_paths_in_db = sorted({p for (p,) in distinct_paths if p})
+            updated = 0
+            for old_path in warc_paths_in_db:
+                new_path = mapping.get(str(Path(old_path).resolve()))
+                if not new_path or new_path == old_path:
+                    continue
+                updated += (
+                    session.query(Snapshot)
+                    .filter(Snapshot.job_id == job.id, Snapshot.warc_path == old_path)
+                    .update({Snapshot.warc_path: new_path}, synchronize_session=False)
+                )
+            if updated:
+                session.commit()
+            print(f"Rewrote Snapshot.warc_path for {updated} row(s).")
+
+
+def cmd_job_storage_report(args: argparse.Namespace) -> None:
+    """
+    Print (and optionally refresh) a job's storage accounting fields.
+    """
+    from pathlib import Path
+
+    from .archive_storage import compute_job_storage_stats
+    from .indexing.warc_discovery import discover_warcs_for_job
+    from .models import ArchiveJob as ORMArchiveJob
+
+    job_id: int = args.id
+    refresh: bool = bool(args.refresh)
+    as_json: bool = bool(args.json)
+
+    with get_session() as session:
+        job = session.get(ORMArchiveJob, job_id)
+        if job is None:
+            print(f"ERROR: Job {job_id} not found.", file=sys.stderr)
+            sys.exit(1)
+
+        output_dir = Path(job.output_dir).resolve()
+        if not output_dir.is_dir():
+            print(
+                f"ERROR: Output directory {output_dir} does not exist or is not a directory.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+
+        if refresh:
+            warc_paths = discover_warcs_for_job(job)
+            temp_dirs = sorted([p for p in output_dir.glob(".tmp*") if p.is_dir()])
+            stats = compute_job_storage_stats(
+                output_dir=output_dir,
+                temp_dirs=temp_dirs,
+                stable_warc_paths=warc_paths,
+            )
+            job.warc_file_count = int(stats.warc_file_count)
+            job.warc_bytes_total = int(stats.warc_bytes_total)
+            job.output_bytes_total = int(stats.output_bytes_total)
+            job.tmp_bytes_total = int(stats.tmp_bytes_total)
+            job.tmp_non_warc_bytes_total = int(stats.tmp_non_warc_bytes_total)
+            job.storage_scanned_at = stats.scanned_at
+            session.commit()
+
+        payload = {
+            "jobId": job.id,
+            "name": job.name,
+            "status": job.status,
+            "outputDir": job.output_dir,
+            "warcFileCount": int(job.warc_file_count),
+            "warcBytesTotal": int(job.warc_bytes_total),
+            "outputBytesTotal": int(job.output_bytes_total),
+            "tmpBytesTotal": int(job.tmp_bytes_total),
+            "tmpNonWarcBytesTotal": int(job.tmp_non_warc_bytes_total),
+            "storageScannedAt": job.storage_scanned_at.isoformat() if job.storage_scanned_at else None,
+        }
+
+        if as_json:
+            print(json.dumps(payload, indent=2, sort_keys=True))
+            return
+
+        print("Job storage report")
+        print("------------------")
+        for k in (
+            "jobId",
+            "name",
+            "status",
+            "outputDir",
+            "warcFileCount",
+            "warcBytesTotal",
+            "outputBytesTotal",
+            "tmpBytesTotal",
+            "tmpNonWarcBytesTotal",
+            "storageScannedAt",
+        ):
+            print(f"{k}: {payload[k]}")
 
 def cmd_replay_index_job(args: argparse.Namespace) -> None:
     """
@@ -1010,6 +1352,7 @@ def cmd_replay_index_job(args: argparse.Namespace) -> None:
     `docs/deployment/replay-service-pywb.md`.
     """
     from pathlib import Path
+    import getpass
 
     from .indexing.warc_discovery import discover_warcs_for_job
     from .models import ArchiveJob as ORMArchiveJob
@@ -1123,7 +1466,18 @@ def cmd_replay_index_job(args: argparse.Namespace) -> None:
                 file=sys.stderr,
             )
             sys.exit(1)
-        path.unlink()
+        try:
+            path.unlink()
+        except PermissionError as exc:
+            user = getpass.getuser()
+            print(
+                f"ERROR: Permission denied while removing existing WARC link {path}: {exc}\n"
+                f"Hint: run this command as a user that can write to {archive_dir} "
+                f"(e.g. `sudo -u hareplay ...` or `sudo ...`). Current user: {user}\n"
+                f"Debug: `ls -ld {archive_dir}`",
+                file=sys.stderr,
+            )
+            sys.exit(1)
 
     host_root_resolved = warcs_host_root.resolve()
     if not host_root_resolved.is_dir():
@@ -1156,7 +1510,18 @@ def cmd_replay_index_job(args: argparse.Namespace) -> None:
             print(f"  would link {link_path} -> {target_in_container}")
             continue
 
-        link_path.symlink_to(target_in_container)
+        try:
+            link_path.symlink_to(target_in_container)
+        except PermissionError as exc:
+            user = getpass.getuser()
+            print(
+                f"ERROR: Permission denied while creating WARC link {link_path}: {exc}\n"
+                f"Hint: run this command as a user that can write to {archive_dir} "
+                f"(e.g. `sudo -u hareplay ...` or `sudo ...`). Current user: {user}\n"
+                f"Debug: `ls -ld {archive_dir}`",
+                file=sys.stderr,
+            )
+            sys.exit(1)
 
     if dry_run:
         print("")
@@ -1875,9 +2240,13 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p_cleanup.add_argument(
         "--mode",
-        choices=["temp"],
+        choices=["temp", "temp-nonwarc"],
         default="temp",
-        help="Cleanup mode (currently only 'temp' is supported).",
+        help=(
+            "Cleanup mode. 'temp' deletes .tmp* and may delete WARCs; "
+            "'temp-nonwarc' consolidates WARCs to warcs/ first and then "
+            "deletes .tmp*."
+        ),
     )
     p_cleanup.add_argument(
         "--force",
@@ -1888,7 +2257,72 @@ def build_parser() -> argparse.ArgumentParser:
             "replay is enabled)."
         ),
     )
+    p_cleanup.add_argument(
+        "--dry-run",
+        action="store_true",
+        default=False,
+        help="Print the planned cleanup actions without changing files or the DB.",
+    )
     p_cleanup.set_defaults(func=cmd_cleanup_job)
+
+    # consolidate-warcs
+    p_consolidate = subparsers.add_parser(
+        "consolidate-warcs",
+        help="Consolidate a job's WARCs into a stable warcs/ directory.",
+    )
+    p_consolidate.add_argument(
+        "--id",
+        type=int,
+        required=True,
+        help="ArchiveJob ID whose WARCs should be consolidated.",
+    )
+    p_consolidate.add_argument(
+        "--dry-run",
+        action="store_true",
+        default=False,
+        help="Print the planned consolidation actions without creating files.",
+    )
+    p_consolidate.add_argument(
+        "--allow-copy",
+        action="store_true",
+        default=False,
+        help=(
+            "Allow falling back to file copies when hardlinking is not possible "
+            "(e.g. cross-device)."
+        ),
+    )
+    p_consolidate.add_argument(
+        "--rewrite-snapshot-paths",
+        action="store_true",
+        default=False,
+        help="Rewrite Snapshot.warc_path values for this job to point at warcs/ stable files.",
+    )
+    p_consolidate.set_defaults(func=cmd_consolidate_warcs)
+
+    # job-storage-report
+    p_storage = subparsers.add_parser(
+        "job-storage-report",
+        help="Report (and optionally refresh) a job's storage accounting fields.",
+    )
+    p_storage.add_argument(
+        "--id",
+        type=int,
+        required=True,
+        help="ArchiveJob ID to report on.",
+    )
+    p_storage.add_argument(
+        "--refresh",
+        action="store_true",
+        default=False,
+        help="Recompute storage stats from disk and persist them to the DB.",
+    )
+    p_storage.add_argument(
+        "--json",
+        action="store_true",
+        default=False,
+        help="Emit JSON instead of human-readable text.",
+    )
+    p_storage.set_defaults(func=cmd_job_storage_report)
 
     # replay-index-job
     p_replay_index = subparsers.add_parser(

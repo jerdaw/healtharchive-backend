@@ -6,13 +6,16 @@ from pathlib import Path
 from sqlalchemy import inspect
 from sqlalchemy.orm import Session
 
+from ha_backend.archive_storage import (compute_job_storage_stats,
+                                        consolidate_warcs, get_job_warcs_dir)
 from ha_backend.authority import recompute_page_signals
 from ha_backend.db import get_session
 from ha_backend.indexing.mapping import record_to_snapshot
 from ha_backend.indexing.text_extraction import (detect_language, extract_text,
                                                  extract_outlink_groups,
                                                  extract_title, make_snippet)
-from ha_backend.indexing.warc_discovery import discover_warcs_for_job
+from ha_backend.indexing.warc_discovery import (discover_temp_warcs_for_job,
+                                                discover_warcs_for_job)
 from ha_backend.indexing.warc_reader import iter_html_records
 from ha_backend.models import ArchiveJob, Snapshot, SnapshotOutlink
 
@@ -58,6 +61,41 @@ def index_job(job_id: int) -> int:
             raise ValueError(
                 f"ArchiveJob {job_id} output_dir does not exist or is not a directory: {output_dir}"
             )
+
+        # Prefer indexing from stable per-job WARCs when possible.
+        #
+        # If the job only has legacy WARCs under `.tmp*`, consolidate them into
+        # `<output_dir>/warcs/` first (via hardlink) so operators can later
+        # safely delete `.tmp*` without breaking replay or snapshot viewing.
+        output_dir = output_dir.resolve()
+        stable_warcs_dir = get_job_warcs_dir(output_dir)
+        stable_present = stable_warcs_dir.is_dir() and (
+            any(stable_warcs_dir.rglob("*.warc.gz"))
+            or any(stable_warcs_dir.rglob("*.warc"))
+        )
+        if not stable_present:
+            temp_warcs = discover_temp_warcs_for_job(job)
+            if temp_warcs:
+                try:
+                    result = consolidate_warcs(
+                        output_dir=output_dir,
+                        source_warc_paths=temp_warcs,
+                        allow_copy_fallback=False,
+                        dry_run=False,
+                    )
+                    logger.info(
+                        "Consolidated %d WARC(s) into %s (created=%d reused=%d).",
+                        len(result.stable_warcs),
+                        result.warcs_dir,
+                        result.created,
+                        result.reused,
+                    )
+                except Exception as exc:
+                    logger.warning(
+                        "WARC consolidation failed for job %s; continuing with legacy `.tmp*` WARCs: %s",
+                        job_id,
+                        exc,
+                    )
 
         # Discover WARC files for this job.
         warc_paths = discover_warcs_for_job(job)
@@ -169,6 +207,22 @@ def index_job(job_id: int) -> int:
             if use_authority and impacted_groups:
                 session.flush()
                 recompute_page_signals(session, groups=tuple(impacted_groups))
+
+            # Best-effort storage accounting (metadata-only; no content reads).
+            try:
+                temp_dirs = sorted([p for p in output_dir.glob(".tmp*") if p.is_dir()])
+                stats = compute_job_storage_stats(
+                    output_dir=output_dir,
+                    temp_dirs=temp_dirs,
+                    stable_warc_paths=warc_paths,
+                )
+                job.warc_bytes_total = stats.warc_bytes_total
+                job.output_bytes_total = stats.output_bytes_total
+                job.tmp_bytes_total = stats.tmp_bytes_total
+                job.tmp_non_warc_bytes_total = stats.tmp_non_warc_bytes_total
+                job.storage_scanned_at = stats.scanned_at
+            except Exception as exc:
+                logger.warning("Failed to compute storage stats for job %s: %s", job_id, exc)
 
             logger.info(
                 "Indexing for job %s completed successfully with %d snapshot(s).",
