@@ -775,16 +775,17 @@ def _search_snapshots_inner(
             db.execute(text("SET LOCAL pg_trgm.similarity_threshold = 0.12"))
 
         url_expr = Snapshot.url
-        group_expr = func.coalesce(Snapshot.normalized_url_group, "")
+        # Use raw columns for the candidate filter so pg_trgm GIN indexes can be
+        # used; avoid wrapping in COALESCE here, as that prevents index usage.
+        title_candidate = Snapshot.title
 
         title_sim = func.similarity(title_expr, q_filter)
         url_sim = func.similarity(url_expr, q_filter)
-        group_sim = func.similarity(group_expr, q_filter)
         snippet_sim = func.similarity(snippet_expr, q_filter)
 
         score_override = func.greatest(
             title_sim,
-            0.8 * func.greatest(url_sim, group_sim),
+            0.8 * url_sim,
             0.4 * snippet_sim,
         )
 
@@ -796,9 +797,8 @@ def _search_snapshots_inner(
         # terms; snippet similarity still contributes to ranking.
         return qry.filter(
             or_(
-                title_expr.op("%")(q_filter),
+                title_candidate.op("%")(q_filter),
                 url_expr.op("%")(q_filter),
-                group_expr.op("%")(q_filter),
             )
         )
 
