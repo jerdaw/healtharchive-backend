@@ -98,9 +98,11 @@ archived URL for edition switching.
   #ha-replay-banner .ha-replay-disclaimer {
     color: rgba(15, 23, 42, 0.55);
     overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
     max-width: 100%;
+    white-space: normal;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
   }
 
   #ha-replay-banner a,
@@ -413,18 +415,33 @@ archived URL for edition switching.
 
         function makeRedirectBlobUrl(dest) {
           try {
+            function escapeHtmlAttr(value) {
+              return String(value)
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;");
+            }
+
+            function escapeHtmlText(value) {
+              return String(value)
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;");
+            }
+
             var html =
               "<!doctype html><meta charset=utf-8>" +
               "<meta name=referrer content=no-referrer>" +
-              "<title>Redirecting…</title>" +
-              "<script>location.replace(" +
-              JSON.stringify(dest) +
-              ")</script>" +
+              "<title>Redirecting...</title>" +
+              '<meta http-equiv="refresh" content="0;url=' +
+              escapeHtmlAttr(dest) +
+              '">' +
               "<p>Redirecting to <a href=" +
               JSON.stringify(dest) +
               ">" +
-              dest +
-              "</a>…</p>";
+              escapeHtmlText(dest) +
+              "</a>...</p>";
             return URL.createObjectURL(new Blob([html], { type: "text/html" }));
           } catch (e) {
             return dest;
