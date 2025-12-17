@@ -7,7 +7,7 @@ from sqlalchemy import Float, Integer, and_, case, cast, func, inspect, literal,
 from sqlalchemy.orm import Session, joinedload, load_only
 
 from ha_backend.db import get_session
-from ha_backend.models import ArchiveJob, PageSignal, Snapshot, SnapshotOutlink, Source
+from ha_backend.models import ArchiveJob, PageSignal, Snapshot, Source
 from ha_backend.search import TS_CONFIG, build_search_vector
 from ha_backend.search_ranking import (
     QueryMode,
@@ -294,11 +294,13 @@ def search_debug(
     if q_clean:
         if use_postgres_fts and effective_sort == SearchSort.relevance:
             tsquery = func.websearch_to_tsquery(TS_CONFIG, q_clean)
-            vector_expr = func.coalesce(
-                Snapshot.search_vector,
-                build_search_vector(Snapshot.title, Snapshot.snippet, Snapshot.url),
+            computed_vector = build_search_vector(Snapshot.title, Snapshot.snippet, Snapshot.url)
+            vector_expr = func.coalesce(Snapshot.search_vector, computed_vector)
+            fts_filter = or_(
+                Snapshot.search_vector.op("@@")(tsquery),
+                and_(Snapshot.search_vector.is_(None), computed_vector.op("@@")(tsquery)),
             )
-            query = query.filter(vector_expr.op("@@")(tsquery))
+            query = query.filter(fts_filter)
         else:
             ilike_pattern = f"%{q_clean}%"
             query = query.filter(
@@ -348,7 +350,6 @@ def search_debug(
     has_page_signals = (
         effective_sort == SearchSort.relevance and q_clean is not None and _has_table(db, "page_signals")
     )
-    has_snapshot_outlinks = _has_table(db, "snapshot_outlinks")
     has_ps_outlink_count = has_page_signals and _has_column(db, "page_signals", "outlink_count")
     has_ps_pagerank = has_page_signals and _has_column(db, "page_signals", "pagerank")
 
@@ -357,7 +358,7 @@ def search_debug(
         ranking_version == RankingVersion.v2
         and ranking_cfg is not None
         and query_mode == QueryMode.broad
-        and has_snapshot_outlinks
+        and has_ps_outlink_count
     )
     use_pagerank = (
         ranking_version == RankingVersion.v2
@@ -367,20 +368,7 @@ def search_debug(
     )
 
     inlink_count_expr = func.coalesce(PageSignal.inlink_count, 0) if has_page_signals else None
-    outlink_count_expr = None
-    if use_hubness:
-        correlated = (
-            db.query(func.count(func.distinct(SnapshotOutlink.to_normalized_url_group)))
-            .filter(SnapshotOutlink.snapshot_id == Snapshot.id)
-            .filter(SnapshotOutlink.to_normalized_url_group != group_key)
-            .correlate(Snapshot)
-            .scalar_subquery()
-        )
-        correlated = func.coalesce(correlated, 0)
-        if has_ps_outlink_count:
-            outlink_count_expr = func.coalesce(PageSignal.outlink_count, correlated)
-        else:
-            outlink_count_expr = correlated
+    outlink_count_expr = func.coalesce(PageSignal.outlink_count, 0) if use_hubness else None
 
     pagerank_expr = func.coalesce(PageSignal.pagerank, 0.0) if use_pagerank else None
 
@@ -748,7 +736,7 @@ def search_debug(
         rankingVersion=ranking_version.value,
         queryMode=query_mode.value if query_mode is not None else None,
         usedPageSignals=bool(has_page_signals),
-        usedSnapshotOutlinks=bool(has_snapshot_outlinks),
+        usedSnapshotOutlinks=False,
         usedPagerank=bool(use_pagerank),
     )
 

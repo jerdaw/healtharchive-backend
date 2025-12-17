@@ -17,7 +17,7 @@ from threading import Lock
 from ha_backend.config import get_replay_base_url, get_replay_preview_dir
 from ha_backend.db import get_session
 from ha_backend.indexing.viewer import find_record_for_snapshot
-from ha_backend.models import ArchiveJob, PageSignal, Snapshot, SnapshotOutlink, Source
+from ha_backend.models import ArchiveJob, PageSignal, Snapshot, Source
 from ha_backend.search import TS_CONFIG, build_search_vector
 from ha_backend.search_ranking import (
     QueryMode,
@@ -749,11 +749,17 @@ def _search_snapshots_inner(
         nonlocal tsquery, vector_expr
         assert q_filter is not None
         tsquery = func.websearch_to_tsquery(TS_CONFIG, q_filter)
-        vector_expr = func.coalesce(
-            Snapshot.search_vector,
-            build_search_vector(Snapshot.title, Snapshot.snippet, Snapshot.url),
+        computed_vector = build_search_vector(Snapshot.title, Snapshot.snippet, Snapshot.url)
+
+        # Filter using the indexed column where possible so Postgres can use the
+        # `ix_snapshots_search_vector` GIN index; only fall back to an on-the-fly
+        # computed vector for rows that are missing the cached value.
+        vector_expr = func.coalesce(Snapshot.search_vector, computed_vector)
+        fts_filter = or_(
+            Snapshot.search_vector.op("@@")(tsquery),
+            and_(Snapshot.search_vector.is_(None), computed_vector.op("@@")(tsquery)),
         )
-        return qry.filter(vector_expr.op("@@")(tsquery))
+        return qry.filter(fts_filter)
 
     def apply_fuzzy_filter(qry: Any) -> Any:
         nonlocal score_override
@@ -902,7 +908,6 @@ def _search_snapshots_inner(
     )
     use_authority = use_page_signals
 
-    has_outlink_table = _has_table(db, "snapshot_outlinks")
     has_ps_outlink_count = use_page_signals and _has_column(
         db, "page_signals", "outlink_count"
     )
@@ -914,7 +919,7 @@ def _search_snapshots_inner(
         and query_mode == QueryMode.broad
         and effective_sort == SearchSort.relevance
         and rank_text is not None
-        and has_outlink_table
+        and has_ps_outlink_count
     )
 
     inlink_count = None
@@ -932,21 +937,7 @@ def _search_snapshots_inner(
 
     outlink_count = None
     if use_hubness:
-        correlated_outlinks = (
-            db.query(func.count(func.distinct(SnapshotOutlink.to_normalized_url_group)))
-            .filter(SnapshotOutlink.snapshot_id == Snapshot.id)
-            .filter(SnapshotOutlink.to_normalized_url_group != group_key)
-            .correlate(Snapshot)
-            .scalar_subquery()
-        )
-        correlated_outlinks = func.coalesce(correlated_outlinks, 0)
-
-        if has_ps_outlink_count:
-            # Use the precomputed per-page outlink_count when available, but fall back
-            # to a correlated per-snapshot count if the page_signals row is missing.
-            outlink_count = func.coalesce(PageSignal.outlink_count, correlated_outlinks)
-        else:
-            outlink_count = correlated_outlinks
+        outlink_count = func.coalesce(PageSignal.outlink_count, 0)
 
     pagerank_value = None
     if use_pagerank:
