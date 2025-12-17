@@ -1700,6 +1700,11 @@ def get_snapshot_raw(
     replay_url = _build_browse_url(snap.job_id, snap.url, snap.capture_timestamp, snap.id)
     snapshot_details_url = f"https://www.healtharchive.ca/snapshot/{snap.id}"
     snapshot_json_url = f"https://api.healtharchive.ca/api/snapshot/{snap.id}"
+    replay_link_html = (
+        f'<a class="ha-replay-link" href="{replay_url}" rel="noreferrer">Replay</a>'
+        if replay_url
+        else ""
+    )
 
     banner = f"""
 <style id="ha-replay-banner-css">
@@ -1850,7 +1855,7 @@ def get_snapshot_raw(
     </div>
     <div class="ha-replay-right">
       <a class="ha-replay-link" href="{snapshot_details_url}" rel="noreferrer">Snapshot details</a>
-      {("<a class=\"ha-replay-link\" href=\"" + replay_url + "\" rel=\"noreferrer\">Replay</a>") if replay_url else ""}
+      {replay_link_html}
       <a class="ha-replay-link" href="{snapshot_json_url}" rel="noreferrer">Metadata JSON</a>
       <button type="button" class="ha-replay-link" id="ha-replay-hide" aria-label="Hide this banner">Hide</button>
     </div>
