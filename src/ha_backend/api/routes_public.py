@@ -769,46 +769,52 @@ def _search_snapshots_inner(
         if not _has_pg_trgm(db):
             return qry.filter(text("0=1"))
 
-        title_expr = func.coalesce(Snapshot.title, "")
-        snippet_expr = func.coalesce(Snapshot.snippet, "")
-
-        # Lower trigram similarity threshold for the fuzzy fallback.
+        # For misspellings we want word-level matching ("coronovirus" should match
+        # "Coronavirus disease ...") without lowering the global similarity
+        # threshold enough to create enormous candidate sets.
         #
-        # Notes:
-        # - `%` uses pg_trgm.similarity_threshold (default is often too strict for
-        #   misspellings like "influensa" / "coronovirus").
-        # - `SET LOCAL` scopes this to the current transaction so pooled
-        #   connections don't carry the setting across requests.
+        # pg_trgm provides a word-similarity operator (<%) which compares against
+        # the best-matching word/substring instead of the entire field.
+        tokens = [t for t in match_tokens if t][:4]
+        if not tokens:
+            return qry.filter(text("0=1"))
+
         if dialect_name == "postgresql":
-            db.execute(text("SET LOCAL pg_trgm.similarity_threshold = 0.12"))
+            # Default is often too strict for common misspellings.
+            db.execute(text("SET LOCAL pg_trgm.word_similarity_threshold = 0.35"))
 
+        title_expr = func.coalesce(Snapshot.title, "")
         url_expr = Snapshot.url
-        # Use raw columns for the candidate filter so pg_trgm GIN indexes can be
-        # used; avoid wrapping in COALESCE here, as that prevents index usage.
+
+        title_scores = [func.word_similarity(title_expr, t) for t in tokens]
+        title_score = sum(title_scores, 0.0) / float(len(title_scores))
+
+        # Only incorporate URL similarity for URL-ish queries; otherwise it tends
+        # to drastically increase candidate counts for broad terms.
+        use_url = any(any(ch in t for ch in ("/", ".", ":", "?", "&", "=")) for t in tokens)
+        if use_url:
+            url_scores = [func.similarity(url_expr, t) for t in tokens]
+            url_score = sum(url_scores, 0.0) / float(len(url_scores))
+            score_override = func.greatest(title_score, 0.8 * url_score)
+        else:
+            score_override = title_score
+
+        # Candidate filter: AND across tokens, OR across fields.
+        # Use raw columns so trigram GIN indexes can be used.
         title_candidate = Snapshot.title
+        token_filters = []
+        for token in tokens:
+            if use_url:
+                token_filters.append(
+                    or_(
+                        title_candidate.op("<%")(token),
+                        url_expr.op("%")(token),
+                    )
+                )
+            else:
+                token_filters.append(title_candidate.op("<%")(token))
 
-        title_sim = func.similarity(title_expr, q_filter)
-        url_sim = func.similarity(url_expr, q_filter)
-        snippet_sim = func.similarity(snippet_expr, q_filter)
-
-        score_override = func.greatest(
-            title_sim,
-            0.8 * url_sim,
-            0.4 * snippet_sim,
-        )
-
-        # Use pg_trgm's similarity operator (%) as the candidate filter so
-        # trigram GIN indexes can be used.
-        #
-        # We intentionally do not include snippet in the candidate filter since
-        # it is long and can drastically increase candidate counts for broad
-        # terms; snippet similarity still contributes to ranking.
-        return qry.filter(
-            or_(
-                title_candidate.op("%")(q_filter),
-                url_expr.op("%")(q_filter),
-            )
-        )
+        return qry.filter(and_(*token_filters))
 
     if url_search_targets:
         query = query.filter(group_key.in_(url_search_targets))
@@ -906,6 +912,7 @@ def _search_snapshots_inner(
     use_page_signals = (
         effective_sort == SearchSort.relevance
         and rank_text is not None
+        and score_override is None
         and _has_table(db, "page_signals")
     )
     use_authority = use_page_signals
@@ -1228,6 +1235,7 @@ def _search_snapshots_inner(
             ranking_version == RankingVersion.v2
             and effective_sort == SearchSort.relevance
             and rank_text
+            and score_override is None
         ):
             ordered = build_item_query_for_pages_v2()
         else:
