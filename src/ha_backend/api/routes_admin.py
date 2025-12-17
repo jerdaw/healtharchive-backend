@@ -309,7 +309,28 @@ def search_debug(
                 )
             )
 
-    group_key = func.coalesce(Snapshot.normalized_url_group, Snapshot.url)
+    def strip_query_fragment_expr(url_expr: object) -> object:
+        if dialect_name == "postgresql":
+            return func.regexp_replace(url_expr, r"[?#].*$", "")
+        if dialect_name == "sqlite":
+            q_pos = func.instr(url_expr, "?")
+            hash_pos = func.instr(url_expr, "#")
+            cut_pos = case(
+                (and_(q_pos > 0, hash_pos > 0), func.min(q_pos, hash_pos)),
+                (q_pos > 0, q_pos),
+                (hash_pos > 0, hash_pos),
+                else_=0,
+            )
+            return case(
+                (cut_pos > 0, func.substr(url_expr, 1, cut_pos - 1)),
+                else_=url_expr,
+            )
+        return url_expr
+
+    group_key = func.coalesce(
+        Snapshot.normalized_url_group,
+        strip_query_fragment_expr(Snapshot.url),
+    )
     if effective_view == SearchView.pages:
         total = query.with_entities(func.count(func.distinct(group_key))).scalar() or 0
     else:

@@ -25,6 +25,9 @@ class _SearchMetrics:
     # Simple breakdown counters.
     relevance_fts: int = 0
     relevance_fallback: int = 0
+    relevance_fuzzy: int = 0
+    boolean: int = 0
+    url: int = 0
     newest: int = 0
 
 
@@ -64,6 +67,12 @@ def observe_search_request(*, duration_seconds: float, mode: str, ok: bool) -> N
             m.relevance_fts += 1
         elif mode.startswith("relevance_fallback"):
             m.relevance_fallback += 1
+        elif mode.startswith("relevance_fuzzy"):
+            m.relevance_fuzzy += 1
+        elif mode == "boolean":
+            m.boolean += 1
+        elif mode == "url":
+            m.url += 1
         else:
             m.newest += 1
 
@@ -99,6 +108,9 @@ def render_search_metrics_prometheus() -> list[str]:
         lines.append("# TYPE healtharchive_search_mode_total counter")
         lines.append(f'healtharchive_search_mode_total{{mode="relevance_fts"}} {m.relevance_fts}')
         lines.append(f'healtharchive_search_mode_total{{mode="relevance_fallback"}} {m.relevance_fallback}')
+        lines.append(f'healtharchive_search_mode_total{{mode="relevance_fuzzy"}} {m.relevance_fuzzy}')
+        lines.append(f'healtharchive_search_mode_total{{mode="boolean"}} {m.boolean}')
+        lines.append(f'healtharchive_search_mode_total{{mode="url"}} {m.url}')
         lines.append(f'healtharchive_search_mode_total{{mode="newest"}} {m.newest}')
 
         lines.append("# HELP healtharchive_search_duration_seconds_max Max observed /api/search latency (seconds)")

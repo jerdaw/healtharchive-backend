@@ -141,6 +141,11 @@ The metrics endpoint exposes, among others:
   healtharchive_search_errors_total 0
   healtharchive_search_duration_seconds_bucket{le="0.3"} 100
   healtharchive_search_mode_total{mode="relevance_fts"} 80
+  healtharchive_search_mode_total{mode="relevance_fallback"} 25
+  healtharchive_search_mode_total{mode="relevance_fuzzy"} 5
+  healtharchive_search_mode_total{mode="boolean"} 2
+  healtharchive_search_mode_total{mode="url"} 3
+  healtharchive_search_mode_total{mode="newest"} 8
   ```
 
 ### 2.3 Example alert ideas (Prometheus‑style)

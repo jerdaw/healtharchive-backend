@@ -120,6 +120,17 @@ for existing rows:
 ha-backend backfill-search-vector
 ```
 
+### 5.1.1 Enable fuzzy search (Postgres only)
+
+Fuzzy matching for misspellings relies on the `pg_trgm` extension and trigram
+GIN indexes (see Alembic migration `0007_pg_trgm_fuzzy_search`).
+
+Notes:
+
+- `CREATE EXTENSION` may require elevated DB privileges on some hosts.
+- If `pg_trgm` is unavailable, search still works (FTS + substring fallback), but
+  the fuzzy similarity fallback is disabled.
+
 ### 5.2 Refresh snippets/titles from WARCs (in place)
 
 After improving HTML extraction logic, update snapshot metadata without
@@ -127,6 +138,16 @@ re-indexing (IDs remain stable):
 
 ```bash
 ha-backend refresh-snapshot-metadata --job-id <JOB_ID>
+```
+
+### 5.2.1 Backfill normalized URL groups (page de-duplication)
+
+If older snapshots are missing `Snapshot.normalized_url_group`, `view=pages`
+may show duplicate “pages” for the same URL (especially when query parameters
+vary). Backfill the column:
+
+```bash
+ha-backend backfill-normalized-url-groups
 ```
 
 ### 5.3 Backfill outlinks + authority signals

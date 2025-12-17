@@ -1,25 +1,10 @@
 from __future__ import annotations
 
 import hashlib
-from urllib.parse import urlsplit, urlunsplit
 
 from ha_backend.indexing.warc_reader import ArchiveRecord
 from ha_backend.models import ArchiveJob, Snapshot, Source
-
-
-def normalize_url_for_grouping(url: str) -> str:
-    """
-    Normalise a URL for grouping snapshots into a logical series.
-
-    For now:
-    - Lowercase scheme and hostname
-    - Drop query and fragment
-    """
-    parts = urlsplit(url)
-    scheme = parts.scheme.lower()
-    netloc = parts.netloc.lower()
-    path = parts.path or "/"
-    return urlunsplit((scheme, netloc, path, "", ""))
+from ha_backend.url_normalization import normalize_url_for_grouping
 
 
 def compute_content_hash(body_bytes: bytes) -> str:
