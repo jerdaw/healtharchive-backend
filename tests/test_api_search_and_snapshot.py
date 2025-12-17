@@ -548,6 +548,17 @@ def test_search_boolean_field_url(tmp_path, monkeypatch) -> None:
     assert "Flu recommendations" in data["results"][0]["title"]
 
 
+def test_search_boolean_field_url_with_dot_is_not_exact_url_lookup(tmp_path, monkeypatch) -> None:
+    client = _init_test_app(tmp_path, monkeypatch)
+    _seed_search_data()
+
+    resp = client.get("/api/search", params={"q": "url:covid19.html"})
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["total"] == 1
+    assert "COVID-19 guidance" in data["results"][0]["title"]
+
+
 def test_search_default_relevance_sort_and_filters_non_2xx(tmp_path, monkeypatch) -> None:
     client = _init_test_app(tmp_path, monkeypatch)
     _seed_search_quality_data()
