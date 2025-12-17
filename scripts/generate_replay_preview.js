@@ -46,8 +46,33 @@ if (!url || !outPath) {
 
 async function main() {
   // Playwright is provided by the Playwright Docker image.
+  // The official Playwright Docker image includes browser binaries, but it does
+  // not necessarily ship with the Node "playwright" package preinstalled.
+  // Our wrapper command may install it into the working directory (cached on
+  // the host). Resolve Playwright from:
+  //   1) normal Node resolution, then
+  //   2) the current working directory (createRequire(process.cwd())).
+  function loadPlaywright() {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      return require("playwright");
+    } catch (err) {
+      // Ignore and try cwd-based resolution below.
+    }
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const { createRequire } = require("module");
+      const requireFromCwd = createRequire(`${process.cwd()}/`);
+      return requireFromCwd("playwright");
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error("Unable to load Playwright from node_modules.", err);
+      throw err;
+    }
+  }
+
   // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const { chromium } = require("playwright");
+  const { chromium } = loadPlaywright();
 
   const browser = await chromium.launch({
     args: ["--disable-dev-shm-usage"],
