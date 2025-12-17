@@ -367,6 +367,24 @@ def _seed_hubness_ranking_data() -> None:
         session.add_all([hub, non_hub])
         session.flush()
 
+        # Precomputed per-page link signals (as produced by recompute-page-signals).
+        session.add_all(
+            [
+                PageSignal(
+                    normalized_url_group=hub.normalized_url_group,
+                    inlink_count=0,
+                    outlink_count=60,
+                    pagerank=0.0,
+                ),
+                PageSignal(
+                    normalized_url_group=non_hub.normalized_url_group,
+                    inlink_count=0,
+                    outlink_count=0,
+                    pagerank=0.0,
+                ),
+            ]
+        )
+
         session.add_all(
             [
                 SnapshotOutlink(
