@@ -63,7 +63,12 @@ def _seed_basic_data() -> None:
             pages_total=20,
             pages_failed=1,
             warc_file_count=2,
+            warc_bytes_total=123,
             indexed_page_count=5,
+            output_bytes_total=456,
+            tmp_bytes_total=789,
+            tmp_non_warc_bytes_total=321,
+            storage_scanned_at=now,
         )
         session.add_all([job1, job2])
         session.flush()
@@ -134,6 +139,8 @@ def test_admin_job_detail_and_status_counts(tmp_path, monkeypatch) -> None:
     assert resp.status_code == 200
     items = resp.json()["items"]
     assert items
+    assert "warcBytesTotal" in items[0]
+    assert "storageScannedAt" in items[0]
     job_id = items[0]["id"]
 
     # Job detail
@@ -143,6 +150,11 @@ def test_admin_job_detail_and_status_counts(tmp_path, monkeypatch) -> None:
     assert detail["id"] == job_id
     assert "outputDir" in detail
     assert "status" in detail
+    assert "warcBytesTotal" in detail
+    assert "outputBytesTotal" in detail
+    assert "tmpBytesTotal" in detail
+    assert "tmpNonWarcBytesTotal" in detail
+    assert "storageScannedAt" in detail
 
     # Status counts
     counts_resp = client.get("/api/admin/jobs/status-counts")
@@ -196,6 +208,8 @@ def test_metrics_content_includes_basic_counters(tmp_path, monkeypatch) -> None:
     assert "healtharchive_snapshots_total" in body
     assert "healtharchive_jobs_pages_crawled_total" in body
     assert "healtharchive_jobs_pages_failed_total" in body
+    assert "healtharchive_jobs_warc_bytes_total" in body
+    assert "healtharchive_jobs_storage_scanned_total" in body
 
 
 def test_metrics_include_cleanup_status_labels(tmp_path, monkeypatch) -> None:
@@ -242,6 +256,8 @@ def test_metrics_include_page_totals_and_per_source(tmp_path, monkeypatch) -> No
     assert "healtharchive_jobs_pages_failed_total" in body
     assert 'healtharchive_jobs_pages_crawled_total{source="hc"}' in body
     assert 'healtharchive_jobs_pages_failed_total{source="hc"}' in body
+    assert "healtharchive_jobs_warc_bytes_total 123" in body
+    assert 'healtharchive_jobs_warc_bytes_total{source="hc"} 123' in body
 
 
 def test_admin_requires_token_when_env_is_production(tmp_path, monkeypatch) -> None:
