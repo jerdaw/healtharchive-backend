@@ -216,7 +216,7 @@ def test_sources_entry_record_prefers_base_url_over_latest_snapshot(
     assert hc_payload["entryRecordId"] == entry_id
     assert (
         hc_payload["entryBrowseUrl"]
-        == f"https://replay.healtharchive.ca/job-{job_id}/20250401120000/https://www.canada.ca/en/health-canada.html"
+        == f"https://replay.healtharchive.ca/job-{job_id}/20250401120000/https://www.canada.ca/en/health-canada.html#ha_snapshot={entry_id}"
     )
 
 
@@ -296,7 +296,7 @@ def test_sources_entry_record_falls_back_to_first_party_host_when_base_url_missi
     assert cihr_payload["entryRecordId"] == entry_id
     assert (
         cihr_payload["entryBrowseUrl"]
-        == f"https://replay.healtharchive.ca/job-{job_id}/20250410123456/https://cihr-irsc.gc.ca/e/193.html"
+        == f"https://replay.healtharchive.ca/job-{job_id}/20250410123456/https://cihr-irsc.gc.ca/e/193.html#ha_snapshot={entry_id}"
     )
 
 
@@ -604,8 +604,16 @@ def test_source_editions_endpoint_includes_entry_browse_url_when_replay_enabled(
                 warc_record_id="hc-home",
             )
         )
+        session.flush()
 
         job_id = job.id
+        entry_snapshot_id = (
+            session.query(Snapshot.id)
+            .filter(Snapshot.job_id == job_id)
+            .filter(Snapshot.source_id == hc.id)
+            .scalar()
+        )
+        assert entry_snapshot_id is not None
 
     resp = client.get("/api/sources/hc/editions")
     assert resp.status_code == 200
@@ -615,7 +623,7 @@ def test_source_editions_endpoint_includes_entry_browse_url_when_replay_enabled(
     assert editions[0]["jobId"] == job_id
     assert (
         editions[0]["entryBrowseUrl"]
-        == f"https://replay.healtharchive.ca/job-{job_id}/20250418120000/https://www.canada.ca/en/health-canada.html"
+        == f"https://replay.healtharchive.ca/job-{job_id}/20250418120000/https://www.canada.ca/en/health-canada.html#ha_snapshot={entry_snapshot_id}"
     )
 
 
@@ -677,7 +685,7 @@ def test_replay_resolve_endpoint_finds_capture_across_www_variants(
     assert body["resolvedUrl"] == "https://www.canada.ca/en/health-canada.html"
     assert (
         body["browseUrl"]
-        == f"https://replay.healtharchive.ca/job-{job_id}/20250418232234/https://www.canada.ca/en/health-canada.html"
+        == f"https://replay.healtharchive.ca/job-{job_id}/20250418232234/https://www.canada.ca/en/health-canada.html#ha_snapshot={snap_id}"
     )
 
 
@@ -722,6 +730,7 @@ def test_replay_resolve_endpoint_falls_back_to_url_group_match(
         session.flush()
 
         job_id = job.id
+        snap_id = snapshot.id
 
     resp = client.get(
         "/api/replay/resolve",
@@ -733,10 +742,11 @@ def test_replay_resolve_endpoint_falls_back_to_url_group_match(
     assert resp.status_code == 200
     body = resp.json()
     assert body["found"] is True
+    assert body["snapshotId"] == snap_id
     assert body["resolvedUrl"] == "https://www.canada.ca/en/health-canada.html"
     assert (
         body["browseUrl"]
-        == f"https://replay.healtharchive.ca/job-{job_id}/20250421125048/https://www.canada.ca/en/health-canada.html"
+        == f"https://replay.healtharchive.ca/job-{job_id}/20250421125048/https://www.canada.ca/en/health-canada.html#ha_snapshot={snap_id}"
     )
 
 
