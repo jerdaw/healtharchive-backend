@@ -1399,7 +1399,7 @@ def list_source_editions(
     return editions
 
 
-@router.get("/sources/{source_code}/preview")
+@router.api_route("/sources/{source_code}/preview", methods=["GET", "HEAD"])
 def get_source_preview(
     source_code: str,
     jobId: int = Query(..., ge=1),
