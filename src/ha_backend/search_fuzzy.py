@@ -17,9 +17,9 @@ def pick_word_similarity_threshold(tokens: Iterable[str]) -> float:
     min_len = min(len(t) for t in tokens_list)
     if min_len <= 5:
         return 0.35
-    if min_len <= 7:
+    if min_len <= 8:
         return 0.30
-    return 0.25
+    return 0.28
 
 
 def token_variants(token: str) -> list[str]:
@@ -43,7 +43,15 @@ def should_use_url_similarity(token: str) -> bool:
     URLs can drastically increase candidate sets for short/broad terms; for long
     tokens or URL-ish patterns, URL similarity is usually helpful and still safe.
     """
-    return any(ch in token for ch in ("/", ".", ":", "?", "&", "=")) or len(token) >= 10
+    token_stripped = token.strip().lower()
+    if not token_stripped:
+        return False
+    if token_stripped.startswith(("http://", "https://", "www.")):
+        return True
+    # Domains, paths, and query-ish tokens.
+    if any(ch in token_stripped for ch in ("/", ".", ":", "?", "&", "=")):
+        return True
+    return False
 
 
 __all__ = [
@@ -51,4 +59,3 @@ __all__ = [
     "token_variants",
     "should_use_url_similarity",
 ]
-
