@@ -1352,6 +1352,7 @@ def cmd_replay_index_job(args: argparse.Namespace) -> None:
     `docs/deployment/replay-service-pywb.md`.
     """
     from pathlib import Path
+    import getpass
 
     from .indexing.warc_discovery import discover_warcs_for_job
     from .models import ArchiveJob as ORMArchiveJob
@@ -1465,7 +1466,18 @@ def cmd_replay_index_job(args: argparse.Namespace) -> None:
                 file=sys.stderr,
             )
             sys.exit(1)
-        path.unlink()
+        try:
+            path.unlink()
+        except PermissionError as exc:
+            user = getpass.getuser()
+            print(
+                f"ERROR: Permission denied while removing existing WARC link {path}: {exc}\n"
+                f"Hint: run this command as a user that can write to {archive_dir} "
+                f"(e.g. `sudo -u hareplay ...` or `sudo ...`). Current user: {user}\n"
+                f"Debug: `ls -ld {archive_dir}`",
+                file=sys.stderr,
+            )
+            sys.exit(1)
 
     host_root_resolved = warcs_host_root.resolve()
     if not host_root_resolved.is_dir():
@@ -1498,7 +1510,18 @@ def cmd_replay_index_job(args: argparse.Namespace) -> None:
             print(f"  would link {link_path} -> {target_in_container}")
             continue
 
-        link_path.symlink_to(target_in_container)
+        try:
+            link_path.symlink_to(target_in_container)
+        except PermissionError as exc:
+            user = getpass.getuser()
+            print(
+                f"ERROR: Permission denied while creating WARC link {link_path}: {exc}\n"
+                f"Hint: run this command as a user that can write to {archive_dir} "
+                f"(e.g. `sudo -u hareplay ...` or `sudo ...`). Current user: {user}\n"
+                f"Debug: `ls -ld {archive_dir}`",
+                file=sys.stderr,
+            )
+            sys.exit(1)
 
     if dry_run:
         print("")
