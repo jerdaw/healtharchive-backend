@@ -176,70 +176,6 @@ archived URL for edition switching.
     background: rgba(148, 163, 184, 0.35);
   }
 
-  @media (prefers-color-scheme: dark) {
-    #ha-replay-banner {
-      background-color: rgba(24, 26, 27, 0.9);
-      background-color: color-mix(in srgb, rgba(24, 26, 27, 0.9) 82%, transparent);
-      border-bottom-color: rgba(54, 59, 61, 0.9);
-      color: #e8e6e3;
-    }
-
-    #ha-replay-banner::after {
-      background: linear-gradient(
-        to bottom,
-        rgba(148, 163, 184, 0.06) 0%,
-        rgba(148, 163, 184, 0.0) 100%
-      );
-    }
-
-    #ha-replay-banner .ha-replay-pill {
-      background: rgba(37, 99, 235, 0.24);
-      border-color: rgba(37, 99, 235, 0.35);
-      color: rgba(219, 234, 254, 0.95);
-    }
-
-    #ha-replay-banner .ha-replay-meta,
-    #ha-replay-banner .ha-replay-disclaimer {
-      color: rgba(226, 232, 240, 0.75);
-    }
-
-    #ha-replay-banner button {
-      color: rgba(226, 232, 240, 0.76);
-    }
-
-    #ha-replay-banner button:hover {
-      background: rgba(148, 163, 184, 0.14);
-      color: rgba(226, 232, 240, 0.95);
-    }
-
-    #ha-replay-banner .ha-replay-action-link {
-      background-color: #2563eb;
-      color: #ffffff;
-      box-shadow: 0 10px 24px rgba(37, 99, 235, 0.28);
-    }
-
-    #ha-replay-banner .ha-replay-action-link:hover {
-      background-color: #1d4ed8;
-    }
-
-    #ha-replay-banner .ha-replay-brand {
-      color: rgba(226, 232, 240, 0.95);
-    }
-
-    #ha-replay-banner .ha-replay-link {
-      color: rgba(226, 232, 240, 0.76);
-    }
-
-    #ha-replay-banner .ha-replay-link:hover {
-      color: rgba(226, 232, 240, 0.95);
-      background: rgba(148, 163, 184, 0.14);
-    }
-
-    #ha-replay-banner .ha-replay-divider {
-      background: rgba(54, 59, 61, 0.9);
-    }
-  }
-
   @media (max-width: 640px) {
     #ha-replay-banner .ha-replay-inner {
       padding-inline: 0.9rem;
@@ -411,8 +347,7 @@ archived URL for edition switching.
       banner.innerHTML =
         '<div class="ha-replay-inner">' +
         '  <div class="ha-replay-left">' +
-        '    <button type="button" class="ha-replay-brand" data-ha-action="home" aria-label="Back to HealthArchive.ca">\u2190 HealthArchive.ca</button>' +
-        '    <button type="button" class="ha-replay-action-link" data-ha-action="browse">Browse</button>' +
+        '    <button type="button" class="ha-replay-action-link" data-ha-action="browse" aria-label="Back to HealthArchive.ca">\u2190 HealthArchive.ca</button>' +
         '    <span class="ha-replay-pill" aria-label="Archived replay notice">Archived replay</span>' +
         "  </div>" +
         '  <div class="ha-replay-center">' +
@@ -456,7 +391,6 @@ archived URL for edition switching.
         var haBase = "https://" + "www." + "healtharchive.ca";
         var apiBase = "https://" + "api." + "healtharchive.ca";
         var routes = {
-          home: haBase + "/",
           browse: haBase + "/archive",
         };
 
@@ -473,17 +407,7 @@ archived URL for edition switching.
             var action = el.getAttribute("data-ha-action");
             var dest = routes[action];
             if (!dest) return;
-            if (action === "home" || action === "browse") {
-              window.location.href = dest;
-              return;
-            }
-
-            try {
-              var opened = window.open(dest, "_blank", "noopener,noreferrer");
-              if (!opened) window.location.href = dest;
-            } catch (e) {
-              window.location.href = dest;
-            }
+            window.location.href = dest;
           });
         });
       } catch (e) {}
