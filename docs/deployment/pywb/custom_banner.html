@@ -22,8 +22,8 @@ archived URL for edition switching.
     justify-content: space-between;
     gap: 0.75rem;
     padding: 0.55rem 0.75rem;
-    background: rgba(255, 255, 255, 0.92);
-    border-bottom: 1px solid rgba(15, 23, 42, 0.14);
+    background: rgba(255, 255, 255, 0.88);
+    border-bottom: 1px solid rgba(15, 23, 42, 0.12);
     color: #111827;
     font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI",
       sans-serif;
@@ -31,6 +31,7 @@ archived URL for edition switching.
     line-height: 1.35;
     -webkit-font-smoothing: antialiased;
     backdrop-filter: blur(10px);
+    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
   }
 
   #ha-replay-banner * {
@@ -138,7 +139,20 @@ archived URL for edition switching.
   }
 
   #ha-replay-banner .ha-replay-action-link {
+    appearance: none;
+    border: 1px solid rgba(15, 23, 42, 0.14);
+    background: rgba(255, 255, 255, 0.7);
     color: #1d4ed8;
+    border-radius: 999px;
+    padding: 0.25rem 0.8rem;
+    font: inherit;
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  #ha-replay-banner .ha-replay-action-link:hover {
+    background: rgba(255, 255, 255, 0.95);
+    text-decoration: none;
   }
 
   @media (prefers-color-scheme: dark) {
@@ -176,12 +190,18 @@ archived URL for edition switching.
       background: rgba(24, 26, 27, 0.95);
     }
 
-    #ha-replay-banner .ha-replay-brand {
-      color: #6bb6ff;
+    #ha-replay-banner .ha-replay-action-link {
+      border-color: rgba(54, 59, 61, 0.9);
+      background: rgba(24, 26, 27, 0.7);
+      color: #dbeafe;
     }
 
-    #ha-replay-banner .ha-replay-action-link {
-      color: #dbeafe;
+    #ha-replay-banner .ha-replay-action-link:hover {
+      background: rgba(24, 26, 27, 0.95);
+    }
+
+    #ha-replay-banner .ha-replay-brand {
+      color: #6bb6ff;
     }
   }
 
@@ -313,7 +333,7 @@ archived URL for edition switching.
 
       banner.innerHTML =
         '<div class="ha-replay-left">' +
-        '  <button type="button" class="ha-replay-brand" data-ha-url="https://www.healtharchive.ca/">HealthArchive.ca</button>' +
+        '  <button type="button" class="ha-replay-brand" data-ha-action="home">HealthArchive.ca</button>' +
         '  <span class="ha-replay-pill">Archived replay</span>' +
         "</div>" +
         '<div class="ha-replay-center">' +
@@ -321,7 +341,7 @@ archived URL for edition switching.
         '  <div class="ha-replay-disclaimer">Independent archival snapshot \u00b7 Not an official government website \u00b7 Content may be outdated</div>' +
         "</div>" +
         '<div class="ha-replay-right">' +
-        '  <button type="button" class="ha-replay-action-link" data-ha-url="https://www.healtharchive.ca/archive">Browse</button>' +
+        '  <button type="button" class="ha-replay-action-link" data-ha-action="browse">Browse</button>' +
         '  <button type="button" id="ha-replay-hide" aria-label="Hide this banner">Hide</button>' +
         "</div>";
 
@@ -344,14 +364,22 @@ archived URL for edition switching.
         });
       }
 
-      // Avoid pywb rewriting our "escape hatch" navigation by using buttons with
-      // explicit JS navigation (instead of <a href="...">).
+      // Avoid pywb rewriting our "escape hatch" navigation by:
+      //  - not embedding HealthArchive URLs directly in HTML attributes, and
+      //  - using buttons with explicit JS navigation.
       try {
-        banner.querySelectorAll("[data-ha-url]").forEach(function (el) {
+        var haBase = "https://" + "www.healtharchive.ca";
+        var routes = {
+          home: haBase + "/",
+          browse: haBase + "/archive",
+        };
+
+        banner.querySelectorAll("[data-ha-action]").forEach(function (el) {
           el.addEventListener("click", function (event) {
             event.preventDefault();
             event.stopPropagation();
-            var dest = el.getAttribute("data-ha-url");
+            var action = el.getAttribute("data-ha-action");
+            var dest = routes[action];
             if (!dest) return;
             window.location.href = dest;
           });
