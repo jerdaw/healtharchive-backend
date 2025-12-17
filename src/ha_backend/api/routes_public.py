@@ -281,6 +281,20 @@ def _extract_url_search_targets(q_clean: str) -> list[str] | None:
 
     if not raw:
         return None
+
+    # The `url:` prefix is also supported by boolean/field search (as a field
+    # selector). To avoid misclassifying URL-field substring queries like
+    # `url:covid19.html` as an *exact* URL lookup (host=`covid19.html`),
+    # only treat `url:` as a URL-lookup hint when the remainder looks like a
+    # real URL (scheme or leading "www."). Otherwise, fall through so the
+    # boolean query parser can handle `url:` as a field prefix.
+    if explicit:
+        lowered = raw.lower()
+        if '"' in raw or " " in raw:
+            return None
+        if not (lowered.startswith("http://") or lowered.startswith("https://") or lowered.startswith("www.")):
+            return None
+
     if not _looks_like_url_query(raw):
         return None
 
