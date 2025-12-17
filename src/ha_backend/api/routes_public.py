@@ -764,9 +764,12 @@ def _search_snapshots_inner(
         title_expr = func.coalesce(Snapshot.title, "")
         snippet_expr = func.coalesce(Snapshot.snippet, "")
 
-        title_sim = func.similarity(title_expr, q_filter)
-        url_sim = func.similarity(Snapshot.url, q_filter)
-        snippet_sim = func.similarity(snippet_expr, q_filter)
+        # Prefer word_similarity over similarity for fuzzy matching: it is much
+        # better for short, misspelled queries against longer titles/snippets
+        # (e.g. "influensa" should match "Flu (influenza): ...").
+        title_sim = func.word_similarity(title_expr, q_filter)
+        url_sim = func.word_similarity(Snapshot.url, q_filter)
+        snippet_sim = func.word_similarity(snippet_expr, q_filter)
 
         score_override = func.greatest(
             title_sim,
@@ -774,13 +777,13 @@ def _search_snapshots_inner(
             0.4 * snippet_sim,
         )
 
-        # Use pg_trgm's similarity operator as the candidate filter so indexes
-        # can be used when available; order by the explicit similarity score.
+        # Use pg_trgm's word-similarity operator as the candidate filter so
+        # trigram indexes can be used when available.
         return qry.filter(
             or_(
-                title_expr.op("%")(q_filter),
-                Snapshot.url.op("%")(q_filter),
-                snippet_expr.op("%")(q_filter),
+                title_expr.op("<%")(q_filter),
+                Snapshot.url.op("<%")(q_filter),
+                snippet_expr.op("<%")(q_filter),
             )
         )
 
