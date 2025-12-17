@@ -896,7 +896,7 @@ Public Pydantic models:
           `snapshots.search_vector`.
           - If FTS yields no results, fall back to tokenized substring matching.
           - If that still yields no results and `pg_trgm` is available, fall back to
-            trigram similarity for fuzzy matching.
+            pg_trgm word-level trigram similarity for fuzzy matching (misspellings).
         - Otherwise: tokenized substring matching on `title`, `snippet`, and `url`.
   - Ordering:
     - Default sort:

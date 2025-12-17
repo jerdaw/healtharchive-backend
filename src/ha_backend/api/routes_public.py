@@ -38,6 +38,11 @@ from ha_backend.search_query import (
     looks_like_advanced_query,
     parse_query,
 )
+from ha_backend.search_fuzzy import (
+    pick_word_similarity_threshold,
+    should_use_url_similarity,
+    token_variants,
+)
 from ha_backend.url_normalization import normalize_url_for_grouping
 from ha_backend.runtime_metrics import observe_search_request
 
@@ -780,20 +785,23 @@ def _search_snapshots_inner(
             return qry.filter(text("0=1"))
 
         if dialect_name == "postgresql":
-            # Default is often too strict for common misspellings.
-            db.execute(text("SET LOCAL pg_trgm.word_similarity_threshold = 0.35"))
+            threshold = pick_word_similarity_threshold(tokens)
+            db.execute(text(f"SET LOCAL pg_trgm.word_similarity_threshold = {threshold:.2f}"))
 
         title_expr = func.coalesce(Snapshot.title, "")
         url_expr = Snapshot.url
 
-        title_scores = [func.word_similarity(title_expr, t) for t in tokens]
-        title_score = sum(title_scores, 0.0) / float(len(title_scores))
+        per_token_title_scores = []
+        for token in tokens:
+            variants = token_variants(token)
+            per_token_title_scores.append(
+                func.greatest(*(func.word_similarity(title_expr, v) for v in variants))
+            )
+        title_score = sum(per_token_title_scores, 0.0) / float(len(per_token_title_scores))
 
-        # Only incorporate URL similarity for URL-ish queries; otherwise it tends
-        # to drastically increase candidate counts for broad terms.
-        use_url = any(any(ch in t for ch in ("/", ".", ":", "?", "&", "=")) for t in tokens)
-        if use_url:
-            url_scores = [func.similarity(url_expr, t) for t in tokens]
+        url_tokens = [t for t in tokens if should_use_url_similarity(t)]
+        if url_tokens:
+            url_scores = [func.similarity(url_expr, t) for t in url_tokens]
             url_score = sum(url_scores, 0.0) / float(len(url_scores))
             score_override = func.greatest(title_score, 0.8 * url_score)
         else:
@@ -804,15 +812,12 @@ def _search_snapshots_inner(
         title_candidate = Snapshot.title
         token_filters = []
         for token in tokens:
-            if use_url:
-                token_filters.append(
-                    or_(
-                        title_candidate.op("<%")(token),
-                        url_expr.op("%")(token),
-                    )
-                )
+            variants = token_variants(token)
+            title_match = or_(*(title_candidate.op("<%")(v) for v in variants))
+            if should_use_url_similarity(token):
+                token_filters.append(or_(title_match, url_expr.op("%")(token)))
             else:
-                token_filters.append(title_candidate.op("<%")(token))
+                token_filters.append(title_match)
 
         return qry.filter(and_(*token_filters))
 

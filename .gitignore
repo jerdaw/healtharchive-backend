@@ -31,6 +31,7 @@ dist/
 # Local data / artifacts
 healtharchive.db
 .dev-healtharchive.db
+ci-healtharchive.db
 .dev-archive-root/
 .dev-replay-previews/
 .preview-node/
