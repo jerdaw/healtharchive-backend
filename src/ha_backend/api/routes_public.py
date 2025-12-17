@@ -1702,8 +1702,8 @@ def get_snapshot_raw(
     snapshot_json_url = f"https://api.healtharchive.ca/api/snapshot/{snap.id}"
 
     banner = f"""
-<style id="ha-raw-banner-css">
-  #ha-raw-banner {{
+<style id="ha-replay-banner-css">
+  #ha-replay-banner {{
     position: sticky;
     top: 0;
     z-index: 2147483647;
@@ -1712,13 +1712,13 @@ def get_snapshot_raw(
     background-color: color-mix(in srgb, rgba(255, 255, 255, 0.9) 82%, transparent);
     font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
     font-size: 0.85rem;
-    line-height: 1.2;
+    line-height: 1.25;
     -webkit-font-smoothing: antialiased;
     backdrop-filter: blur(10px) saturate(1.1);
     box-shadow: 0 8px 16px rgba(15, 23, 42, 0.04);
   }}
 
-  #ha-raw-banner::after {{
+  #ha-replay-banner::after {{
     content: "";
     position: absolute;
     left: 0;
@@ -1733,27 +1733,27 @@ def get_snapshot_raw(
     );
   }}
 
-  #ha-raw-banner * {{
+  #ha-replay-banner * {{
     box-sizing: border-box;
   }}
 
-  #ha-raw-banner .ha-raw-inner {{
+  #ha-replay-banner .ha-replay-inner {{
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 0.75rem;
-    padding: 0.6rem 1.25rem;
+    padding: 0.8rem 1.25rem;
   }}
 
-  #ha-raw-banner .ha-raw-left,
-  #ha-raw-banner .ha-raw-right {{
+  #ha-replay-banner .ha-replay-left,
+  #ha-replay-banner .ha-replay-right {{
     display: flex;
     align-items: center;
     gap: 0.45rem;
     flex-shrink: 0;
   }}
 
-  #ha-raw-banner .ha-raw-pill {{
+  #ha-replay-banner .ha-replay-pill {{
     display: inline-flex;
     align-items: center;
     gap: 0.35rem;
@@ -1766,16 +1766,33 @@ def get_snapshot_raw(
     white-space: nowrap;
   }}
 
-  #ha-raw-banner .ha-raw-center {{
+  #ha-replay-banner .ha-replay-center {{
     flex: 1;
     min-width: 0;
-    white-space: nowrap;
     overflow: hidden;
-    text-overflow: ellipsis;
-    color: rgba(15, 23, 42, 0.62);
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.2rem;
   }}
 
-  #ha-raw-banner a {{
+  #ha-replay-banner .ha-replay-meta {{
+    color: rgba(15, 23, 42, 0.7);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 100%;
+  }}
+
+  #ha-replay-banner .ha-replay-disclaimer {{
+    color: rgba(15, 23, 42, 0.55);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 100%;
+  }}
+
+  #ha-replay-banner a {{
     appearance: none;
     border: 1px solid transparent;
     background: transparent;
@@ -1788,43 +1805,49 @@ def get_snapshot_raw(
     line-height: 1;
     text-decoration: none;
     transition: background 120ms ease, transform 120ms ease;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
   }}
 
-  #ha-raw-banner a:hover {{
+  #ha-replay-banner a:hover {{
     color: rgba(15, 23, 42, 0.95);
     transform: translateY(-1px);
     background: rgba(148, 163, 184, 0.16);
     text-decoration: none;
   }}
 
-  #ha-raw-banner .ha-raw-primary {{
+  #ha-replay-banner .ha-replay-action-link {{
     background-color: #2563eb;
     color: #ffffff;
     box-shadow: 0 10px 24px rgba(37, 99, 235, 0.35);
   }}
 
-  #ha-raw-banner .ha-raw-primary:hover {{
+  #ha-replay-banner .ha-replay-action-link:hover {{
     background-color: #1d4ed8;
     color: #ffffff;
   }}
 
   @media (max-width: 780px) {{
-    #ha-raw-banner .ha-raw-center {{
+    #ha-replay-banner .ha-replay-center {{
       display: none;
     }}
   }}
 </style>
-<div id="ha-raw-banner" role="region" aria-label="HealthArchive raw snapshot notice">
-  <div class="ha-raw-inner">
-    <div class="ha-raw-left">
-      <a class="ha-raw-primary" href="https://www.healtharchive.ca/archive" rel="noreferrer">\u2190 HealthArchive.ca</a>
-      <span class="ha-raw-pill">Raw HTML</span>
+<div id="ha-replay-banner" role="region" aria-label="HealthArchive snapshot header">
+  <div class="ha-replay-inner">
+    <div class="ha-replay-left">
+      <a class="ha-replay-action-link" href="https://www.healtharchive.ca/archive" rel="noreferrer">\u2190 HealthArchive.ca</a>
+      <span class="ha-replay-pill">Raw HTML</span>
     </div>
-    <div class="ha-raw-center">Debug view \u00b7 Archived HTML as stored (may be incomplete/outdated)</div>
-    <div class="ha-raw-right">
-      <a href="{snapshot_details_url}" rel="noreferrer">Snapshot details</a>
-      {"<a href=\"" + replay_url + "\" rel=\"noreferrer\">Replay</a>" if replay_url else ""}
-      <a href="{snapshot_json_url}" rel="noreferrer">Metadata JSON</a>
+    <div class="ha-replay-center">
+      <div class="ha-replay-meta">Raw HTML debug view</div>
+      <div class="ha-replay-disclaimer">Independent archive \u00b7 Not an official government website \u00b7 Content may be outdated</div>
+    </div>
+    <div class="ha-replay-right">
+      <a class="ha-replay-link" href="{snapshot_details_url}" rel="noreferrer">Snapshot details</a>
+      {("<a class=\"ha-replay-link\" href=\"" + replay_url + "\" rel=\"noreferrer\">Replay</a>") if replay_url else ""}
+      <a class="ha-replay-link" href="{snapshot_json_url}" rel="noreferrer">Metadata JSON</a>
     </div>
   </div>
 </div>
