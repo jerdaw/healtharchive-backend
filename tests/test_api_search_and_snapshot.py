@@ -466,6 +466,88 @@ def test_search_filters_by_query(tmp_path, monkeypatch) -> None:
     assert "topics" not in result
 
 
+def test_search_matches_query_tokens_out_of_order(tmp_path, monkeypatch) -> None:
+    client = _init_test_app(tmp_path, monkeypatch)
+    _seed_search_data()
+
+    resp = client.get("/api/search", params={"q": "guidance covid"})
+    assert resp.status_code == 200
+    data = resp.json()
+
+    assert data["total"] == 1
+    assert "COVID-19 guidance" in data["results"][0]["title"]
+
+
+def test_search_boolean_and(tmp_path, monkeypatch) -> None:
+    client = _init_test_app(tmp_path, monkeypatch)
+    _seed_search_data()
+
+    resp = client.get("/api/search", params={"q": "covid AND guidance"})
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["total"] == 1
+    assert "COVID-19 guidance" in data["results"][0]["title"]
+
+
+def test_search_boolean_or(tmp_path, monkeypatch) -> None:
+    client = _init_test_app(tmp_path, monkeypatch)
+    _seed_search_data()
+
+    resp = client.get("/api/search", params={"q": "covid OR flu"})
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["total"] == 2
+    titles = {r["title"] for r in data["results"]}
+    assert any("COVID-19 guidance" in (t or "") for t in titles)
+    assert any("Flu recommendations" in (t or "") for t in titles)
+
+
+def test_search_boolean_not(tmp_path, monkeypatch) -> None:
+    client = _init_test_app(tmp_path, monkeypatch)
+    _seed_search_data()
+
+    resp = client.get("/api/search", params={"q": "covid NOT guidance"})
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["total"] == 0
+
+
+def test_search_boolean_dash_not(tmp_path, monkeypatch) -> None:
+    client = _init_test_app(tmp_path, monkeypatch)
+    _seed_search_data()
+
+    resp = client.get("/api/search", params={"q": "flu -covid"})
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["total"] == 1
+    assert "Flu recommendations" in data["results"][0]["title"]
+
+
+def test_search_boolean_parentheses(tmp_path, monkeypatch) -> None:
+    client = _init_test_app(tmp_path, monkeypatch)
+    _seed_search_data()
+
+    resp = client.get(
+        "/api/search",
+        params={"q": "(covid OR flu) AND recommendations"},
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["total"] == 1
+    assert "Flu recommendations" in data["results"][0]["title"]
+
+
+def test_search_boolean_field_url(tmp_path, monkeypatch) -> None:
+    client = _init_test_app(tmp_path, monkeypatch)
+    _seed_search_data()
+
+    resp = client.get("/api/search", params={"q": "url:flu"})
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["total"] == 1
+    assert "Flu recommendations" in data["results"][0]["title"]
+
+
 def test_search_default_relevance_sort_and_filters_non_2xx(tmp_path, monkeypatch) -> None:
     client = _init_test_app(tmp_path, monkeypatch)
     _seed_search_quality_data()
@@ -615,6 +697,135 @@ def test_search_view_pages_returns_canonical_original_url(tmp_path, monkeypatch)
         data_snaps["results"][0]["originalUrl"]
         == "https://www.canada.ca/en/public-health/services/diseases/coronavirus-disease-covid-19.html?utm_campaign=x&wbdisable=true"
     )
+
+
+def test_search_view_pages_dedupes_querystring_variants_without_normalized_group(
+    tmp_path, monkeypatch
+) -> None:
+    client = _init_test_app(tmp_path, monkeypatch)
+
+    with get_session() as session:
+        hc = Source(
+            code="hc",
+            name="Health Canada",
+            base_url="https://www.canada.ca/en/health-canada.html",
+            description="Health Canada",
+            enabled=True,
+        )
+        session.add(hc)
+        session.flush()
+
+        session.add_all(
+            [
+                Snapshot(
+                    job_id=None,
+                    source_id=hc.id,
+                    url="https://example.org/covid?wbdisable=true",
+                    normalized_url_group=None,
+                    capture_timestamp=datetime(2025, 4, 1, 12, 0, tzinfo=timezone.utc),
+                    mime_type="text/html",
+                    status_code=200,
+                    title="COVID-19: Current situation",
+                    snippet="COVID-19 hub page.",
+                    language="en",
+                    warc_path="/warcs/hc-covid-hub-1.warc.gz",
+                    warc_record_id="hc-covid-hub-1",
+                ),
+                Snapshot(
+                    job_id=None,
+                    source_id=hc.id,
+                    url="https://example.org/covid?wbdisable=false",
+                    normalized_url_group=None,
+                    capture_timestamp=datetime(2025, 4, 2, 12, 0, tzinfo=timezone.utc),
+                    mime_type="text/html",
+                    status_code=200,
+                    title="COVID-19: Current situation",
+                    snippet="COVID-19 hub page.",
+                    language="en",
+                    warc_path="/warcs/hc-covid-hub-2.warc.gz",
+                    warc_record_id="hc-covid-hub-2",
+                ),
+            ]
+        )
+
+    resp_pages = client.get("/api/search", params={"q": "covid", "view": "pages"})
+    assert resp_pages.status_code == 200
+    data_pages = resp_pages.json()
+    assert data_pages["total"] == 1
+    assert len(data_pages["results"]) == 1
+    assert data_pages["results"][0]["originalUrl"] == "https://example.org/covid"
+
+
+def test_search_accepts_url_queries_and_matches_common_variants(
+    tmp_path, monkeypatch
+) -> None:
+    client = _init_test_app(tmp_path, monkeypatch)
+
+    with get_session() as session:
+        hc = Source(
+            code="hc",
+            name="Health Canada",
+            base_url="https://www.canada.ca/en/health-canada.html",
+            description="Health Canada",
+            enabled=True,
+        )
+        session.add(hc)
+        session.flush()
+
+        session.add(
+            Snapshot(
+                job_id=None,
+                source_id=hc.id,
+                url="https://www.canada.ca/en/public-health/services/diseases/covid.html?utm_campaign=x",
+                normalized_url_group="https://www.canada.ca/en/public-health/services/diseases/covid.html",
+                capture_timestamp=datetime(2025, 4, 1, 12, 0, tzinfo=timezone.utc),
+                mime_type="text/html",
+                status_code=200,
+                title="COVID-19: Current situation - Canada.ca",
+                snippet="COVID-19 hub page.",
+                language="en",
+                warc_path="/warcs/hc-covid.warc.gz",
+                warc_record_id="hc-covid",
+            )
+        )
+
+    # No scheme (should assume https://).
+    resp = client.get(
+        "/api/search",
+        params={"q": "www.canada.ca/en/public-health/services/diseases/covid.html"},
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["total"] == 1
+
+    # No www (should try www and non-www variants).
+    resp = client.get(
+        "/api/search",
+        params={"q": "canada.ca/en/public-health/services/diseases/covid.html"},
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["total"] == 1
+
+    # http:// variant (should try both http/https).
+    resp = client.get(
+        "/api/search",
+        params={"q": "http://www.canada.ca/en/public-health/services/diseases/covid.html"},
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["total"] == 1
+
+    # Explicit url: operator.
+    resp = client.get(
+        "/api/search",
+        params={
+            "q": "url:https://www.canada.ca/en/public-health/services/diseases/covid.html?utm_campaign=x"
+        },
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["total"] == 1
 
 
 def test_search_relevance_uses_page_signal_boost_for_tie_breaks(

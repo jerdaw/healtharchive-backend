@@ -285,6 +285,69 @@ def cmd_backfill_search_vector(args: argparse.Namespace) -> None:
     print(f"Done. Total rows updated: {total_updated}")
 
 
+def cmd_backfill_normalized_url_groups(args: argparse.Namespace) -> None:
+    """
+    Backfill Snapshot.normalized_url_group for existing rows.
+
+    This improves /api/search de-duplication in view=pages and supports URL-style
+    lookup features that rely on normalized page grouping.
+    """
+    from sqlalchemy import or_
+
+    from .models import Snapshot, Source
+    from .url_normalization import normalize_url_for_grouping
+
+    batch_size: int = args.batch_size
+    job_id: int | None = args.job_id
+    source: str | None = args.source
+    dry_run: bool = args.dry_run
+    limit: int | None = args.limit
+
+    normalized_source = source.strip().lower() if source else None
+
+    updated = 0
+    scanned = 0
+
+    with get_session() as session:
+        query = session.query(Snapshot)
+        if normalized_source:
+            query = query.join(Source).filter(Source.code == normalized_source)
+        if job_id is not None:
+            query = query.filter(Snapshot.job_id == job_id)
+
+        query = query.filter(
+            or_(
+                Snapshot.normalized_url_group.is_(None),
+                Snapshot.normalized_url_group == "",
+            )
+        ).order_by(Snapshot.id)
+
+        if limit is not None:
+            query = query.limit(limit)
+
+        for snap in query.yield_per(batch_size):
+            scanned += 1
+            normalized = normalize_url_for_grouping(snap.url)
+            if not normalized:
+                continue
+            snap.normalized_url_group = normalized
+            updated += 1
+
+            if scanned % batch_size == 0:
+                session.flush()
+                if not dry_run:
+                    session.commit()
+
+        session.flush()
+        if dry_run:
+            session.rollback()
+        else:
+            session.commit()
+
+    mode = "DRY RUN" if dry_run else "UPDATED"
+    print(f"{mode}: normalized_url_group for {updated} row(s) (scanned {scanned}).")
+
+
 def cmd_refresh_snapshot_metadata(args: argparse.Namespace) -> None:
     """
     Refresh title/snippet/language for snapshots of a job by re-reading WARCs.
@@ -1616,6 +1679,39 @@ def build_parser() -> argparse.ArgumentParser:
         help="Recompute vectors even when search_vector is already populated.",
     )
     p_backfill_search.set_defaults(func=cmd_backfill_search_vector)
+
+    # backfill-normalized-url-groups
+    p_backfill_groups = subparsers.add_parser(
+        "backfill-normalized-url-groups",
+        help="Backfill Snapshot.normalized_url_group for consistent view=pages grouping.",
+    )
+    p_backfill_groups.add_argument(
+        "--batch-size",
+        type=int,
+        default=5000,
+        help="Rows to process per batch commit.",
+    )
+    p_backfill_groups.add_argument(
+        "--job-id",
+        type=int,
+        help="Optional ArchiveJob ID filter.",
+    )
+    p_backfill_groups.add_argument(
+        "--source",
+        help="Optional Source code filter (e.g. 'hc', 'phac').",
+    )
+    p_backfill_groups.add_argument(
+        "--limit",
+        type=int,
+        help="Optional maximum number of rows to scan (debugging).",
+    )
+    p_backfill_groups.add_argument(
+        "--dry-run",
+        action="store_true",
+        default=False,
+        help="Compute updates but roll back at the end (no DB changes).",
+    )
+    p_backfill_groups.set_defaults(func=cmd_backfill_normalized_url_groups)
 
     # refresh-snapshot-metadata
     p_refresh = subparsers.add_parser(
