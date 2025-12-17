@@ -99,6 +99,81 @@ async def metrics(
             f'healtharchive_jobs_cleanup_status_total{{cleanup_status="{cleanup_status}"}} {int(count)}'
         )
 
+    # Storage bytes (best-effort; depends on jobs having been scanned and persisted).
+    totals_row = db.query(
+        func.coalesce(func.sum(ArchiveJob.warc_bytes_total), 0),
+        func.coalesce(func.sum(ArchiveJob.output_bytes_total), 0),
+        func.coalesce(func.sum(ArchiveJob.tmp_bytes_total), 0),
+        func.coalesce(func.sum(ArchiveJob.tmp_non_warc_bytes_total), 0),
+    ).one()
+    (
+        total_warc_bytes,
+        total_output_bytes,
+        total_tmp_bytes,
+        total_tmp_non_warc_bytes,
+    ) = totals_row
+
+    scanned_jobs = (
+        db.query(func.count(ArchiveJob.id))
+        .filter(ArchiveJob.storage_scanned_at.isnot(None))
+        .scalar()
+        or 0
+    )
+
+    lines.append(
+        "# HELP healtharchive_jobs_storage_scanned_total Number of jobs with storage stats computed at least once"
+    )
+    lines.append("# TYPE healtharchive_jobs_storage_scanned_total gauge")
+    lines.append(f"healtharchive_jobs_storage_scanned_total {int(scanned_jobs)}")
+
+    lines.append(
+        "# HELP healtharchive_jobs_warc_bytes_total Total WARC bytes across jobs (from last persisted scan)"
+    )
+    lines.append("# TYPE healtharchive_jobs_warc_bytes_total gauge")
+    lines.append(f"healtharchive_jobs_warc_bytes_total {int(total_warc_bytes)}")
+
+    lines.append(
+        "# HELP healtharchive_jobs_output_bytes_total Total output bytes across jobs (from last persisted scan)"
+    )
+    lines.append("# TYPE healtharchive_jobs_output_bytes_total gauge")
+    lines.append(f"healtharchive_jobs_output_bytes_total {int(total_output_bytes)}")
+
+    lines.append(
+        "# HELP healtharchive_jobs_tmp_bytes_total Total .tmp* bytes across jobs (from last persisted scan)"
+    )
+    lines.append("# TYPE healtharchive_jobs_tmp_bytes_total gauge")
+    lines.append(f"healtharchive_jobs_tmp_bytes_total {int(total_tmp_bytes)}")
+
+    lines.append(
+        "# HELP healtharchive_jobs_tmp_non_warc_bytes_total Total non-WARC bytes under .tmp* across jobs (from last persisted scan)"
+    )
+    lines.append("# TYPE healtharchive_jobs_tmp_non_warc_bytes_total gauge")
+    lines.append(
+        f"healtharchive_jobs_tmp_non_warc_bytes_total {int(total_tmp_non_warc_bytes)}"
+    )
+
+    per_source_storage = (
+        db.query(
+            Source.code,
+            func.coalesce(func.sum(ArchiveJob.warc_bytes_total), 0),
+            func.coalesce(func.sum(ArchiveJob.output_bytes_total), 0),
+            func.coalesce(func.sum(ArchiveJob.tmp_bytes_total), 0),
+            func.coalesce(func.sum(ArchiveJob.tmp_non_warc_bytes_total), 0),
+        )
+        .join(ArchiveJob, ArchiveJob.source_id == Source.id)
+        .group_by(Source.code)
+        .all()
+    )
+    for code, warc_bytes, output_bytes, tmp_bytes, tmp_non_warc_bytes in per_source_storage:
+        lines.append(f'healtharchive_jobs_warc_bytes_total{{source="{code}"}} {int(warc_bytes)}')
+        lines.append(
+            f'healtharchive_jobs_output_bytes_total{{source="{code}"}} {int(output_bytes)}'
+        )
+        lines.append(f'healtharchive_jobs_tmp_bytes_total{{source="{code}"}} {int(tmp_bytes)}')
+        lines.append(
+            f'healtharchive_jobs_tmp_non_warc_bytes_total{{source="{code}"}} {int(tmp_non_warc_bytes)}'
+        )
+
     # Snapshot totals (global and per source)
     total_snapshots = db.query(func.count(Snapshot.id)).scalar() or 0
     lines.append("# HELP healtharchive_snapshots_total Number of snapshots")
