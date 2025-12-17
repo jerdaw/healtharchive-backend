@@ -17,20 +17,15 @@ archived URL for edition switching.
     position: sticky;
     top: 0;
     z-index: 2147483647;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.75rem;
-    padding: 0.55rem 0.75rem;
-    background: rgba(255, 255, 255, 0.88);
+    background: rgba(255, 255, 255, 0.9);
     border-bottom: 1px solid rgba(15, 23, 42, 0.12);
-    color: #111827;
+    color: #0f172a;
     font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI",
       sans-serif;
     font-size: 12px;
-    line-height: 1.35;
+    line-height: 1.2;
     -webkit-font-smoothing: antialiased;
-    backdrop-filter: blur(10px);
+    backdrop-filter: blur(12px);
     box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
   }
 
@@ -38,37 +33,27 @@ archived URL for edition switching.
     box-sizing: border-box;
   }
 
-  #ha-replay-banner a {
-    color: #2563eb;
-    text-decoration: none;
-    font-weight: 600;
-  }
-
-  #ha-replay-banner a:hover {
-    color: #1d4ed8;
-    text-decoration: underline;
-  }
-
-  #ha-replay-banner .ha-replay-left {
+  #ha-replay-banner .ha-replay-inner {
     display: flex;
     align-items: center;
-    gap: 0.55rem;
-    min-width: 0;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.6rem 0.9rem;
   }
 
-  #ha-replay-banner .ha-replay-brand {
-    display: inline-flex;
+  #ha-replay-banner .ha-replay-left,
+  #ha-replay-banner .ha-replay-right {
+    display: flex;
     align-items: center;
-    gap: 0.4rem;
-    font-weight: 700;
-    color: inherit;
+    gap: 0.45rem;
+    flex-shrink: 0;
   }
 
   #ha-replay-banner .ha-replay-pill {
     display: inline-flex;
     align-items: center;
     gap: 0.35rem;
-    padding: 0.16rem 0.5rem;
+    padding: 0.18rem 0.55rem;
     border-radius: 999px;
     background: rgba(37, 99, 235, 0.1);
     border: 1px solid rgba(37, 99, 235, 0.25);
@@ -81,56 +66,56 @@ archived URL for edition switching.
     flex: 1;
     min-width: 0;
     display: flex;
-    flex-direction: column;
-    gap: 0.15rem;
+    align-items: baseline;
+    gap: 0.65rem;
+    white-space: nowrap;
+    overflow: hidden;
   }
 
   #ha-replay-banner .ha-replay-meta {
-    color: rgba(17, 24, 39, 0.8);
-    white-space: nowrap;
+    color: rgba(15, 23, 42, 0.78);
+    overflow: hidden;
     overflow: hidden;
     text-overflow: ellipsis;
   }
 
   #ha-replay-banner .ha-replay-disclaimer {
-    color: rgba(17, 24, 39, 0.72);
-    white-space: nowrap;
+    color: rgba(15, 23, 42, 0.6);
     overflow: hidden;
     text-overflow: ellipsis;
-  }
-
-  #ha-replay-banner .ha-replay-right {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    flex-shrink: 0;
   }
 
   #ha-replay-banner button {
     appearance: none;
     border: 1px solid rgba(15, 23, 42, 0.16);
-    background: rgba(255, 255, 255, 0.65);
+    background: rgba(255, 255, 255, 0.75);
     color: inherit;
     border-radius: 999px;
-    padding: 0.25rem 0.7rem;
+    padding: 0.28rem 0.72rem;
     font: inherit;
     font-weight: 600;
     cursor: pointer;
+    line-height: 1;
+  }
+
+  #ha-replay-banner button {
+    transition: background 120ms ease, border-color 120ms ease, transform 120ms ease;
   }
 
   #ha-replay-banner button:hover {
-    background: rgba(255, 255, 255, 0.95);
+    background: rgba(255, 255, 255, 0.98);
+    border-color: rgba(37, 99, 235, 0.4);
   }
 
   #ha-replay-banner .ha-replay-brand {
     appearance: none;
     border: none;
     background: transparent;
-    padding: 0;
+    padding: 0 0.2rem 0 0;
     margin: 0;
     font: inherit;
     font-weight: 800;
-    color: #11588f;
+    color: #0b5ea8;
     cursor: pointer;
   }
 
@@ -155,19 +140,35 @@ archived URL for edition switching.
     text-decoration: none;
   }
 
+  #ha-replay-banner .ha-replay-link {
+    appearance: none;
+    border: none;
+    background: transparent;
+    padding: 0.25rem 0.35rem;
+    margin: 0;
+    font: inherit;
+    font-weight: 650;
+    color: rgba(15, 23, 42, 0.75);
+    cursor: pointer;
+    border-radius: 0.5rem;
+  }
+
+  #ha-replay-banner .ha-replay-link:hover {
+    color: rgba(15, 23, 42, 0.92);
+    background: rgba(37, 99, 235, 0.08);
+  }
+
+  #ha-replay-banner .ha-replay-divider {
+    width: 1px;
+    height: 20px;
+    background: rgba(15, 23, 42, 0.14);
+  }
+
   @media (prefers-color-scheme: dark) {
     #ha-replay-banner {
       background: rgba(24, 26, 27, 0.92);
       border-bottom-color: rgba(54, 59, 61, 0.9);
       color: #e8e6e3;
-    }
-
-    #ha-replay-banner a {
-      color: #388fed;
-    }
-
-    #ha-replay-banner a:hover {
-      color: #4693ef;
     }
 
     #ha-replay-banner .ha-replay-pill {
@@ -203,10 +204,26 @@ archived URL for edition switching.
     #ha-replay-banner .ha-replay-brand {
       color: #6bb6ff;
     }
+
+    #ha-replay-banner .ha-replay-link {
+      color: rgba(232, 230, 227, 0.82);
+    }
+
+    #ha-replay-banner .ha-replay-link:hover {
+      color: rgba(232, 230, 227, 0.98);
+      background: rgba(56, 143, 237, 0.12);
+    }
+
+    #ha-replay-banner .ha-replay-divider {
+      background: rgba(232, 230, 227, 0.14);
+    }
   }
 
   @media (max-width: 780px) {
     #ha-replay-banner .ha-replay-center {
+      display: none;
+    }
+    #ha-replay-banner .ha-replay-divider {
       display: none;
     }
   }
@@ -215,6 +232,7 @@ archived URL for edition switching.
 <script id="ha-replay-banner-js">
   (function () {
     var MESSAGE_TYPE = "haReplayNavigation";
+    var SNAPSHOT_STORAGE_KEY = "haReplaySnapshotId";
 
     function isEmbedded() {
       try {
@@ -300,6 +318,36 @@ archived URL for edition switching.
       // Ignore storage failures.
     }
 
+    function loadSnapshotId() {
+      var raw = "";
+      try {
+        raw = window.location.hash || "";
+      } catch (e) {
+        raw = "";
+      }
+      var hash = raw.replace(/^#/, "");
+      var snapshotId = null;
+      try {
+        var params = new URLSearchParams(hash);
+        snapshotId = params.get("ha_snapshot") || params.get("haSnapshot");
+      } catch (e) {
+        snapshotId = null;
+      }
+
+      if (snapshotId) {
+        try {
+          sessionStorage.setItem(SNAPSHOT_STORAGE_KEY, String(snapshotId));
+        } catch (e) {}
+        return String(snapshotId);
+      }
+
+      try {
+        var stored = sessionStorage.getItem(SNAPSHOT_STORAGE_KEY);
+        if (stored) return stored;
+      } catch (e) {}
+      return null;
+    }
+
     function formatTimestamp(ts) {
       if (!ts || typeof ts !== "string" || ts.length < 8) return null;
       var year = Number(ts.slice(0, 4));
@@ -326,23 +374,33 @@ archived URL for edition switching.
       var banner = document.getElementById("ha-replay-banner");
       if (banner) return;
 
+      var snapshotId = loadSnapshotId();
+
       banner = document.createElement("div");
       banner.id = "ha-replay-banner";
       banner.setAttribute("role", "region");
       banner.setAttribute("aria-label", "HealthArchive replay notice");
 
       banner.innerHTML =
-        '<div class="ha-replay-left">' +
-        '  <button type="button" class="ha-replay-brand" data-ha-action="home">HealthArchive.ca</button>' +
-        '  <span class="ha-replay-pill">Archived replay</span>' +
-        "</div>" +
-        '<div class="ha-replay-center">' +
-        '  <div class="ha-replay-meta" id="ha-replay-meta"></div>' +
-        '  <div class="ha-replay-disclaimer">Independent archival snapshot \u00b7 Not an official government website \u00b7 Content may be outdated</div>' +
-        "</div>" +
-        '<div class="ha-replay-right">' +
-        '  <button type="button" class="ha-replay-action-link" data-ha-action="browse">Browse</button>' +
-        '  <button type="button" id="ha-replay-hide" aria-label="Hide this banner">Hide</button>' +
+        '<div class="ha-replay-inner">' +
+        '  <div class="ha-replay-left">' +
+        '    <button type="button" class="ha-replay-brand" data-ha-action="home" aria-label="Back to HealthArchive.ca">\u2190 HealthArchive.ca</button>' +
+        '    <button type="button" class="ha-replay-action-link" data-ha-action="browse">Browse</button>' +
+        '    <span class="ha-replay-pill" aria-label="Archived replay notice">Archived replay</span>' +
+        "  </div>" +
+        '  <div class="ha-replay-center">' +
+        '    <div class="ha-replay-meta" id="ha-replay-meta"></div>' +
+        '    <div class="ha-replay-disclaimer">Independent archive \u00b7 Not a government website \u00b7 Content may be outdated</div>' +
+        "  </div>" +
+        '  <div class="ha-replay-right" id="ha-replay-actions">' +
+        (snapshotId
+          ? '    <button type="button" class="ha-replay-link" data-ha-action="details">Snapshot details</button>' +
+            '    <button type="button" class="ha-replay-link" data-ha-action="raw">Raw HTML</button>' +
+            '    <button type="button" class="ha-replay-link" data-ha-action="json">Metadata JSON</button>' +
+            '    <span class="ha-replay-divider" aria-hidden="true"></span>'
+          : "") +
+        '    <button type="button" id="ha-replay-hide" class="ha-replay-link" aria-label="Hide this banner">Hide</button>' +
+        "  </div>" +
         "</div>";
 
       document.body.insertBefore(banner, document.body.firstChild);
@@ -368,11 +426,18 @@ archived URL for edition switching.
       //  - not embedding HealthArchive URLs directly in HTML attributes, and
       //  - using buttons with explicit JS navigation.
       try {
-        var haBase = "https://" + "www.healtharchive.ca";
+        var haBase = "https://" + "www." + "healtharchive.ca";
+        var apiBase = "https://" + "api." + "healtharchive.ca";
         var routes = {
           home: haBase + "/",
           browse: haBase + "/archive",
         };
+
+        if (snapshotId) {
+          routes.details = haBase + "/snapshot/" + snapshotId;
+          routes.raw = apiBase + "/api/snapshots/raw/" + snapshotId;
+          routes.json = apiBase + "/api/snapshot/" + snapshotId;
+        }
 
         banner.querySelectorAll("[data-ha-action]").forEach(function (el) {
           el.addEventListener("click", function (event) {
@@ -381,7 +446,17 @@ archived URL for edition switching.
             var action = el.getAttribute("data-ha-action");
             var dest = routes[action];
             if (!dest) return;
-            window.location.href = dest;
+            if (action === "home" || action === "browse") {
+              window.location.href = dest;
+              return;
+            }
+
+            try {
+              var opened = window.open(dest, "_blank", "noopener,noreferrer");
+              if (!opened) window.location.href = dest;
+            } catch (e) {
+              window.location.href = dest;
+            }
           });
         });
       } catch (e) {}

@@ -691,7 +691,7 @@ def test_snapshot_detail_includes_browse_url_when_replay_configured(
     assert body["captureTimestamp"] == "2025-04-18T12:01:00+00:00"
     assert (
         body["browseUrl"]
-        == "https://replay.healtharchive.ca/job-1/20250418120100/https://canada.ca/en/health-canada.html"
+        == f"https://replay.healtharchive.ca/job-1/20250418120100/https://canada.ca/en/health-canada.html#ha_snapshot={snap_id}"
     )
 
     resp2 = client.get("/api/search")
