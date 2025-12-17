@@ -747,7 +747,8 @@ def _search_snapshots_inner(
 
     def apply_fts_filter(qry: Any) -> Any:
         nonlocal tsquery, vector_expr
-        assert q_filter is not None
+        if q_filter is None:
+            raise ValueError("apply_fts_filter called without q_filter")
         tsquery = func.websearch_to_tsquery(TS_CONFIG, q_filter)
         computed_vector = build_search_vector(Snapshot.title, Snapshot.snippet, Snapshot.url)
 
@@ -763,7 +764,8 @@ def _search_snapshots_inner(
 
     def apply_fuzzy_filter(qry: Any) -> Any:
         nonlocal score_override
-        assert q_filter is not None
+        if q_filter is None:
+            raise ValueError("apply_fuzzy_filter called without q_filter")
         if not _has_pg_trgm(db):
             return qry.filter(text("0=1"))
 
