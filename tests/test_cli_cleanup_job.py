@@ -9,7 +9,7 @@ from archive_tool.state import CrawlState
 from ha_backend import cli as cli_module
 from ha_backend import db as db_module
 from ha_backend.db import Base, get_engine, get_session
-from ha_backend.models import ArchiveJob, Source
+from ha_backend.models import ArchiveJob, Snapshot, Source
 
 
 def _init_test_db(tmp_path: Path, monkeypatch) -> None:
@@ -206,3 +206,71 @@ def test_cleanup_job_allows_temp_with_force_when_replay_enabled(
 
     assert not temp_dir.exists()
     assert not state_path.exists()
+
+
+def test_cleanup_job_temp_nonwarc_consolidates_warcs_and_rewrites_snapshot_paths(
+    tmp_path, monkeypatch
+) -> None:
+    _init_test_db(tmp_path, monkeypatch)
+    job_id = _seed_indexed_job(tmp_path)
+
+    with get_session() as session:
+        job = session.get(ArchiveJob, job_id)
+        assert job is not None
+        output_dir = Path(job.output_dir)
+        temp_dir = next(output_dir.glob(".tmp*"))
+
+        archive_dir = temp_dir / "collections" / "crawl-test" / "archive"
+        archive_dir.mkdir(parents=True, exist_ok=True)
+        source_warc = archive_dir / "rec-1.warc.gz"
+        source_warc.write_bytes(b"dummy warc bytes")
+
+        snap = Snapshot(
+            job_id=job.id,
+            source_id=job.source_id,
+            url="https://example.test/page",
+            normalized_url_group="https://example.test/page",
+            capture_timestamp=datetime(2025, 1, 1, 12, 0, tzinfo=timezone.utc),
+            mime_type="text/html",
+            status_code=200,
+            title="Example",
+            snippet="Example",
+            language="en",
+            warc_path=str(source_warc),
+            warc_record_id="rec-1",
+        )
+        session.add(snap)
+
+    parser = cli_module.build_parser()
+    args = parser.parse_args(["cleanup-job", "--id", str(job_id), "--mode", "temp-nonwarc"])
+
+    stdout = StringIO()
+    old_stdout = sys.stdout
+    try:
+        sys.stdout = stdout
+        args.func(args)
+    finally:
+        sys.stdout = old_stdout
+
+    with get_session() as session:
+        job = session.get(ArchiveJob, job_id)
+        assert job is not None
+        assert job.cleanup_status == "temp_nonwarc_cleaned"
+        assert job.cleaned_at is not None
+
+        snap = session.query(Snapshot).filter(Snapshot.job_id == job_id).one()
+        assert "/.tmp" not in snap.warc_path
+        assert "/warcs/" in snap.warc_path
+
+    assert not any(output_dir.glob(".tmp*"))
+    assert not (output_dir / ".archive_state.json").exists()
+
+    warcs_dir = output_dir / "warcs"
+    assert warcs_dir.is_dir()
+    stable_warcs = list(warcs_dir.glob("*.warc.gz"))
+    assert len(stable_warcs) == 1
+    assert stable_warcs[0].is_file()
+    assert stable_warcs[0].stat().st_size > 0
+
+    provenance_state = output_dir / "provenance" / "archive_state.json"
+    assert provenance_state.is_file()

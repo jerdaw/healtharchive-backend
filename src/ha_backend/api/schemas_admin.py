@@ -22,7 +22,9 @@ class JobSummarySchema(BaseModel):
     crawlerExitCode: Optional[int]
     crawlerStatus: Optional[str]
     warcFileCount: int
+    warcBytesTotal: int
     indexedPageCount: int
+    storageScannedAt: Optional[datetime] = None
 
 
 class JobDetailSchema(BaseModel):
@@ -43,10 +45,15 @@ class JobDetailSchema(BaseModel):
     crawlerStatus: Optional[str]
     crawlerStage: Optional[str]
     warcFileCount: int
+    warcBytesTotal: int
     indexedPageCount: int
     pagesCrawled: int
     pagesTotal: int
     pagesFailed: int
+    outputBytesTotal: int
+    tmpBytesTotal: int
+    tmpNonWarcBytesTotal: int
+    storageScannedAt: Optional[datetime] = None
     finalZimPath: Optional[str]
     combinedLogPath: Optional[str]
     stateFilePath: Optional[str]

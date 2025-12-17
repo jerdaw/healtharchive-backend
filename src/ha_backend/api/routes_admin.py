@@ -89,7 +89,9 @@ def list_jobs(
                 crawlerExitCode=job.crawler_exit_code,
                 crawlerStatus=job.crawler_status,
                 warcFileCount=job.warc_file_count,
+                warcBytesTotal=int(job.warc_bytes_total or 0),
                 indexedPageCount=job.indexed_page_count,
+                storageScannedAt=job.storage_scanned_at,
             )
         )
 
@@ -158,10 +160,15 @@ def get_job_detail(
         crawlerStatus=job.crawler_status,
         crawlerStage=job.crawler_stage,
         warcFileCount=job.warc_file_count,
+        warcBytesTotal=int(job.warc_bytes_total or 0),
         indexedPageCount=job.indexed_page_count,
         pagesCrawled=job.pages_crawled,
         pagesTotal=job.pages_total,
         pagesFailed=job.pages_failed,
+        outputBytesTotal=int(job.output_bytes_total or 0),
+        tmpBytesTotal=int(job.tmp_bytes_total or 0),
+        tmpNonWarcBytesTotal=int(job.tmp_non_warc_bytes_total or 0),
+        storageScannedAt=job.storage_scanned_at,
         finalZimPath=job.final_zim_path,
         combinedLogPath=job.combined_log_path,
         stateFilePath=job.state_file_path,

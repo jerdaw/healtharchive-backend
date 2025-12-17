@@ -5,6 +5,7 @@ from typing import Any, Dict, List, Optional
 
 from sqlalchemy import (
     JSON,
+    BigInteger,
     Boolean,
     Column,
     DateTime,
@@ -144,10 +145,34 @@ class ArchiveJob(TimestampMixin, Base):
         nullable=False,
         server_default=text("0"),
     )
+    warc_bytes_total: Mapped[int] = mapped_column(
+        BigInteger,
+        nullable=False,
+        server_default=text("0"),
+    )
     indexed_page_count: Mapped[int] = mapped_column(
         Integer,
         nullable=False,
         server_default=text("0"),
+    )
+
+    output_bytes_total: Mapped[int] = mapped_column(
+        BigInteger,
+        nullable=False,
+        server_default=text("0"),
+    )
+    tmp_bytes_total: Mapped[int] = mapped_column(
+        BigInteger,
+        nullable=False,
+        server_default=text("0"),
+    )
+    tmp_non_warc_bytes_total: Mapped[int] = mapped_column(
+        BigInteger,
+        nullable=False,
+        server_default=text("0"),
+    )
+    storage_scanned_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True)
     )
 
     cleanup_status: Mapped[str] = mapped_column(
