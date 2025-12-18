@@ -486,6 +486,254 @@ def cmd_schedule_annual(args: argparse.Namespace) -> None:
                 )
 
 
+def cmd_annual_status(args: argparse.Namespace) -> None:
+    """
+    Report the status of the Jan 01 (UTC) annual campaign for a given year.
+
+    This is a read-only convenience command designed for operations.
+    """
+    from datetime import datetime, timezone
+
+    from .models import ArchiveJob as ORMArchiveJob
+    from .models import Source
+
+    year = int(args.year)
+    campaign_dt = datetime(year, 1, 1, tzinfo=timezone.utc)
+    campaign_date = campaign_dt.date().isoformat()
+
+    annual_sources_ordered = ("hc", "phac", "cihr")
+    allowed_sources = set(annual_sources_ordered)
+
+    # Optional filter to match schedule-annual’s allowlist discipline.
+    requested_sources = getattr(args, "sources", None) or list(annual_sources_ordered)
+    normalized_requested = [s.strip().lower() for s in requested_sources if s.strip()]
+    invalid_sources = sorted({s for s in normalized_requested if s not in allowed_sources})
+    if invalid_sources:
+        print(
+            "ERROR: --sources contains unsupported codes: "
+            + ", ".join(invalid_sources)
+            + ". Allowed: hc, phac, cihr.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    requested_set = set(normalized_requested)
+    sources_in_order = [s for s in annual_sources_ordered if s in requested_set]
+
+    def _dt_str(dt: datetime | None) -> str | None:
+        if dt is None:
+            return None
+        return dt.astimezone(timezone.utc).replace(microsecond=0).isoformat()
+
+    results: list[dict[str, object]] = []
+
+    with get_session() as session:
+        for source_code in sources_in_order:
+            expected_job_name = f"{source_code}-{year}0101"
+
+            source = session.query(Source).filter_by(code=source_code).one_or_none()
+            if source is None:
+                results.append(
+                    {
+                        "sourceCode": source_code,
+                        "expectedJobName": expected_job_name,
+                        "status": "error",
+                        "error": "Missing Source row; run 'ha-backend seed-sources'",
+                        "job": None,
+                        "candidates": [],
+                        "isSearchReady": False,
+                    }
+                )
+                continue
+
+            jobs = (
+                session.query(ORMArchiveJob)
+                .filter(ORMArchiveJob.source_id == source.id)
+                .order_by(ORMArchiveJob.id.desc())
+                .all()
+            )
+
+            blocking_statuses = {
+                "queued",
+                "retryable",
+                "running",
+                "completed",
+                "indexing",
+                "index_failed",
+            }
+            blocking_job = next(
+                (j for j in jobs if j.status in blocking_statuses),
+                None,
+            )
+            blocking_payload = (
+                {
+                    "jobId": blocking_job.id,
+                    "jobName": blocking_job.name,
+                    "status": blocking_job.status,
+                    "createdAt": _dt_str(blocking_job.created_at),
+                }
+                if blocking_job is not None
+                else None
+            )
+
+            meta_candidates = [
+                j
+                for j in jobs
+                if (j.config or {}).get("campaign_kind") == "annual"
+                and (j.config or {}).get("campaign_year") == year
+            ]
+            name_candidates = [j for j in jobs if j.name == expected_job_name]
+
+            candidates = meta_candidates or name_candidates
+            candidates_payload = [
+                {
+                    "jobId": j.id,
+                    "jobName": j.name,
+                    "status": j.status,
+                    "createdAt": _dt_str(j.created_at),
+                }
+                for j in candidates
+            ]
+
+            if not candidates:
+                results.append(
+                    {
+                        "sourceCode": source_code,
+                        "expectedJobName": expected_job_name,
+                        "status": "missing",
+                        "job": None,
+                        "blockingJob": blocking_payload,
+                        "candidates": [],
+                        "isSearchReady": False,
+                    }
+                )
+                continue
+
+            if len(candidates) > 1:
+                results.append(
+                    {
+                        "sourceCode": source_code,
+                        "expectedJobName": expected_job_name,
+                        "status": "error",
+                        "error": "Multiple annual job candidates found; resolve duplicates before relying on status.",
+                        "job": None,
+                        "candidates": candidates_payload,
+                        "isSearchReady": False,
+                    }
+                )
+                continue
+
+            job = candidates[0]
+            cfg = job.config or {}
+
+            is_search_ready = job.status == "indexed"
+
+            results.append(
+                {
+                    "sourceCode": source_code,
+                    "expectedJobName": expected_job_name,
+                    "status": job.status,
+                    "job": {
+                        "jobId": job.id,
+                        "jobName": job.name,
+                        "outputDir": job.output_dir,
+                        "queuedAt": _dt_str(job.queued_at),
+                        "startedAt": _dt_str(job.started_at),
+                        "finishedAt": _dt_str(job.finished_at),
+                        "retryCount": job.retry_count,
+                        "indexedPageCount": job.indexed_page_count,
+                        "crawlerExitCode": job.crawler_exit_code,
+                        "crawlerStatus": job.crawler_status,
+                        "crawlerStage": job.crawler_stage,
+                        "campaignKind": cfg.get("campaign_kind"),
+                        "campaignYear": cfg.get("campaign_year"),
+                        "campaignDate": cfg.get("campaign_date"),
+                        "schedulerVersion": cfg.get("scheduler_version"),
+                    },
+                    "blockingJob": blocking_payload,
+                    "candidates": candidates_payload,
+                    "isSearchReady": is_search_ready,
+                }
+            )
+
+    total_sources = len(results)
+    indexed = sum(1 for r in results if r.get("status") == "indexed")
+    failed = sum(1 for r in results if r.get("status") in {"failed", "index_failed"})
+    missing = sum(1 for r in results if r.get("status") == "missing")
+    errors = sum(1 for r in results if r.get("status") == "error")
+    in_progress = total_sources - indexed - failed - missing - errors
+
+    ready_for_search = indexed == total_sources and errors == 0
+
+    payload = {
+        "campaignYear": year,
+        "campaignDate": campaign_date,
+        "sources": results,
+        "summary": {
+            "totalSources": total_sources,
+            "indexed": indexed,
+            "inProgress": in_progress,
+            "failed": failed,
+            "missing": missing,
+            "errors": errors,
+            "readyForSearch": ready_for_search,
+        },
+    }
+
+    if bool(getattr(args, "json", False)):
+        print(json.dumps(payload, indent=2, sort_keys=True))
+        return
+
+    print(f"Annual campaign status — {campaign_date} (Jan 01 UTC)")
+    print(f"Ready for search: {'YES' if ready_for_search else 'NO'}")
+    print(
+        "Summary: "
+        f"total={total_sources} indexed={indexed} in_progress={in_progress} "
+        f"failed={failed} missing={missing} errors={errors}"
+    )
+    print("")
+
+    for r in results:
+        source_code = str(r.get("sourceCode"))
+        status = str(r.get("status"))
+
+        if status == "missing":
+            blocking_job = r.get("blockingJob")
+            if isinstance(blocking_job, dict) and blocking_job:
+                print(
+                    f"{source_code}: MISSING annual job for {year} (expected {r.get('expectedJobName')}); "
+                    f"active_job={blocking_job.get('jobId')}({blocking_job.get('status')}) {blocking_job.get('jobName')}"
+                )
+            else:
+                print(
+                    f"{source_code}: MISSING annual job for {year} (expected {r.get('expectedJobName')})"
+                )
+            continue
+
+        if status == "error":
+            err = r.get("error") or "Unknown error"
+            print(f"{source_code}: ERROR - {err}")
+            candidates = r.get("candidates") or []
+            if isinstance(candidates, list) and candidates:
+                ids = ", ".join(
+                    f"{c.get('jobId')}({c.get('status')})" for c in candidates if isinstance(c, dict)
+                )
+                if ids:
+                    print(f"     candidates: {ids}")
+            continue
+
+        job_data = r.get("job") or {}
+        if not isinstance(job_data, dict):
+            job_data = {}
+
+        print(
+            f"{source_code}: job_id={job_data.get('jobId')} status={status} "
+            f"indexed_pages={job_data.get('indexedPageCount')} retries={job_data.get('retryCount')} "
+            f"crawl_rc={job_data.get('crawlerExitCode')} crawl_status={job_data.get('crawlerStatus')} "
+            f"name={job_data.get('jobName')}"
+        )
+
+
 def cmd_backfill_search_vector(args: argparse.Namespace) -> None:
     """
     Backfill Snapshot.search_vector for Postgres FTS.
@@ -2424,6 +2672,30 @@ def build_parser() -> argparse.ArgumentParser:
         help="Create queued ArchiveJob rows (otherwise dry-run only).",
     )
     p_schedule_annual.set_defaults(func=cmd_schedule_annual)
+
+    # annual-status
+    p_annual_status = subparsers.add_parser(
+        "annual-status",
+        help="Report annual campaign status for a year (jobs + indexing readiness).",
+    )
+    p_annual_status.add_argument(
+        "--year",
+        type=int,
+        required=True,
+        help="Campaign year (reports the Jan 01 UTC annual edition for that year).",
+    )
+    p_annual_status.add_argument(
+        "--json",
+        action="store_true",
+        default=False,
+        help="Emit machine-readable JSON instead of text output.",
+    )
+    p_annual_status.add_argument(
+        "--sources",
+        nargs="+",
+        help="Subset of sources to report (allowlisted): hc phac cihr.",
+    )
+    p_annual_status.set_defaults(func=cmd_annual_status)
 
     # backfill-search-vector
     p_backfill_search = subparsers.add_parser(
