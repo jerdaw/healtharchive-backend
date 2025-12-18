@@ -264,11 +264,17 @@ Run the annual scheduler automatically on Jan 01 UTC, reliably.
 
 **systemd units (draft)**
 
-- `healtharchive-schedule-annual.service`
-  - Runs: `ha-backend schedule-annual --apply --sources hc phac cihr`
-    - (If running outside Jan 01 UTC, include `--year YYYY` explicitly.)
+Templates live in: `../deployment/systemd/`
+
+- `healtharchive-schedule-annual.service` (apply)
+  - Runs: `ha-backend schedule-annual --apply --year <UTC_YEAR> --sources hc phac cihr`
+    - `<UTC_YEAR>` is computed at runtime (`date -u +%Y`) so that
+      `Persistent=true` can safely run a missed activation after a reboot.
   - Uses `EnvironmentFile=/etc/healtharchive/backend.env`
-  - Uses `ConditionPathExists=/etc/healtharchive/automation-enabled`
+  - Gated by `ConditionPathExists=/etc/healtharchive/automation-enabled`
+  - Uses `RefuseManualStart=yes` to reduce accidental production scheduling.
+- `healtharchive-schedule-annual-dry-run.service` (safe validation)
+  - Runs the same scheduler without `--apply` (no DB writes).
 - `healtharchive-schedule-annual.timer`
   - `OnCalendar=*-01-01 00:05:00 UTC`
   - `Persistent=true`
@@ -281,7 +287,8 @@ Run the annual scheduler automatically on Jan 01 UTC, reliably.
 
 **Acceptance criteria**
 
-- Timer wiring is validated by running the service manually in dry-run mode.
+- Timer wiring is validated by running the dry-run service manually:
+  `systemctl start healtharchive-schedule-annual-dry-run.service`
 - Timer is enabled only after manual review.
 
 **Rollback**
@@ -309,6 +316,12 @@ Actions:
   - optionally `IOSchedulingClass=best-effort`, `IOSchedulingPriority=6`
 - Keep only one worker process unless you explicitly decide to accept more
   contention for a tighter “same moment” capture.
+
+**Implementation (v1)**
+
+- Use a systemd drop-in for the worker:
+  - template: `../deployment/systemd/healtharchive-worker.service.override.conf`
+  - install path: `/etc/systemd/system/healtharchive-worker.service.d/override.conf`
 
 **Acceptance criteria**
 
