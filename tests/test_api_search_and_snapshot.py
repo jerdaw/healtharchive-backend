@@ -635,6 +635,70 @@ def test_search_include_non_2xx_includes_error_pages_but_ranks_lower(
     assert "COVID-19 not found (404)" in titles
 
 
+def test_search_hides_same_day_content_duplicates_by_default(tmp_path, monkeypatch) -> None:
+    client = _init_test_app(tmp_path, monkeypatch)
+    _seed_search_data()
+
+    with get_session() as session:
+        hc = session.query(Source).filter(Source.code == "hc").one()
+        ts_a = datetime(2025, 4, 21, 12, 0, tzinfo=timezone.utc)
+        ts_b = datetime(2025, 4, 21, 12, 5, tzinfo=timezone.utc)
+        content_hash = "a" * 64
+
+        s1 = Snapshot(
+            job_id=None,
+            source_id=hc.id,
+            url="https://canada.demdex.net/dest5.html?d_nsid=0",
+            normalized_url_group=None,
+            capture_timestamp=ts_a,
+            mime_type="text/html",
+            status_code=200,
+            title="Adobe AudienceManager",
+            snippet="Adobe AudienceManager",
+            language="und",
+            warc_path="/warcs/demdex-1.warc.gz",
+            warc_record_id="demdex-1",
+            content_hash=content_hash,
+        )
+        s2 = Snapshot(
+            job_id=None,
+            source_id=hc.id,
+            url="https://canada.demdex.net/dest5.html?d_nsid=0",
+            normalized_url_group=None,
+            capture_timestamp=ts_b,
+            mime_type="text/html",
+            status_code=200,
+            title="Adobe AudienceManager",
+            snippet="Adobe AudienceManager",
+            language="und",
+            warc_path="/warcs/demdex-2.warc.gz",
+            warc_record_id="demdex-2",
+            content_hash=content_hash,
+        )
+        session.add_all([s1, s2])
+
+    resp = client.get(
+        "/api/search",
+        params={"q": "AudienceManager", "view": "snapshots", "source": "hc"},
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["total"] == 1
+
+    resp_dupes = client.get(
+        "/api/search",
+        params={
+            "q": "AudienceManager",
+            "view": "snapshots",
+            "source": "hc",
+            "includeDuplicates": True,
+        },
+    )
+    assert resp_dupes.status_code == 200
+    data_dupes = resp_dupes.json()
+    assert data_dupes["total"] == 2
+
+
 def test_search_sort_newest(tmp_path, monkeypatch) -> None:
     client = _init_test_app(tmp_path, monkeypatch)
     _seed_search_quality_data()
@@ -646,6 +710,57 @@ def test_search_sort_newest(tmp_path, monkeypatch) -> None:
     assert data["total"] == 2
     titles = [r["title"] for r in data["results"]]
     assert titles[0] == "Latest public health updates"
+
+
+def test_search_relevance_prefers_top_level_pages_on_ties(tmp_path, monkeypatch) -> None:
+    client = _init_test_app(tmp_path, monkeypatch)
+    _seed_search_data()
+
+    with get_session() as session:
+        hc = session.query(Source).filter(Source.code == "hc").one()
+        ts = datetime(2025, 5, 1, 12, 0, tzinfo=timezone.utc)
+        s_short = Snapshot(
+            job_id=None,
+            source_id=hc.id,
+            url="https://example.com/a",
+            normalized_url_group=None,
+            capture_timestamp=ts,
+            mime_type="text/html",
+            status_code=200,
+            title="Important guidance update",
+            snippet="Guidance update",
+            language="en",
+            warc_path="/warcs/short.warc.gz",
+            warc_record_id="short",
+            content_hash="b" * 64,
+        )
+        s_long = Snapshot(
+            job_id=None,
+            source_id=hc.id,
+            url="https://example.com/a/b/c/d/e",
+            normalized_url_group=None,
+            capture_timestamp=ts,
+            mime_type="text/html",
+            status_code=200,
+            title="Important guidance update",
+            snippet="Guidance update",
+            language="en",
+            warc_path="/warcs/long.warc.gz",
+            warc_record_id="long",
+            content_hash="c" * 64,
+        )
+        session.add_all([s_short, s_long])
+
+    resp = client.get(
+        "/api/search",
+        params={"q": "guidance", "view": "pages", "sort": "relevance", "source": "hc"},
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    urls = [r["originalUrl"] for r in data["results"]]
+    assert "https://example.com/a" in urls
+    assert "https://example.com/a/b/c/d/e" in urls
+    assert urls.index("https://example.com/a") < urls.index("https://example.com/a/b/c/d/e")
 
 
 def test_search_view_pages_dedupes_by_normalized_url_group(tmp_path, monkeypatch) -> None:
