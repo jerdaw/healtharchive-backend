@@ -10,7 +10,7 @@ from urllib.parse import urlsplit, urlunsplit
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
-from sqlalchemy import and_, case, func, inspect, or_, text
+from sqlalchemy import String, and_, case, cast, func, inspect, or_, text
 from sqlalchemy.orm import Session, joinedload, load_only
 from threading import Lock
 
@@ -616,6 +616,7 @@ def _search_snapshots_inner(
     sort: SearchSort | None,
     view: SearchView | None,
     includeNon2xx: bool,
+    includeDuplicates: bool,
     from_date: date | None,
     to_date: date | None,
     page: int,
@@ -884,11 +885,21 @@ def _search_snapshots_inner(
             )
         return url_expr
 
+    def capture_date_expr(ts_expr: Any) -> Any:
+        if dialect_name == "postgresql":
+            return func.date(func.timezone("UTC", ts_expr))
+        if dialect_name == "sqlite":
+            return func.date(ts_expr)
+        return func.date(ts_expr)
+
     group_key = func.coalesce(
         Snapshot.normalized_url_group,
         strip_query_fragment_expr(Snapshot.url),
     )
     page_partition_key = (Snapshot.source_id, group_key)
+
+    pages_url_length = func.length(group_key)
+    snapshots_url_length = func.length(strip_query_fragment_expr(Snapshot.url))
 
     def compute_total(query: Any) -> int:
         if effective_view == SearchView.pages:
@@ -906,7 +917,49 @@ def _search_snapshots_inner(
                 .scalar()
                 or 0
             )
+        if effective_view == SearchView.snapshots and not includeDuplicates:
+            capture_day = capture_date_expr(Snapshot.capture_timestamp).label("capture_day")
+            content_key = cast(func.coalesce(Snapshot.content_hash, cast(Snapshot.id, String)), String).label(
+                "content_key"
+            )
+            distinct_items = (
+                query.with_entities(
+                    Snapshot.source_id.label("source_id"),
+                    Snapshot.url.label("url"),
+                    content_key,
+                    capture_day,
+                )
+                .distinct()
+                .subquery()
+            )
+            return (
+                db.query(func.count())
+                .select_from(distinct_items)
+                .scalar()
+                or 0
+            )
         return query.with_entities(func.count(Snapshot.id)).scalar() or 0
+
+    def apply_snapshot_dedup(query: Any) -> Any:
+        capture_day = capture_date_expr(Snapshot.capture_timestamp)
+        content_key = cast(
+            func.coalesce(Snapshot.content_hash, cast(Snapshot.id, String)),
+            String,
+        )
+        partition_key = (Snapshot.source_id, Snapshot.url, content_key, capture_day)
+        row_number = func.row_number().over(
+            partition_by=partition_key,
+            order_by=(Snapshot.capture_timestamp.desc(), Snapshot.id.desc()),
+        ).label("rn")
+        dedup_subq = query.with_entities(
+            Snapshot.id.label("id"),
+            row_number,
+        ).subquery()
+        return (
+            db.query(Snapshot)
+            .join(dedup_subq, Snapshot.id == dedup_subq.c.id)
+            .filter(dedup_subq.c.rn == 1)
+        )
 
     query = base_query
     tsquery = None
@@ -1078,6 +1131,9 @@ def _search_snapshots_inner(
                     )
     else:
         total = compute_total(query)
+
+    if effective_view == SearchView.snapshots and not includeDuplicates:
+        query = apply_snapshot_dedup(query)
 
     mode = search_mode or "newest"
     if ranking_version == RankingVersion.v2 and mode.startswith("relevance"):
@@ -1414,6 +1470,7 @@ def _search_snapshots_inner(
             .order_by(
                 status_quality.desc(),
                 group_scores_subq.c.group_score.desc(),
+                func.length(group_scores_subq.c.group_key).asc(),
                 Snapshot.capture_timestamp.desc(),
                 Snapshot.id.desc(),
             )
@@ -1440,6 +1497,7 @@ def _search_snapshots_inner(
                 ordered = item_query.order_by(
                     status_quality.desc(),
                     rank_score.desc(),
+                    pages_url_length.asc(),
                     Snapshot.capture_timestamp.desc(),
                     Snapshot.id.desc(),
                 )
@@ -2152,6 +2210,10 @@ def search_snapshots(
     sort: Optional[SearchSort] = Query(default=None),
     view: Optional[SearchView] = Query(default=None),
     includeNon2xx: bool = Query(default=False),
+    includeDuplicates: bool = Query(
+        default=False,
+        description="When view=snapshots, include same-day duplicate captures with identical content.",
+    ),
     from_: Optional[date] = Query(
         default=None,
         alias="from",
@@ -2183,6 +2245,7 @@ def search_snapshots(
             sort=sort,
             view=view,
             includeNon2xx=includeNon2xx,
+            includeDuplicates=includeDuplicates,
             from_date=from_,
             to_date=to,
             page=page,

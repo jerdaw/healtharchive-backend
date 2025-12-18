@@ -153,6 +153,20 @@ vary). Backfill the column:
 ha-backend backfill-normalized-url-groups
 ```
 
+### 5.2.2 Snapshot view: hide same-day content duplicates (UI)
+
+In `view=snapshots`, the API can hide *same-day duplicates* of the exact same
+URL when the content is identical (same `content_hash`), which helps reduce
+noise from repeated tracker / redirect captures while keeping the underlying
+data intact.
+
+- Default: duplicates are hidden.
+- To include them: `GET /api/search?...&view=snapshots&includeDuplicates=true`
+
+TODO (storage-only, must preserve trustworthiness): if we can *prove* the HTML
+payload is identical (and preserve provenance), consider pruning same-day
+duplicates from storage to save disk space.
+
 ### 5.3 Backfill outlinks + authority signals
 
 If you have applied the authority schema (tables `snapshot_outlinks` and
