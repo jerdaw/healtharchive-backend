@@ -11,7 +11,7 @@ This is a light-weight ops helper for Phase 7 (post-campaign verification):
   3) Runs ./scripts/search-eval-capture.sh with a stable --run-id so artifacts live together
 
 Usage:
-  ./scripts/annual-search-verify.sh [--year YYYY] [--out-root DIR] [--base-url URL] [--run-id ID] [--allow-not-ready] [--allow-existing] [--] [capture args...]
+  ./scripts/annual-search-verify.sh [--year YYYY] [--out-root DIR] [--base-url URL] [--run-id ID] [--env-file FILE] [--allow-not-ready] [--allow-existing] [--] [capture args...]
 
 Examples:
   ./scripts/annual-search-verify.sh
@@ -24,6 +24,8 @@ Notes:
   - Default year is current UTC year.
   - Default out-root is /srv/healtharchive/ops/search-eval if /srv/healtharchive exists,
     otherwise /tmp/ha-search-eval.
+  - If HEALTHARCHIVE_DATABASE_URL is not set in your shell, this script will auto-source
+    /etc/healtharchive/backend.env when it exists (or you can pass --env-file).
   - capture args after `--` are passed through to ./scripts/search-eval-capture.sh.
 EOF
 }
@@ -32,6 +34,8 @@ YEAR=""
 OUT_ROOT=""
 BASE_URL="http://127.0.0.1:8001"
 RUN_ID=""
+ENV_FILE=""
+EFFECTIVE_ENV_FILE=""
 ALLOW_NOT_READY="false"
 ALLOW_EXISTING="false"
 
@@ -53,6 +57,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --run-id)
       RUN_ID="$2"
+      shift 2
+      ;;
+    --env-file)
+      ENV_FILE="$2"
       shift 2
       ;;
     --allow-not-ready)
@@ -96,6 +104,27 @@ if ! command -v "${HA_BACKEND_BIN}" >/dev/null 2>&1; then
     echo "ERROR: ha-backend not found in PATH and no venv binary at ${REPO_ROOT}/.venv/bin/ha-backend" >&2
     echo "Hint: activate the venv or install deps: pip install -e '.[dev]'" >&2
     exit 1
+  fi
+fi
+
+if [[ -z "${HEALTHARCHIVE_DATABASE_URL:-}" ]]; then
+  auto_env="/etc/healtharchive/backend.env"
+  if [[ -n "${ENV_FILE}" ]]; then
+    if [[ ! -f "${ENV_FILE}" ]]; then
+      echo "ERROR: --env-file not found: ${ENV_FILE}" >&2
+      exit 2
+    fi
+    set -a
+    # shellcheck disable=SC1090
+    source "${ENV_FILE}"
+    set +a
+    EFFECTIVE_ENV_FILE="${ENV_FILE}"
+  elif [[ -f "${auto_env}" ]]; then
+    set -a
+    # shellcheck disable=SC1091
+    source "${auto_env}"
+    set +a
+    EFFECTIVE_ENV_FILE="${auto_env}"
   fi
 fi
 
@@ -166,6 +195,7 @@ meta_file="${CAPTURE_DIR}/annual-search-verify.meta.txt"
   echo "run_id=${RUN_ID}"
   echo "verified_at_utc=$(date -u +%Y%m%dT%H%M%SZ)"
   echo "base_url=${BASE_URL}"
+  echo "env_file=${EFFECTIVE_ENV_FILE:-none}"
   echo "out_root=${OUT_ROOT}"
   echo "capture_dir=${CAPTURE_DIR}"
   echo "hostname=$(hostname)"
