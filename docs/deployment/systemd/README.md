@@ -7,6 +7,7 @@ They implement:
 
 - Phase 5: annual scheduling timer (Jan 01 UTC)
 - Phase 6: worker priority lowering during campaign (always-on, low-risk)
+- Phase 8: replay reconciliation timer (pywb indexing; capped)
 
 Assumptions (adjust paths/user if your VPS differs):
 
@@ -31,6 +32,15 @@ Assumptions (adjust paths/user if your VPS differs):
   - Safe validation service (no DB writes).
 - `healtharchive-worker.service.override.conf`
   - Drop-in that lowers worker CPU/IO priority to keep the API responsive.
+- `healtharchive-replay-reconcile.service`
+  - **Apply mode**: runs `ha-backend replay-reconcile --apply --max-jobs 1`.
+  - Gated by `ConditionPathExists=/etc/healtharchive/replay-automation-enabled`.
+  - Uses a lock file under `/srv/healtharchive/replay/.locks/` to prevent concurrent runs.
+- `healtharchive-replay-reconcile.timer`
+  - Daily at `*-*-* 02:30:00 UTC`
+  - `Persistent=true` (runs on next boot if missed)
+- `healtharchive-replay-reconcile-dry-run.service`
+  - Safe validation service (no docker exec, no filesystem writes beyond the lock file dir).
 
 ---
 
@@ -50,6 +60,18 @@ sudo install -m 0644 -o root -g root \
 sudo install -m 0644 -o root -g root \
   /opt/healtharchive-backend/docs/deployment/systemd/healtharchive-schedule-annual-dry-run.service \
   /etc/systemd/system/healtharchive-schedule-annual-dry-run.service
+
+sudo install -m 0644 -o root -g root \
+  /opt/healtharchive-backend/docs/deployment/systemd/healtharchive-replay-reconcile.service \
+  /etc/systemd/system/healtharchive-replay-reconcile.service
+
+sudo install -m 0644 -o root -g root \
+  /opt/healtharchive-backend/docs/deployment/systemd/healtharchive-replay-reconcile.timer \
+  /etc/systemd/system/healtharchive-replay-reconcile.timer
+
+sudo install -m 0644 -o root -g root \
+  /opt/healtharchive-backend/docs/deployment/systemd/healtharchive-replay-reconcile-dry-run.service \
+  /etc/systemd/system/healtharchive-replay-reconcile-dry-run.service
 ```
 
 Install the worker priority drop-in:
@@ -96,6 +118,18 @@ it enqueues jobs and the worker may start crawling immediately.
 
 ---
 
+## Validate replay reconciliation (safe)
+
+This dry-run service exercises DB connectivity + filesystem drift detection
+without running any docker exec commands:
+
+```bash
+sudo systemctl start healtharchive-replay-reconcile-dry-run.service
+sudo journalctl -u healtharchive-replay-reconcile-dry-run.service -n 200 --no-pager
+```
+
+---
+
 ## Enable automation (Jan 01)
 
 Create the automation sentinel file:
@@ -116,6 +150,27 @@ enabled.
 
 ---
 
+## Enable replay reconciliation automation (optional)
+
+Create the replay automation sentinel file:
+
+```bash
+sudo install -m 0644 -o root -g root /dev/null /etc/healtharchive/replay-automation-enabled
+```
+
+Enable the timer:
+
+```bash
+sudo systemctl enable --now healtharchive-replay-reconcile.timer
+systemctl list-timers | rg healtharchive-replay-reconcile || systemctl list-timers | grep healtharchive-replay-reconcile
+```
+
+Note: by default, the timer only reconciles **replay indexing**. Preview image
+generation is intentionally left manual/capped until you decide it’s stable
+enough to automate.
+
+---
+
 ## Rollback / disable quickly
 
 - Disable timer immediately:
@@ -128,6 +183,13 @@ enabled.
 
   ```bash
   sudo rm -f /etc/healtharchive/automation-enabled
+  ```
+
+- Disable replay reconciliation automation immediately:
+
+  ```bash
+  sudo systemctl disable --now healtharchive-replay-reconcile.timer
+  sudo rm -f /etc/healtharchive/replay-automation-enabled
   ```
 
 - Remove the worker priority override:

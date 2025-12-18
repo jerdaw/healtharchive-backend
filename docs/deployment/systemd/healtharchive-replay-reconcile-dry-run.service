@@ -1,0 +1,20 @@
+[Unit]
+Description=HealthArchive replay reconciler (dry run)
+Wants=network-online.target
+After=network-online.target docker.service postgresql.service
+ConditionPathExists=/etc/healtharchive/backend.env
+
+[Service]
+Type=oneshot
+User=haadmin
+WorkingDirectory=/opt/healtharchive-backend
+EnvironmentFile=/etc/healtharchive/backend.env
+
+# Keep impact low on the single VPS.
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=6
+
+TimeoutStartSec=30m
+
+ExecStart=/opt/healtharchive-backend/.venv/bin/ha-backend replay-reconcile --max-jobs 3 --collections-dir /srv/healtharchive/replay/collections --warcs-host-root /srv/healtharchive/jobs --warcs-container-root /warcs --lock-file /srv/healtharchive/replay/.locks/replay-reconcile.lock

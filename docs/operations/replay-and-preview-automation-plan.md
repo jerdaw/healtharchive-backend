@@ -1,6 +1,6 @@
 # Replay + Preview Automation (Plan Only)
 
-Status: **design draft** (no automation implemented).
+Status: **design draft** (v1 implemented: `ha-backend replay-reconcile`; automation timers remain optional).
 
 This document is a **thorough, safety-first plan** for automating the operational steps that make HealthArchive “feel like a real site archive”:
 
@@ -450,4 +450,3 @@ When a new job is indexed:
 3. Verify:
    - `/snapshot/<id>` and `/browse/<id>`
    - `/archive` source cards show preview and deep browsing works
-

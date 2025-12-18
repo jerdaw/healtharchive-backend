@@ -336,16 +336,44 @@ Actions:
 After all annual jobs are indexed, capture evidence that search is working and
 stable.
 
-Actions:
+Implementation (v1):
 
-- Run `annual-status --year YYYY` and confirm “ready”.
-- Capture golden queries via `scripts/search-eval-capture.sh`, storing outputs
-  under a year-tagged directory.
-- Optional (Postgres): run ANALYZE/VACUUM once after ingestion completes.
+- `scripts/search-eval-capture.sh` now supports `--run-id ID` so you can place
+  captures under a stable, year-tagged path (instead of a nested timestamp you
+  need to “discover” after the fact).
+- `scripts/annual-search-verify.sh` wraps the flow safely:
+  - runs `ha-backend annual-status --year YYYY --json`,
+  - refuses to capture unless `summary.readyForSearch=true` (unless you pass
+    `--allow-not-ready`),
+  - writes `annual-status.json`/`annual-status.txt` into the same capture dir as
+    the golden query responses,
+  - passes optional args through to `search-eval-capture.sh`.
+
+Recommended artifact layout on the VPS:
+
+- `/srv/healtharchive/ops/search-eval/<year>/<run_id>/`
+  - `annual-status.json`
+  - `annual-status.txt`
+  - `annual-search-verify.meta.txt`
+  - `meta.txt` (from `search-eval-capture.sh`)
+  - `<query>.(pages|snapshots).json`
+
+Operator command (production example):
+
+```bash
+set -a; source /etc/healtharchive/backend.env; set +a
+cd /opt/healtharchive-backend
+./scripts/annual-search-verify.sh --year 2026 --out-root /srv/healtharchive/ops/search-eval --base-url http://127.0.0.1:8001
+```
+
+Optional (Postgres, manual): consider running a one-time `VACUUM (ANALYZE)`
+after large ingestion completes. Do this manually, off-peak, and only if you’re
+confident it won’t starve IO for user traffic.
 
 **Acceptance criteria**
 
-- You have a timestamped artifact directory for the year showing search outputs.
+- You have a year-tagged artifact directory showing `annual-status` output plus
+  captured `/api/search` JSON for the golden query set.
 
 ---
 
@@ -356,19 +384,36 @@ Actions:
 Make replay and previews converge to correct state without risking core search
 availability.
 
-Approach (aligns with `replay-and-preview-automation-plan.md`):
+Implementation (v1) (aligns with `replay-and-preview-automation-plan.md`):
 
-- Implement a reconciler that:
-  - runs out-of-band,
-  - is capped and locked,
-  - prefers “repair drift” over “hook into worker”.
+- New ops command: `ha-backend replay-reconcile`
+  - default mode is **dry-run** (safe): prints what it would do.
+  - `--apply` performs the actions.
+  - global lock file prevents concurrent runs (default:
+    `/srv/healtharchive/replay/.locks/replay-reconcile.lock`).
+  - caps:
+    - `--max-jobs N` (default 1) limits replay indexing repairs per run.
+    - optional `--previews --max-previews N` (default 1) generates missing
+      preview images for `/archive` source cards (still capped).
+  - allowlists:
+    - `--sources hc phac ...`
+    - `--job-id 123 456 ...`
+    - optional `--campaign-year YYYY` for annual-only reconciliation.
+
+- Replay indexing metadata:
+  - `ha-backend replay-index-job --id <id>` now writes a marker file under the
+    collection root: `replay-index.meta.json` (WARC count + hash + timestamps).
+  - `replay-reconcile --verify-warc-hash` can use the marker to detect drift
+    (slower; optional).
 
 Phased rollout:
 
-1. Reconciler dry-run
-2. Manual apply for one job
-3. Timer with caps
-4. Optional previews (still capped; failures non-fatal)
+1. Dry-run:
+   - `ha-backend replay-reconcile --collections-dir /srv/healtharchive/replay/collections`
+2. Apply for one job (manual allowlist):
+   - `ha-backend replay-reconcile --apply --job-id <JOB_ID> --max-jobs 1`
+3. Timer with caps (templates under `docs/deployment/systemd/`; disabled by default).
+4. Optional previews (still capped; failures are surfaced clearly).
 
 ---
 
@@ -379,13 +424,36 @@ Phased rollout:
 Reduce operator error in backend deployments without introducing brittle
 GitHub→VPS automation.
 
-Opinionated steps:
+Implementation (v1)
 
-1. Create a VPS-local “one-command deploy” runbook/script:
-   - checkout pinned SHA
-   - install deps
-   - run migrations
-   - restart services
-   - verify `/api/health`
-2. Only later, if desired, consider GitHub Actions deployments (requires
-   secrets, rollback discipline, and is higher-risk without staging).
+- A single-VPS deploy helper script now exists:
+  - `scripts/vps-deploy.sh`
+- It is **dry-run by default**; use `--apply` to actually deploy.
+- It supports:
+  - fast-forward deploys (`git pull --ff-only`), or pinned SHAs via `--ref`
+  - dependency install (editable) + optional skip flags
+  - Alembic migrations (sources `/etc/healtharchive/backend.env` but does not print it)
+  - systemd restarts for API + worker
+  - a final `/api/health` check
+  - a deploy lock file to avoid concurrent deploys
+
+Operator usage (production):
+
+```bash
+cd /opt/healtharchive-backend
+
+# Dry-run:
+./scripts/vps-deploy.sh
+
+# Deploy latest main:
+./scripts/vps-deploy.sh --apply
+
+# Deploy pinned SHA:
+./scripts/vps-deploy.sh --apply --ref <GIT_SHA>
+```
+
+Future (optional, higher-risk without staging):
+
+- GitHub Actions deployments can be considered later, but require secrets,
+  rollback discipline, and careful failure handling. For now, the recommended
+  posture is “boring manual deploy with a single trusted script”.

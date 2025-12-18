@@ -1977,6 +1977,8 @@ def cmd_replay_index_job(args: argparse.Namespace) -> None:
     """
     from pathlib import Path
     import getpass
+    import hashlib
+    from datetime import datetime, timezone
 
     from .indexing.warc_discovery import discover_warcs_for_job
     from .models import ArchiveJob as ORMArchiveJob
@@ -2112,6 +2114,7 @@ def cmd_replay_index_job(args: argparse.Namespace) -> None:
         sys.exit(1)
 
     print(f"Linking {len(warc_paths)} WARC(s) into {archive_dir}")
+    rel_paths_for_hash: list[str] = []
     for idx, host_warc_path in enumerate(warc_paths, start=1):
         suffix = "".join(host_warc_path.suffixes) or host_warc_path.suffix
         link_name = f"warc-{idx:06d}{suffix}"
@@ -2126,6 +2129,8 @@ def cmd_replay_index_job(args: argparse.Namespace) -> None:
                 file=sys.stderr,
             )
             sys.exit(1)
+
+        rel_paths_for_hash.append(rel.as_posix())
 
         target_in_container = str(Path(warcs_container_root) / rel)
         link_path = archive_dir / link_name
@@ -2158,6 +2163,33 @@ def cmd_replay_index_job(args: argparse.Namespace) -> None:
     run_docker(
         ["docker", "exec", container_name, "wb-manager", "reindex", collection_name]
     )
+    warc_list_hash = hashlib.sha256(
+        "\n".join(sorted(rel_paths_for_hash)).encode("utf-8")
+    ).hexdigest()
+    marker_path = collection_root / "replay-index.meta.json"
+    marker_payload = {
+        "version": 1,
+        "jobId": job_id,
+        "collectionName": collection_name,
+        "indexedAtUtc": datetime.now(timezone.utc).replace(microsecond=0).isoformat(),
+        "warcCount": len(rel_paths_for_hash),
+        "warcListHash": warc_list_hash,
+        "warcsHostRoot": str(host_root_resolved),
+        "warcsContainerRoot": warcs_container_root,
+    }
+    try:
+        tmp_path = marker_path.with_suffix(".tmp")
+        tmp_path.write_text(
+            json.dumps(marker_payload, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+        tmp_path.replace(marker_path)
+    except Exception as exc:
+        print(
+            f"WARNING: Failed to write replay index marker {marker_path}: {exc}",
+            file=sys.stderr,
+        )
+
     print("Replay indexing complete.")
 
 
@@ -2431,6 +2463,507 @@ def cmd_replay_generate_previews(args: argparse.Namespace) -> None:
     if failures:
         print(f"Failed:    {len(failures)} ({', '.join(failures)})", file=sys.stderr)
         sys.exit(1)
+
+
+def cmd_replay_reconcile(args: argparse.Namespace) -> None:
+    """
+    Reconcile replay indexing (pywb) and optional source previews for indexed jobs.
+
+    This is intentionally "ops-y" and safe-by-default:
+    - dry-run by default (use --apply to perform actions)
+    - capped work per run
+    - global lock to prevent concurrent runs
+
+    It is designed to align with `docs/operations/replay-and-preview-automation-plan.md`.
+    """
+    from dataclasses import dataclass
+    from datetime import datetime, timezone
+    from pathlib import Path
+    import hashlib
+    import os
+
+    from .api.routes_public import _find_replay_preview_file, list_sources
+    from .indexing.warc_discovery import discover_warcs_for_job
+    from .models import ArchiveJob as ORMArchiveJob
+    from .models import Source
+
+    apply_mode: bool = bool(args.apply)
+    dry_run: bool = not apply_mode
+
+    max_jobs: int = int(args.max_jobs)
+    if max_jobs < 0:
+        print("ERROR: --max-jobs must be >= 0.", file=sys.stderr)
+        sys.exit(2)
+
+    previews_enabled: bool = bool(args.previews)
+    max_previews: int = int(args.max_previews)
+    if max_previews < 0:
+        print("ERROR: --max-previews must be >= 0.", file=sys.stderr)
+        sys.exit(2)
+
+    verify_warc_hash: bool = bool(args.verify_warc_hash)
+
+    requested_sources = getattr(args, "sources", None) or []
+    source_allowlist = {s.strip().lower() for s in requested_sources if s.strip()}
+
+    requested_job_ids = getattr(args, "job_id", None) or []
+    job_id_allowlist = {int(v) for v in requested_job_ids} if requested_job_ids else set()
+
+    campaign_year: int | None = getattr(args, "campaign_year", None)
+    if campaign_year is not None and campaign_year < 1970:
+        print("ERROR: --campaign-year looks invalid.", file=sys.stderr)
+        sys.exit(2)
+
+    container_name: str = str(args.container)
+    collections_dir = Path(args.collections_dir).expanduser()
+    warcs_host_root = Path(args.warcs_host_root).expanduser()
+    warcs_container_root = str(args.warcs_container_root)
+
+    lock_file = Path(args.lock_file).expanduser()
+
+    @dataclass(frozen=True)
+    class ReplayCheck:
+        job_id: int
+        source_code: str | None
+        collection_name: str
+        needs_reindex: bool
+        is_blocked: bool
+        reason: str
+        has_index: bool
+        has_warc_links: bool
+
+    def _lock_or_exit() -> object:
+        lock_file.parent.mkdir(parents=True, exist_ok=True)
+
+        try:
+            import fcntl  # type: ignore
+        except Exception:  # pragma: no cover - non-POSIX fallback
+            fcntl = None  # type: ignore
+
+        if fcntl is None:
+            # Minimal cross-platform fallback: atomic create. Not crash-proof, but
+            # better than no lock in dev environments.
+            try:
+                fd = os.open(str(lock_file), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+            except FileExistsError:
+                print(
+                    f"ERROR: Lock file already exists; is another reconciler running? {lock_file}",
+                    file=sys.stderr,
+                )
+                sys.exit(2)
+            os.write(
+                fd,
+                f"pid={os.getpid()}\nstarted_at_utc={datetime.now(timezone.utc).isoformat()}\n".encode(
+                    "utf-8"
+                ),
+            )
+            os.close(fd)
+
+            class _FallbackLock:
+                def __enter__(self) -> "_FallbackLock":
+                    return self
+
+                def __exit__(self, exc_type, exc, tb) -> None:  # type: ignore[no-untyped-def]
+                    try:
+                        lock_file.unlink()
+                    except FileNotFoundError:
+                        return
+
+            return _FallbackLock()
+
+        fh = lock_file.open("a+")
+        try:
+            fcntl.flock(fh.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            print(
+                f"ERROR: Another replay reconciler is already running (lock held): {lock_file}",
+                file=sys.stderr,
+            )
+            sys.exit(2)
+
+        fh.seek(0)
+        fh.truncate()
+        fh.write(f"pid={os.getpid()}\n")
+        fh.write(f"started_at_utc={datetime.now(timezone.utc).isoformat()}\n")
+        fh.flush()
+
+        class _FlockLock:
+            def __enter__(self) -> "_FlockLock":
+                return self
+
+            def __exit__(self, exc_type, exc, tb) -> None:  # type: ignore[no-untyped-def]
+                try:
+                    fh.close()
+                except Exception:
+                    return
+
+        return _FlockLock()
+
+    def _job_replay_state(job: ORMArchiveJob, source_code: str | None) -> ReplayCheck:
+        collection_name = f"job-{job.id}"
+        collection_root = collections_dir / collection_name
+        archive_dir = collection_root / "archive"
+        index_file = collection_root / "indexes" / "index.cdxj"
+
+        has_index = index_file.is_file()
+        has_warc_links = bool(list(archive_dir.glob("warc-*"))) if archive_dir.is_dir() else False
+
+        if has_index and has_warc_links and not verify_warc_hash:
+            return ReplayCheck(
+                job_id=job.id,
+                source_code=source_code,
+                collection_name=collection_name,
+                needs_reindex=False,
+                is_blocked=False,
+                reason="ready",
+                has_index=has_index,
+                has_warc_links=has_warc_links,
+            )
+
+        marker_path = collection_root / "replay-index.meta.json"
+        if has_index and has_warc_links and marker_path.is_file() and verify_warc_hash:
+            try:
+                marker = json.loads(marker_path.read_text(encoding="utf-8"))
+            except Exception as exc:
+                return ReplayCheck(
+                    job_id=job.id,
+                    source_code=source_code,
+                    collection_name=collection_name,
+                    needs_reindex=True,
+                    is_blocked=False,
+                    reason=f"marker_parse_error: {exc}",
+                    has_index=has_index,
+                    has_warc_links=has_warc_links,
+                )
+
+            expected_hash = marker.get("warcListHash")
+            expected_count = marker.get("warcCount")
+
+            try:
+                warcs = discover_warcs_for_job(job)
+            except Exception as exc:
+                return ReplayCheck(
+                    job_id=job.id,
+                    source_code=source_code,
+                    collection_name=collection_name,
+                    needs_reindex=True,
+                    is_blocked=True,
+                    reason=f"blocked: warc_discovery_failed: {exc}",
+                    has_index=has_index,
+                    has_warc_links=has_warc_links,
+                )
+
+            if not warcs:
+                return ReplayCheck(
+                    job_id=job.id,
+                    source_code=source_code,
+                    collection_name=collection_name,
+                    needs_reindex=True,
+                    is_blocked=True,
+                    reason="blocked: no_warcs_discovered",
+                    has_index=has_index,
+                    has_warc_links=has_warc_links,
+                )
+
+            try:
+                rels = sorted(
+                    str(p.resolve().relative_to(warcs_host_root.resolve())).replace(os.sep, "/")
+                    for p in warcs
+                )
+                current_hash = hashlib.sha256("\n".join(rels).encode("utf-8")).hexdigest()
+            except Exception as exc:
+                return ReplayCheck(
+                    job_id=job.id,
+                    source_code=source_code,
+                    collection_name=collection_name,
+                    needs_reindex=True,
+                    is_blocked=False,
+                    reason=f"hash_error: {exc}",
+                    has_index=has_index,
+                    has_warc_links=has_warc_links,
+                )
+
+            if expected_hash and expected_hash != current_hash:
+                return ReplayCheck(
+                    job_id=job.id,
+                    source_code=source_code,
+                    collection_name=collection_name,
+                    needs_reindex=True,
+                    is_blocked=False,
+                    reason="warc_hash_changed",
+                    has_index=has_index,
+                    has_warc_links=has_warc_links,
+                )
+
+            if isinstance(expected_count, int) and expected_count != len(warcs):
+                return ReplayCheck(
+                    job_id=job.id,
+                    source_code=source_code,
+                    collection_name=collection_name,
+                    needs_reindex=True,
+                    is_blocked=False,
+                    reason="warc_count_changed",
+                    has_index=has_index,
+                    has_warc_links=has_warc_links,
+                )
+
+            return ReplayCheck(
+                job_id=job.id,
+                source_code=source_code,
+                collection_name=collection_name,
+                needs_reindex=False,
+                is_blocked=False,
+                reason="ready (marker verified)",
+                has_index=has_index,
+                has_warc_links=has_warc_links,
+            )
+
+        # If we're missing the basic replay ingredients, we need to (re)index.
+        needs_reindex = not has_index or not has_warc_links
+        reason_parts: list[str] = []
+        if not has_index:
+            reason_parts.append("missing_index")
+        if not has_warc_links:
+            reason_parts.append("missing_warc_links")
+
+        is_blocked = False
+        reason = ",".join(reason_parts) if reason_parts else "needs_reindex"
+
+        if needs_reindex:
+            try:
+                warcs = discover_warcs_for_job(job)
+            except Exception as exc:
+                is_blocked = True
+                reason = f"blocked: warc_discovery_failed: {exc}"
+            else:
+                if not warcs:
+                    is_blocked = True
+                    reason = "blocked: no_warcs_discovered"
+
+        return ReplayCheck(
+            job_id=job.id,
+            source_code=source_code,
+            collection_name=collection_name,
+            needs_reindex=needs_reindex and not is_blocked,
+            is_blocked=is_blocked,
+            reason=reason,
+            has_index=has_index,
+            has_warc_links=has_warc_links,
+        )
+
+    def _is_job_replay_ready(job_id: int) -> bool:
+        collection_name = f"job-{job_id}"
+        collection_root = collections_dir / collection_name
+        archive_dir = collection_root / "archive"
+        index_file = collection_root / "indexes" / "index.cdxj"
+        return index_file.is_file() and archive_dir.is_dir() and bool(list(archive_dir.glob("warc-*")))
+
+    with _lock_or_exit():
+        print("Replay reconcile")
+        print("----------------")
+        print(f"Mode:            {'APPLY' if apply_mode else 'DRY-RUN'}")
+        print(f"Collections dir: {collections_dir}")
+        print(f"Lock file:       {lock_file}")
+        print(f"Container:       {container_name}")
+        print(f"Verify WARC hash: {'YES' if verify_warc_hash else 'NO'}")
+        print(f"Max jobs:        {max_jobs}")
+        print(f"Previews:        {'YES' if previews_enabled else 'NO'}")
+        if previews_enabled:
+            print(f"Max previews:    {max_previews}")
+        if source_allowlist:
+            print(f"Sources:         {', '.join(sorted(source_allowlist))}")
+        if job_id_allowlist:
+            print(f"Job IDs:         {', '.join(str(v) for v in sorted(job_id_allowlist))}")
+        if campaign_year is not None:
+            print(f"Campaign year:   {campaign_year}")
+        print("")
+
+        with get_session() as session:
+            rows = (
+                session.query(ORMArchiveJob, Source.code)
+                .outerjoin(Source, Source.id == ORMArchiveJob.source_id)
+                .filter(ORMArchiveJob.status == "indexed")
+                .order_by(ORMArchiveJob.id.desc())
+                .all()
+            )
+
+            filtered: list[tuple[ORMArchiveJob, str | None]] = []
+            for job, source_code in rows:
+                if source_allowlist:
+                    if source_code is None or source_code not in source_allowlist:
+                        continue
+                if job_id_allowlist and job.id not in job_id_allowlist:
+                    continue
+                if campaign_year is not None:
+                    cfg = job.config or {}
+                    if cfg.get("campaign_kind") != "annual" or cfg.get("campaign_year") != campaign_year:
+                        continue
+                filtered.append((job, source_code))
+
+            checks = [_job_replay_state(job, source_code) for job, source_code in filtered]
+            needs = [c for c in checks if c.needs_reindex]
+            blocked = [c for c in checks if c.is_blocked]
+
+            planned = needs[:max_jobs]
+            capped = needs[max_jobs:]
+
+            ready = len(checks) - len(needs) - len(blocked)
+
+            print("Replay indexing status")
+            print("----------------------")
+            print(
+                f"Jobs scanned: {len(checks)}  ready={ready}  needs_index={len(needs)}  blocked={len(blocked)}"
+            )
+            if capped:
+                print(f"Capped: {len(capped)} (use --max-jobs to increase)")
+            print("")
+
+            if planned:
+                for c in planned:
+                    src = c.source_code or "?"
+                    print(
+                        f"WOULD INDEX: job_id={c.job_id} source={src} collection={c.collection_name} reason={c.reason}"
+                        if dry_run
+                        else f"INDEXING: job_id={c.job_id} source={src} collection={c.collection_name} reason={c.reason}"
+                    )
+                print("")
+
+            if blocked:
+                for c in blocked:
+                    src = c.source_code or "?"
+                    print(
+                        f"BLOCKED: job_id={c.job_id} source={src} collection={c.collection_name} reason={c.reason}",
+                        file=sys.stderr,
+                    )
+                print("")
+
+            replay_indexed_ok = 0
+            replay_indexed_failed = 0
+
+            if apply_mode and planned:
+                for c in planned:
+                    ns = argparse.Namespace(
+                        id=c.job_id,
+                        collection=None,
+                        container=container_name,
+                        collections_dir=str(collections_dir),
+                        warcs_host_root=str(warcs_host_root),
+                        warcs_container_root=warcs_container_root,
+                        limit_warcs=None,
+                        dry_run=False,
+                    )
+                    try:
+                        cmd_replay_index_job(ns)
+                    except SystemExit as exc:
+                        replay_indexed_failed += 1
+                        print(
+                            f"ERROR: replay-index-job failed for job {c.job_id} (exit {exc.code})",
+                            file=sys.stderr,
+                        )
+                    else:
+                        replay_indexed_ok += 1
+
+            if apply_mode and planned:
+                print("")
+                print(
+                    f"Replay indexing applied: ok={replay_indexed_ok} failed={replay_indexed_failed}"
+                )
+
+            # === Optional preview reconciliation ===
+            if not previews_enabled or max_previews == 0:
+                if dry_run:
+                    print("Previews: disabled (pass --previews to enable).")
+                return
+
+            preview_dir = get_replay_preview_dir()
+            if preview_dir is None:
+                print(
+                    "ERROR: HEALTHARCHIVE_REPLAY_PREVIEW_DIR is not set; cannot reconcile previews.",
+                    file=sys.stderr,
+                )
+                sys.exit(1)
+
+            preview_dir = preview_dir.expanduser().resolve()
+
+            source_summaries = list_sources(db=session)
+            wanted_sources = (
+                [s for s in source_summaries if s.sourceCode in source_allowlist]
+                if source_allowlist
+                else list(source_summaries)
+            )
+
+            missing_preview_sources: list[str] = []
+            blocked_preview_sources: list[str] = []
+            planned_job_ids = {p.job_id for p in planned}
+
+            for src in wanted_sources:
+                browse_url = src.entryBrowseUrl or ""
+                match = re.search(r"/job-(\d+)(?:/|$)", browse_url)
+                if not match:
+                    continue
+                job_id = int(match.group(1))
+
+                if not _is_job_replay_ready(job_id):
+                    if dry_run and job_id in planned_job_ids:
+                        # In dry-run mode, allow preview planning for jobs that would be
+                        # made replay-ready by the planned replay indexing actions above.
+                        pass
+                    else:
+                        blocked_preview_sources.append(src.sourceCode)
+                        continue
+
+                found = _find_replay_preview_file(preview_dir, src.sourceCode, job_id)
+                if found is None:
+                    missing_preview_sources.append(src.sourceCode)
+
+            if not missing_preview_sources:
+                print("Previews: all selected sources already have previews.")
+                return
+
+            planned_preview_sources = missing_preview_sources[:max_previews]
+            capped_previews = missing_preview_sources[max_previews:]
+
+            print("")
+            print("Preview status")
+            print("--------------")
+            print(
+                f"Missing previews: {len(missing_preview_sources)}  planned={len(planned_preview_sources)}"
+            )
+            if capped_previews:
+                print(f"Capped: {len(capped_previews)} (use --max-previews to increase)")
+            if blocked_preview_sources:
+                print(
+                    "Blocked (replay not ready yet): " + ", ".join(sorted(set(blocked_preview_sources))),
+                    file=sys.stderr,
+                )
+            print("")
+
+            if dry_run:
+                print("WOULD GENERATE previews for: " + ", ".join(planned_preview_sources))
+                print("Dry-run only; re-run with --apply to generate previews.")
+                return
+
+            ns = argparse.Namespace(
+                source=planned_preview_sources,
+                overwrite=False,
+                format="jpeg",
+                jpeg_quality=80,
+                playwright_image="mcr.microsoft.com/playwright:v1.50.1-jammy",
+                network="auto",
+                width=1000,
+                height=540,
+                timeout_ms=45000,
+                settle_ms=1200,
+                dry_run=False,
+            )
+            try:
+                cmd_replay_generate_previews(ns)
+            except SystemExit as exc:
+                print(
+                    f"ERROR: replay-generate-previews failed (exit {exc.code}).",
+                    file=sys.stderr,
+                )
+                sys.exit(int(exc.code or 1))
 
 
 def cmd_register_job_dir(args: argparse.Namespace) -> None:
@@ -3152,6 +3685,90 @@ def build_parser() -> argparse.ArgumentParser:
         help="Print actions without creating files or running docker.",
     )
     p_replay_previews.set_defaults(func=cmd_replay_generate_previews)
+
+    # replay-reconcile
+    p_replay_reconcile = subparsers.add_parser(
+        "replay-reconcile",
+        help=(
+            "Reconcile pywb replay indexing (and optionally previews) for indexed jobs. "
+            "Dry-run by default; pass --apply to perform actions."
+        ),
+    )
+    p_replay_reconcile.add_argument(
+        "--apply",
+        action="store_true",
+        default=False,
+        help="Apply changes (default is dry-run).",
+    )
+    p_replay_reconcile.add_argument(
+        "--max-jobs",
+        type=int,
+        default=1,
+        help="Max replay indexing jobs to run per invocation (default: 1).",
+    )
+    p_replay_reconcile.add_argument(
+        "--job-id",
+        nargs="+",
+        type=int,
+        help="Optional allowlist of ArchiveJob IDs to consider.",
+    )
+    p_replay_reconcile.add_argument(
+        "--sources",
+        nargs="+",
+        help="Optional allowlist of source codes to consider (e.g. hc phac).",
+    )
+    p_replay_reconcile.add_argument(
+        "--campaign-year",
+        type=int,
+        help="Optional filter: only jobs with config campaign_kind=annual and campaign_year=YYYY.",
+    )
+    p_replay_reconcile.add_argument(
+        "--verify-warc-hash",
+        action="store_true",
+        default=False,
+        help=(
+            "Verify replay-index.meta.json WARC hash/count for existing collections "
+            "and reindex when mismatched (more expensive)."
+        ),
+    )
+    p_replay_reconcile.add_argument(
+        "--container",
+        default="healtharchive-replay",
+        help="Docker container name for the replay service.",
+    )
+    p_replay_reconcile.add_argument(
+        "--collections-dir",
+        default="/srv/healtharchive/replay/collections",
+        help="Host path to the pywb collections directory.",
+    )
+    p_replay_reconcile.add_argument(
+        "--warcs-host-root",
+        default="/srv/healtharchive/jobs",
+        help="Host path that contains WARCs and is mounted into the replay container.",
+    )
+    p_replay_reconcile.add_argument(
+        "--warcs-container-root",
+        default="/warcs",
+        help="Container path where --warcs-host-root is mounted.",
+    )
+    p_replay_reconcile.add_argument(
+        "--lock-file",
+        default="/srv/healtharchive/replay/.locks/replay-reconcile.lock",
+        help="Lock file path used to prevent concurrent reconciliation runs.",
+    )
+    p_replay_reconcile.add_argument(
+        "--previews",
+        action="store_true",
+        default=False,
+        help="Also reconcile cached /archive source preview images.",
+    )
+    p_replay_reconcile.add_argument(
+        "--max-previews",
+        type=int,
+        default=1,
+        help="Max previews to generate per invocation when --previews is enabled (default: 1).",
+    )
+    p_replay_reconcile.set_defaults(func=cmd_replay_reconcile)
 
     # start-worker
     p_worker = subparsers.add_parser(

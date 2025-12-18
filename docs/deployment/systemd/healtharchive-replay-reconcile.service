@@ -1,0 +1,23 @@
+[Unit]
+Description=HealthArchive replay reconciler (pywb indexing)
+Wants=network-online.target
+After=network-online.target docker.service postgresql.service
+Requires=docker.service
+ConditionPathExists=/etc/healtharchive/backend.env
+ConditionPathExists=/etc/healtharchive/replay-automation-enabled
+
+[Service]
+Type=oneshot
+User=haadmin
+WorkingDirectory=/opt/healtharchive-backend
+EnvironmentFile=/etc/healtharchive/backend.env
+
+# Keep impact low on the single VPS.
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=6
+
+# pywb reindex time scales with WARC size; allow long runs.
+TimeoutStartSec=6h
+
+ExecStart=/opt/healtharchive-backend/.venv/bin/ha-backend replay-reconcile --apply --max-jobs 1 --collections-dir /srv/healtharchive/replay/collections --warcs-host-root /srv/healtharchive/jobs --warcs-container-root /warcs --lock-file /srv/healtharchive/replay/.locks/replay-reconcile.lock
