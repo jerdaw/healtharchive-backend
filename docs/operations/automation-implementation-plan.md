@@ -221,7 +221,7 @@ Make it trivial to answer:
 
 **Proposed CLI**
 
-- `ha-backend annual-status --year YYYY [--json]`
+- `ha-backend annual-status --year YYYY [--json] [--sources ...]`
 
 Reports per source:
 
@@ -235,6 +235,19 @@ Campaign-level summary:
 
 - total sources, indexed count, failed count, in-progress count
 - “ready for search” boolean (all indexed)
+
+**Implementation notes (v1)**
+
+- Uses `ArchiveJob.config` metadata written by `schedule-annual`:
+  - `campaign_kind="annual"`
+  - `campaign_year=YYYY`
+- Fallback: if metadata is missing, it will also consider the canonical annual
+  name format (e.g. `hc-20270101`).
+- If no annual job is found for a source, the command will also surface the
+  most recent “active” job for that source (queued/running/completed/indexing/
+  index_failed/retryable) to help explain why scheduling may have been skipped.
+- If multiple annual candidates are found for a source/year, the command prints
+  an error for that source (operators must resolve duplicates).
 
 **Acceptance criteria**
 
