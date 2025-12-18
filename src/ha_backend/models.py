@@ -251,6 +251,61 @@ class Snapshot(TimestampMixin, Base):
         return f"<Snapshot id={self.id!r} url={self.url!r}>"
 
 
+class Page(TimestampMixin, Base):
+    """
+    Canonical "page" concept, grouping multiple Snapshot captures.
+
+    This table is intentionally metadata-only: it does not replace Snapshots or
+    WARCs, and exists to support more efficient search/browse operations that
+    operate at the page (URL-group) level.
+    """
+
+    __tablename__ = "pages"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    source_id: Mapped[int] = mapped_column(
+        ForeignKey("sources.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    normalized_url_group: Mapped[str] = mapped_column(Text, nullable=False)
+
+    first_capture_timestamp: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True)
+    )
+    last_capture_timestamp: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True)
+    )
+    snapshot_count: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        server_default=text("0"),
+    )
+
+    # Convenience pointers for browse/search operations.
+    #
+    # - latest_snapshot_id: latest capture for the page (any status).
+    # - latest_ok_snapshot_id: latest capture with status_code NULL or 2xx.
+    latest_snapshot_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("snapshots.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    latest_ok_snapshot_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("snapshots.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+
+    source: Mapped[Source] = relationship()
+
+    __table_args__ = (
+        UniqueConstraint(
+            "source_id",
+            "normalized_url_group",
+            name="uq_pages_source_group",
+        ),
+    )
+
+
 class SnapshotOutlink(TimestampMixin, Base):
     """
     Outgoing link edge from a snapshot's (main) content to another page group.
@@ -321,6 +376,7 @@ __all__ = [
     "Source",
     "ArchiveJob",
     "Snapshot",
+    "Page",
     "SnapshotOutlink",
     "PageSignal",
 ]

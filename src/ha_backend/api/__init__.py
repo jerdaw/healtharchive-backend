@@ -1,15 +1,17 @@
 from __future__ import annotations
 
+from datetime import timezone
+
 from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import PlainTextResponse
-from sqlalchemy import func
+from sqlalchemy import func, inspect
 from sqlalchemy.orm import Session
 
-from ha_backend.config import get_cors_origins
+from ha_backend.config import get_cors_origins, get_pages_fastpath_enabled
 from ha_backend.db import get_session
 from ha_backend.logging_config import configure_logging
-from ha_backend.models import ArchiveJob, Snapshot, Source
+from ha_backend.models import ArchiveJob, Page, Snapshot, Source
 from ha_backend.runtime_metrics import render_search_metrics_prometheus
 
 from .deps import require_admin
@@ -188,6 +190,41 @@ async def metrics(
     )
     for code, count in per_source_rows:
         lines.append(f'healtharchive_snapshots_total{{source="{code}"}} {int(count)}')
+
+    insp = inspect(db.get_bind())
+    pages_table_present = bool(insp.has_table("pages"))
+    lines.append("# HELP healtharchive_pages_table_present Whether the pages table exists in the DB")
+    lines.append("# TYPE healtharchive_pages_table_present gauge")
+    lines.append(f"healtharchive_pages_table_present {1 if pages_table_present else 0}")
+
+    lines.append("# HELP healtharchive_pages_fastpath_enabled Whether /api/search can use the pages-table browse fast path")
+    lines.append("# TYPE healtharchive_pages_fastpath_enabled gauge")
+    lines.append(f"healtharchive_pages_fastpath_enabled {1 if get_pages_fastpath_enabled() else 0}")
+
+    if pages_table_present:
+        total_pages = db.query(func.count(Page.id)).scalar() or 0
+        lines.append("# HELP healtharchive_pages_total Number of pages (URL groups) in the pages table")
+        lines.append("# TYPE healtharchive_pages_total gauge")
+        lines.append(f"healtharchive_pages_total {int(total_pages)}")
+
+        per_source_pages_rows = (
+            db.query(Source.code, func.count(Page.id))
+            .join(Page, Page.source_id == Source.id)
+            .group_by(Source.code)
+            .all()
+        )
+        for code, count in per_source_pages_rows:
+            lines.append(f'healtharchive_pages_total{{source="{code}"}} {int(count)}')
+
+        max_updated_at = db.query(func.max(Page.updated_at)).scalar()
+        max_updated_at_seconds = 0
+        if max_updated_at is not None:
+            if max_updated_at.tzinfo is None:
+                max_updated_at = max_updated_at.replace(tzinfo=timezone.utc)
+            max_updated_at_seconds = int(max_updated_at.timestamp())
+        lines.append("# HELP healtharchive_pages_updated_at_max_seconds Max pages.updated_at (Unix epoch seconds, UTC)")
+        lines.append("# TYPE healtharchive_pages_updated_at_max_seconds gauge")
+        lines.append(f"healtharchive_pages_updated_at_max_seconds {max_updated_at_seconds}")
 
     # Page-level crawl metrics (derived from ArchiveJob pages_* fields).
     page_totals = db.query(

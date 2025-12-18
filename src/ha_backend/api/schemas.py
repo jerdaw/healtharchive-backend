@@ -47,6 +47,7 @@ class SnapshotSummarySchema(BaseModel):
     jobId: Optional[int]
     originalUrl: str
     snippet: Optional[str]
+    pageSnapshotsCount: Optional[int] = None
     rawSnapshotUrl: Optional[str]
     browseUrl: Optional[str]
 

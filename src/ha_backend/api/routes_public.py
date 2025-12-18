@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import time
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from enum import Enum
 from pathlib import Path
 import re
@@ -14,10 +14,14 @@ from sqlalchemy import and_, case, func, inspect, or_, text
 from sqlalchemy.orm import Session, joinedload, load_only
 from threading import Lock
 
-from ha_backend.config import get_replay_base_url, get_replay_preview_dir
+from ha_backend.config import (
+    get_pages_fastpath_enabled,
+    get_replay_base_url,
+    get_replay_preview_dir,
+)
 from ha_backend.db import get_session
 from ha_backend.indexing.viewer import find_record_for_snapshot
-from ha_backend.models import ArchiveJob, PageSignal, Snapshot, Source
+from ha_backend.models import ArchiveJob, Page, PageSignal, Snapshot, Source
 from ha_backend.search import TS_CONFIG, build_search_vector
 from ha_backend.search_ranking import (
     QueryMode,
@@ -612,6 +616,8 @@ def _search_snapshots_inner(
     sort: SearchSort | None,
     view: SearchView | None,
     includeNon2xx: bool,
+    from_date: date | None,
+    to_date: date | None,
     page: int,
     pageSize: int,
     ranking: str | None,
@@ -667,6 +673,27 @@ def _search_snapshots_inner(
     dialect_name = db.get_bind().dialect.name
     use_postgres_fts = dialect_name == "postgresql"
 
+    if from_date and to_date and from_date > to_date:
+        raise HTTPException(
+            status_code=422,
+            detail="Invalid date range: 'from' must be <= 'to'.",
+        )
+
+    range_start: datetime | None = None
+    range_end_exclusive: datetime | None = None
+    if from_date:
+        range_start = datetime(from_date.year, from_date.month, from_date.day, tzinfo=timezone.utc)
+    if to_date:
+        range_end_exclusive = datetime(to_date.year, to_date.month, to_date.day, tzinfo=timezone.utc) + timedelta(days=1)
+
+    # SQLite often round-trips timezone-aware datetimes as naive. Use naive bounds
+    # for consistent filtering in tests/dev when running on SQLite.
+    if dialect_name == "sqlite":
+        if range_start is not None:
+            range_start = range_start.replace(tzinfo=None)
+        if range_end_exclusive is not None:
+            range_end_exclusive = range_end_exclusive.replace(tzinfo=None)
+
     rank_text = q_filter or q_rank
 
     ranking_version = get_ranking_version(ranking)
@@ -691,6 +718,11 @@ def _search_snapshots_inner(
     if source:
         base_query = base_query.filter(Source.code == source.lower())
 
+    if range_start is not None:
+        base_query = base_query.filter(Snapshot.capture_timestamp >= range_start)
+    if range_end_exclusive is not None:
+        base_query = base_query.filter(Snapshot.capture_timestamp < range_end_exclusive)
+
     if not includeNon2xx:
         base_query = base_query.filter(
             or_(
@@ -701,6 +733,138 @@ def _search_snapshots_inner(
                 ),
             )
         )
+
+    offset = (page - 1) * pageSize
+
+    # Fast path: when browsing pages without a search query or date range,
+    # prefer the Page table (if present) to avoid window functions over the
+    # full Snapshot table.
+    if (
+        effective_view == SearchView.pages
+        and raw_q is None
+        and range_start is None
+        and range_end_exclusive is None
+        and get_pages_fastpath_enabled()
+        and _has_table(db, "pages")
+    ):
+        selected_snapshot_id = (
+            Page.latest_snapshot_id if includeNon2xx else Page.latest_ok_snapshot_id
+        )
+
+        page_query = (
+            db.query(Snapshot)
+            .join(
+                Page,
+                and_(
+                    Snapshot.id == selected_snapshot_id,
+                    Snapshot.source_id == Page.source_id,
+                ),
+            )
+            .join(Source)
+            .filter(~Source.code.in_(_PUBLIC_EXCLUDED_SOURCE_CODES))
+        )
+        if source:
+            page_query = page_query.filter(Source.code == source.lower())
+
+        total = page_query.with_entities(func.count(Page.id)).scalar() or 0
+        if total > 0:
+            status_quality = case(
+                (Snapshot.status_code.is_(None), 0),
+                (and_(Snapshot.status_code >= 200, Snapshot.status_code < 300), 2),
+                (and_(Snapshot.status_code >= 300, Snapshot.status_code < 400), 1),
+                else_=-1,
+            )
+
+            items = (
+                page_query.options(
+                    load_only(
+                        Snapshot.id,
+                        Snapshot.job_id,
+                        Snapshot.url,
+                        Snapshot.normalized_url_group,
+                        Snapshot.capture_timestamp,
+                        Snapshot.mime_type,
+                        Snapshot.status_code,
+                        Snapshot.title,
+                        Snapshot.snippet,
+                        Snapshot.language,
+                        Snapshot.warc_path,
+                        Snapshot.warc_record_id,
+                    ),
+                    joinedload(Snapshot.source),
+                )
+                .order_by(
+                    status_quality.desc(),
+                    Snapshot.capture_timestamp.desc(),
+                    Snapshot.id.desc(),
+                )
+                .offset(offset)
+                .limit(pageSize)
+                .all()
+            )
+
+            page_counts_by_snapshot_id: dict[int, int] = {}
+            snapshot_ids = [s.id for s in items]
+            if snapshot_ids:
+                rows = (
+                    db.query(selected_snapshot_id.label("snapshot_id"), Page.snapshot_count)
+                    .filter(selected_snapshot_id.isnot(None))
+                    .filter(selected_snapshot_id.in_(snapshot_ids))
+                    .all()
+                )
+                page_counts_by_snapshot_id = {
+                    int(snapshot_id): int(count)
+                    for snapshot_id, count in rows
+                    if snapshot_id is not None and count is not None
+                }
+
+            results: List[SnapshotSummarySchema] = []
+            for snap in items:
+                source_obj = snap.source
+                if source_obj is None:
+                    continue
+
+                capture_date = (
+                    snap.capture_timestamp.date().isoformat()
+                    if isinstance(snap.capture_timestamp, datetime)
+                    else str(snap.capture_timestamp)
+                )
+
+                original_url = (
+                    snap.normalized_url_group
+                    or normalize_url_for_grouping(snap.url)
+                    or _strip_url_query_and_fragment(snap.url)
+                )
+
+                results.append(
+                    SnapshotSummarySchema(
+                        id=snap.id,
+                        title=snap.title,
+                        sourceCode=source_obj.code,
+                        sourceName=source_obj.name,
+                        language=snap.language,
+                        captureDate=capture_date,
+                        captureTimestamp=_format_capture_timestamp(snap.capture_timestamp),
+                        jobId=snap.job_id,
+                        originalUrl=original_url,
+                        snippet=snap.snippet,
+                        pageSnapshotsCount=page_counts_by_snapshot_id.get(snap.id),
+                        rawSnapshotUrl=f"/api/snapshots/raw/{snap.id}",
+                        browseUrl=_build_browse_url(
+                            snap.job_id, original_url, snap.capture_timestamp, snap.id
+                        ),
+                    )
+                )
+
+            return (
+                SearchResponseSchema(
+                    results=results,
+                    total=int(total),
+                    page=page,
+                    pageSize=pageSize,
+                ),
+                "pages_fastpath",
+            )
 
     def strip_query_fragment_expr(url_expr: Any) -> Any:
         if dialect_name == "postgresql":
@@ -724,10 +888,24 @@ def _search_snapshots_inner(
         Snapshot.normalized_url_group,
         strip_query_fragment_expr(Snapshot.url),
     )
+    page_partition_key = (Snapshot.source_id, group_key)
 
     def compute_total(query: Any) -> int:
         if effective_view == SearchView.pages:
-            return query.with_entities(func.count(func.distinct(group_key))).scalar() or 0
+            distinct_pages = (
+                query.with_entities(
+                    Snapshot.source_id.label("source_id"),
+                    group_key.label("group_key"),
+                )
+                .distinct()
+                .subquery()
+            )
+            return (
+                db.query(func.count())
+                .select_from(distinct_pages)
+                .scalar()
+                or 0
+            )
         return query.with_entities(func.count(Snapshot.id)).scalar() or 0
 
     query = base_query
@@ -904,8 +1082,6 @@ def _search_snapshots_inner(
     mode = search_mode or "newest"
     if ranking_version == RankingVersion.v2 and mode.startswith("relevance"):
         mode = f"{mode}_v2"
-
-    offset = (page - 1) * pageSize
 
     status_quality = case(
         (Snapshot.status_code.is_(None), 0),
@@ -1164,7 +1340,7 @@ def _search_snapshots_inner(
 
     def build_item_query_for_pages_v1() -> Any:
         row_number = func.row_number().over(
-            partition_by=group_key,
+            partition_by=page_partition_key,
             order_by=(Snapshot.capture_timestamp.desc(), Snapshot.id.desc()),
         ).label("rn")
         latest_ids_subq = query.with_entities(
@@ -1182,7 +1358,7 @@ def _search_snapshots_inner(
             return build_item_query_for_pages_v1()
 
         row_number = func.row_number().over(
-            partition_by=group_key,
+            partition_by=page_partition_key,
             order_by=(Snapshot.capture_timestamp.desc(), Snapshot.id.desc()),
         ).label("rn")
         candidates_query = query
@@ -1195,6 +1371,7 @@ def _search_snapshots_inner(
             candidates_query
             .with_entities(
                 Snapshot.id.label("id"),
+                Snapshot.source_id.label("source_id"),
                 group_key.label("group_key"),
                 Snapshot.capture_timestamp.label("capture_timestamp"),
                 row_number,
@@ -1205,16 +1382,18 @@ def _search_snapshots_inner(
 
         group_scores_subq = (
             db.query(
+                candidates_subq.c.source_id.label("source_id"),
                 candidates_subq.c.group_key.label("group_key"),
                 func.max(candidates_subq.c.snapshot_score).label("group_score"),
             )
-            .group_by(candidates_subq.c.group_key)
+            .group_by(candidates_subq.c.source_id, candidates_subq.c.group_key)
             .subquery()
         )
 
         latest_ids_subq = (
             db.query(
                 candidates_subq.c.id.label("id"),
+                candidates_subq.c.source_id.label("source_id"),
                 candidates_subq.c.group_key.label("group_key"),
                 candidates_subq.c.rn.label("rn"),
             )
@@ -1224,7 +1403,13 @@ def _search_snapshots_inner(
         return (
             db.query(Snapshot)
             .join(latest_ids_subq, Snapshot.id == latest_ids_subq.c.id)
-            .join(group_scores_subq, group_scores_subq.c.group_key == latest_ids_subq.c.group_key)
+            .join(
+                group_scores_subq,
+                and_(
+                    group_scores_subq.c.source_id == latest_ids_subq.c.source_id,
+                    group_scores_subq.c.group_key == latest_ids_subq.c.group_key,
+                ),
+            )
             .filter(latest_ids_subq.c.rn == 1)
             .order_by(
                 status_quality.desc(),
@@ -1309,6 +1494,32 @@ def _search_snapshots_inner(
     )
 
     results: List[SnapshotSummarySchema] = []
+    page_counts_by_key: dict[tuple[int, str], int] = {}
+    if effective_view == SearchView.pages and _has_table(db, "pages"):
+        pairs: set[tuple[int, str]] = set()
+        for snap in items:
+            if snap.source_id is None:
+                continue
+            group_val = snap.normalized_url_group or _strip_url_query_and_fragment(snap.url)
+            if not group_val:
+                continue
+            pairs.add((int(snap.source_id), group_val))
+
+        if pairs:
+            conditions = [
+                and_(Page.source_id == sid, Page.normalized_url_group == group)
+                for sid, group in pairs
+            ]
+            rows = (
+                db.query(Page.source_id, Page.normalized_url_group, Page.snapshot_count)
+                .filter(or_(*conditions))
+                .all()
+            )
+            page_counts_by_key = {
+                (int(sid), str(group)): int(count)
+                for sid, group, count in rows
+                if sid is not None and group and count is not None
+            }
 
     for snap in items:
         source_obj = snap.source
@@ -1331,6 +1542,12 @@ def _search_snapshots_inner(
                 or _strip_url_query_and_fragment(snap.url)
             )
 
+        page_snapshots_count = None
+        if effective_view == SearchView.pages and snap.source_id is not None:
+            group_val = snap.normalized_url_group or _strip_url_query_and_fragment(snap.url)
+            if group_val:
+                page_snapshots_count = page_counts_by_key.get((int(snap.source_id), group_val))
+
         results.append(
             SnapshotSummarySchema(
                 id=snap.id,
@@ -1343,6 +1560,7 @@ def _search_snapshots_inner(
                 jobId=snap.job_id,
                 originalUrl=original_url,
                 snippet=snap.snippet,
+                pageSnapshotsCount=page_snapshots_count,
                 rawSnapshotUrl=f"/api/snapshots/raw/{snap.id}",
                 browseUrl=_build_browse_url(
                     snap.job_id, original_url, snap.capture_timestamp, snap.id
@@ -1430,13 +1648,17 @@ def get_archive_stats(response: Response, db: Session = Depends(get_db)) -> Arch
 
     snapshots_total = int(db.query(func.count(Snapshot.id)).scalar() or 0)
 
-    pages_total = int(
+    distinct_pages = (
         db.query(
-            func.count(
-                func.distinct(func.coalesce(Snapshot.normalized_url_group, Snapshot.url))
-            )
-        ).scalar()
-        or 0
+            Snapshot.source_id.label("source_id"),
+            func.coalesce(Snapshot.normalized_url_group, Snapshot.url).label("group_key"),
+        )
+        .filter(Snapshot.source_id.isnot(None))
+        .distinct()
+        .subquery()
+    )
+    pages_total = int(
+        db.query(func.count()).select_from(distinct_pages).scalar() or 0
     )
 
     sources_total = int(
@@ -1930,6 +2152,15 @@ def search_snapshots(
     sort: Optional[SearchSort] = Query(default=None),
     view: Optional[SearchView] = Query(default=None),
     includeNon2xx: bool = Query(default=False),
+    from_: Optional[date] = Query(
+        default=None,
+        alias="from",
+        description="Filter captures from this UTC date (YYYY-MM-DD), inclusive.",
+    ),
+    to: Optional[date] = Query(
+        default=None,
+        description="Filter captures up to this UTC date (YYYY-MM-DD), inclusive.",
+    ),
     page: int = Query(default=1, ge=1),
     pageSize: int = Query(default=20, ge=1, le=100),
     ranking: Optional[str] = Query(
@@ -1952,6 +2183,8 @@ def search_snapshots(
             sort=sort,
             view=view,
             includeNon2xx=includeNon2xx,
+            from_date=from_,
+            to_date=to,
             page=page,
             pageSize=pageSize,
             ranking=ranking,
