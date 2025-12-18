@@ -878,6 +878,8 @@ Public Pydantic models:
     - `sort: "relevance" | "newest" | None` – ordering mode.
     - `view: "snapshots" | "pages" | None` – results grouping mode.
     - `includeNon2xx: bool` – include non‑2xx HTTP status captures (defaults to `false`).
+    - `from: YYYY-MM-DD | None` – filter captures from this UTC date, inclusive.
+    - `to: YYYY-MM-DD | None` – filter captures up to this UTC date, inclusive.
     - `page: int` – 1‑based page index (default `1`, must be `>= 1`).
     - `pageSize: int` – results per page (default `20`, minimum `1`, maximum `100`).
   - Filters:
@@ -918,6 +920,11 @@ Public Pydantic models:
     - `view="pages"` returns only the **latest** snapshot for each page group
       (`normalized_url_group`, falling back to `url` with query/fragment stripped), and
       `total` counts page groups.
+    - When `view="pages"` is used for browse (no `q` and no date range), the API can optionally
+      use the `pages` table as a fast path (controlled by `HA_PAGES_FASTPATH`). This is a
+      metadata-only optimization and does not affect replay fidelity.
+    - When available, `pageSnapshotsCount` is included on `view="pages"` results to show the
+      number of captures for that page group.
   - Pagination semantics:
     - `total` is the total number of matching items across all pages (snapshots
       for `view="snapshots"`, page groups for `view="pages"`).

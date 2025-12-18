@@ -34,6 +34,10 @@ Keyword searches (`q=...`) and date-range filters still run directly against
 
 Notes:
 
+- On Postgres, the CLI may print `upserted unknown` because the DB driver often
+  does not report an accurate `rowcount` for large `INSERT ... SELECT` statements.
+  Use the verification steps below (or `SELECT count(*) FROM pages;`) to confirm
+  it worked.
 - For large datasets this can take a while; run it in `tmux` or off-peak.
 - The worker will keep the table updated for newly indexed jobs (incremental
   rebuilds happen after indexing).

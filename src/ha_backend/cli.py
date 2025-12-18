@@ -368,7 +368,10 @@ def cmd_rebuild_pages(args: argparse.Namespace) -> None:
     with get_session() as session:
         if truncate:
             deleted = session.query(Page).delete(synchronize_session=False)
-            print(f"Truncated pages table ({deleted} row(s) deleted).")
+            if dry_run:
+                print(f"DRY RUN: would truncate pages table ({deleted} row(s) would be deleted).")
+            else:
+                print(f"Truncated pages table ({deleted} row(s) deleted).")
 
         if job_id is not None:
             job = session.get(ArchiveJob, job_id)
@@ -404,17 +407,45 @@ def cmd_rebuild_pages(args: argparse.Namespace) -> None:
                 delete_missing=False,
             )
 
+        def format_upserted_groups(n: int) -> str:
+            # Postgres often reports rowcount=-1 for INSERT..SELECT statements,
+            # especially with ON CONFLICT; treat that as "unknown" rather than
+            # printing a confusing negative number.
+            if n < 0:
+                return "unknown"
+            return str(n)
+
         if dry_run:
             session.rollback()
             print(
                 "DRY RUN: would upsert "
-                f"{result.upserted_groups} page group(s) and delete {result.deleted_groups}."
+                f"{format_upserted_groups(result.upserted_groups)} page group(s) and delete {result.deleted_groups}."
             )
         else:
             session.commit()
+            if result.upserted_groups < 0:
+                from sqlalchemy import func
+
+                total_pages = session.query(func.count(Page.id)).scalar() or 0
+                if job_id is not None and job is not None and job.source_id is not None:
+                    total_pages = (
+                        session.query(func.count(Page.id))
+                        .filter(Page.source_id == job.source_id)
+                        .scalar()
+                        or 0
+                    )
+                elif normalized_source and source_id is not None:
+                    total_pages = (
+                        session.query(func.count(Page.id))
+                        .filter(Page.source_id == source_id)
+                        .scalar()
+                        or 0
+                    )
+                print(f"Pages table now contains {int(total_pages)} row(s).")
+
             print(
                 "UPDATED: upserted "
-                f"{result.upserted_groups} page group(s) and deleted {result.deleted_groups}."
+                f"{format_upserted_groups(result.upserted_groups)} page group(s) and deleted {result.deleted_groups}."
             )
 
 
