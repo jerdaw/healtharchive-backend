@@ -349,6 +349,75 @@ def cmd_backfill_normalized_url_groups(args: argparse.Namespace) -> None:
     print(f"{mode}: normalized_url_group for {updated} row(s) (scanned {scanned}).")
 
 
+def cmd_rebuild_pages(args: argparse.Namespace) -> None:
+    """
+    Rebuild Page rows (page-level grouping) from Snapshot rows.
+
+    This is metadata-only: it never reads or mutates WARC content.
+    """
+    from .models import ArchiveJob, Page, Source
+    from .pages import discover_job_page_groups, rebuild_pages
+
+    source: str | None = args.source
+    job_id: int | None = args.job_id
+    dry_run: bool = args.dry_run
+    truncate: bool = args.truncate
+
+    normalized_source = source.strip().lower() if source else None
+
+    with get_session() as session:
+        if truncate:
+            deleted = session.query(Page).delete(synchronize_session=False)
+            print(f"Truncated pages table ({deleted} row(s) deleted).")
+
+        if job_id is not None:
+            job = session.get(ArchiveJob, job_id)
+            if job is None:
+                raise SystemExit(f"ArchiveJob {job_id} not found.")
+            if job.source_id is None:
+                raise SystemExit(f"ArchiveJob {job_id} has no source_id; cannot rebuild pages.")
+
+            groups = discover_job_page_groups(session, job_id=job_id)
+            print(f"Discovered {len(groups)} page group(s) from job {job_id}.")
+
+            result = rebuild_pages(
+                session,
+                source_id=job.source_id,
+                groups=tuple(groups),
+                delete_missing=True,
+            )
+        else:
+            source_id = None
+            if normalized_source:
+                row = (
+                    session.query(Source.id)
+                    .filter(Source.code == normalized_source)
+                    .one_or_none()
+                )
+                if row is None:
+                    raise SystemExit(f"Source {normalized_source!r} not found.")
+                source_id = int(row[0])
+
+            result = rebuild_pages(
+                session,
+                source_id=source_id,
+                delete_missing=False,
+            )
+
+        if dry_run:
+            session.rollback()
+            print(
+                "DRY RUN: would upsert "
+                f"{result.upserted_groups} page group(s) and delete {result.deleted_groups}."
+            )
+        else:
+            session.commit()
+            print(
+                "UPDATED: upserted "
+                f"{result.upserted_groups} page group(s) and deleted {result.deleted_groups}."
+            )
+
+
 def cmd_refresh_snapshot_metadata(args: argparse.Namespace) -> None:
     """
     Refresh title/snippet/language for snapshots of a job by re-reading WARCs.
@@ -2077,6 +2146,34 @@ def build_parser() -> argparse.ArgumentParser:
         help="Compute updates but roll back at the end (no DB changes).",
     )
     p_backfill_groups.set_defaults(func=cmd_backfill_normalized_url_groups)
+
+    # rebuild-pages
+    p_rebuild_pages = subparsers.add_parser(
+        "rebuild-pages",
+        help="Rebuild page-level grouping rows (pages table) from snapshots.",
+    )
+    p_rebuild_pages.add_argument(
+        "--source",
+        help="Optional Source code filter (e.g. 'hc', 'phac').",
+    )
+    p_rebuild_pages.add_argument(
+        "--job-id",
+        type=int,
+        help="Optional ArchiveJob ID; rebuild pages only for groups referenced by this job.",
+    )
+    p_rebuild_pages.add_argument(
+        "--truncate",
+        action="store_true",
+        default=False,
+        help="Delete all existing Page rows before rebuilding (useful for a full refresh).",
+    )
+    p_rebuild_pages.add_argument(
+        "--dry-run",
+        action="store_true",
+        default=False,
+        help="Compute changes but roll back at the end (no DB changes).",
+    )
+    p_rebuild_pages.set_defaults(func=cmd_rebuild_pages)
 
     # refresh-snapshot-metadata
     p_refresh = subparsers.add_parser(

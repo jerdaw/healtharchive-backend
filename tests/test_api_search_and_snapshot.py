@@ -470,6 +470,31 @@ def test_search_filters_by_source(tmp_path, monkeypatch) -> None:
     assert all(r["sourceCode"] == "hc" for r in data["results"])
 
 
+def test_search_filters_by_date_range_inclusive(tmp_path, monkeypatch) -> None:
+    client = _init_test_app(tmp_path, monkeypatch)
+    _seed_search_data()
+
+    # 'to' is inclusive (UTC date).
+    resp = client.get("/api/search", params={"q": "flu", "to": "2025-02-14"})
+    assert resp.status_code == 200
+    assert resp.json()["total"] == 0
+
+    resp = client.get("/api/search", params={"q": "flu", "to": "2025-02-15"})
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["total"] == 1
+    assert data["results"][0]["title"] == "Flu recommendations"
+
+    # 'from' is inclusive (UTC date).
+    resp = client.get("/api/search", params={"q": "flu", "from": "2025-02-15"})
+    assert resp.status_code == 200
+    assert resp.json()["total"] == 1
+
+    resp = client.get("/api/search", params={"q": "flu", "from": "2025-02-16"})
+    assert resp.status_code == 200
+    assert resp.json()["total"] == 0
+
+
 def test_search_filters_by_query(tmp_path, monkeypatch) -> None:
     client = _init_test_app(tmp_path, monkeypatch)
     _seed_search_data()
@@ -639,6 +664,63 @@ def test_search_view_pages_dedupes_by_normalized_url_group(tmp_path, monkeypatch
     assert urls.count("https://www.canada.ca/en/health-canada/covid19.html") == 1
 
 
+def test_search_view_pages_fastpath_uses_pages_table_when_populated(
+    tmp_path, monkeypatch
+) -> None:
+    client = _init_test_app(tmp_path, monkeypatch)
+    monkeypatch.setenv("HA_PAGES_FASTPATH", "1")
+    _seed_pages_view_data()
+
+    from ha_backend.pages import rebuild_pages
+    from ha_backend.runtime_metrics import SEARCH_METRICS
+
+    with get_session() as session:
+        rebuild_pages(session)
+
+    with SEARCH_METRICS.lock:
+        baseline_fastpath = SEARCH_METRICS.pages_fastpath
+
+    resp = client.get("/api/search", params={"view": "pages"})
+    assert resp.status_code == 200
+    data = resp.json()
+
+    assert data["total"] == 3
+    assert data["results"][0]["title"] == "COVID-19 guidance (updated)"
+
+    # When the pages table is populated, view=pages browse should include the
+    # per-page capture count.
+    assert data["results"][0]["pageSnapshotsCount"] == 2
+
+    with SEARCH_METRICS.lock:
+        assert SEARCH_METRICS.pages_fastpath == baseline_fastpath + 1
+
+
+def test_search_view_pages_fastpath_can_be_disabled(tmp_path, monkeypatch) -> None:
+    client = _init_test_app(tmp_path, monkeypatch)
+    monkeypatch.setenv("HA_PAGES_FASTPATH", "0")
+    _seed_pages_view_data()
+
+    from ha_backend.pages import rebuild_pages
+    from ha_backend.runtime_metrics import SEARCH_METRICS
+
+    with get_session() as session:
+        rebuild_pages(session)
+
+    with SEARCH_METRICS.lock:
+        baseline_fastpath = SEARCH_METRICS.pages_fastpath
+
+    resp = client.get("/api/search", params={"view": "pages"})
+    assert resp.status_code == 200
+    data = resp.json()
+
+    assert data["total"] == 3
+    assert data["results"][0]["title"] == "COVID-19 guidance (updated)"
+    assert data["results"][0]["pageSnapshotsCount"] == 2
+
+    with SEARCH_METRICS.lock:
+        assert SEARCH_METRICS.pages_fastpath == baseline_fastpath
+
+
 def test_search_view_pages_returns_latest_snapshot_for_group(tmp_path, monkeypatch) -> None:
     client = _init_test_app(tmp_path, monkeypatch)
     _seed_pages_view_data()
@@ -649,6 +731,35 @@ def test_search_view_pages_returns_latest_snapshot_for_group(tmp_path, monkeypat
 
     assert data["total"] == 1
     assert data["results"][0]["title"] == "COVID-19 guidance (updated)"
+
+
+def test_search_view_pages_date_range_limits_latest_snapshot(tmp_path, monkeypatch) -> None:
+    client = _init_test_app(tmp_path, monkeypatch)
+    _seed_pages_view_data()
+
+    # The "COVID-19 guidance" page was updated on 2025-04-15. With a date range
+    # that excludes that update, view=pages should show the latest snapshot
+    # *within* the range (the older title).
+    resp = client.get(
+        "/api/search",
+        params={"q": "COVID-19", "view": "pages", "to": "2025-01-31"},
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["total"] == 1
+    assert data["results"][0]["title"] == "COVID-19 guidance"
+
+
+def test_search_invalid_date_range_returns_422(tmp_path, monkeypatch) -> None:
+    client = _init_test_app(tmp_path, monkeypatch)
+    _seed_search_data()
+
+    resp = client.get(
+        "/api/search",
+        params={"from": "2025-03-01", "to": "2025-02-01"},
+    )
+    assert resp.status_code == 422
+    assert resp.json()["detail"] == "Invalid date range: 'from' must be <= 'to'."
 
 
 def test_search_view_pages_ranking_v2_scores_best_snapshot_for_group(

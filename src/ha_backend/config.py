@@ -42,6 +42,12 @@ DEFAULT_REPLAY_BASE_URL = ""
 #   HEALTHARCHIVE_REPLAY_PREVIEW_DIR=/srv/healtharchive/replay/previews
 DEFAULT_REPLAY_PREVIEW_DIR = ""
 
+# === Search/browse behavior toggles ===
+
+# When enabled, /api/search with view=pages and no query/date-range can use the
+# materialized "pages" table for faster browsing.
+DEFAULT_PAGES_FASTPATH_ENABLED = True
+
 
 @dataclass
 class ArchiveToolConfig:
@@ -154,3 +160,14 @@ def get_replay_preview_dir() -> Path | None:
     if not raw:
         return None
     return Path(raw)
+
+
+def get_pages_fastpath_enabled() -> bool:
+    """
+    Return whether the API should use the pages-table fast path for browse.
+
+    Controlled via HA_PAGES_FASTPATH (truthy/falsey). Defaults to enabled.
+    """
+    default = "1" if DEFAULT_PAGES_FASTPATH_ENABLED else "0"
+    raw = os.environ.get("HA_PAGES_FASTPATH", default).strip().lower()
+    return raw not in ("0", "false", "no", "off")

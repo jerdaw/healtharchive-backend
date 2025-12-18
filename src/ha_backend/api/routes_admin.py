@@ -340,8 +340,17 @@ def search_debug(
         Snapshot.normalized_url_group,
         strip_query_fragment_expr(Snapshot.url),
     )
+    page_partition_key = (Snapshot.source_id, group_key)
     if effective_view == SearchView.pages:
-        total = query.with_entities(func.count(func.distinct(group_key))).scalar() or 0
+        distinct_pages = (
+            query.with_entities(
+                Snapshot.source_id.label("source_id"),
+                group_key.label("group_key"),
+            )
+            .distinct()
+            .subquery()
+        )
+        total = db.query(func.count()).select_from(distinct_pages).scalar() or 0
     else:
         total = query.with_entities(func.count(Snapshot.id)).scalar() or 0
 
@@ -638,7 +647,7 @@ def search_debug(
     else:
         # pages: compute latest snapshot per group; v2 orders by group_score (best snapshot in group).
         rn_latest = func.row_number().over(
-            partition_by=group_key,
+            partition_by=page_partition_key,
             order_by=(Snapshot.capture_timestamp.desc(), Snapshot.id.desc()),
         ).label("rn_latest")
 
@@ -646,6 +655,7 @@ def search_debug(
             # No query: treat as newest pages
             candidates = base_query.with_entities(
                 Snapshot.id.label("id"),
+                Snapshot.source_id.label("source_id"),
                 group_key.label("group_key"),
                 rn_latest,
             ).subquery()
@@ -655,12 +665,13 @@ def search_debug(
             ordered_rows = [(s,) for s in snaps]
         else:
             rn_best = func.row_number().over(
-                partition_by=group_key,
+                partition_by=page_partition_key,
                 order_by=(snapshot_score.desc(), Snapshot.capture_timestamp.desc(), Snapshot.id.desc()),
             ).label("rn_best")
 
             candidates_subq = base_query.with_entities(
                 Snapshot.id.label("id"),
+                Snapshot.source_id.label("source_id"),
                 group_key.label("group_key"),
                 Snapshot.capture_timestamp.label("capture_timestamp"),
                 rn_latest,
@@ -687,6 +698,7 @@ def search_debug(
             )
             best_subq = (
                 db.query(
+                    candidates_subq.c.source_id.label("source_id"),
                     candidates_subq.c.group_key.label("group_key"),
                     candidates_subq.c.id.label("best_snapshot_id"),
                     candidates_subq.c.snapshot_score.label("group_score"),
@@ -698,7 +710,13 @@ def search_debug(
             ordered = (
                 db.query(Snapshot)
                 .join(latest_subq, Snapshot.id == latest_subq.c.id)
-                .join(best_subq, best_subq.c.group_key == latest_subq.c.group_key)
+                .join(
+                    best_subq,
+                    and_(
+                        best_subq.c.source_id == latest_subq.c.source_id,
+                        best_subq.c.group_key == latest_subq.c.group_key,
+                    ),
+                )
                 .with_entities(
                     Snapshot,
                     Source.code.label("source_code"),

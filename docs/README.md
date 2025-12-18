@@ -13,6 +13,7 @@ This folder contains the canonical documentation for the **HealthArchive backend
    - `deployment/production-single-vps.md` (current production runbook)
    - `deployment/replay-service-pywb.md` (pywb replay service for full-fidelity browsing)
    - `deployment/search-rollout.md` (enable v2 search + rollback)
+   - `deployment/pages-table-rollout.md` (pages table backfill + browse fast path)
    - `deployment/hosting-and-live-server-to-dos.md` (deployment checklist + Vercel wiring)
    - `deployment/environment-matrix.md` (cross‑repo env var + host matrix)
    - `deployment/production-rollout-checklist.md` (generic production checklist)

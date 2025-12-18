@@ -44,6 +44,7 @@ def index_job(job_id: int) -> int:
         has_outlinks = inspector.has_table("snapshot_outlinks")
         has_page_signals = inspector.has_table("page_signals")
         use_authority = has_outlinks and has_page_signals
+        has_pages = inspector.has_table("pages")
 
         if job.source is None:
             raise ValueError(
@@ -115,6 +116,12 @@ def index_job(job_id: int) -> int:
         )
 
         impacted_groups: set[str] = set()
+        impacted_page_groups: set[str] = set()
+        if has_pages:
+            from ha_backend.pages import discover_job_page_groups
+
+            impacted_page_groups.update(discover_job_page_groups(session, job_id=job.id))
+
         if has_outlinks:
             # Capture the set of groups affected by removing the old outlinks,
             # so PageSignal counts can be kept in sync after re-indexing.
@@ -160,6 +167,13 @@ def index_job(job_id: int) -> int:
                             language=language,
                         )
 
+                        if has_pages:
+                            group_key = snapshot.normalized_url_group
+                            if not group_key:
+                                group_key = rec.url.split("#", 1)[0].split("?", 1)[0]
+                            if group_key:
+                                impacted_page_groups.add(group_key)
+
                         if use_postgres_fts:
                             from ha_backend.search import build_search_vector
 
@@ -203,6 +217,23 @@ def index_job(job_id: int) -> int:
 
             job.indexed_page_count = n_snapshots
             job.status = "indexed"
+
+            if has_pages and impacted_page_groups:
+                from ha_backend.pages import rebuild_pages
+
+                session.flush()
+                result = rebuild_pages(
+                    session,
+                    source_id=job.source_id,
+                    groups=tuple(sorted(impacted_page_groups)),
+                    delete_missing=True,
+                )
+                logger.info(
+                    "Rebuilt %d page group(s) (deleted %d) for job %s.",
+                    result.upserted_groups,
+                    result.deleted_groups,
+                    job_id,
+                )
 
             if use_authority and impacted_groups:
                 session.flush()
