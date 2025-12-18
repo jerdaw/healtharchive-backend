@@ -147,6 +147,11 @@ Systemd services:
 - Worker: `/etc/systemd/system/healtharchive-worker.service`
   - `ExecStart=/opt/healtharchive-backend/.venv/bin/ha-backend start-worker --poll-interval 30`
 
+Optional systemd automation (recommended):
+
+- Annual scheduling timer (Jan 01 UTC) + worker priority drop-in:
+  - Templates + install steps: `deployment/systemd/README.md`
+
 Enable + start:
 
 ```bash
