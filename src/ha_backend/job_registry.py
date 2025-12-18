@@ -14,6 +14,35 @@ from .models import ArchiveJob as ORMArchiveJob
 from .models import Source
 
 
+HC_CANADA_CA_SCOPE_INCLUDE_RX = (
+    r"^https://www[.]canada[.]ca/"
+    r"(?:"
+    r"en/health-canada[.]html"
+    r"|fr/sante-canada[.]html"
+    r"|en/health-canada/.*"
+    r"|fr/sante-canada/.*"
+    r"|etc/designs/canada/wet-boew/.*"
+    r"|content/dam/canada/sitemenu/.*"
+    r"|content/dam/themes/health/.*"
+    r"|content/dam/hc-sc/.*"
+    r")$"
+)
+
+PHAC_CANADA_CA_SCOPE_INCLUDE_RX = (
+    r"^https://www[.]canada[.]ca/"
+    r"(?:"
+    r"en/public-health[.]html"
+    r"|fr/sante-publique[.]html"
+    r"|en/public-health/.*"
+    r"|fr/sante-publique/.*"
+    r"|etc/designs/canada/wet-boew/.*"
+    r"|content/dam/canada/sitemenu/.*"
+    r"|content/dam/themes/health/.*"
+    r"|content/dam/phac-aspc/.*"
+    r")$"
+)
+
+
 @dataclass
 class SourceJobConfig:
     """
@@ -39,10 +68,18 @@ SOURCE_JOB_CONFIGS: Dict[str, SourceJobConfig] = {
     "hc": SourceJobConfig(
         source_code="hc",
         name_template="hc-{date:%Y%m%d}",
-        default_seeds=["https://www.canada.ca/en/health-canada.html"],
+        default_seeds=[
+            "https://www.canada.ca/en/health-canada.html",
+            "https://www.canada.ca/fr/sante-canada.html",
+        ],
         # Zimit arguments passed after the "--" separator. Keep conservative
         # defaults for now and tune later as needed.
-        default_zimit_passthrough_args=[],
+        default_zimit_passthrough_args=[
+            "--scopeType",
+            "custom",
+            "--scopeIncludeRx",
+            HC_CANADA_CA_SCOPE_INCLUDE_RX,
+        ],
         default_tool_options={
             "cleanup": False,
             "overwrite": False,
@@ -53,13 +90,21 @@ SOURCE_JOB_CONFIGS: Dict[str, SourceJobConfig] = {
             "log_level": "INFO",
             "relax_perms": True,  # ensure WARCs are readable on host in dev
         },
-        schedule_hint="monthly",
+        schedule_hint="annual",
     ),
     "phac": SourceJobConfig(
         source_code="phac",
         name_template="phac-{date:%Y%m%d}",
-        default_seeds=["https://www.canada.ca/en/public-health.html"],
-        default_zimit_passthrough_args=[],
+        default_seeds=[
+            "https://www.canada.ca/en/public-health.html",
+            "https://www.canada.ca/fr/sante-publique.html",
+        ],
+        default_zimit_passthrough_args=[
+            "--scopeType",
+            "custom",
+            "--scopeIncludeRx",
+            PHAC_CANADA_CA_SCOPE_INCLUDE_RX,
+        ],
         default_tool_options={
             "cleanup": False,
             "overwrite": False,
@@ -70,7 +115,30 @@ SOURCE_JOB_CONFIGS: Dict[str, SourceJobConfig] = {
             "log_level": "INFO",
             "relax_perms": True,
         },
-        schedule_hint="monthly",
+        schedule_hint="annual",
+    ),
+    "cihr": SourceJobConfig(
+        source_code="cihr",
+        name_template="cihr-{date:%Y%m%d}",
+        default_seeds=[
+            "https://cihr-irsc.gc.ca/e/193.html",
+            "https://cihr-irsc.gc.ca/f/193.html",
+        ],
+        default_zimit_passthrough_args=[
+            "--scopeType",
+            "host",
+        ],
+        default_tool_options={
+            "cleanup": False,
+            "overwrite": False,
+            "enable_monitoring": False,
+            "enable_adaptive_workers": False,
+            "enable_vpn_rotation": False,
+            "initial_workers": 1,
+            "log_level": "INFO",
+            "relax_perms": True,
+        },
+        schedule_hint="annual",
     ),
 }
 

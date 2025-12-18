@@ -7,6 +7,7 @@ from pathlib import Path
 from ha_backend import cli as cli_module
 from ha_backend import db as db_module
 from ha_backend.db import Base, get_engine, get_session
+from ha_backend.job_registry import SOURCE_JOB_CONFIGS
 from ha_backend.models import ArchiveJob, Source
 from ha_backend.seeds import seed_sources
 
@@ -79,7 +80,9 @@ def test_create_job_injects_zimit_passthrough_args(tmp_path, monkeypatch) -> Non
         cfg = job.config or {}
         z_args = cfg.get("zimit_passthrough_args") or []
 
-    assert z_args == ["--pageLimit", "5", "--depth", "1"]
+    expected_prefix = SOURCE_JOB_CONFIGS["hc"].default_zimit_passthrough_args
+    assert z_args[: len(expected_prefix)] == expected_prefix
+    assert z_args[len(expected_prefix) :] == ["--pageLimit", "5", "--depth", "1"]
 
 
 def test_register_job_dir_creates_completed_job(tmp_path, monkeypatch) -> None:
