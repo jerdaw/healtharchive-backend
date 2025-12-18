@@ -191,3 +191,20 @@ For each source’s annual job:
 
 Replay and previews are “eventually consistent” follow-ups and are not part of
 the “search is ready” definition for the annual campaign.
+
+---
+
+## 6) Post-campaign verification (Phase 7)
+
+Once **all** annual jobs are `indexed`, capture “search readiness” evidence as a
+timestamped artifact directory:
+
+```bash
+ha-backend annual-status --year <YYYY>
+./scripts/annual-search-verify.sh --year <YYYY> --out-root /srv/healtharchive/ops/search-eval --base-url http://127.0.0.1:8001
+```
+
+This produces:
+
+- `annual-status.json` / `annual-status.txt` (campaign readiness evidence)
+- captured `/api/search` JSON for the golden query set (for later diffing)

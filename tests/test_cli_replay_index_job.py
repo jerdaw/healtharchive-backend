@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import os
+import hashlib
+import json
 import subprocess
 import sys
 from io import StringIO
@@ -126,6 +128,20 @@ def test_replay_index_job_creates_symlinks_and_runs_docker(tmp_path, monkeypatch
     rel_b = warcs[1].resolve().relative_to(tmp_path.resolve())
     assert target1 == f"/warcs/{rel_a}"
     assert target2 == f"/warcs/{rel_b}"
+
+    marker_path = collections_dir / f"job-{job_id}" / "replay-index.meta.json"
+    assert marker_path.is_file()
+
+    marker = json.loads(marker_path.read_text(encoding="utf-8"))
+    assert marker["jobId"] == job_id
+    assert marker["collectionName"] == f"job-{job_id}"
+    assert marker["warcCount"] == 2
+    assert marker["warcsHostRoot"] == str(tmp_path.resolve())
+    assert marker["warcsContainerRoot"] == "/warcs"
+
+    rels = sorted([rel_a.as_posix(), rel_b.as_posix()])
+    expected_hash = hashlib.sha256("\n".join(rels).encode("utf-8")).hexdigest()
+    assert marker["warcListHash"] == expected_hash
 
 
 def test_replay_index_job_dry_run_does_not_modify_files_or_run_docker(

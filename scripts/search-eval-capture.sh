@@ -6,18 +6,19 @@ usage() {
 Capture /api/search JSON responses for a standard set of "golden queries".
 
 Usage:
-  ./scripts/search-eval-capture.sh [--base-url URL] [--out-dir DIR] [--page-size N] [--queries-file FILE] [--ranking (v1|v2)] [--generate-from-db ...]
+  ./scripts/search-eval-capture.sh [--base-url URL] [--out-dir DIR] [--run-id ID] [--page-size N] [--queries-file FILE] [--ranking (v1|v2)] [--generate-from-db ...]
 
 Examples:
   ./scripts/search-eval-capture.sh
   ./scripts/search-eval-capture.sh --base-url https://api.healtharchive.ca --out-dir /tmp/ha-search-eval
+  ./scripts/search-eval-capture.sh --out-dir /tmp/ha-search-eval --run-id 20270101T120000Z
   ./scripts/search-eval-capture.sh --queries-file ./scripts/search-eval-queries.txt
   ./scripts/search-eval-capture.sh --ranking v2
   ./scripts/search-eval-capture.sh --generate-from-db
   ./scripts/search-eval-capture.sh --generate-from-db --corpus-max-titles 100000 --corpus-top-unigrams 60 --corpus-top-bigrams 40
 
 Notes:
-  - Writes files to a timestamped subdirectory under --out-dir.
+  - Writes files to a run-id subdirectory under --out-dir (default: UTC timestamp).
   - Captures both view=pages and view=snapshots for each query.
   - --ranking overrides the backend default (useful when comparing ranking versions).
   - --generate-from-db generates a corpus-derived query list from the configured DB
@@ -27,6 +28,7 @@ EOF
 
 BASE_URL="http://127.0.0.1:8001"
 OUT_DIR="/tmp/ha-search-eval"
+RUN_ID=""
 PAGE_SIZE="20"
 QUERIES_FILE=""
 RANKING=""
@@ -44,6 +46,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --out-dir)
       OUT_DIR="$2"
+      shift 2
+      ;;
+    --run-id)
+      RUN_ID="$2"
       shift 2
       ;;
     --page-size)
@@ -93,6 +99,17 @@ done
 if [[ -n "${RANKING}" && "${RANKING}" != "v1" && "${RANKING}" != "v2" ]]; then
   echo "ERROR: --ranking must be 'v1' or 'v2' (got: ${RANKING})" >&2
   exit 2
+fi
+
+captured_at_utc="$(date -u +%Y%m%dT%H%M%SZ)"
+run_id="${RUN_ID}"
+if [[ -z "${run_id}" ]]; then
+  run_id="${captured_at_utc}"
+else
+  if [[ ! "${run_id}" =~ ^[A-Za-z0-9._-]+$ ]]; then
+    echo "ERROR: --run-id must match ^[A-Za-z0-9._-]+$ (got: ${run_id})" >&2
+    exit 2
+  fi
 fi
 
 urlencode() {
@@ -147,8 +164,7 @@ mental health
 EOF
 }
 
-timestamp="$(date -u +%Y%m%dT%H%M%SZ)"
-capture_dir="${OUT_DIR%/}/${timestamp}"
+capture_dir="${OUT_DIR%/}/${run_id}"
 mkdir -p "${capture_dir}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -159,7 +175,8 @@ fi
 
 meta_file="${capture_dir}/meta.txt"
 {
-  echo "timestamp_utc=${timestamp}"
+  echo "run_id=${run_id}"
+  echo "captured_at_utc=${captured_at_utc}"
   echo "base_url=${BASE_URL}"
   echo "page_size=${PAGE_SIZE}"
   echo "ranking=${RANKING:-default}"

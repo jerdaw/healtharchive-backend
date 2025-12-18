@@ -1,0 +1,9 @@
+[Unit]
+Description=Run HealthArchive replay reconciler (capped, safe-by-default)
+
+[Timer]
+OnCalendar=*-*-* 02:30:00 UTC
+Persistent=true
+
+[Install]
+WantedBy=timers.target

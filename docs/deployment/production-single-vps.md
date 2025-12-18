@@ -151,6 +151,8 @@ Optional systemd automation (recommended):
 
 - Annual scheduling timer (Jan 01 UTC) + worker priority drop-in:
   - Templates + install steps: `deployment/systemd/README.md`
+- Replay reconciliation timer (pywb indexing; capped, optional):
+  - Templates + install steps: `deployment/systemd/README.md`
 
 Enable + start:
 
@@ -158,6 +160,21 @@ Enable + start:
 sudo systemctl daemon-reload
 sudo systemctl enable --now healtharchive-api healtharchive-worker
 curl -i http://127.0.0.1:8001/api/health
+```
+
+Routine deploys (after initial install):
+
+```bash
+cd /opt/healtharchive-backend
+
+# Dry-run (prints actions):
+./scripts/vps-deploy.sh
+
+# Deploy latest main (fast-forward only):
+./scripts/vps-deploy.sh --apply
+
+# Deploy pinned commit:
+./scripts/vps-deploy.sh --apply --ref <GIT_SHA>
 ```
 
 ---
