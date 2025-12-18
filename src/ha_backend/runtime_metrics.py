@@ -28,6 +28,7 @@ class _SearchMetrics:
     relevance_fuzzy: int = 0
     boolean: int = 0
     url: int = 0
+    pages_fastpath: int = 0
     newest: int = 0
 
 
@@ -73,6 +74,8 @@ def observe_search_request(*, duration_seconds: float, mode: str, ok: bool) -> N
             m.boolean += 1
         elif mode == "url":
             m.url += 1
+        elif mode == "pages_fastpath":
+            m.pages_fastpath += 1
         else:
             m.newest += 1
 
@@ -111,6 +114,7 @@ def render_search_metrics_prometheus() -> list[str]:
         lines.append(f'healtharchive_search_mode_total{{mode="relevance_fuzzy"}} {m.relevance_fuzzy}')
         lines.append(f'healtharchive_search_mode_total{{mode="boolean"}} {m.boolean}')
         lines.append(f'healtharchive_search_mode_total{{mode="url"}} {m.url}')
+        lines.append(f'healtharchive_search_mode_total{{mode="pages_fastpath"}} {m.pages_fastpath}')
         lines.append(f'healtharchive_search_mode_total{{mode="newest"}} {m.newest}')
 
         lines.append("# HELP healtharchive_search_duration_seconds_max Max observed /api/search latency (seconds)")
