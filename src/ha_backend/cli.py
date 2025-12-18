@@ -201,13 +201,289 @@ def cmd_index_job(args: argparse.Namespace) -> None:
 
 def cmd_seed_sources(args: argparse.Namespace) -> None:
     """
-    Insert initial Source rows (hc, phac) if they are missing.
+    Insert initial Source rows (hc, phac, cihr) if they are missing.
     """
     created_count = 0
     with get_session() as session:
         created_count = seed_sources(session)
 
     print(f"Seeded {created_count} source(s).")
+
+
+def cmd_schedule_annual(args: argparse.Namespace) -> None:
+    """
+    Enqueue the Jan 01 (UTC) annual campaign jobs for a specific year.
+
+    This command is intentionally conservative:
+    - dry-run is the default (no DB changes unless --apply is passed)
+    - sources are allowlisted and ordered (hc, phac, cihr)
+    - job creation is idempotent using config metadata + name collision checks
+    - refuses to create a new annual job if the source already has an "active"
+      job (queued/running/completed/indexing/index_failed/retryable) that is not
+      indexed yet
+    """
+    from datetime import datetime, timezone
+
+    from .job_registry import (
+        build_job_config,
+        build_output_dir_for_job,
+        generate_job_name,
+        get_config_for_source,
+    )
+    from .models import ArchiveJob as ORMArchiveJob
+    from .models import Source
+
+    apply_mode = bool(getattr(args, "apply", False))
+
+    now = datetime.now(timezone.utc)
+    year = getattr(args, "year", None)
+    if year is None:
+        if now.month == 1 and now.day == 1:
+            year = now.year
+        else:
+            print(
+                "ERROR: --year is required unless this command is run on Jan 01 (UTC).",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+
+    if not isinstance(year, int) or year < 1970 or year > 2100:
+        print(
+            "ERROR: --year must be a four-digit year between 1970 and 2100.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    campaign_dt = datetime(year, 1, 1, tzinfo=timezone.utc)
+    campaign_date = campaign_dt.date().isoformat()
+
+    annual_sources_ordered = ("hc", "phac", "cihr")
+    allowed_sources = set(annual_sources_ordered)
+
+    requested_sources = getattr(args, "sources", None) or list(annual_sources_ordered)
+    normalized_requested = [s.strip().lower() for s in requested_sources if s.strip()]
+    invalid_sources = sorted({s for s in normalized_requested if s not in allowed_sources})
+    if invalid_sources:
+        print(
+            "ERROR: --sources contains unsupported codes: "
+            + ", ".join(invalid_sources)
+            + ". Allowed: hc, phac, cihr.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    requested_set = set(normalized_requested)
+    sources_in_order = [s for s in annual_sources_ordered if s in requested_set]
+
+    max_create_per_run = getattr(args, "max_create_per_run", None)
+    if max_create_per_run is None:
+        max_create_per_run = len(sources_in_order)
+    if max_create_per_run < 0:
+        print("ERROR: --max-create-per-run must be >= 0.", file=sys.stderr)
+        sys.exit(1)
+
+    tool_cfg = get_archive_tool_config()
+    scheduled_at = now
+
+    blocking_statuses = {
+        "queued",
+        "retryable",
+        "running",
+        "completed",
+        "indexing",
+        "index_failed",
+    }
+
+    print("HealthArchive Backend – Schedule Annual Campaign")
+    print("------------------------------------------------")
+    print(f"Mode:            {'APPLY' if apply_mode else 'DRY-RUN'}")
+    print(f"Campaign date:   {campaign_date} (Jan 01 UTC)")
+    print(
+        f"Sources:         {', '.join(sources_in_order) if sources_in_order else '(none)'}"
+    )
+    print(f"Max creates:     {max_create_per_run}")
+    print(f"Archive root:    {tool_cfg.archive_root}")
+    print("")
+
+    plan: list[dict[str, object]] = []
+
+    with get_session() as session:
+        for source_code in sources_in_order:
+            cfg = get_config_for_source(source_code)
+            if cfg is None:
+                plan.append(
+                    {
+                        "source": source_code,
+                        "action": "error",
+                        "reason": "Source is not registered in job_registry.py",
+                    }
+                )
+                continue
+
+            source = session.query(Source).filter_by(code=cfg.source_code).one_or_none()
+            if source is None:
+                plan.append(
+                    {
+                        "source": source_code,
+                        "action": "error",
+                        "reason": "Missing Source row in DB; run 'ha-backend seed-sources'",
+                    }
+                )
+                continue
+
+            job_name = generate_job_name(cfg, now=campaign_dt)
+
+            existing_jobs = (
+                session.query(ORMArchiveJob)
+                .filter(ORMArchiveJob.source_id == source.id)
+                .order_by(ORMArchiveJob.id.desc())
+                .all()
+            )
+
+            annual_matches = [
+                j
+                for j in existing_jobs
+                if (j.config or {}).get("campaign_kind") == "annual"
+                and (j.config or {}).get("campaign_year") == year
+            ]
+            if len(annual_matches) > 1:
+                plan.append(
+                    {
+                        "source": source_code,
+                        "action": "error",
+                        "reason": f"Multiple annual jobs already exist for {year} (ids: {', '.join(str(j.id) for j in annual_matches)})",
+                    }
+                )
+                continue
+            if len(annual_matches) == 1:
+                j = annual_matches[0]
+                plan.append(
+                    {
+                        "source": source_code,
+                        "action": "skip",
+                        "reason": f"Already scheduled for {year} (job id={j.id}, status={j.status}, name={j.name})",
+                    }
+                )
+                continue
+
+            name_matches = [j for j in existing_jobs if j.name == job_name]
+            if name_matches:
+                j = name_matches[0]
+                plan.append(
+                    {
+                        "source": source_code,
+                        "action": "skip",
+                        "reason": f"Job name already exists (job id={j.id}, status={j.status}, name={j.name}); refusing to create a duplicate",
+                    }
+                )
+                continue
+
+            blocked = next((j for j in existing_jobs if j.status in blocking_statuses), None)
+            if blocked is not None:
+                plan.append(
+                    {
+                        "source": source_code,
+                        "action": "skip",
+                        "reason": f"Source has an active job (job id={blocked.id}, status={blocked.status}, name={blocked.name}); finish/index it before scheduling annual",
+                    }
+                )
+                continue
+
+            job_config = build_job_config(cfg)
+            job_config.update(
+                {
+                    "campaign_kind": "annual",
+                    "campaign_year": year,
+                    "campaign_date": campaign_date,
+                    "campaign_date_utc": f"{campaign_date}T00:00:00Z",
+                    "scheduler_version": "v1",
+                }
+            )
+
+            output_dir = build_output_dir_for_job(
+                cfg.source_code,
+                job_name,
+                archive_root=tool_cfg.archive_root,
+                now=scheduled_at,
+            )
+
+            plan.append(
+                {
+                    "source": source_code,
+                    "action": "create",
+                    "job_name": job_name,
+                    "output_dir": str(output_dir),
+                    "job_config": job_config,
+                    "source_id": source.id,
+                }
+            )
+
+        errors = [p for p in plan if p.get("action") == "error"]
+        creates = [p for p in plan if p.get("action") == "create"]
+
+        for item in plan:
+            src = str(item.get("source"))
+            action = str(item.get("action"))
+            reason = item.get("reason")
+
+            if action == "create":
+                job_name = str(item.get("job_name"))
+                output_dir = str(item.get("output_dir"))
+                seeds = (item.get("job_config") or {}).get("seeds")  # type: ignore[union-attr]
+                seed_count = len(seeds) if isinstance(seeds, list) else 0
+                print(f"{src}: WOULD CREATE {job_name} (seeds={seed_count})")
+                print(f"     output_dir={output_dir}")
+            elif action == "skip":
+                print(f"{src}: SKIP - {reason}")
+            else:
+                print(f"{src}: ERROR - {reason}")
+
+        print("")
+        print(
+            f"Summary: would_create={len(creates)}, skip={len([p for p in plan if p.get('action') == 'skip'])}, errors={len(errors)}"
+        )
+
+        if not apply_mode:
+            print("")
+            print("Dry-run only; re-run with --apply to enqueue jobs.")
+            return
+
+        if errors:
+            print("")
+            print("Aborting (no changes applied) due to errors above.", file=sys.stderr)
+            sys.exit(1)
+
+        created = 0
+        for item in creates:
+            if created >= max_create_per_run:
+                break
+
+            source_id = int(item["source_id"])  # type: ignore[arg-type]
+            source = session.get(Source, source_id)
+            if source is None:
+                raise RuntimeError(
+                    f"Internal error: planned Source id={source_id} disappeared during apply."
+                )
+
+            job = ORMArchiveJob(
+                source=source,
+                name=str(item["job_name"]),
+                output_dir=str(item["output_dir"]),
+                status="queued",
+                queued_at=scheduled_at,
+                config=item["job_config"],  # type: ignore[arg-type]
+            )
+            session.add(job)
+            session.flush()
+            created += 1
+            print(f"CREATED {source.code}: job id={job.id} name={job.name}")
+
+        if created < len(creates):
+            for item in creates[created:]:
+                print(
+                    f"NOT CREATED (cap): {item['source']} {item['job_name']} "
+                    f"(--max-create-per-run={max_create_per_run})"
+                )
 
 
 def cmd_backfill_search_vector(args: argparse.Namespace) -> None:
@@ -2111,9 +2387,43 @@ def build_parser() -> argparse.ArgumentParser:
     # seed-sources
     p_seed = subparsers.add_parser(
         "seed-sources",
-        help="Insert initial Source rows (hc, phac) into the database if missing.",
+        help="Insert initial Source rows (hc, phac, cihr) into the database if missing.",
     )
     p_seed.set_defaults(func=cmd_seed_sources)
+
+    # schedule-annual
+    p_schedule_annual = subparsers.add_parser(
+        "schedule-annual",
+        help=(
+            "Enqueue the Jan 01 (UTC) annual campaign jobs (hc/phac/cihr). "
+            "Dry-run by default; pass --apply to create jobs."
+        ),
+    )
+    p_schedule_annual.add_argument(
+        "--year",
+        type=int,
+        help=(
+            "Campaign year (jobs are labeled as Jan 01 UTC for that year). "
+            "If omitted, only allowed when running on Jan 01 (UTC)."
+        ),
+    )
+    p_schedule_annual.add_argument(
+        "--sources",
+        nargs="+",
+        help="Subset of sources to schedule (allowlisted): hc phac cihr.",
+    )
+    p_schedule_annual.add_argument(
+        "--max-create-per-run",
+        type=int,
+        help="Hard cap on jobs created in one run (defaults to number of selected sources).",
+    )
+    p_schedule_annual.add_argument(
+        "--apply",
+        action="store_true",
+        default=False,
+        help="Create queued ArchiveJob rows (otherwise dry-run only).",
+    )
+    p_schedule_annual.set_defaults(func=cmd_schedule_annual)
 
     # backfill-search-vector
     p_backfill_search = subparsers.add_parser(

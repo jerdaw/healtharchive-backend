@@ -20,6 +20,8 @@ This folder contains the canonical documentation for the **HealthArchive backend
    - `deployment/staging-rollout-checklist.md` (optional future staging)
 4. Operations (how to keep it healthy)
    - `operations/monitoring-and-ci-checklist.md`
+   - `operations/annual-campaign.md` (canonical annual scope + seeds; Jan 01 UTC)
+   - `operations/automation-implementation-plan.md` (detailed phased plan for production-only automation)
    - `operations/replay-and-preview-automation-plan.md` (design-only plan for future automation + guardrails)
    - `operations/search-quality.md` (how to evaluate relevance changes)
    - `operations/search-golden-queries.md` (curated queries + expectations)

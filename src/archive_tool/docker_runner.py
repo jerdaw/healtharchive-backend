@@ -27,8 +27,13 @@ def build_zimit_args(
     # (Keep existing implementation)
     zimit_args = ["zimit"]
     if "seeds" in required_args and not is_final_build:
-        for seed_url in required_args["seeds"]:
-            zimit_args.extend(["--seeds", seed_url])
+        # zimit expects multiple seeds as a single comma-separated string.
+        # Passing repeated --seeds flags results in only the last seed being used.
+        seeds = required_args["seeds"]
+        seeds_csv = (
+            ",".join(seeds) if isinstance(seeds, (list, tuple)) else str(seeds)
+        )
+        zimit_args.extend(["--seeds", seeds_csv])
     if "name" in required_args:
         zimit_args.extend(["--name", required_args["name"]])
 

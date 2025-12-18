@@ -4,7 +4,7 @@ from pathlib import Path
 
 from ha_backend import db as db_module
 from ha_backend.db import Base, get_engine, get_session
-from ha_backend.job_registry import create_job_for_source
+from ha_backend.job_registry import SOURCE_JOB_CONFIGS, create_job_for_source
 from ha_backend.jobs import run_persistent_job
 from ha_backend.models import ArchiveJob, Source
 from ha_backend.seeds import seed_sources
@@ -163,6 +163,7 @@ def test_run_persistent_job_builds_monitoring_and_vpn_args(tmp_path, monkeypatch
         "--backoff-delay-minutes",
         "15",
         "--relax-perms",
+        *tuple(SOURCE_JOB_CONFIGS["hc"].default_zimit_passthrough_args),
         "--pageLimit",
         "5",
     )
