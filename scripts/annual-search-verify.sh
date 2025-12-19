@@ -182,7 +182,7 @@ if ! "${HA_BACKEND_BIN}" annual-status --year "${YEAR}" --json >"${tmp_annual_st
 fi
 
 annual_json="$(cat "${tmp_annual_stdout}")"
-if [[ -z "${annual_json}" ]]; then
+if [[ -z "${annual_json//[[:space:]]/}" ]]; then
   echo "ERROR: annual-status produced empty output; refusing to continue." >&2
   if [[ -s "${tmp_annual_stderr}" ]]; then
     echo "--- STDERR ---" >&2
@@ -191,7 +191,9 @@ if [[ -z "${annual_json}" ]]; then
   exit 3
 fi
 
-ready="$(
+ready=""
+set +e
+ready_parse_out="$(
   printf '%s' "${annual_json}" | "${PYTHON_BIN}" - <<'PY'
 import json
 import sys
@@ -201,12 +203,26 @@ try:
     data = json.loads(raw)
 except json.JSONDecodeError as exc:
     print(f"ERROR: annual-status --json was not valid JSON: {exc}", file=sys.stderr)
-    preview = raw[:500].replace("\n", "\\n")
-    print(f"Output preview (first 500 chars): {preview}", file=sys.stderr)
-    raise
+    preview = raw[:500]
+    print(f"Output repr (first 200 chars): {preview[:200]!r}", file=sys.stderr)
+    sys.exit(2)
 print("true" if data.get("summary", {}).get("readyForSearch") else "false")
 PY
 )"
+parse_rc=$?
+set -e
+
+if [[ $parse_rc -eq 0 ]]; then
+  ready="${ready_parse_out}" 
+else
+  if [[ "${ALLOW_NOT_READY}" == "true" ]]; then
+    ready="false"
+  else
+    echo "ERROR: annual-status JSON parse failed; refusing to continue." >&2
+    echo "Hint: re-run with --allow-not-ready to capture anyway." >&2
+    exit 3
+  fi
+fi
 
 if [[ "${ready}" != "true" && "${ALLOW_NOT_READY}" != "true" ]]; then
   echo "ERROR: Annual campaign ${YEAR} is not ready for search; refusing to capture." >&2
