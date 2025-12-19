@@ -213,44 +213,25 @@ Verification (VPS):
 
 ### Phase 6 — Optional GitHub-driven deploys (CD) (infrastructure project)
 
-Objective: deploy the backend to the single VPS from GitHub Actions, while
-keeping SSH closed to the public internet.
+Objective: reduce deploy mistakes without expanding the production attack
+surface.
 
-Reality check:
+Recommended posture for this project (single VPS, no staging backend):
 
-- This project’s VPS posture is “Tailscale-only SSH”. A GitHub runner cannot
-  reach the VPS unless it joins your tailnet.
-- This requires secrets (Tailscale auth key + SSH key) and sudo configuration
-  (non-interactive service restarts).
+- Keep deployments **manual** on the VPS.
+- Use the deploy helper script:
+  - `scripts/vps-deploy.sh` (dry-run default; `--apply` to deploy)
 
-Recommended posture:
+Rationale:
 
-- Keep the deploy path **manual** unless you explicitly need GitHub-driven CD.
-- If you do want it, prefer a **manual GitHub workflow dispatch** (not auto-deploy
-  on every push).
+- Avoids storing production access secrets in GitHub.
+- Avoids granting passwordless sudo/SSH access to GitHub Actions.
+- Keeps the operational path “boring” and easy to reason about.
 
-If you proceed:
+Verification (VPS):
 
-1. Create a dedicated deploy SSH keypair (no passphrase) and install the public
-   key on the VPS for a deploy user (or `haadmin` if you accept that risk).
-2. Configure passwordless sudo for the minimal set of commands used by:
-   - `scripts/vps-deploy.sh` (systemctl daemon-reload + restart/status)
-3. Create a short-lived or scoped Tailscale auth key for the GitHub runner.
-4. Store secrets in GitHub (never in the repo):
-   - `TAILSCALE_AUTHKEY`
-   - `VPS_TAILSCALE_IP`
-   - `VPS_SSH_USER`
-   - `VPS_SSH_PRIVATE_KEY`
-5. Add a `workflow_dispatch` deploy workflow that:
-   - joins tailnet,
-   - SSHes to the VPS,
-   - runs `./scripts/vps-deploy.sh` (dry-run),
-   - optionally runs `./scripts/vps-deploy.sh --apply`.
-
-Verification:
-
-- Run a dry-run deploy workflow and confirm logs show the correct plan.
-- Run an apply deploy workflow and confirm `/api/health` is green afterward.
+- Dry-run: `cd /opt/healtharchive-backend && ./scripts/vps-deploy.sh`
+- Apply: `cd /opt/healtharchive-backend && ./scripts/vps-deploy.sh --apply`
 
 ## 1. Uptime and health checks
 
