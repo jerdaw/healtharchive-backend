@@ -11,7 +11,9 @@ This is a light-weight ops helper for Phase 7 (post-campaign verification):
   3) Runs ./scripts/search-eval-capture.sh with a stable --run-id so artifacts live together
 
 Usage:
-  ./scripts/annual-search-verify.sh [--year YYYY] [--out-root DIR] [--base-url URL] [--run-id ID] [--env-file FILE] [--allow-not-ready] [--allow-existing] [--] [capture args...]
+  ./scripts/annual-search-verify.sh [--year YYYY] [--out-root DIR] [--base-url URL] [--run-id ID] [--env-file FILE]
+                                   [--allow-not-ready] [--allow-existing] [--skip-if-exists] [--exit-zero-if-not-ready]
+                                   [--] [capture args...]
 
 Examples:
   ./scripts/annual-search-verify.sh
@@ -38,6 +40,8 @@ ENV_FILE=""
 EFFECTIVE_ENV_FILE=""
 ALLOW_NOT_READY="false"
 ALLOW_EXISTING="false"
+SKIP_IF_EXISTS="false"
+EXIT_ZERO_IF_NOT_READY="false"
 
 CAPTURE_ARGS=()
 
@@ -69,6 +73,14 @@ while [[ $# -gt 0 ]]; do
       ;;
     --allow-existing)
       ALLOW_EXISTING="true"
+      shift 1
+      ;;
+    --skip-if-exists)
+      SKIP_IF_EXISTS="true"
+      shift 1
+      ;;
+    --exit-zero-if-not-ready)
+      EXIT_ZERO_IF_NOT_READY="true"
       shift 1
       ;;
     --)
@@ -228,17 +240,26 @@ else
 fi
 
 if [[ "${ready}" != "true" && "${ALLOW_NOT_READY}" != "true" ]]; then
+  if [[ "${EXIT_ZERO_IF_NOT_READY}" == "true" ]]; then
+    echo "Annual campaign ${YEAR} is not ready for search; skipping capture (--exit-zero-if-not-ready)." >&2
+    exit 0
+  fi
+
   echo "ERROR: Annual campaign ${YEAR} is not ready for search; refusing to capture." >&2
   echo "" >&2
   "${HA_BACKEND_BIN}" annual-status --year "${YEAR}" >&2 || true
   echo "" >&2
   echo "Hint: pass --allow-not-ready to capture anyway." >&2
-  exit 3
+  exit 4
 fi
 
 if [[ -d "${CAPTURE_DIR}" && "${ALLOW_EXISTING}" != "true" ]]; then
   existing_count="$(ls -A "${CAPTURE_DIR}" 2>/dev/null | wc -l | tr -d '[:space:]' || true)"
   if [[ "${existing_count}" != "0" ]]; then
+    if [[ "${SKIP_IF_EXISTS}" == "true" ]]; then
+      echo "Capture dir exists; skipping (--skip-if-exists): ${CAPTURE_DIR}" >&2
+      exit 0
+    fi
     echo "ERROR: Capture dir exists and is non-empty: ${CAPTURE_DIR}" >&2
     echo "Hint: choose a different --run-id or pass --allow-existing." >&2
     exit 2

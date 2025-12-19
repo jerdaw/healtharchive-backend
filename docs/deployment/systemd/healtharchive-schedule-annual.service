@@ -11,4 +11,5 @@ Type=oneshot
 User=haadmin
 WorkingDirectory=/opt/healtharchive-backend
 EnvironmentFile=/etc/healtharchive/backend.env
-ExecStart=/usr/bin/bash -c '/opt/healtharchive-backend/.venv/bin/ha-backend schedule-annual --apply --year $(date -u +%%Y) --sources hc phac cihr'
+EnvironmentFile=-/etc/healtharchive/healthchecks.env
+ExecStart=/opt/healtharchive-backend/scripts/systemd-healthchecks-wrapper.sh --ping-var HEALTHARCHIVE_HC_PING_SCHEDULE_ANNUAL -- /usr/bin/bash -lc '/opt/healtharchive-backend/.venv/bin/ha-backend schedule-annual --apply --year $(date -u +%%Y) --sources hc phac cihr'

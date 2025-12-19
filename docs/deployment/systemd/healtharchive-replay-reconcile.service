@@ -11,6 +11,7 @@ Type=oneshot
 User=haadmin
 WorkingDirectory=/opt/healtharchive-backend
 EnvironmentFile=/etc/healtharchive/backend.env
+EnvironmentFile=-/etc/healtharchive/healthchecks.env
 
 # Keep impact low on the single VPS.
 Nice=10
@@ -20,4 +21,4 @@ IOSchedulingPriority=6
 # pywb reindex time scales with WARC size; allow long runs.
 TimeoutStartSec=6h
 
-ExecStart=/opt/healtharchive-backend/.venv/bin/ha-backend replay-reconcile --apply --max-jobs 1 --collections-dir /srv/healtharchive/replay/collections --warcs-host-root /srv/healtharchive/jobs --warcs-container-root /warcs --lock-file /srv/healtharchive/replay/.locks/replay-reconcile.lock
+ExecStart=/opt/healtharchive-backend/scripts/systemd-healthchecks-wrapper.sh --ping-var HEALTHARCHIVE_HC_PING_REPLAY_RECONCILE -- /opt/healtharchive-backend/.venv/bin/ha-backend replay-reconcile --apply --max-jobs 1 --collections-dir /srv/healtharchive/replay/collections --warcs-host-root /srv/healtharchive/jobs --warcs-container-root /warcs --lock-file /srv/healtharchive/replay/.locks/replay-reconcile.lock
