@@ -181,60 +181,47 @@ if ! "${HA_BACKEND_BIN}" annual-status --year "${YEAR}" --json >"${tmp_annual_st
   exit 3
 fi
 
-annual_json="$(cat "${tmp_annual_stdout}")"
-annual_json_is_empty="false"
 annual_json_parse_failed="false"
 annual_status_note=""
 
-if [[ -z "${annual_json//[[:space:]]/}" ]]; then
-  annual_json_is_empty="true"
-  annual_json_parse_failed="true"
-  annual_status_note="annual-status --json output was empty/whitespace"
-
-  if [[ "${ALLOW_NOT_READY}" != "true" ]]; then
-    echo "ERROR: ${annual_status_note}; refusing to continue." >&2
-    if [[ -s "${tmp_annual_stderr}" ]]; then
-      echo "--- STDERR ---" >&2
-      cat "${tmp_annual_stderr}" >&2
-    fi
-    exit 3
-  fi
-fi
-
 ready=""
-ready_parse_out=""
-parse_rc=0
-if [[ "${annual_json_parse_failed}" != "true" ]]; then
-  set +e
-  ready_parse_out="$(
-    printf '%s' "${annual_json}" | "${PYTHON_BIN}" - <<'PY'
+set +e
+ready_parse_out="$(
+  "${PYTHON_BIN}" - "${tmp_annual_stdout}" <<'PY'
 import json
 import sys
+from pathlib import Path
 
-raw = sys.stdin.read()
+path = Path(sys.argv[1])
+raw = path.read_text(encoding="utf-8", errors="replace")
+if not raw.strip():
+    print("ERROR: annual-status --json output was empty/whitespace", file=sys.stderr)
+    sys.exit(2)
 try:
     data = json.loads(raw)
 except json.JSONDecodeError as exc:
     print(f"ERROR: annual-status --json was not valid JSON: {exc}", file=sys.stderr)
-    preview = raw[:500]
-    print(f"Output repr (first 200 chars): {preview[:200]!r}", file=sys.stderr)
+    print(f"Output repr (first 200 chars): {raw[:200]!r}", file=sys.stderr)
     sys.exit(2)
 print("true" if data.get("summary", {}).get("readyForSearch") else "false")
 PY
-  )"
-  parse_rc=$?
-  set -e
-fi
+)"
+parse_rc=$?
+set -e
 
 if [[ $parse_rc -eq 0 ]]; then
-  ready="${ready_parse_out}" 
+  ready="${ready_parse_out}"
 else
   if [[ "${ALLOW_NOT_READY}" == "true" ]]; then
     ready="false"
     annual_json_parse_failed="true"
-    annual_status_note="annual-status --json output was not valid JSON"
+    annual_status_note="annual-status --json output was empty or not valid JSON"
   else
     echo "ERROR: annual-status JSON parse failed; refusing to continue." >&2
+    if [[ -s "${tmp_annual_stderr}" ]]; then
+      echo "--- STDERR ---" >&2
+      cat "${tmp_annual_stderr}" >&2
+    fi
     echo "Hint: re-run with --allow-not-ready to capture anyway." >&2
     exit 3
   fi
@@ -260,10 +247,11 @@ fi
 
 mkdir -p "${CAPTURE_DIR}"
 
+cp -f "${tmp_annual_stdout}" "${CAPTURE_DIR}/annual-status.stdout.txt" || true
+cp -f "${tmp_annual_stderr}" "${CAPTURE_DIR}/annual-status.stderr.txt" || true
+
 if [[ "${annual_json_parse_failed}" == "true" ]]; then
   echo "WARNING: ${annual_status_note}; continuing due to --allow-not-ready." >&2
-  cp -f "${tmp_annual_stdout}" "${CAPTURE_DIR}/annual-status.stdout.txt" || true
-  cp -f "${tmp_annual_stderr}" "${CAPTURE_DIR}/annual-status.stderr.txt" || true
 
   # Keep annual-status.json valid JSON so downstream tooling is predictable.
   "${PYTHON_BIN}" - <<'PY' "${annual_status_note}" > "${CAPTURE_DIR}/annual-status.json"
@@ -278,7 +266,7 @@ payload = {
 print(json.dumps(payload, indent=2, sort_keys=True))
 PY
 else
-  printf '%s\n' "${annual_json}" > "${CAPTURE_DIR}/annual-status.json"
+  cp -f "${tmp_annual_stdout}" "${CAPTURE_DIR}/annual-status.json"
 fi
 
 "${HA_BACKEND_BIN}" annual-status --year "${YEAR}" > "${CAPTURE_DIR}/annual-status.txt" || true
