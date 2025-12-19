@@ -1,0 +1,87 @@
+name: VPS Deploy (manual)
+
+on:
+  workflow_dispatch:
+    inputs:
+      apply:
+        description: "Apply deploy (dangerous); otherwise dry-run only"
+        required: true
+        default: false
+        type: boolean
+      confirm:
+        description: "Type DEPLOY to confirm when apply=true"
+        required: false
+        default: ""
+        type: string
+      restart_replay:
+        description: "Also restart healtharchive-replay.service"
+        required: true
+        default: false
+        type: boolean
+
+concurrency:
+  group: vps-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Validate inputs
+        run: |
+          set -euo pipefail
+          if [[ "${{ inputs.apply }}" == "true" && "${{ inputs.confirm }}" != "DEPLOY" ]]; then
+            echo "ERROR: To run with apply=true, set confirm=DEPLOY." >&2
+            exit 2
+          fi
+
+      - name: Connect to Tailscale
+        uses: tailscale/github-action@v3
+        with:
+          authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
+          hostname: gha-healtharchive-${{ github.run_id }}
+
+      - name: Write SSH key + known_hosts
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.VPS_SSH_PRIVATE_KEY }}
+          SSH_KNOWN_HOSTS: ${{ secrets.VPS_SSH_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          install -d -m 0700 ~/.ssh
+          printf '%s\n' "${SSH_PRIVATE_KEY}" > ~/.ssh/id_ed25519
+          chmod 0600 ~/.ssh/id_ed25519
+          printf '%s\n' "${SSH_KNOWN_HOSTS}" > ~/.ssh/known_hosts
+          chmod 0600 ~/.ssh/known_hosts
+
+      - name: Preflight (SSH + passwordless sudo)
+        env:
+          VPS_HOST: ${{ secrets.VPS_TAILSCALE_IP }}
+          VPS_USER: ${{ secrets.VPS_SSH_USER }}
+        run: |
+          set -euo pipefail
+          ssh -o BatchMode=yes -o StrictHostKeyChecking=yes "${VPS_USER}@${VPS_HOST}" \
+            'sudo -n systemctl daemon-reload && sudo -n systemctl status healtharchive-api --no-pager -l >/dev/null'
+
+      - name: Deploy (dry-run)
+        env:
+          VPS_HOST: ${{ secrets.VPS_TAILSCALE_IP }}
+          VPS_USER: ${{ secrets.VPS_SSH_USER }}
+        run: |
+          set -euo pipefail
+          ssh -o BatchMode=yes -o StrictHostKeyChecking=yes "${VPS_USER}@${VPS_HOST}" \
+            'cd /opt/healtharchive-backend && ./scripts/vps-deploy.sh'
+
+      - name: Deploy (apply)
+        if: ${{ inputs.apply }}
+        env:
+          VPS_HOST: ${{ secrets.VPS_TAILSCALE_IP }}
+          VPS_USER: ${{ secrets.VPS_SSH_USER }}
+        run: |
+          set -euo pipefail
+          extra=""
+          if [[ "${{ inputs.restart_replay }}" == "true" ]]; then
+            extra="--restart-replay"
+          fi
+          ssh -o BatchMode=yes -o StrictHostKeyChecking=yes "${VPS_USER}@${VPS_HOST}" \
+            "cd /opt/healtharchive-backend && ./scripts/vps-deploy.sh --apply ${extra}"

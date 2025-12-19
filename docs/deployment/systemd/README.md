@@ -8,6 +8,8 @@ They implement:
 - Phase 5: annual scheduling timer (Jan 01 UTC)
 - Phase 6: worker priority lowering during campaign (always-on, low-risk)
 - Phase 8: replay reconciliation timer (pywb indexing; capped)
+- Phase 4: optional "timer ran" pings (Healthchecks-style)
+- Phase 5 (ops): annual search verification capture (optional, safe)
 
 Assumptions (adjust paths/user if your VPS differs):
 
@@ -41,6 +43,12 @@ Assumptions (adjust paths/user if your VPS differs):
   - `Persistent=true` (runs on next boot if missed)
 - `healtharchive-replay-reconcile-dry-run.service`
   - Safe validation service (no docker exec, no filesystem writes beyond the lock file dir).
+- `scripts/systemd-healthchecks-wrapper.sh`
+  - Helper for optional Healthchecks-style pings without embedding ping URLs in unit files.
+- `healtharchive-annual-search-verify.service`
+  - Runs `scripts/annual-search-verify.sh` daily, but captures **once per year** (idempotent).
+- `healtharchive-annual-search-verify.timer`
+  - Daily timer for `healtharchive-annual-search-verify.service`.
 
 ---
 
@@ -72,6 +80,14 @@ sudo install -m 0644 -o root -g root \
 sudo install -m 0644 -o root -g root \
   /opt/healtharchive-backend/docs/deployment/systemd/healtharchive-replay-reconcile-dry-run.service \
   /etc/systemd/system/healtharchive-replay-reconcile-dry-run.service
+
+sudo install -m 0644 -o root -g root \
+  /opt/healtharchive-backend/docs/deployment/systemd/healtharchive-annual-search-verify.service \
+  /etc/systemd/system/healtharchive-annual-search-verify.service
+
+sudo install -m 0644 -o root -g root \
+  /opt/healtharchive-backend/docs/deployment/systemd/healtharchive-annual-search-verify.timer \
+  /etc/systemd/system/healtharchive-annual-search-verify.timer
 ```
 
 Install the worker priority drop-in:
@@ -100,6 +116,35 @@ Verify the priority values:
 ```bash
 systemctl show healtharchive-worker -p Nice -p IOSchedulingClass -p IOSchedulingPriority
 ```
+
+---
+
+## Optional: "timer ran" pings (Healthchecks-style)
+
+This repo does not commit ping URLs. If you want "did it run?" checks, create a
+root-owned env file on the VPS:
+
+```bash
+sudo install -d -m 0755 -o root -g root /etc/healtharchive
+sudo install -m 0600 -o root -g root /dev/null /etc/healtharchive/healthchecks.env
+```
+
+Edit `/etc/healtharchive/healthchecks.env` and set (examples):
+
+```bash
+HEALTHARCHIVE_HC_PING_REPLAY_RECONCILE=https://hc-ping.com/<uuid>
+HEALTHARCHIVE_HC_PING_SCHEDULE_ANNUAL=https://hc-ping.com/<uuid>
+```
+
+Notes:
+
+- The unit templates use `EnvironmentFile=-/etc/healtharchive/healthchecks.env`
+  so the file is optional.
+- If set, services will best-effort ping:
+  - `<url>/start` at the beginning
+  - `<url>` on success
+  - `<url>/fail` on failure
+- Ping failures do not fail the service.
 
 ---
 
@@ -171,6 +216,32 @@ enough to automate.
 
 ---
 
+## Enable annual search verification capture (optional)
+
+This captures golden-query `/api/search` JSON once per year **after** the annual
+campaign becomes search-ready.
+
+The service is idempotent:
+
+- If the campaign isn't ready, it exits 0 (no failure spam).
+- If artifacts already exist for the current year/run-id, it exits 0.
+
+Enable the timer:
+
+```bash
+sudo systemctl enable --now healtharchive-annual-search-verify.timer
+systemctl list-timers | rg healtharchive-annual-search-verify || systemctl list-timers | grep healtharchive-annual-search-verify
+```
+
+Artifacts default to:
+
+- `/srv/healtharchive/ops/search-eval/<year>/final/`
+
+To force a re-run for the current year, delete that directory and run the
+service once.
+
+---
+
 ## Rollback / disable quickly
 
 - Disable timer immediately:
@@ -190,6 +261,12 @@ enough to automate.
   ```bash
   sudo systemctl disable --now healtharchive-replay-reconcile.timer
   sudo rm -f /etc/healtharchive/replay-automation-enabled
+  ```
+
+- Disable annual search verification automation immediately:
+
+  ```bash
+  sudo systemctl disable --now healtharchive-annual-search-verify.timer
   ```
 
 - Remove the worker priority override:

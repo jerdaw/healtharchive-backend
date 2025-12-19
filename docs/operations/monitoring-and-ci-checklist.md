@@ -128,6 +128,130 @@ Verification:
 
 ---
 
+### Phase 4 — Timer ran monitoring (Healthchecks-style; optional but recommended)
+
+Objective: get alerted if systemd timers stop running (even when the site is up).
+
+This is intentionally optional: you already have high-value uptime checks in
+Phase 3, but "timer ran" alerts are useful for catching silent failures (timer
+disabled, unit failing, disk low refusal, etc.).
+
+Recommended checks to monitor:
+
+- Replay reconcile (daily):
+  - `healtharchive-replay-reconcile.timer`
+  - Ping variable: `HEALTHARCHIVE_HC_PING_REPLAY_RECONCILE`
+- Annual scheduler (yearly):
+  - `healtharchive-schedule-annual.timer`
+  - Ping variable: `HEALTHARCHIVE_HC_PING_SCHEDULE_ANNUAL`
+
+Implementation approach (VPS):
+
+1. Create a check in your Healthchecks provider for each timer you care about.
+2. Store ping URLs only on the VPS in a root-owned env file:
+   - `/etc/healtharchive/healthchecks.env` (mode 0600, root:root)
+3. Ensure the installed systemd units source that env file:
+   - `EnvironmentFile=-/etc/healtharchive/healthchecks.env`
+4. Ensure the unit uses the wrapper so ping URLs never appear in unit files:
+   - `/opt/healtharchive-backend/scripts/systemd-healthchecks-wrapper.sh`
+
+Safety posture:
+
+- Pinging is best-effort; ping failures do not fail jobs.
+- Removing `/etc/healtharchive/healthchecks.env` disables pings immediately.
+
+Verification (VPS):
+
+- Add a temporary ping URL for one service, then run:
+  - `sudo systemctl start healtharchive-replay-reconcile-dry-run.service`
+  - Confirm the check receives a ping.
+
+---
+
+### Phase 5 — Automated post-campaign search verification capture (optional)
+
+Objective: once the annual campaign becomes search-ready, automatically capture
+golden-query `/api/search` JSON into a year-tagged directory for later diffing
+and audits.
+
+What gets captured (recommended minimal set):
+
+- `annual-status.json` and a human-readable `annual-status.txt`
+- `meta.txt` (capture metadata)
+- `<query>.pages.json` + `<query>.snapshots.json` for your golden query list
+
+Implementation approach (VPS, systemd):
+
+- This repo provides an optional daily timer that is idempotent:
+  - If the campaign is not ready, it exits 0 (no alert noise).
+  - If artifacts already exist for the current year/run-id, it exits 0.
+
+Install and enable:
+
+1. Copy templates onto the VPS (see `../deployment/systemd/README.md`):
+   - `healtharchive-annual-search-verify.service`
+   - `healtharchive-annual-search-verify.timer`
+2. Reload systemd:
+   - `sudo systemctl daemon-reload`
+3. Enable the timer:
+   - `sudo systemctl enable --now healtharchive-annual-search-verify.timer`
+
+Artifacts:
+
+- Default location: `/srv/healtharchive/ops/search-eval/<year>/final/`
+- To force re-run for a year: delete that directory and re-run the service.
+
+Verification (VPS):
+
+- Force-run once:
+  - `sudo systemctl start healtharchive-annual-search-verify.service`
+- Confirm it either:
+  - exits 0 quickly (not ready), or
+  - creates artifacts under `/srv/healtharchive/ops/search-eval/<year>/final/`.
+
+---
+
+### Phase 6 — Optional GitHub-driven deploys (CD) (infrastructure project)
+
+Objective: deploy the backend to the single VPS from GitHub Actions, while
+keeping SSH closed to the public internet.
+
+Reality check:
+
+- This project’s VPS posture is “Tailscale-only SSH”. A GitHub runner cannot
+  reach the VPS unless it joins your tailnet.
+- This requires secrets (Tailscale auth key + SSH key) and sudo configuration
+  (non-interactive service restarts).
+
+Recommended posture:
+
+- Keep the deploy path **manual** unless you explicitly need GitHub-driven CD.
+- If you do want it, prefer a **manual GitHub workflow dispatch** (not auto-deploy
+  on every push).
+
+If you proceed:
+
+1. Create a dedicated deploy SSH keypair (no passphrase) and install the public
+   key on the VPS for a deploy user (or `haadmin` if you accept that risk).
+2. Configure passwordless sudo for the minimal set of commands used by:
+   - `scripts/vps-deploy.sh` (systemctl daemon-reload + restart/status)
+3. Create a short-lived or scoped Tailscale auth key for the GitHub runner.
+4. Store secrets in GitHub (never in the repo):
+   - `TAILSCALE_AUTHKEY`
+   - `VPS_TAILSCALE_IP`
+   - `VPS_SSH_USER`
+   - `VPS_SSH_PRIVATE_KEY`
+5. Add a `workflow_dispatch` deploy workflow that:
+   - joins tailnet,
+   - SSHes to the VPS,
+   - runs `./scripts/vps-deploy.sh` (dry-run),
+   - optionally runs `./scripts/vps-deploy.sh --apply`.
+
+Verification:
+
+- Run a dry-run deploy workflow and confirm logs show the correct plan.
+- Run an apply deploy workflow and confirm `/api/health` is green afterward.
+
 ## 1. Uptime and health checks
 
 ### 1.1 Backend health endpoint
