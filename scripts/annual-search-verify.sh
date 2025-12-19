@@ -92,19 +92,25 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 PYTHON_BIN="python"
-if [[ -z "${VIRTUAL_ENV:-}" && -x "${REPO_ROOT}/.venv/bin/python" ]]; then
-  PYTHON_BIN="${REPO_ROOT}/.venv/bin/python"
+if [[ -z "${VIRTUAL_ENV:-}" ]]; then
+  if [[ -x "${REPO_ROOT}/.venv/bin/python3" ]]; then
+    PYTHON_BIN="${REPO_ROOT}/.venv/bin/python3"
+  elif [[ -x "${REPO_ROOT}/.venv/bin/python" ]]; then
+    PYTHON_BIN="${REPO_ROOT}/.venv/bin/python"
+  fi
 fi
 
-HA_BACKEND_BIN="ha-backend"
-if ! command -v "${HA_BACKEND_BIN}" >/dev/null 2>&1; then
-  if [[ -x "${REPO_ROOT}/.venv/bin/ha-backend" ]]; then
-    HA_BACKEND_BIN="${REPO_ROOT}/.venv/bin/ha-backend"
-  else
-    echo "ERROR: ha-backend not found in PATH and no venv binary at ${REPO_ROOT}/.venv/bin/ha-backend" >&2
-    echo "Hint: activate the venv or install deps: pip install -e '.[dev]'" >&2
-    exit 1
-  fi
+HA_BACKEND_BIN=""
+if [[ -x "${REPO_ROOT}/.venv/bin/ha-backend" ]]; then
+  # Prefer the per-repo venv entrypoint to avoid accidentally using a globally
+  # installed ha-backend with a different version/command set.
+  HA_BACKEND_BIN="${REPO_ROOT}/.venv/bin/ha-backend"
+elif command -v ha-backend >/dev/null 2>&1; then
+  HA_BACKEND_BIN="ha-backend"
+else
+  echo "ERROR: ha-backend not found (no venv binary at ${REPO_ROOT}/.venv/bin/ha-backend and not in PATH)" >&2
+  echo "Hint: activate the venv or install deps: pip install -e '.[dev]'" >&2
+  exit 1
 fi
 
 if [[ -z "${HEALTHARCHIVE_DATABASE_URL:-}" ]]; then
@@ -155,13 +161,49 @@ fi
 YEAR_DIR="${OUT_ROOT%/}/${YEAR}"
 CAPTURE_DIR="${YEAR_DIR%/}/${RUN_ID}"
 
-annual_json="$("${HA_BACKEND_BIN}" annual-status --year "${YEAR}" --json)"
+tmp_annual_stdout="$(mktemp)"
+tmp_annual_stderr="$(mktemp)"
+cleanup_tmp() {
+  rm -f "${tmp_annual_stdout}" "${tmp_annual_stderr}"
+}
+trap cleanup_tmp EXIT
+
+if ! "${HA_BACKEND_BIN}" annual-status --year "${YEAR}" --json >"${tmp_annual_stdout}" 2>"${tmp_annual_stderr}"; then
+  echo "ERROR: Failed to run annual-status." >&2
+  if [[ -s "${tmp_annual_stderr}" ]]; then
+    echo "--- STDERR ---" >&2
+    cat "${tmp_annual_stderr}" >&2
+  fi
+  if [[ -s "${tmp_annual_stdout}" ]]; then
+    echo "--- STDOUT ---" >&2
+    cat "${tmp_annual_stdout}" >&2
+  fi
+  exit 3
+fi
+
+annual_json="$(cat "${tmp_annual_stdout}")"
+if [[ -z "${annual_json}" ]]; then
+  echo "ERROR: annual-status produced empty output; refusing to continue." >&2
+  if [[ -s "${tmp_annual_stderr}" ]]; then
+    echo "--- STDERR ---" >&2
+    cat "${tmp_annual_stderr}" >&2
+  fi
+  exit 3
+fi
+
 ready="$(
   printf '%s' "${annual_json}" | "${PYTHON_BIN}" - <<'PY'
 import json
 import sys
 
-data = json.load(sys.stdin)
+raw = sys.stdin.read()
+try:
+    data = json.loads(raw)
+except json.JSONDecodeError as exc:
+    print(f"ERROR: annual-status --json was not valid JSON: {exc}", file=sys.stderr)
+    preview = raw[:500].replace("\n", "\\n")
+    print(f"Output preview (first 500 chars): {preview}", file=sys.stderr)
+    raise
 print("true" if data.get("summary", {}).get("readyForSearch") else "false")
 PY
 )"
