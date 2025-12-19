@@ -14,6 +14,120 @@ It is meant to complement:
 
 ---
 
+## 0. Implementation phases (CI + external monitoring)
+
+This section is a **practical, sequential** setup plan for enforcing CI and
+configuring external monitoring in the real world (GitHub + UptimeRobot, etc.).
+
+Important: most of this is **not** “code you deploy” — it is configuration in:
+
+- GitHub repository settings (branch protection)
+- Your monitoring provider (UptimeRobot, Healthchecks, etc.)
+
+### Phase 0 — Baseline audit + decisions (operator)
+
+Objective: avoid duplicate monitors, avoid alert noise, and avoid “unknown
+settings drift”.
+
+1. Inventory current external monitors (UptimeRobot, etc.):
+   - Monitor name
+   - URL
+   - Interval + timeout
+   - Alert contacts/routes
+   - Any keyword/body assertions
+2. Decide alert routing:
+   - Which alerts should page you vs. just email (recommended: only “site down”
+     pages; everything else emails).
+3. Decide the `main` branch policy:
+   - **PR-only merges** into `main` (recommended).
+   - Whether admins should be subject to protection:
+     - Solo-dev: **do not** “Include administrators” (lets you bypass in emergencies).
+     - Team repo: enable “Include administrators”.
+
+Verification:
+
+- You can point to a quick note (even in a personal doc) listing current
+  monitors + what each covers.
+
+### Phase 1 — Verify CI runs and learn the exact check name (operator)
+
+Objective: make sure you require the **correct** status check in branch
+protection (GitHub requires the exact check name string).
+
+1. Confirm GitHub Actions workflows are enabled:
+   - Repo → Actions → ensure workflows are enabled (not disabled by org/fork policy).
+2. Open a PR against `main` (can be a trivial doc change).
+3. On the PR “Checks” tab:
+   - Identify the exact backend check name shown by GitHub.
+   - Typical format for this repo: `Backend CI / test` (workflow name + job name).
+4. Record the exact check string you will require in branch protection.
+
+Verification:
+
+- The PR shows the backend CI check running and passing.
+
+### Phase 2 — Enforce PR-only merges into `main` (operator; GitHub settings)
+
+Objective: prevent broken deploys by requiring CI to pass before merge.
+
+GitHub → Repo → Settings → Branches → Branch protection rules → Add/edit rule for `main`:
+
+1. Enable **Require a pull request before merging**.
+2. Enable **Require status checks to pass before merging**.
+3. Select the required check(s) captured in Phase 1 (e.g. `Backend CI / test`).
+4. Recommended (low friction, high value):
+   - Enable **Require branches to be up to date before merging**.
+   - Disable force pushes.
+5. Solo-dev posture (per current project reality):
+   - Leave **Include administrators** OFF.
+
+Verification:
+
+- Create a PR that fails tests: merge should be blocked.
+- Create a PR that passes CI: merge should be allowed.
+
+Emergency bypass protocol (recommended):
+
+- Only bypass protections for a production incident.
+- Immediately follow up with a PR containing the same change (or a cherry-pick)
+  so the “real” history shows CI passing on the fix.
+
+### Phase 3 — External uptime monitoring (operator; UptimeRobot settings)
+
+Objective: catch real, user-visible failures with minimal noise.
+
+Recommended minimal monitor set (HTTP(s) checks):
+
+1. **API health**
+   - URL: `https://api.healtharchive.ca/api/health`
+   - Expected: HTTP 200
+   - Interval: 1–5 minutes
+   - Note: backend supports `HEAD /api/health` for providers that default to `HEAD`.
+2. **Frontend integration**
+   - URL: `https://www.healtharchive.ca/archive`
+   - Expected: HTTP 200
+   - Interval: 5 minutes
+   - Optional: keyword assertion (stable string that should always appear).
+3. **Replay base URL** (optional but recommended if you rely on replay)
+   - URL: `https://replay.healtharchive.ca/`
+   - Expected: HTTP 200
+   - Interval: 5–10 minutes
+
+Optional, higher-signal replay monitoring (recommended later):
+
+- After annual jobs exist and are replay-indexed, add 1–3 “known-good replay URL”
+  monitors (one per source or one total) pointing at a stable capture inside a
+  `job-<id>` collection. Update them annually.
+
+Verification:
+
+- Optional pre-flight from the VPS (or any machine with internet + `curl`):
+  - `./scripts/smoke-external-monitors.sh`
+- All monitors show “Up”.
+- Alerting routes work (optional test: intentionally break a monitor briefly).
+
+---
+
 ## 1. Uptime and health checks
 
 ### 1.1 Backend health endpoint
@@ -79,6 +193,18 @@ Suggested uptime monitor:
   - Downloads `https://healtharchive.ca/archive`.
   - Optionally asserts presence of a known string in the body (e.g.
     “HealthArchive.ca” or “Browse & search demo snapshots”).
+
+### 1.3 Replay uptime check (optional but recommended if replay is in use)
+
+To ensure replay is reachable:
+
+- `GET https://replay.healtharchive.ca/`
+
+If you want a higher-signal check (recommended once you have stable annual jobs):
+
+- Monitor a known-good replay URL inside a specific `job-<id>` collection:
+  - `https://replay.healtharchive.ca/job-<id>/<original_url>`
+  - Choose an original URL that is stable and low-cost to serve.
 
 ---
 
@@ -212,7 +338,8 @@ In each repo:
      - The backend CI workflow for the backend repo.
      - The frontend CI workflow for the frontend repo.
    - Optionally:
-     - Enable **Include administrators**.
+     - Enable **Include administrators** (recommended for team repos; solo-dev
+       can leave this off for emergency bypasses).
 
 This ensures:
 

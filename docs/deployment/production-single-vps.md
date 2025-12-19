@@ -337,8 +337,14 @@ Result: restore succeeded, `snapshots` contained 1 row (the synthetic test snaps
 Configure an external monitor (e.g., UptimeRobot) for:
 - `https://api.healtharchive.ca/api/health`
 - `https://www.healtharchive.ca/archive`
+- (Optional) `https://replay.healtharchive.ca/` (if replay is enabled/in use)
 
 Note: some providers use `HEAD` by default; the backend supports `HEAD /api/health`.
+
+For a more detailed, step-by-step checklist (including branch protection / CI
+enforcement), see:
+
+- `../operations/monitoring-and-ci-checklist.md`
 
 ---
 
