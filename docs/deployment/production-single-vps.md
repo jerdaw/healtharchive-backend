@@ -127,6 +127,12 @@ HEALTHARCHIVE_USAGE_METRICS_WINDOW_DAYS=30
 # Optional: change tracking + diff feeds (Phase 3).
 HEALTHARCHIVE_CHANGE_TRACKING_ENABLED=1
 
+# Optional: research exports (Phase 5).
+# Controls the public metadata export endpoints under `/api/exports`.
+HEALTHARCHIVE_EXPORTS_ENABLED=1
+HEALTHARCHIVE_EXPORTS_DEFAULT_LIMIT=1000
+HEALTHARCHIVE_EXPORTS_MAX_LIMIT=10000
+
 # Public site base URL for RSS feed links and public compare URLs.
 HEALTHARCHIVE_PUBLIC_SITE_URL=https://healtharchive.ca
 
