@@ -2592,7 +2592,7 @@ def get_changes_rss(
         title = "HealthArchive changes - latest editions"
 
     from email.utils import format_datetime
-    from xml.sax.saxutils import escape as xml_escape
+    from html import escape as xml_escape
 
     items = []
     for row in rows:
