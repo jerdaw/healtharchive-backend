@@ -18,6 +18,8 @@ from ha_backend.config import (
     get_pages_fastpath_enabled,
     get_replay_base_url,
     get_replay_preview_dir,
+    get_usage_metrics_enabled,
+    get_usage_metrics_window_days,
 )
 from ha_backend.db import get_session
 from ha_backend.indexing.viewer import find_record_for_snapshot
@@ -49,6 +51,14 @@ from ha_backend.search_fuzzy import (
 )
 from ha_backend.url_normalization import normalize_url_for_grouping
 from ha_backend.runtime_metrics import observe_search_request
+from ha_backend.usage_metrics import (
+    EVENT_REPORT_SUBMITTED,
+    EVENT_SEARCH_REQUEST,
+    EVENT_SNAPSHOT_DETAIL,
+    EVENT_SNAPSHOT_RAW,
+    build_usage_summary,
+    record_usage_event,
+)
 
 from .schemas import (
     ArchiveStatsSchema,
@@ -60,6 +70,9 @@ from .schemas import (
     SnapshotSummarySchema,
     SourceEditionSchema,
     SourceSummarySchema,
+    UsageMetricsCountsSchema,
+    UsageMetricsDaySchema,
+    UsageMetricsSchema,
 )
 
 router = APIRouter()
@@ -1592,9 +1605,7 @@ def _search_snapshots_inner(
             else str(snap.capture_timestamp)
         )
 
-        original_url = (
-            snap.url
-        )
+        original_url = snap.url
         if effective_view == SearchView.pages:
             original_url = (
                 snap.normalized_url_group
@@ -1645,6 +1656,15 @@ def get_db() -> Session:
     """
     with get_session() as session:
         yield session
+
+
+def _build_usage_counts(raw: dict[str, int]) -> UsageMetricsCountsSchema:
+    return UsageMetricsCountsSchema(
+        searchRequests=raw.get(EVENT_SEARCH_REQUEST, 0),
+        snapshotDetailViews=raw.get(EVENT_SNAPSHOT_DETAIL, 0),
+        rawSnapshotViews=raw.get(EVENT_SNAPSHOT_RAW, 0),
+        reportSubmissions=raw.get(EVENT_REPORT_SUBMITTED, 0),
+    )
 
 
 @router.post("/reports", response_model=IssueReportReceiptSchema, status_code=201)
@@ -1698,10 +1718,53 @@ def submit_issue_report(
     db.commit()
     db.refresh(report)
 
+    record_usage_event(db, EVENT_REPORT_SUBMITTED)
+
     return IssueReportReceiptSchema(
         reportId=report.id,
         status=report.status,
         receivedAt=report.created_at or received_at,
+    )
+
+
+@router.get("/usage", response_model=UsageMetricsSchema)
+def get_usage_metrics(db: Session = Depends(get_db)) -> UsageMetricsSchema:
+    """
+    Return aggregated usage metrics (daily counts).
+    """
+    window_days = get_usage_metrics_window_days()
+    if not get_usage_metrics_enabled():
+        empty = UsageMetricsCountsSchema(
+            searchRequests=0,
+            snapshotDetailViews=0,
+            rawSnapshotViews=0,
+            reportSubmissions=0,
+        )
+        return UsageMetricsSchema(
+            enabled=False,
+            windowDays=window_days,
+            totals=empty,
+            daily=[],
+        )
+
+    _start, _end, totals_raw, daily_raw = build_usage_summary(db, window_days)
+    totals = _build_usage_counts(totals_raw)
+    daily = [
+        UsageMetricsDaySchema(
+            date=row["date"],
+            searchRequests=row.get(EVENT_SEARCH_REQUEST, 0),
+            snapshotDetailViews=row.get(EVENT_SNAPSHOT_DETAIL, 0),
+            rawSnapshotViews=row.get(EVENT_SNAPSHOT_RAW, 0),
+            reportSubmissions=row.get(EVENT_REPORT_SUBMITTED, 0),
+        )
+        for row in daily_raw
+    ]
+
+    return UsageMetricsSchema(
+        enabled=True,
+        windowDays=window_days,
+        totals=totals,
+        daily=daily,
     )
 
 
@@ -2326,6 +2389,7 @@ def search_snapshots(
         mode=mode,
         ok=True,
     )
+    record_usage_event(db, EVENT_SEARCH_REQUEST)
     return response
 
 
@@ -2365,6 +2429,8 @@ def get_snapshot_detail(
         if isinstance(snap.capture_timestamp, datetime)
         else str(snap.capture_timestamp)
     )
+
+    record_usage_event(db, EVENT_SNAPSHOT_DETAIL)
 
     return SnapshotDetailSchema(
         id=snap.id,
@@ -2428,6 +2494,8 @@ def get_snapshot_raw(
             status_code=404,
             detail="Could not locate corresponding record in the WARC file",
         )
+
+    record_usage_event(db, EVENT_SNAPSHOT_RAW)
 
     try:
         html = record.body_bytes.decode("utf-8", errors="replace")
