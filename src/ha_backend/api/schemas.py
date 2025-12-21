@@ -86,6 +86,24 @@ class ArchiveStatsSchema(BaseModel):
     latestCaptureAgeDays: Optional[int]
 
 
+class UsageMetricsCountsSchema(BaseModel):
+    searchRequests: int
+    snapshotDetailViews: int
+    rawSnapshotViews: int
+    reportSubmissions: int
+
+
+class UsageMetricsDaySchema(UsageMetricsCountsSchema):
+    date: str
+
+
+class UsageMetricsSchema(BaseModel):
+    enabled: bool
+    windowDays: int
+    totals: UsageMetricsCountsSchema
+    daily: List[UsageMetricsDaySchema]
+
+
 class IssueReportCategory(str, Enum):
     broken_snapshot = "broken_snapshot"
     incorrect_metadata = "incorrect_metadata"
@@ -118,6 +136,9 @@ __all__ = [
     "SearchResponseSchema",
     "SnapshotDetailSchema",
     "ArchiveStatsSchema",
+    "UsageMetricsCountsSchema",
+    "UsageMetricsDaySchema",
+    "UsageMetricsSchema",
     "IssueReportCategory",
     "IssueReportCreateSchema",
     "IssueReportReceiptSchema",

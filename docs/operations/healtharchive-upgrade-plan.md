@@ -1064,7 +1064,192 @@ Reliability:
 - The status/metrics page works even when replay is not configured (and does not leak admin endpoints).
 - The status/metrics page is explicit about what is measured and what is not.
 
----
+### Phase 2 Implementation Plan (Detailed; sub-phases)
+
+Phase 2 is about *credibility through measurability*. The goal is not “more numbers”; it’s to make HealthArchive look and behave like a maintained public service with transparent coverage and clear limitations.
+
+#### Design principles (Phase 2)
+
+- **Honesty over completeness.** Only publish metrics you can define and reproduce.
+- **Privacy-first.** Prefer aggregated counts over user-level tracking. Default to collecting *less*.
+- **No new risk surface by accident.** Avoid adding third-party scripts until you have explicitly decided to do so and updated CSP accordingly.
+- **Keep public vs admin boundaries strict.** The status page must not depend on admin-only endpoints.
+- **Single-VPS realism.** Any new aggregation pipeline must be lightweight and must not compete with indexing/crawling for CPU/IO.
+
+#### Sub-phase 2A — Decide the “official” metric contract (½–1 day)
+
+**Goal:** Create a stable set of metrics with explicit definitions, and decide how you’ll measure usage (or explicitly not).
+
+Deliverables:
+
+- A “Metrics definitions” section (can live on the new `/status` page, or as a short doc linked from it).
+- A decision on **usage measurement** (see Sub-phase 2D).
+
+Recommended official metrics (initial set):
+
+1) **Coverage**
+   - `sourcesTotal`, `pagesTotal`, `snapshotsTotal` (already available via public API).
+   - Per-source:
+     - `recordCount`, `firstCapture`, `lastCapture` (already available via `/api/sources`).
+
+2) **Freshness**
+   - Per-source “last capture date” (proxy for freshness).
+   - Optional later: “time to index” (requires tracking job completion vs indexing completion).
+
+3) **Reliability**
+   - Public: “API reachable” (based on `/api/health`).
+   - Public: “Replay enabled” and “previews enabled” (based on whether URLs are returned).
+   - External monitor uptime (%): start as “not yet measured” or “measured externally” until you have a real monitor.
+
+4) **Usage (optional, and only if you choose)**
+   - `searchRequestsPerDay`, `snapshotViewsPerDay`, `browseViewsPerDay`, `reportSubmissionsPerDay` (aggregated).
+   - If you do *not* measure usage, state that explicitly in `/privacy` and in the metrics definitions.
+
+Acceptance criteria:
+
+- Each metric has: definition, data source, and update cadence (e.g., “computed nightly” vs “live”).
+
+#### Sub-phase 2B — Public Status/Metrics page MVP (frontend + existing endpoints) (1–2 days)
+
+**Goal:** Ship a status page that works immediately without new backend changes.
+
+Recommended route:
+
+- `/status` (or `/status` + `/metrics` as a separate section; avoid naming collisions with backend `/metrics`).
+
+Data sources (public endpoints only):
+
+- `/api/health` → “API status”
+- `/api/stats` → totals
+- `/api/sources` → per-source coverage table
+
+Recommended sections (copywriting guidance):
+
+- **Current status**
+  - “Operational / degraded / down” (simple, based on whether `/api/health` succeeds).
+  - Timestamp: “Last checked: …”
+  - Small note: “This is a public archive; not medical advice.”
+
+- **Coverage snapshot**
+  - Sources tracked, snapshots, pages
+  - Latest capture date (if available via stats)
+
+- **Per-source coverage**
+  - Source name + counts + first/last capture
+  - Link to browse entry point (if available)
+
+- **Data notes**
+  - What “missing” can mean (not captured yet, capture failure, out of scope)
+  - Replay limitations and third-party asset caveats
+
+Acceptance criteria:
+
+- Page loads even if the backend is down (show an honest fallback message; do not fabricate metrics).
+- Page stays within existing security posture (no new scripts; no CSP weakening).
+
+#### Sub-phase 2C — “Metrics definitions” and transparency language (½ day)
+
+**Goal:** Prevent “numbers with vibes” by publishing the meaning and limits of each metric.
+
+Include:
+
+- What counts as a snapshot vs a page group
+- Timezones (capture dates are UTC)
+- What “last capture date” means (it is not necessarily “last updated by the source”)
+- Whether usage metrics are collected (and if so, how coarse they are)
+
+Acceptance criteria:
+
+- A researcher can quote your definitions in a methods section without guesswork.
+
+#### Sub-phase 2D — Decide and implement a usage measurement approach (plan-level options) (1–4 days)
+
+This is the key decision point. Choose one:
+
+**Option D1: No usage analytics (privacy-first)**
+- Publish only coverage + freshness + reliability proxies.
+- Evidence of impact comes from: partner adoption, citations, verifier statements, issue report volume.
+- Lowest risk and operational overhead.
+
+**Option D2: Server-side aggregate counters (recommended “best practice” for your posture)**
+- Track *only aggregated daily counts* for key public actions:
+  - search requests, snapshot detail views, raw snapshot views, browse page loads, report submissions
+- Store aggregates (e.g., per day) in the backend DB, not user-level logs.
+- No cookies and no third-party scripts required.
+- This is usually the best balance: measurable impact without surveillance optics.
+
+**Option D3: Privacy-preserving third-party analytics**
+- Only if you explicitly decide to accept the CSP and supply-chain tradeoffs.
+- Must update `/privacy` to reflect the provider and data collected.
+
+Acceptance criteria:
+
+- Whatever option you pick is reflected in `/privacy` and on the status page.
+
+#### Sub-phase 2E — Reliability measurement + incident notes (½–2 days, incremental)
+
+**Goal:** Make “service operations” legible without pretending you have enterprise SRE.
+
+Approach:
+
+- Start with a manual “Recent incidents” section on `/status` (or `/changelog` entries tagged “incident”).
+- Add external uptime monitoring later (recommended by existing ops docs) and then display 30-day uptime once you have a data source you trust.
+
+Acceptance criteria:
+
+- If something breaks, you have a public place to acknowledge it (even briefly).
+
+#### Sub-phase 2F — Monthly Impact Report (template + storage + cadence) (½–1 day)
+
+**Goal:** Create a repeatable “proof artifact” that builds ABS verifiability over time.
+
+Deliverables:
+
+- A template (web page or markdown) with these sections:
+  - “What’s new”
+  - “Coverage changes”
+  - “Reliability notes”
+  - “Usage snapshot” (only if you measure)
+  - “Partner/mention highlights”
+  - “Known limitations / next month focus”
+
+Storage/location:
+
+- Keep impact reports in a stable folder (e.g., `docs/impact/YYYY-MM.md` in the frontend repo, or a dedicated section on the site).
+- Link each report from `/changelog`.
+
+Acceptance criteria:
+
+- You can produce the report in under 30 minutes each month.
+
+#### Sub-phase 2G — Documentation + runbook updates (½ day)
+
+- Update:
+  - Frontend docs to mention `/status` and where its data comes from.
+  - Backend docs if new public endpoints or aggregation logic are introduced.
+- Add a changelog entry: “Status/Metrics page launched; metrics definitions published.”
+
+#### Sub-phase 2H — Tests (as behavior changes) (½–2 days)
+
+- Frontend: add tests that `/status` renders expected sections (and handles “backend unreachable” gracefully).
+- Backend (only if Option D2 is implemented): add tests that aggregates update correctly and do not store PII.
+
+**Definition of done (Phase 2, detailed)**
+
+- A public `/status` page exists and answers: “Is it up? what’s covered? how current? what are the limitations?”
+- Metric definitions are published and consistent with `/privacy`.
+- If usage is measured, it is aggregated and privacy-preserving; if not, that is explicitly stated.
+- A monthly impact report template exists and is linked from `/changelog`.
+
+**Status (Phase 2 implementation)**
+
+- Implemented on 2025-12-21.
+- Added `/status` and `/impact` pages to the frontend.
+- Added `/api/usage` to the backend with daily aggregate counts (search, snapshot detail, raw snapshot, reports).
+- Updated `/privacy` to disclose aggregate usage counts.
+- Added a baseline impact report and changelog entry for Phase 2.
+
+--- 
 
 ## Phase 3 — Change Tracking + Compare + Digest (expanded)
 

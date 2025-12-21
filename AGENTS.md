@@ -159,6 +159,8 @@ Public routes (for the frontend):
 * `GET /api/search` – paginated search with `q`, `source`, `page`, `pageSize`.
 * `GET /api/snapshot/{id}` – metadata for one snapshot.
 * `GET /api/snapshots/raw/{id}` – raw HTML replay.
+* `GET /api/usage` – aggregated daily usage metrics for public reporting.
+* `POST /api/reports` – public issue report intake.
 
 Admin & metrics:
 
