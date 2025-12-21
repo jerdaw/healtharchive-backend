@@ -36,6 +36,7 @@ ci-healtharchive.db
 .dev-replay-previews/
 .preview-node/
 tmp-test.warc.gz
+*.bak
 
 # Additional dev DBs / scratch artifacts
 .dev-*.db
