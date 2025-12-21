@@ -1,6 +1,6 @@
 # HealthArchive Upgrade Plan (Agent-Ready)
 
-Status: **planning only** (this is a roadmap document; it does not implement changes).
+Status: **active roadmap** (Phases 0-3 implemented; phases 4-6 pending).
 
 This file is intentionally written so you can hand it to another LLM/AI (or a human contributor) and they will understand:
 
@@ -1505,6 +1505,16 @@ Performance gates:
 
 - No compare request should trigger heavy diff computation synchronously.
 - Feed endpoints should be index-backed and fast for large datasets.
+
+**Status (Phase 3 implementation)**
+
+- Implemented on 2025-12-22.
+- Added a `snapshot_changes` table and precomputed diff artifacts.
+- Introduced `ha-backend compute-changes` for backfill + incremental diffing.
+- Added public APIs: `/api/changes`, `/api/changes/compare`, `/api/changes/rss`, `/api/snapshots/{id}/timeline`.
+- Added frontend pages `/changes`, `/compare`, `/digest` plus snapshot timeline UX.
+- Updated governance/methods/researcher copy and changelog to reflect change tracking.
+- Added systemd timer templates for scheduled change tracking runs (see `docs/deployment/systemd/README.md`).
 
 --- 
 

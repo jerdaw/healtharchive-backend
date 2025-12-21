@@ -318,6 +318,104 @@ class UsageMetric(TimestampMixin, Base):
         return f"<UsageMetric date={self.metric_date!r} event={self.event!r} count={self.count!r}>"
 
 
+class SnapshotChange(TimestampMixin, Base):
+    """
+    Precomputed change event between two captures of the same page group.
+    """
+
+    __tablename__ = "snapshot_changes"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+
+    source_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("sources.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    normalized_url_group: Mapped[Optional[str]] = mapped_column(Text, index=True)
+
+    from_snapshot_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("snapshots.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    to_snapshot_id: Mapped[int] = mapped_column(
+        ForeignKey("snapshots.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+        unique=True,
+    )
+
+    from_job_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("archive_jobs.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    to_job_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("archive_jobs.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+
+    from_capture_timestamp: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True)
+    )
+    to_capture_timestamp: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True),
+        index=True,
+    )
+
+    change_type: Mapped[str] = mapped_column(
+        String(32),
+        nullable=False,
+        index=True,
+    )
+
+    summary: Mapped[Optional[str]] = mapped_column(Text)
+    diff_format: Mapped[Optional[str]] = mapped_column(String(20))
+    diff_html: Mapped[Optional[str]] = mapped_column(Text)
+    diff_truncated: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        server_default=text("0"),
+    )
+
+    added_sections: Mapped[Optional[int]] = mapped_column(Integer)
+    removed_sections: Mapped[Optional[int]] = mapped_column(Integer)
+    changed_sections: Mapped[Optional[int]] = mapped_column(Integer)
+    added_lines: Mapped[Optional[int]] = mapped_column(Integer)
+    removed_lines: Mapped[Optional[int]] = mapped_column(Integer)
+    change_ratio: Mapped[Optional[float]] = mapped_column(Float)
+
+    high_noise: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        server_default=text("0"),
+    )
+
+    diff_version: Mapped[Optional[str]] = mapped_column(String(32))
+    normalization_version: Mapped[Optional[str]] = mapped_column(String(32))
+    computed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    computed_by: Mapped[Optional[str]] = mapped_column(String(64))
+    error_message: Mapped[Optional[str]] = mapped_column(Text)
+
+    from_snapshot: Mapped[Optional["Snapshot"]] = relationship(
+        foreign_keys=[from_snapshot_id],
+        lazy="joined",
+    )
+    to_snapshot: Mapped[Optional["Snapshot"]] = relationship(
+        foreign_keys=[to_snapshot_id],
+        lazy="joined",
+    )
+    source: Mapped[Optional[Source]] = relationship(lazy="joined")
+
+    def __repr__(self) -> str:
+        return (
+            f"<SnapshotChange id={self.id!r} to_snapshot_id={self.to_snapshot_id!r} "
+            f"type={self.change_type!r}>"
+        )
+
+
 class Page(TimestampMixin, Base):
     """
     Canonical "page" concept, grouping multiple Snapshot captures.
@@ -445,6 +543,7 @@ __all__ = [
     "Snapshot",
     "IssueReport",
     "UsageMetric",
+    "SnapshotChange",
     "Page",
     "SnapshotOutlink",
     "PageSignal",

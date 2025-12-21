@@ -74,13 +74,24 @@ overview of common commands and local testing flows, see
      - Writes `Snapshot` rows for each captured page.
      - Marks job `indexed` with `indexed_page_count`.
 
-4. **Serving**:
+4. **Change tracking (Snapshot → Change events)**:
+   - A background task (`ha-backend compute-changes`) computes **precomputed**
+     change events between adjacent captures of the same `normalized_url_group`.
+   - Outputs `SnapshotChange` rows with:
+     - provenance (from/to snapshot IDs, timestamps),
+     - summary stats (sections/lines changed),
+     - and a renderable diff artifact when available.
+   - This work is intentionally **off the request path** to keep APIs fast.
+
+5. **Serving**:
    - FastAPI app:
      - `GET /api/search` queries `Snapshot` for search results.
      - `GET /api/stats` provides lightweight public archive totals for frontend metrics.
      - `GET /api/sources` summarises captures per `Source`.
      - `GET /api/snapshot/{id}` returns metadata for a single snapshot.
      - `GET /api/snapshots/raw/{id}` replays archived HTML from a WARC.
+     - `GET /api/changes` and `GET /api/changes/compare` expose change feeds and diffs.
+     - `GET /api/snapshots/{id}/timeline` returns a capture timeline for a page group.
 
 5. **Admin & cleanup**:
    - Admin API:

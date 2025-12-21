@@ -92,6 +92,8 @@ export HA_SEARCH_RANKING_VERSION=v2
 export HA_PAGES_FASTPATH=1
 export HEALTHARCHIVE_USAGE_METRICS_ENABLED=1
 export HEALTHARCHIVE_USAGE_METRICS_WINDOW_DAYS=30
+export HEALTHARCHIVE_CHANGE_TRACKING_ENABLED=1
+export HEALTHARCHIVE_PUBLIC_SITE_URL=https://healtharchive.ca
 export HEALTHARCHIVE_REPLAY_BASE_URL=https://replay.healtharchive.ca
 export HEALTHARCHIVE_REPLAY_PREVIEW_DIR=/srv/healtharchive/replay/previews
 ```
@@ -104,6 +106,9 @@ Notes:
   and `/api/snapshot/{id}` so the frontend can embed the replay service.
 - `HEALTHARCHIVE_USAGE_METRICS_ENABLED` controls whether aggregated daily usage
   counts are recorded; disable it for a metrics-free deployment.
+- `HEALTHARCHIVE_CHANGE_TRACKING_ENABLED` controls whether change tracking
+  endpoints/diff feeds are active (disable if you are not running the pipeline).
+- `HEALTHARCHIVE_PUBLIC_SITE_URL` sets the public base URL used in RSS links.
 - In `production` (and `staging`), if the admin token is missing, admin/metrics
   endpoints fail closed (HTTP 500) instead of being left open.
 - `HEALTHARCHIVE_CORS_ORIGINS` should be kept as narrow as possible; it controls
@@ -123,6 +128,8 @@ export HEALTHARCHIVE_CORS_ORIGINS=https://healtharchive.vercel.app
 export HEALTHARCHIVE_LOG_LEVEL=INFO
 export HEALTHARCHIVE_USAGE_METRICS_ENABLED=1
 export HEALTHARCHIVE_USAGE_METRICS_WINDOW_DAYS=30
+export HEALTHARCHIVE_CHANGE_TRACKING_ENABLED=1
+export HEALTHARCHIVE_PUBLIC_SITE_URL=https://healtharchive.ca
 ```
 
 ---

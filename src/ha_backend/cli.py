@@ -22,6 +22,7 @@ from .indexing import index_job
 from .job_registry import create_job_for_source
 from .jobs import create_job, run_persistent_job
 from .logging_config import configure_logging
+from .changes import compute_changes_backfill, compute_changes_since
 from .seeds import seed_sources
 from .worker import run_worker_loop
 
@@ -208,6 +209,39 @@ def cmd_seed_sources(args: argparse.Namespace) -> None:
         created_count = seed_sources(session)
 
     print(f"Seeded {created_count} source(s).")
+
+
+def cmd_compute_changes(args: argparse.Namespace) -> None:
+    """
+    Compute change events (diffs) between adjacent snapshot captures.
+    """
+    max_events = args.max_events
+    source_code = args.source
+    dry_run = args.dry_run
+
+    with get_session() as session:
+        if args.backfill:
+            result = compute_changes_backfill(
+                session,
+                source_code=source_code,
+                max_events=max_events,
+                dry_run=dry_run,
+            )
+        else:
+            result = compute_changes_since(
+                session,
+                since_days=args.since_days,
+                source_code=source_code,
+                max_events=max_events,
+                dry_run=dry_run,
+            )
+
+    mode = "backfill" if args.backfill else f"last {args.since_days} days"
+    print("Computed change events:")
+    print(f"  Mode:    {mode}")
+    print(f"  Created: {result.created}")
+    print(f"  Skipped: {result.skipped}")
+    print(f"  Dry-run: {dry_run}")
 
 
 def cmd_schedule_annual(args: argparse.Namespace) -> None:
@@ -3171,6 +3205,41 @@ def build_parser() -> argparse.ArgumentParser:
         help="Insert initial Source rows (hc, phac, cihr) into the database if missing.",
     )
     p_seed.set_defaults(func=cmd_seed_sources)
+
+    # compute-changes
+    p_changes = subparsers.add_parser(
+        "compute-changes",
+        help="Compute change events (diffs) between adjacent snapshot captures.",
+    )
+    p_changes.add_argument(
+        "--source",
+        help="Optional source code filter (e.g., hc, phac).",
+    )
+    p_changes.add_argument(
+        "--max-events",
+        type=int,
+        default=200,
+        help="Maximum change events to compute in one run.",
+    )
+    p_changes.add_argument(
+        "--since-days",
+        type=int,
+        default=30,
+        help="Only consider snapshots captured in the last N days (default: 30).",
+    )
+    p_changes.add_argument(
+        "--backfill",
+        action="store_true",
+        default=False,
+        help="Backfill all missing change events (ignores --since-days).",
+    )
+    p_changes.add_argument(
+        "--dry-run",
+        action="store_true",
+        default=False,
+        help="Compute counts without writing change events to the database.",
+    )
+    p_changes.set_defaults(func=cmd_compute_changes)
 
     # schedule-annual
     p_schedule_annual = subparsers.add_parser(

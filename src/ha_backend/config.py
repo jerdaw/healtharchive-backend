@@ -55,6 +55,14 @@ DEFAULT_PAGES_FASTPATH_ENABLED = True
 DEFAULT_USAGE_METRICS_ENABLED = True
 DEFAULT_USAGE_METRICS_WINDOW_DAYS = 30
 
+# === Change tracking ===
+
+# Precomputed change events and diff artifacts (Phase 3).
+DEFAULT_CHANGE_TRACKING_ENABLED = True
+
+# Public site base URL for building absolute links (RSS feeds, etc.).
+DEFAULT_PUBLIC_SITE_BASE_URL = "https://healtharchive.ca"
+
 
 @dataclass
 class ArchiveToolConfig:
@@ -205,3 +213,23 @@ def get_usage_metrics_window_days() -> int:
     except ValueError:
         value = DEFAULT_USAGE_METRICS_WINDOW_DAYS
     return max(1, min(value, 365))
+
+
+def get_change_tracking_enabled() -> bool:
+    """
+    Return whether change tracking (diff computation + feeds) is enabled.
+    """
+    default = "1" if DEFAULT_CHANGE_TRACKING_ENABLED else "0"
+    raw = os.environ.get("HEALTHARCHIVE_CHANGE_TRACKING_ENABLED", default).strip().lower()
+    return raw not in ("0", "false", "no", "off")
+
+
+def get_public_site_base_url() -> str:
+    """
+    Return the public site base URL for building absolute links.
+    """
+    raw = os.environ.get(
+        "HEALTHARCHIVE_PUBLIC_SITE_URL",
+        DEFAULT_PUBLIC_SITE_BASE_URL,
+    ).strip()
+    return raw.rstrip("/") if raw else DEFAULT_PUBLIC_SITE_BASE_URL
