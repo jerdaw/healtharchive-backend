@@ -2011,7 +2011,7 @@ Stretch goals:
 - Export schema documented in `healtharchive-backend/docs/operations/exports-data-dictionary.md`.
 - Export env toggles documented (`HEALTHARCHIVE_EXPORTS_ENABLED`, defaults, and limits).
 
-Remaining Phase 5 work: dataset release cadence + methods note + external research adoption.
+Remaining Phase 5 work: dataset release cadence + external research adoption.
 
 ---
 
