@@ -22,16 +22,17 @@ Status: **active roadmap** (Phases 0–6 implemented (core); remaining work is m
 
 **Decision tracker (update as you go; keep public-safe)**
 
-- Dataset release cadence: **TBD** (monthly vs quarterly; should match actual capture rhythm)
-- Dataset release scope: **TBD** (full-to-date vs rolling window vs incremental)
-- Dataset release venue: **TBD** (GitHub Releases recommended; decide which repo/org hosts it)
+- Dataset release cadence: **Quarterly** (automated; runs Jan/Apr/Jul/Oct)
+- Dataset release scope: **Full-to-date** (metadata-only; paginated via `afterId`; no rolling window)
+- Dataset release venue: **GitHub Releases** in `jerdaw/healtharchive-datasets`
+- Dataset release tag format: **`healtharchive-dataset-YYYY-MM-DD`**
+- Dataset release artifacts: **`healtharchive-snapshots.jsonl.gz`, `healtharchive-changes.jsonl.gz`, `manifest.json`, `SHA256SUMS`** (no CSV)
 - Restore test logging: **TBD** (where the public-safe log lives; repo vs private ops directory)
 - Production timers (record what is enabled today):
   - Change tracking: **TBD** (expected: enabled when `/etc/healtharchive/change-tracking-enabled` exists)
   - Annual scheduling: **TBD** (gated by `/etc/healtharchive/automation-enabled`)
   - Replay reconcile: **TBD** (gated by `/etc/healtharchive/replay-automation-enabled`; only if replay enabled/stable)
   - Annual search verification capture: **TBD** (optional)
-
 **Next steps (small, safe, sequential)**
 
 1) Decide dataset cadence + scope (Phase 5) and record the decision.
