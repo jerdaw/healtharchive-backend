@@ -61,6 +61,27 @@ Assumptions (adjust paths/user if your VPS differs):
 
 ---
 
+## Recommended enablement (Phase 6 guidance)
+
+These timers are safe-by-default and gated by sentinel files. Enable only what
+matches your operational readiness.
+
+- **Change tracking** (`healtharchive-change-tracking.timer`)
+  - Recommended to enable once the `snapshot_changes` table exists and a dry
+    run succeeds without errors.
+- **Annual scheduling** (`healtharchive-schedule-annual.timer`)
+  - Enable only after an annual dry-run succeeds and storage headroom is
+    confirmed.
+- **Replay reconcile** (`healtharchive-replay-reconcile.timer`)
+  - Enable only if replay is enabled and stable.
+- **Annual search verification** (`healtharchive-annual-search-verify.timer`)
+  - Optional; safe to enable if you want a yearly search QA artifact.
+
+If a timer is enabled, also ensure its sentinel file exists under
+`/etc/healtharchive/` (see the enablement sections below).
+
+---
+
 ## Install / update on the VPS
 
 Copy unit files:
