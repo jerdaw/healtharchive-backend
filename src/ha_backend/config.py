@@ -60,6 +60,13 @@ DEFAULT_USAGE_METRICS_WINDOW_DAYS = 30
 # Precomputed change events and diff artifacts (Phase 3).
 DEFAULT_CHANGE_TRACKING_ENABLED = True
 
+# === Research exports ===
+
+# Public, metadata-only exports for research (Phase 5).
+DEFAULT_EXPORTS_ENABLED = True
+DEFAULT_EXPORTS_DEFAULT_LIMIT = 1000
+DEFAULT_EXPORTS_MAX_LIMIT = 10000
+
 # Public site base URL for building absolute links (RSS feeds, etc.).
 DEFAULT_PUBLIC_SITE_BASE_URL = "https://healtharchive.ca"
 
@@ -222,6 +229,46 @@ def get_change_tracking_enabled() -> bool:
     default = "1" if DEFAULT_CHANGE_TRACKING_ENABLED else "0"
     raw = os.environ.get("HEALTHARCHIVE_CHANGE_TRACKING_ENABLED", default).strip().lower()
     return raw not in ("0", "false", "no", "off")
+
+
+def get_exports_enabled() -> bool:
+    """
+    Return whether public export endpoints are enabled.
+    """
+    default = "1" if DEFAULT_EXPORTS_ENABLED else "0"
+    raw = os.environ.get("HEALTHARCHIVE_EXPORTS_ENABLED", default).strip().lower()
+    return raw not in ("0", "false", "no", "off")
+
+
+def get_exports_default_limit() -> int:
+    """
+    Default maximum rows returned by export endpoints.
+    """
+    raw = os.environ.get(
+        "HEALTHARCHIVE_EXPORTS_DEFAULT_LIMIT",
+        str(DEFAULT_EXPORTS_DEFAULT_LIMIT),
+    ).strip()
+    try:
+        value = int(raw)
+    except ValueError:
+        value = DEFAULT_EXPORTS_DEFAULT_LIMIT
+    max_limit = get_exports_max_limit()
+    return max(1, min(value, max_limit))
+
+
+def get_exports_max_limit() -> int:
+    """
+    Hard cap on rows returned by export endpoints.
+    """
+    raw = os.environ.get(
+        "HEALTHARCHIVE_EXPORTS_MAX_LIMIT",
+        str(DEFAULT_EXPORTS_MAX_LIMIT),
+    ).strip()
+    try:
+        value = int(raw)
+    except ValueError:
+        value = DEFAULT_EXPORTS_MAX_LIMIT
+    return max(1, value)
 
 
 def get_public_site_base_url() -> str:

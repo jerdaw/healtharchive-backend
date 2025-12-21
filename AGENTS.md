@@ -163,6 +163,9 @@ Public routes (for the frontend):
 * `GET /api/changes` – change-event feed (edition-aware by default).
 * `GET /api/changes/compare` – precomputed diff between adjacent captures.
 * `GET /api/changes/rss` – RSS feed for change events.
+* `GET /api/exports` – export manifest (formats + limits).
+* `GET /api/exports/snapshots` – snapshot metadata export (JSONL/CSV).
+* `GET /api/exports/changes` – change event export (JSONL/CSV).
 * `GET /api/snapshots/{id}/timeline` – timeline for a page group.
 * `POST /api/reports` – public issue report intake.
 
