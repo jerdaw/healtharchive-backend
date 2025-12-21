@@ -19,6 +19,10 @@ depends_on = None
 
 
 def upgrade() -> None:
+    bind = op.get_bind()
+    dialect = bind.dialect.name if bind is not None else ""
+    bool_false = sa.text("false") if dialect == "postgresql" else sa.text("0")
+
     op.create_table(
         "snapshot_changes",
         sa.Column("id", sa.Integer(), primary_key=True, autoincrement=True),
@@ -38,7 +42,7 @@ def upgrade() -> None:
             "diff_truncated",
             sa.Boolean(),
             nullable=False,
-            server_default=sa.text("0"),
+            server_default=bool_false,
         ),
         sa.Column("added_sections", sa.Integer(), nullable=True),
         sa.Column("removed_sections", sa.Integer(), nullable=True),
@@ -50,7 +54,7 @@ def upgrade() -> None:
             "high_noise",
             sa.Boolean(),
             nullable=False,
-            server_default=sa.text("0"),
+            server_default=bool_false,
         ),
         sa.Column("diff_version", sa.String(length=32), nullable=True),
         sa.Column("normalization_version", sa.String(length=32), nullable=True),
