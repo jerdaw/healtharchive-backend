@@ -3,6 +3,10 @@
 - Annual capture campaign (scope + seeds): `annual-campaign.md`
 - Automation implementation plan (phased, production-only): `automation-implementation-plan.md`
 - Monitoring + uptime + CI checklist: `monitoring-and-ci-checklist.md`
+- Ops cadence checklist (internal routine): `ops-cadence-checklist.md`
+- Growth constraints (storage + scope budgets): `growth-constraints.md`
+- Restore test procedure (quarterly): `restore-test-procedure.md`
+- Restore test log template: `restore-test-log-template.md`
 - HealthArchive upgrade roadmap (phased, cross-repo): `healtharchive-upgrade-plan.md`
 - Phase 4 partner kit (brief + citation + screenshots): `phase-4-partner-kit.md`
 - Phase 4 one-page brief (shareable): `phase-4-one-page-brief.md`
