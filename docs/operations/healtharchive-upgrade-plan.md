@@ -1,6 +1,6 @@
 # HealthArchive Upgrade Plan (Agent-Ready)
 
-Status: **active roadmap** (Phases 0-3 implemented; phases 4-6 pending).
+Status: **active roadmap** (Phases 0-3 implemented; Phase 4 assets drafted; phases 4-6 pending).
 
 This file is intentionally written so you can hand it to another LLM/AI (or a human contributor) and they will understand:
 
@@ -1746,6 +1746,14 @@ Stretch goals (high value if feasible):
 - 1 course/lab/student project uses the data and is willing to be named.
 - 1 external mention in a newsletter/blog post/paper.
 
+**Status (Phase 4 assets implemented)**
+
+- Partner kit draft: `healtharchive-backend/docs/operations/phase-4-partner-kit.md`
+- Outreach templates: `healtharchive-backend/docs/operations/phase-4-outreach-templates.md`
+- Verification packet outline: `healtharchive-backend/docs/operations/phase-4-verification-packet.md`
+- Mentions log template: `healtharchive-backend/docs/operations/phase-4-mentions-log-template.md`
+
+Remaining Phase 4 work is outreach and external validation.
 ## Phase 5 — Research-Grade Outputs (expanded)
 
 ### Why this matters
