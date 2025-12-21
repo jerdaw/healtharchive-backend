@@ -207,6 +207,14 @@ sudo systemctl start healtharchive-change-tracking-dry-run.service
 sudo journalctl -u healtharchive-change-tracking-dry-run.service -n 200 --no-pager
 ```
 
+If you see an error like `relation "snapshot_changes" does not exist`, apply
+migrations first (idempotent):
+
+```bash
+cd /opt/healtharchive-backend
+sudo -u haadmin /opt/healtharchive-backend/.venv/bin/alembic upgrade head
+```
+
 ---
 
 ## Enable automation (Jan 01)
