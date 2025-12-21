@@ -6,6 +6,11 @@ HealthArchive without implying endorsement or medical guidance.
 Use this file as the source-of-truth for the 1-page brief, citation handout,
 and copy-paste blurbs. Do not include private emails or contact lists here.
 
+Canonical standalone versions (for sharing/printing):
+
+- One-page brief: `phase-4-one-page-brief.md`
+- Citation handout: `phase-4-citation-handout.md`
+
 ---
 
 ## 1) One-page brief (draft copy)
@@ -34,6 +39,8 @@ in time, plus change tracking to show how wording evolved between editions.
 
 - Search and browse: `/archive`
 - Snapshot viewer: `/snapshot/<id>`
+- One-page brief: `/brief`
+- Citation guidance: `/cite`
 - Changes feed (edition-aware): `/changes`
 - Compare view (descriptive diffs): `/compare?to=<id>`
 - Digest + RSS: `/digest`
@@ -66,6 +73,8 @@ Suggested links:
 
 - Digest (RSS + overview): https://www.healtharchive.ca/digest
 - Changes feed: https://www.healtharchive.ca/changes
+- One-page brief: https://www.healtharchive.ca/brief
+- Citation guidance: https://www.healtharchive.ca/cite
 - Methods and scope: https://www.healtharchive.ca/methods
 
 ---

@@ -1,6 +1,6 @@
 # HealthArchive Upgrade Plan (Agent-Ready)
 
-Status: **active roadmap** (Phases 0-3 implemented; Phase 4 assets drafted; phases 4-6 pending).
+Status: **active roadmap** (Phases 0-3 implemented; Phase 4 partner assets + public brief/citation pages implemented; phases 5-6 pending).
 
 This file is intentionally written so you can hand it to another LLM/AI (or a human contributor) and they will understand:
 
@@ -1748,7 +1748,11 @@ Stretch goals (high value if feasible):
 
 **Status (Phase 4 assets implemented)**
 
+- Public one-page brief page: `https://www.healtharchive.ca/brief` (downloadable Markdown at `/partner-kit/healtharchive-brief.md`)
+- Public citation guidance page: `https://www.healtharchive.ca/cite` (downloadable Markdown at `/partner-kit/healtharchive-citation.md`)
 - Partner kit draft: `healtharchive-backend/docs/operations/phase-4-partner-kit.md`
+- One-page brief (source copy): `healtharchive-backend/docs/operations/phase-4-one-page-brief.md`
+- Citation handout (source copy): `healtharchive-backend/docs/operations/phase-4-citation-handout.md`
 - Outreach templates: `healtharchive-backend/docs/operations/phase-4-outreach-templates.md`
 - Verification packet outline: `healtharchive-backend/docs/operations/phase-4-verification-packet.md`
 - Mentions log template: `healtharchive-backend/docs/operations/phase-4-mentions-log-template.md`
