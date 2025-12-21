@@ -1849,6 +1849,17 @@ Acceptance criteria:
 
 **Goal:** Provide research-friendly data without turning the public API into an unbounded bulk download service.
 
+**Recommended defaults (decisions)**
+
+- **Canonical format:** `JSON Lines` (`.jsonl`) compressed with `gzip` (`.jsonl.gz`)
+  - Why: streamable, append-friendly, handles optional fields cleanly, works well for large datasets, and is robust to schema evolution.
+- **Convenience format:** `CSV` compressed with `gzip` (`.csv.gz`)
+  - Why: easy for non-programmers (Excel/R), still compact when gzipped.
+- **Release packaging:** always include a small `manifest.json` alongside exports
+  - Why: makes releases citable and reproducible (schema version, date ranges, source list, row counts, checksums).
+- **No raw content by default:** exclude full `diff_html` and raw snapshot HTML from exports
+  - Why: keeps exports lightweight and reduces misuse risk; raw content stays accessible via the UI and specific snapshot URLs.
+
 Export tiers (recommended):
 
 - Tier 0 (public, lightweight, always on):
@@ -1862,9 +1873,30 @@ Export tiers (recommended):
 
 Deliverables:
 
-- Define a stable export format (CSV and/or JSON Lines) with consistent fields:
-  - Snapshots: id, source, original URL, normalized group key, capture timestamp (UTC), language, status code, content type, edition/job identifiers, and stable snapshot URL.
-  - Changes: change id, source, group key, from/to snapshot IDs, from/to capture timestamps, change type, summary, counts (added/removed/changed sections/lines), “high noise” flag, diff version.
+- Define a stable export schema (same field names across `.jsonl` and `.csv`):
+  - **Snapshots export (minimum viable)**
+    - `snapshot_id`
+    - `source_code`, `source_name`
+    - `captured_url` (as archived)
+    - `normalized_url_group` (canonical grouping key)
+    - `capture_timestamp_utc` (ISO-8601, UTC)
+    - `language`, `status_code`, `mime_type`
+    - `title` (optional but recommended)
+    - `job_id`, `job_name` (edition anchor)
+    - `snapshot_url` (absolute; e.g., `https://www.healtharchive.ca/snapshot/123`)
+  - **Changes export (minimum viable)**
+    - `change_id`
+    - `source_code`, `source_name`
+    - `normalized_url_group`
+    - `from_snapshot_id`, `to_snapshot_id`
+    - `from_capture_timestamp_utc`, `to_capture_timestamp_utc`
+    - `from_job_id`, `to_job_id`
+    - `change_type`, `summary`
+    - `added_sections`, `removed_sections`, `changed_sections`
+    - `added_lines`, `removed_lines`, `change_ratio`
+    - `high_noise`, `diff_truncated`
+    - `diff_version`, `normalization_version`, `computed_at_utc`
+    - `compare_url` (absolute; e.g., `https://www.healtharchive.ca/compare?from=…&to=…`)
 - Add a “data dictionary” page in docs and link to it from the export endpoint and `/researchers`.
 - Add clear limitations:
   - coverage depends on scope rules and capture success,
@@ -1879,6 +1911,15 @@ Acceptance criteria:
 #### Sub-phase 5D — Dataset releases (versioned, citable artifacts)
 
 **Goal:** Create periodic “research objects” that can be cited and referenced over time.
+
+**Recommended defaults (decisions)**
+
+- **Where to publish:** GitHub Releases (initially)
+  - Why: simple, already in your workflow, supports attaching files + checksums, and provides stable URLs for citation.
+- **Release cadence:** monthly if the archive is actively changing; quarterly if updates are mostly annual
+  - Why: cadence should reflect real capture rhythm to avoid “activity theatre.”
+- **Release contents:** `snapshots.jsonl.gz`, `snapshots.csv.gz`, `changes.jsonl.gz`, `changes.csv.gz`, `manifest.json`, `SHA256SUMS`
+  - Why: two common formats + reproducible integrity metadata.
 
 Deliverables:
 
