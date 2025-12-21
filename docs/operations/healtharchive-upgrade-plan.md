@@ -2058,6 +2058,171 @@ explicit and sustainable.
 - There is a clearly documented “how we operate” routine that does not require heroics.
 - The public-facing cadence statement matches what you actually do.
 
+### Phase 6 Implementation Plan (Detailed; sub-phases)
+
+Phase 6 is mostly **operationalizing** what already exists: turning “we do X” into **repeatable routines** with lightweight artifacts so you can prove reliability over time without burning out.
+
+Key principle: Phase 6 is successful when it reduces cognitive load and removes “heroic memory” from operations.
+
+#### Sub-phase 6A — Baseline audit (inventory + decisions)
+
+Goal: ensure the cadence/scope language you publish is true, and ensure the internal routines match the system as deployed.
+
+Tasks:
+
+- Inventory current reality (don’t guess):
+  - What cadence you actually run today (annual editions + ad-hoc).
+  - Which timers/automation are installed and enabled on the VPS (if any).
+  - What backups exist and how restore is validated today.
+  - What monitoring exists today (external checks, Healthchecks-style pings, logs).
+- Decide what you are comfortable committing to publicly (policy that matches your capacity):
+  - Annual edition is the default (“Jan 01 UTC”).
+  - What counts as an “ad-hoc capture” exception (e.g., major event, urgent operational fix).
+  - Whether annual scheduling should be fully automated or remain operator-triggered.
+- Decide whether “replay automation” is enabled and what the retention stance is (WARCs must remain available if replay is enabled).
+
+Deliverables:
+
+- A short “Phase 6 baseline notes” section appended to the changelog (or a dated internal note) capturing the decisions above.
+
+Acceptance criteria:
+
+- You can state “what happens when” in one paragraph without contradictions.
+
+#### Sub-phase 6B — Public capture cadence policy (public-facing)
+
+Goal: publish a clear, non-misleading cadence statement that matches annual-edition reality and avoids “real-time update” impressions.
+
+Tasks:
+
+- Update public copy to be explicit and consistent:
+  - “Annual edition captured Jan 01 UTC.”
+  - “Exceptions may trigger ad-hoc captures; these are explicitly labeled.”
+  - “Change tracking is edition-aware; it does not imply real-time monitoring.”
+- Ensure the policy appears where users form expectations:
+  - `/methods` (primary place for operational details),
+  - `/governance` (policy + scope stance),
+  - `/changes` + `/digest` (short, high-visibility summary),
+  - optionally `/status` (freshness definitions).
+
+Deliverables:
+
+- Public cadence policy text (short, stable, linked from the footer or methods/governance).
+
+Acceptance criteria:
+
+- A user cannot reasonably interpret “Changes” as “this is what happened this week in real time” when editions are annual.
+
+#### Sub-phase 6C — Ops cadence (internal runbook routines)
+
+Goal: define a boring, repeatable operations cadence that can be followed by you or a backup operator.
+
+Recommended cadence (adjust to your capacity):
+
+- Weekly: 10–15 minute health review
+  - API health, worker status, disk usage trend, failed jobs queue.
+- Monthly: reliability review (can be merged into the monthly impact report)
+  - top incidents, planned maintenance, search quality checks.
+- Quarterly: restore test (prove backups are usable)
+  - restore DB + verify key endpoints or counts.
+- Ongoing: dependency patching routine
+  - safe update cadence; avoid surprise upgrades during capture campaigns.
+
+Tasks:
+
+- Write a single “Ops cadence checklist” doc that includes:
+  - what to check,
+  - where to look (systemd, logs, DB counts),
+  - how to record outcomes (a lightweight log entry).
+- Decide where the “ops log” lives:
+  - simplest: a dated Markdown file in a private operator notes location (not necessarily in git),
+  - or, if public-safe, a minimal “incident log” section on `/impact` or `/changelog`.
+
+Deliverables:
+
+- Internal ops cadence doc (checklist-style, copy/paste commands, no secrets).
+
+Acceptance criteria:
+
+- A future-you can follow the checklist after 3 months away and still operate safely.
+
+#### Sub-phase 6D — Automation gates (systemd timers + safe enablement)
+
+Goal: enable automation only where it reduces toil without increasing risk.
+
+Tasks:
+
+- Validate installed timers and dry-run services (safe-by-default):
+  - annual scheduling dry-run,
+  - change tracking dry-run,
+  - replay reconcile dry-run (if replay enabled),
+  - annual search verification (optional).
+- Decide which automations to enable now vs later:
+  - **Change tracking:** typically safe to keep enabled (already capped and edition-aware).
+  - **Annual scheduling:** enable only after confirming job configs, disk headroom, and monitoring.
+  - **Replay reconcile:** enable only if replay is enabled and stable.
+- Use sentinel files to gate automation:
+  - `/etc/healtharchive/automation-enabled` (annual scheduling),
+  - `/etc/healtharchive/change-tracking-enabled`,
+  - `/etc/healtharchive/replay-automation-enabled` (optional).
+- Add “timer ran” visibility (optional but high leverage):
+  - Healthchecks-style pings using a root-owned env file on the VPS (no URLs in git).
+
+Deliverables:
+
+- Updated deployment docs indicating which timers are expected to be enabled in production and why.
+- A clear operator “enable automation” checklist (dry-run → enable timer → confirm next run).
+
+Acceptance criteria:
+
+- Automation does not surprise-run expensive tasks without an explicit enablement step.
+
+#### Sub-phase 6E — Growth constraints (budgets + boundaries)
+
+Goal: prevent slow “scope creep” from breaking reliability (single-VPS reality).
+
+Tasks:
+
+- Define and publish (internally) budgets with conservative defaults:
+  - storage budget (WARCs + DB + backups),
+  - source cap per year (how many new sources you can safely add),
+  - performance budget (acceptable API latency and indexing overhead),
+  - replay retention stance (WARCs must remain if replay is on).
+- Make the public-facing version “principle based”:
+  - “reliability over breadth,”
+  - “scope is constrained by storage and operational capacity,”
+  - “sources are added deliberately with explicit rules.”
+
+Deliverables:
+
+- Internal “budgets & constraints” doc (numbers and targets).
+- Public-facing summary paragraph in `/governance` (principles, not sensitive numbers).
+
+Acceptance criteria:
+
+- You can answer “why not add 50 sources?” with a documented policy, not vibes.
+
+#### Sub-phase 6F — Disaster recovery proof (restore test discipline)
+
+Goal: make “we have backups” verifiable by doing quarterly restore tests and recording results.
+
+Tasks:
+
+- Define the quarterly restore test procedure:
+  - restore DB dump to a temporary/staging DB,
+  - run a minimal verification checklist (counts + key endpoints),
+  - verify that the system starts cleanly with restored state.
+- Create a public-safe template for recording results (no secrets):
+  - date, operator, what was restored, what checks ran, pass/fail, follow-ups.
+
+Deliverables:
+
+- Restore test template + documented procedure.
+
+Acceptance criteria:
+
+- You can show “restore tests performed” as a reliability artifact (even if the underlying logs live privately).
+
 ---
 
 ## Appendix A — Suggested new public routes (conceptual)
