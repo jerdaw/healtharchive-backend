@@ -104,6 +104,22 @@ class UsageMetricsSchema(BaseModel):
     daily: List[UsageMetricsDaySchema]
 
 
+class ExportResourceSchema(BaseModel):
+    path: str
+    description: str
+    formats: List[str]
+
+
+class ExportManifestSchema(BaseModel):
+    enabled: bool
+    formats: List[str]
+    defaultLimit: int
+    maxLimit: int
+    dataDictionaryUrl: Optional[str] = None
+    snapshots: ExportResourceSchema
+    changes: ExportResourceSchema
+
+
 class ChangeEventSchema(BaseModel):
     changeId: int
     changeType: str
@@ -209,6 +225,8 @@ __all__ = [
     "UsageMetricsCountsSchema",
     "UsageMetricsDaySchema",
     "UsageMetricsSchema",
+    "ExportManifestSchema",
+    "ExportResourceSchema",
     "ChangeEventSchema",
     "ChangeFeedSchema",
     "ChangeCompareSnapshotSchema",

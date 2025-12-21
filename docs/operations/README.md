@@ -10,6 +10,7 @@
 - Phase 4 outreach templates (email copy): `phase-4-outreach-templates.md`
 - Phase 4 verification packet (verifier handoff): `phase-4-verification-packet.md`
 - Phase 4 mentions log template (public-safe): `phase-4-mentions-log-template.md`
+- Phase 5 exports data dictionary (public schema): `exports-data-dictionary.md`
 - Search relevance evaluation (process + commands): `search-quality.md`
 - Golden queries + expected results (living checklist): `search-golden-queries.md`
 - Replay + preview automation plan (design + guardrails; includes `replay-reconcile`): `replay-and-preview-automation-plan.md`

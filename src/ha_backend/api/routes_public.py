@@ -5,17 +5,24 @@ from datetime import date, datetime, timedelta, timezone
 from enum import Enum
 from pathlib import Path
 import re
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Iterable, Iterator, List, Optional
 from urllib.parse import urlsplit, urlunsplit
+import csv
+import gzip
+import io
+import json
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, StreamingResponse
 from sqlalchemy import String, and_, case, cast, func, inspect, or_, text
 from sqlalchemy.orm import Session, joinedload, load_only
 from threading import Lock
 
 from ha_backend.config import (
     get_change_tracking_enabled,
+    get_exports_default_limit,
+    get_exports_enabled,
+    get_exports_max_limit,
     get_pages_fastpath_enabled,
     get_public_site_base_url,
     get_replay_base_url,
@@ -73,6 +80,8 @@ from ha_backend.usage_metrics import (
 
 from .schemas import (
     ArchiveStatsSchema,
+    ExportManifestSchema,
+    ExportResourceSchema,
     IssueReportCreateSchema,
     IssueReportReceiptSchema,
     ReplayResolveSchema,
@@ -144,6 +153,279 @@ def _format_capture_timestamp(value: Any) -> Optional[str]:
         # round-trips timezone-aware values as naive).
         return value.replace(tzinfo=timezone.utc).isoformat()
     return str(value)
+
+
+_EXPORT_FORMATS = ("jsonl", "csv")
+_EXPORT_CONTENT_TYPES = {
+    "jsonl": "application/x-ndjson",
+    "csv": "text/csv; charset=utf-8",
+}
+_SNAPSHOT_EXPORT_FIELDS = [
+    "snapshot_id",
+    "source_code",
+    "source_name",
+    "captured_url",
+    "normalized_url_group",
+    "capture_timestamp_utc",
+    "language",
+    "status_code",
+    "mime_type",
+    "title",
+    "job_id",
+    "job_name",
+    "snapshot_url",
+]
+_CHANGE_EXPORT_FIELDS = [
+    "change_id",
+    "source_code",
+    "source_name",
+    "normalized_url_group",
+    "from_snapshot_id",
+    "to_snapshot_id",
+    "from_capture_timestamp_utc",
+    "to_capture_timestamp_utc",
+    "from_job_id",
+    "to_job_id",
+    "change_type",
+    "summary",
+    "added_sections",
+    "removed_sections",
+    "changed_sections",
+    "added_lines",
+    "removed_lines",
+    "change_ratio",
+    "high_noise",
+    "diff_truncated",
+    "diff_version",
+    "normalization_version",
+    "computed_at_utc",
+    "compare_url",
+]
+
+
+def _normalize_export_format(value: str | None) -> str:
+    normalized = (value or "jsonl").strip().lower()
+    if normalized == "ndjson":
+        normalized = "jsonl"
+    if normalized not in _EXPORT_FORMATS:
+        raise HTTPException(
+            status_code=422,
+            detail="Unsupported export format; use jsonl or csv.",
+        )
+    return normalized
+
+
+def _build_date_range(
+    *,
+    from_: date | None,
+    to: date | None,
+    dialect_name: str,
+) -> tuple[datetime | None, datetime | None]:
+    if from_ and to and from_ > to:
+        raise HTTPException(
+            status_code=422,
+            detail="Invalid date range: 'from' must be <= 'to'.",
+        )
+
+    range_start: datetime | None = None
+    range_end_exclusive: datetime | None = None
+    if from_:
+        range_start = datetime(from_.year, from_.month, from_.day, tzinfo=timezone.utc)
+    if to:
+        range_end_exclusive = datetime(to.year, to.month, to.day, tzinfo=timezone.utc) + timedelta(days=1)
+
+    if dialect_name == "sqlite":
+        if range_start is not None:
+            range_start = range_start.replace(tzinfo=None)
+        if range_end_exclusive is not None:
+            range_end_exclusive = range_end_exclusive.replace(tzinfo=None)
+
+    return range_start, range_end_exclusive
+
+
+def _resolve_source_id(db: Session, source: str | None) -> Optional[int]:
+    if not source:
+        return None
+    normalized = source.strip().lower()
+    if not normalized or normalized in _PUBLIC_EXCLUDED_SOURCE_CODES:
+        raise HTTPException(status_code=404, detail="Source not found")
+    source_row = db.query(Source).filter(Source.code == normalized).first()
+    if not source_row:
+        raise HTTPException(status_code=404, detail="Source not found")
+    return source_row.id
+
+
+def _iter_snapshot_export_rows(
+    *,
+    db: Session,
+    source_id: int | None,
+    after_id: int | None,
+    limit: int,
+    range_start: datetime | None,
+    range_end_exclusive: datetime | None,
+    public_base: str,
+) -> Iterable[dict[str, Any]]:
+    query = (
+        db.query(Snapshot, Source, ArchiveJob)
+        .join(Source, Snapshot.source_id == Source.id, isouter=True)
+        .join(ArchiveJob, Snapshot.job_id == ArchiveJob.id, isouter=True)
+    )
+    query = query.filter(
+        or_(Source.code.is_(None), ~Source.code.in_(_PUBLIC_EXCLUDED_SOURCE_CODES))
+    )
+    if source_id is not None:
+        query = query.filter(Snapshot.source_id == source_id)
+    if after_id is not None:
+        query = query.filter(Snapshot.id > after_id)
+    if range_start is not None:
+        query = query.filter(Snapshot.capture_timestamp >= range_start)
+    if range_end_exclusive is not None:
+        query = query.filter(Snapshot.capture_timestamp < range_end_exclusive)
+
+    rows = query.order_by(Snapshot.id).limit(limit).yield_per(1000)
+
+    for snapshot, source, job in rows:
+        yield {
+            "snapshot_id": snapshot.id,
+            "source_code": source.code if source else None,
+            "source_name": source.name if source else None,
+            "captured_url": snapshot.url,
+            "normalized_url_group": snapshot.normalized_url_group,
+            "capture_timestamp_utc": _format_capture_timestamp(snapshot.capture_timestamp),
+            "language": snapshot.language,
+            "status_code": snapshot.status_code,
+            "mime_type": snapshot.mime_type,
+            "title": snapshot.title,
+            "job_id": snapshot.job_id,
+            "job_name": job.name if job else None,
+            "snapshot_url": f"{public_base}/snapshot/{snapshot.id}",
+        }
+
+
+def _iter_change_export_rows(
+    *,
+    db: Session,
+    source_id: int | None,
+    after_id: int | None,
+    limit: int,
+    range_start: datetime | None,
+    range_end_exclusive: datetime | None,
+    public_base: str,
+) -> Iterable[dict[str, Any]]:
+    query = (
+        db.query(SnapshotChange, Source)
+        .join(Source, SnapshotChange.source_id == Source.id, isouter=True)
+    )
+    query = query.filter(
+        or_(Source.code.is_(None), ~Source.code.in_(_PUBLIC_EXCLUDED_SOURCE_CODES))
+    )
+    if source_id is not None:
+        query = query.filter(SnapshotChange.source_id == source_id)
+    if after_id is not None:
+        query = query.filter(SnapshotChange.id > after_id)
+    if range_start is not None:
+        query = query.filter(SnapshotChange.to_capture_timestamp >= range_start)
+    if range_end_exclusive is not None:
+        query = query.filter(SnapshotChange.to_capture_timestamp < range_end_exclusive)
+
+    rows = query.order_by(SnapshotChange.id).limit(limit).yield_per(1000)
+
+    for change, source in rows:
+        compare_url = f"{public_base}/compare?to={change.to_snapshot_id}"
+        if change.from_snapshot_id is not None:
+            compare_url = (
+                f"{public_base}/compare?from={change.from_snapshot_id}"
+                f"&to={change.to_snapshot_id}"
+            )
+        yield {
+            "change_id": change.id,
+            "source_code": source.code if source else None,
+            "source_name": source.name if source else None,
+            "normalized_url_group": change.normalized_url_group,
+            "from_snapshot_id": change.from_snapshot_id,
+            "to_snapshot_id": change.to_snapshot_id,
+            "from_capture_timestamp_utc": _format_capture_timestamp(change.from_capture_timestamp),
+            "to_capture_timestamp_utc": _format_capture_timestamp(change.to_capture_timestamp),
+            "from_job_id": change.from_job_id,
+            "to_job_id": change.to_job_id,
+            "change_type": change.change_type,
+            "summary": change.summary,
+            "added_sections": change.added_sections,
+            "removed_sections": change.removed_sections,
+            "changed_sections": change.changed_sections,
+            "added_lines": change.added_lines,
+            "removed_lines": change.removed_lines,
+            "change_ratio": change.change_ratio,
+            "high_noise": bool(change.high_noise),
+            "diff_truncated": bool(change.diff_truncated),
+            "diff_version": change.diff_version,
+            "normalization_version": change.normalization_version,
+            "computed_at_utc": _format_capture_timestamp(change.computed_at),
+            "compare_url": compare_url,
+        }
+
+
+def _iter_jsonl(rows: Iterable[dict[str, Any]]) -> Iterator[bytes]:
+    for row in rows:
+        yield (json.dumps(row, ensure_ascii=False) + "\n").encode("utf-8")
+
+
+def _iter_csv(rows: Iterable[dict[str, Any]], fieldnames: list[str]) -> Iterator[bytes]:
+    buffer = io.StringIO()
+    writer = csv.DictWriter(buffer, fieldnames=fieldnames, extrasaction="ignore")
+    writer.writeheader()
+    yield buffer.getvalue().encode("utf-8")
+    buffer.seek(0)
+    buffer.truncate(0)
+
+    for row in rows:
+        writer.writerow(row)
+        yield buffer.getvalue().encode("utf-8")
+        buffer.seek(0)
+        buffer.truncate(0)
+
+
+def _iter_gzip(chunks: Iterable[bytes]) -> Iterator[bytes]:
+    buffer = io.BytesIO()
+    gzipper = gzip.GzipFile(fileobj=buffer, mode="wb")
+    for chunk in chunks:
+        gzipper.write(chunk)
+        gzipper.flush()
+        data = buffer.getvalue()
+        if data:
+            yield data
+            buffer.seek(0)
+            buffer.truncate(0)
+    gzipper.close()
+    data = buffer.getvalue()
+    if data:
+        yield data
+
+
+def _build_export_response(
+    *,
+    rows: Iterable[dict[str, Any]],
+    export_format: str,
+    filename_base: str,
+    fieldnames: list[str],
+    compressed: bool,
+) -> StreamingResponse:
+    content_type = _EXPORT_CONTENT_TYPES[export_format]
+    if export_format == "jsonl":
+        stream = _iter_jsonl(rows)
+        filename = f"{filename_base}.jsonl"
+    else:
+        stream = _iter_csv(rows, fieldnames)
+        filename = f"{filename_base}.csv"
+
+    headers: dict[str, str] = {}
+    if compressed:
+        stream = _iter_gzip(stream)
+        filename = f"{filename}.gz"
+        headers["Content-Encoding"] = "gzip"
+
+    headers["Content-Disposition"] = f'attachment; filename="{filename}"'
+    return StreamingResponse(stream, media_type=content_type, headers=headers)
 
 
 def _build_browse_url(
@@ -1808,6 +2090,141 @@ def get_usage_metrics(db: Session = Depends(get_db)) -> UsageMetricsSchema:
         windowDays=window_days,
         totals=totals,
         daily=daily,
+    )
+
+
+@router.get("/exports", response_model=ExportManifestSchema)
+def get_exports_manifest() -> ExportManifestSchema:
+    """
+    Describe the public export endpoints and limits.
+    """
+    enabled = get_exports_enabled()
+    site_base = get_public_site_base_url()
+    return ExportManifestSchema(
+        enabled=enabled,
+        formats=list(_EXPORT_FORMATS),
+        defaultLimit=get_exports_default_limit(),
+        maxLimit=get_exports_max_limit(),
+        dataDictionaryUrl=f"{site_base}/exports",
+        snapshots=ExportResourceSchema(
+            path="/api/exports/snapshots",
+            description="Snapshot metadata export (no raw HTML).",
+            formats=list(_EXPORT_FORMATS),
+        ),
+        changes=ExportResourceSchema(
+            path="/api/exports/changes",
+            description="Change event export (no diff HTML bodies).",
+            formats=list(_EXPORT_FORMATS),
+        ),
+    )
+
+
+@router.get("/exports/snapshots")
+def export_snapshots(
+    format: str = Query(default="jsonl"),
+    compressed: bool = Query(default=True),
+    source: Optional[str] = Query(default=None),
+    afterId: Optional[int] = Query(default=None, ge=0),
+    limit: Optional[int] = Query(default=None, ge=1),
+    from_: Optional[date] = Query(default=None, alias="from"),
+    to: Optional[date] = Query(default=None),
+    db: Session = Depends(get_db),
+) -> StreamingResponse:
+    """
+    Stream snapshot metadata exports in JSONL or CSV format.
+    """
+    if not get_exports_enabled():
+        raise HTTPException(status_code=403, detail="Exports are disabled.")
+
+    export_format = _normalize_export_format(format)
+    max_limit = get_exports_max_limit()
+    if limit is not None and limit > max_limit:
+        raise HTTPException(
+            status_code=422,
+            detail=f"limit must be <= {max_limit}",
+        )
+    effective_limit = limit or get_exports_default_limit()
+
+    dialect_name = db.get_bind().dialect.name
+    range_start, range_end_exclusive = _build_date_range(
+        from_=from_, to=to, dialect_name=dialect_name
+    )
+    source_id = _resolve_source_id(db, source)
+    public_base = get_public_site_base_url()
+
+    rows = _iter_snapshot_export_rows(
+        db=db,
+        source_id=source_id,
+        after_id=afterId,
+        limit=effective_limit,
+        range_start=range_start,
+        range_end_exclusive=range_end_exclusive,
+        public_base=public_base,
+    )
+
+    return _build_export_response(
+        rows=rows,
+        export_format=export_format,
+        filename_base="healtharchive-snapshots",
+        fieldnames=_SNAPSHOT_EXPORT_FIELDS,
+        compressed=compressed,
+    )
+
+
+@router.get("/exports/changes")
+def export_changes(
+    format: str = Query(default="jsonl"),
+    compressed: bool = Query(default=True),
+    source: Optional[str] = Query(default=None),
+    afterId: Optional[int] = Query(default=None, ge=0),
+    limit: Optional[int] = Query(default=None, ge=1),
+    from_: Optional[date] = Query(default=None, alias="from"),
+    to: Optional[date] = Query(default=None),
+    db: Session = Depends(get_db),
+) -> StreamingResponse:
+    """
+    Stream change event exports in JSONL or CSV format.
+    """
+    if not get_exports_enabled():
+        raise HTTPException(status_code=403, detail="Exports are disabled.")
+    if not get_change_tracking_enabled():
+        raise HTTPException(
+            status_code=403,
+            detail="Change tracking is disabled; change exports are unavailable.",
+        )
+
+    export_format = _normalize_export_format(format)
+    max_limit = get_exports_max_limit()
+    if limit is not None and limit > max_limit:
+        raise HTTPException(
+            status_code=422,
+            detail=f"limit must be <= {max_limit}",
+        )
+    effective_limit = limit or get_exports_default_limit()
+
+    dialect_name = db.get_bind().dialect.name
+    range_start, range_end_exclusive = _build_date_range(
+        from_=from_, to=to, dialect_name=dialect_name
+    )
+    source_id = _resolve_source_id(db, source)
+    public_base = get_public_site_base_url()
+
+    rows = _iter_change_export_rows(
+        db=db,
+        source_id=source_id,
+        after_id=afterId,
+        limit=effective_limit,
+        range_start=range_start,
+        range_end_exclusive=range_end_exclusive,
+        public_base=public_base,
+    )
+
+    return _build_export_response(
+        rows=rows,
+        export_format=export_format,
+        filename_base="healtharchive-changes",
+        fieldnames=_CHANGE_EXPORT_FIELDS,
+        compressed=compressed,
     )
 
 
