@@ -1558,6 +1558,194 @@ External validation is the “credibility multiplier”:
 
 ---
 
+### Phase 4 Implementation Plan (Detailed; sub-phases)
+
+Phase 4 is intentionally **mostly non-code**. The outputs that “count” are public artifacts and third-party confirmations (links/embeds, emails/letters, citations/mentions) rather than features.
+
+#### Design principles (Phase 4)
+
+- **Distribution before complexity.** Prefer RSS + “link to `/changes`” over building bespoke widgets.
+- **No medical interpretation.** Partners should be distributing an archive/change log, not “recommendations”.
+- **Permission + accuracy.** Never list a partner or verifier publicly without explicit permission and a reviewed description.
+- **Privacy by default.** Do not collect or store partner contact details in the repo. Keep outreach tracking private.
+- **Evidence-first.** Every claimed partnership should have a “proof artifact” you can show (screenshot, published link, email permission).
+
+#### Sub-phase 4A — Define target partners + selection criteria (½–1 day)
+
+**Goal:** A small, realistic list of targets you can actually contact and close.
+
+Decide:
+
+- The **primary distribution channel** for Phase 4 (recommended): the `/digest` RSS feeds (global + per-source).
+- The **default “ask”** (keep it easy): “Please link to HealthArchive’s digest/changes page as a resource for reproducibility and auditability.”
+- Partner “tiers” (avoid overpromising):
+  - **Distribution partner:** links to `/digest` or `/changes`, or republishes the RSS feed in a resource page.
+  - **Review partner:** provides occasional feedback on governance/scope wording (informal advisory).
+  - **Research/teaching partner:** uses it in a class/lab project and is willing to be named (optional; high value).
+
+Selection criteria for the initial list (use as a filter):
+
+- Audience overlap with HealthArchive (research methods, journalism, digital scholarship, evidence communication).
+- Ability to “say yes” quickly (a librarian maintaining a LibGuides page, a lab website admin, a newsletter editor).
+- Comfort with the “archive, not guidance” framing.
+- Willingness to be publicly named and/or verify use.
+
+Deliverables:
+
+- A private “Top 10 targets” list with:
+  - org name, relevant program/page, role/title to contact,
+  - one sentence: why they are a fit,
+  - one sentence: what you’re asking them to do,
+  - the lowest-friction next step (email vs warm intro vs office hours).
+
+Proof artifacts (later):
+
+- Screenshot or archived copy of their page once they link/mention it.
+
+#### Sub-phase 4B — Build partner-ready assets (1–2 days)
+
+**Goal:** Remove friction for adoption and prevent misinterpretation.
+
+Create (minimum viable kit):
+
+1) **One-page brief** (PDF or web page)
+   - “What it is” in 2 sentences (archive + timestamped change tracking).
+   - “What it is not” (not medical advice; not current guidance; not affiliated).
+   - Who it is for (researchers/journalists/educators first).
+   - Links: `/methods`, `/governance`, `/status`, `/impact`, `/digest`, `/changes`.
+   - A small “project snapshot” box: sources tracked, snapshots, latest capture date.
+
+2) **Screenshot pack** (5–8 images)
+   - Home + “What this is/isn’t”
+   - Archive search page
+   - Snapshot page metadata + report link
+   - Changes feed (`/changes`)
+   - Compare view (`/compare?to=<real id>`) showing “descriptive only”
+   - Digest page (`/digest`) with RSS links
+   - Status/Impact pages (optional but persuasive)
+
+3) **“How to cite” handout** (1 page)
+   - Snapshot citation format (already present on `/researchers`; refine into a stable standalone artifact).
+   - Compare citation format (two snapshot IDs + timestamps + compare URL).
+   - A clear disclaimer that citations refer to archived content, not current guidance.
+
+4) **Outreach email templates** (plain text)
+   - One initial email template per partner tier (distribution vs research/teaching).
+   - A 2–3 sentence “elevator pitch” that avoids adversarial language (“auditability” rather than “accountability attack”).
+
+Rules:
+
+- Do not include private emails/phone numbers in repo artifacts.
+- Do not include claims like “widely used” until you can support them with numbers/partners.
+
+Deliverables location guidance:
+
+- Public-facing, non-sensitive assets can live in the repo (docs folder) if you want versioning.
+- Contact lists and outreach logs should stay private (not committed).
+
+#### Sub-phase 4C — Outreach workflow + tracking (1–2 weeks, ongoing)
+
+**Goal:** Run outreach like a small operational process, not ad-hoc messages.
+
+Suggested workflow:
+
+1) Identify 3 “warmest” targets (fastest to yes).
+2) Send the initial email with:
+   - one-page brief link/attachment,
+   - link to `/digest` and `/changes`,
+   - one specific ask,
+   - one low-effort follow-up option (“If helpful, I can send a 2-minute screencast or hop on a 15-minute call.”).
+3) Track each outreach attempt privately:
+   - date sent, response, follow-up dates, outcome.
+4) Follow-up cadence:
+   - 7 days after initial email,
+   - 14 days after initial email (final polite close).
+
+Example “distribution ask” (keep it concrete):
+
+- “Would you be willing to add HealthArchive.ca to your digital scholarship/public health methods resources page, linking to the digest (`/digest`) or the changes feed (`/changes`)? The site is explicitly non-authoritative and is intended for reproducibility and auditability.”
+
+Proof artifacts (save for ABS/verifiers):
+
+- Email thread granting permission to be listed (even a short “Yes, you can list us” reply).
+- Screenshot of the published link on their site (with date).
+
+#### Sub-phase 4D — Partner onboarding (½ day per partner)
+
+**Goal:** Make “yes” immediately turn into public evidence, with minimal partner burden.
+
+Distribution options (in order):
+
+1) Link to `/digest` (RSS + explainer).
+2) Link to `/changes` (edition-aware changes feed).
+3) Optional: partner adds the RSS feed to their own page/newsletter tooling.
+
+What you provide back:
+
+- A short “How to use this resource” blurb they can paste (includes disclaimers).
+- The exact RSS URL(s) for global/per-source feeds.
+- A suggested citation sentence: “This is an archival record; verify current guidance on the official source.”
+
+What you avoid:
+
+- Anything that looks like endorsement or clinical guidance.
+- Anything requiring ongoing support (custom widgets, per-partner deployments) until you have bandwidth.
+
+#### Sub-phase 4E — Verifier strategy + verification packet (½–1 day)
+
+**Goal:** Make it easy for one credible person to verify your role and the project’s use/impact.
+
+Identify one verifier candidate (examples):
+
+- librarian/archivist in digital scholarship,
+- public health researcher supervising a methods project,
+- journalism faculty/editor using the resource in a workflow.
+
+Build a small “verification packet” (shareable link or PDF):
+
+- Mission + safety posture (one paragraph).
+- What you built (high-level architecture, no sensitive infrastructure details).
+- What is live now (key pages + APIs).
+- Metrics snapshot (from `/status` + `/impact`).
+- What you do operationally (annual capture policy + change tracking cadence).
+- A short role summary (what you personally did; keep it factual).
+
+Ask the verifier explicitly:
+
+- “Are you willing to verify that I built and operate this project and that it has been useful for X purpose?”
+- “May I list your name/title as a verifier (with your preferred wording)?”
+
+Proof artifact:
+
+- Written confirmation (email is sufficient) saved privately.
+
+#### Sub-phase 4F — Mentions/citations capture (ongoing; 15 min/month)
+
+**Goal:** Build an evidence trail without invasive analytics.
+
+Keep a lightweight, public “mentions log” (can be a section in the changelog or impact report):
+
+- date, outlet/org, link, one-sentence context.
+
+Ways to find mentions (non-invasive):
+
+- manual search for “healtharchive.ca” occasionally,
+- direct partner updates (“we added you to our resources page”),
+- optional: set up alerts outside the repo (do not commit credentials).
+
+#### Sub-phase 4G — Phase 4 definitions of done (make success measurable)
+
+Minimum viable “Phase 4 complete”:
+
+- 1 distribution partner publicly links to `/digest` or `/changes` (with permission to name them).
+- 1 verifier agrees (with permission) to verify your role and describe the project’s utility.
+- 1 impact report includes the above as “Partner highlights” with links.
+
+Stretch goals (high value if feasible):
+
+- 1 course/lab/student project uses the data and is willing to be named.
+- 1 external mention in a newsletter/blog post/paper.
+
 ## Phase 5 — Research-Grade Outputs (expanded)
 
 ### Why this matters
