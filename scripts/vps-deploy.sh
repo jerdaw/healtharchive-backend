@@ -145,6 +145,31 @@ run_shell() {
   bash -lc "$1"
 }
 
+wait_for_health() {
+  local url="$1"
+  local attempts="${2:-30}"
+  local delay_seconds="${3:-1}"
+
+  if [[ "${APPLY}" != "true" ]]; then
+    echo "+ wait_for_health \"${url}\" (attempts=${attempts}, delay=${delay_seconds}s)"
+    return 0
+  fi
+
+  local i
+  for ((i = 1; i <= attempts; i++)); do
+    if curl -fsS --max-time 2 "${url}" >/dev/null; then
+      return 0
+    fi
+    sleep "${delay_seconds}"
+  done
+
+  echo "ERROR: Health check failed after ${attempts} attempts: ${url}" >&2
+  echo "Hint: Inspect service status and logs:" >&2
+  echo "  sudo systemctl status healtharchive-api healtharchive-worker --no-pager -l" >&2
+  echo "  sudo journalctl -u healtharchive-api -n 200 --no-pager" >&2
+  return 1
+}
+
 lock_dir="$(dirname "${LOCK_FILE}")"
 mkdir -p "${lock_dir}"
 
@@ -230,6 +255,7 @@ else
   echo "Skipping service restart (--skip-restart)."
 fi
 
+wait_for_health "${HEALTH_URL}" 30 1
 run bash -lc "curl -fsS \"${HEALTH_URL}\" | head -c 2000; echo"
 
 echo ""
