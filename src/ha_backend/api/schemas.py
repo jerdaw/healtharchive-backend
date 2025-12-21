@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+from datetime import datetime
+from enum import Enum
 from typing import List, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class SourceSummarySchema(BaseModel):
@@ -84,6 +86,30 @@ class ArchiveStatsSchema(BaseModel):
     latestCaptureAgeDays: Optional[int]
 
 
+class IssueReportCategory(str, Enum):
+    broken_snapshot = "broken_snapshot"
+    incorrect_metadata = "incorrect_metadata"
+    missing_snapshot = "missing_snapshot"
+    takedown = "takedown"
+    general_feedback = "general_feedback"
+
+
+class IssueReportCreateSchema(BaseModel):
+    category: IssueReportCategory
+    description: str = Field(min_length=20, max_length=4000)
+    snapshotId: Optional[int] = Field(default=None, ge=1)
+    originalUrl: Optional[str] = Field(default=None, max_length=4096)
+    reporterEmail: Optional[str] = Field(default=None, max_length=255)
+    pageUrl: Optional[str] = Field(default=None, max_length=4096)
+    website: Optional[str] = Field(default=None, max_length=200)
+
+
+class IssueReportReceiptSchema(BaseModel):
+    reportId: Optional[int]
+    status: str
+    receivedAt: datetime
+
+
 __all__ = [
     "SourceSummarySchema",
     "SourceEditionSchema",
@@ -92,4 +118,7 @@ __all__ = [
     "SearchResponseSchema",
     "SnapshotDetailSchema",
     "ArchiveStatsSchema",
+    "IssueReportCategory",
+    "IssueReportCreateSchema",
+    "IssueReportReceiptSchema",
 ]

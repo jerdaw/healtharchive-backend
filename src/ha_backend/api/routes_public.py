@@ -21,7 +21,7 @@ from ha_backend.config import (
 )
 from ha_backend.db import get_session
 from ha_backend.indexing.viewer import find_record_for_snapshot
-from ha_backend.models import ArchiveJob, Page, PageSignal, Snapshot, Source
+from ha_backend.models import ArchiveJob, IssueReport, Page, PageSignal, Snapshot, Source
 from ha_backend.search import TS_CONFIG, build_search_vector
 from ha_backend.search_ranking import (
     QueryMode,
@@ -52,6 +52,8 @@ from ha_backend.runtime_metrics import observe_search_request
 
 from .schemas import (
     ArchiveStatsSchema,
+    IssueReportCreateSchema,
+    IssueReportReceiptSchema,
     ReplayResolveSchema,
     SearchResponseSchema,
     SnapshotDetailSchema,
@@ -1643,6 +1645,64 @@ def get_db() -> Session:
     """
     with get_session() as session:
         yield session
+
+
+@router.post("/reports", response_model=IssueReportReceiptSchema, status_code=201)
+def submit_issue_report(
+    payload: IssueReportCreateSchema, db: Session = Depends(get_db)
+) -> IssueReportReceiptSchema:
+    """
+    Accept a public issue report submission.
+
+    This endpoint intentionally collects minimal data and does not accept
+    attachments. Reports are meant for metadata errors, broken snapshots,
+    missing coverage, or takedown requests.
+    """
+    received_at = datetime.now(timezone.utc)
+
+    if payload.website and payload.website.strip():
+        return IssueReportReceiptSchema(
+            reportId=None,
+            status="received",
+            receivedAt=received_at,
+        )
+
+    description = payload.description.strip()
+    if len(description) < 20:
+        raise HTTPException(
+            status_code=400, detail="Description must be at least 20 characters."
+        )
+
+    original_url = payload.originalUrl.strip() if payload.originalUrl else None
+    if original_url == "":
+        original_url = None
+
+    page_url = payload.pageUrl.strip() if payload.pageUrl else None
+    if page_url == "":
+        page_url = None
+
+    reporter_email = payload.reporterEmail.strip() if payload.reporterEmail else None
+    if reporter_email == "":
+        reporter_email = None
+
+    report = IssueReport(
+        category=payload.category.value,
+        description=description,
+        snapshot_id=payload.snapshotId,
+        original_url=original_url,
+        reporter_email=reporter_email,
+        page_url=page_url,
+        status="new",
+    )
+    db.add(report)
+    db.commit()
+    db.refresh(report)
+
+    return IssueReportReceiptSchema(
+        reportId=report.id,
+        status=report.status,
+        receivedAt=report.created_at or received_at,
+    )
 
 
 @router.get("/health")

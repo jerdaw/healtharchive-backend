@@ -251,6 +251,36 @@ class Snapshot(TimestampMixin, Base):
         return f"<Snapshot id={self.id!r} url={self.url!r}>"
 
 
+class IssueReport(TimestampMixin, Base):
+    """
+    Public issue report submitted via the site (metadata errors, broken replay, etc.).
+    """
+
+    __tablename__ = "issue_reports"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    category: Mapped[str] = mapped_column(
+        String(50),
+        nullable=False,
+        index=True,
+    )
+    description: Mapped[str] = mapped_column(Text, nullable=False)
+    snapshot_id: Mapped[Optional[int]] = mapped_column(Integer, index=True)
+    original_url: Mapped[Optional[str]] = mapped_column(Text)
+    reporter_email: Mapped[Optional[str]] = mapped_column(String(255))
+    page_url: Mapped[Optional[str]] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(
+        String(50),
+        nullable=False,
+        server_default=text("'new'"),
+        index=True,
+    )
+    internal_notes: Mapped[Optional[str]] = mapped_column(Text)
+
+    def __repr__(self) -> str:
+        return f"<IssueReport id={self.id!r} category={self.category!r}>"
+
+
 class Page(TimestampMixin, Base):
     """
     Canonical "page" concept, grouping multiple Snapshot captures.
@@ -376,6 +406,7 @@ __all__ = [
     "Source",
     "ArchiveJob",
     "Snapshot",
+    "IssueReport",
     "Page",
     "SnapshotOutlink",
     "PageSignal",

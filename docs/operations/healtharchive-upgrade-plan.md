@@ -186,7 +186,244 @@ Your internal documentation quality is already high; an advisory circle makes it
 -   The site has publicly visible: Governance, Terms, Privacy, Changelog, Report-an-issue flow.
 -   A neutral reviewer can understand your rules and safety posture in under 2 minutes.
 
----
+### Phase 1 Implementation Plan (Detailed; sub-phases)
+
+This phase is deliberately **mostly writing + lightweight UI + lightweight backend plumbing**. The goal is not bureaucracy — it’s to make HealthArchive legible, defensible, and easy to verify as “public-interest infrastructure”.
+
+**Design principles (Phase 1)**
+
+- **Plain language over legalese.** You are defining procedures and expectations, not trying to replace a lawyer.
+- **Minimal collection.** No accounts, no tracking IDs tied to people, no sensitive submissions. Default to “do not submit personal/health information.”
+- **Consistency.** The same core “this is an archive / not guidance / not medical advice” language should appear across the new pages, reusing frontend’s canonical copy source (`healtharchive-frontend/src/lib/siteCopy.ts`).
+- **Operational reality.** Policies should match how you actually operate today (annual editions, constrained scope, optional replay).
+- **Fail safe.** When the API is unreachable, reporting should still work (e.g., mailto fallback).
+
+#### Sub-phase 1A — Inventory + decisions (½ day)
+
+**Goal:** Avoid writing policies that contradict the real system or overpromise.
+
+Checklist:
+
+- Confirm what is already stated on `/methods`, `/about`, `/researchers`, footer disclaimers, and Phase 0 callouts.
+- Confirm what user data is currently collected (likely: server access logs via Caddy/uvicorn; no explicit frontend analytics).
+- Decide the **minimum policy commitments** you are comfortable operationalizing:
+  - Corrections response time (example: “within 7 days”; urgent labeling issues: “within 48 hours”).
+  - What you will and won’t take down (government sources vs third-party; link-outs vs full removal; “restrict access” option).
+  - Which contact channel is authoritative (email; optionally GitHub issues for technical items).
+- Decide the initial “advisory circle” stance:
+  - If you don’t yet have advisors, plan to publish “seeking advisors” language rather than faking a board.
+
+Deliverables:
+
+- A short “Phase 1 policy decisions” note (can live as a section in the changelog or as internal notes).
+- A list of new public routes to create (see Sub-phase 1C).
+
+#### Sub-phase 1B — Draft public Governance content (1–2 days)
+
+**Goal:** Ship a governance page that answers the big questions quickly.
+
+Governance page structure (recommended single page with anchored sections):
+
+1) **Mission + audience**
+   - One sentence mission (align with Phase 0).
+   - Primary audiences (researchers/journalists/educators) + secondary audiences (public/clinicians) with guardrails.
+
+2) **Scope + inclusion criteria**
+   - What sources qualify (Canadian public health agencies; criteria examples):
+     - Publicly accessible pages
+     - High-impact guidance/data/communications
+     - Stable provenance labeling possible
+   - What’s out of scope (examples to explicitly state):
+     - Private/internal content; anything behind login
+     - User-submitted or personal data sources
+     - Any attempt to “mirror the entire internet”
+   - “Reliability over breadth” statement.
+
+3) **Provenance commitments**
+   - What you guarantee to show on snapshot pages (examples):
+     - Capture timestamp (timezone)
+     - Source name/code
+     - Original URL
+     - Snapshot permalink
+   - Explicit limitation examples:
+     - Some JS dashboards may not replay perfectly
+     - Missing assets may occur
+     - Captures represent “what the crawler saw”, not a perfect reconstruction
+
+4) **Corrections policy**
+   - What counts as a correction:
+     - Wrong metadata, broken replay/raw HTML, mislabeled source, missing warnings
+   - What does *not* count as a correction:
+     - Disagreements with what an agency published
+   - Response expectations (SLA language you can meet)
+   - How corrections are documented (ties to changelog; optional per-snapshot note later)
+
+5) **Takedown / opt-out policy**
+   - Most content is from government sources; still define:
+     - How to request review
+     - What you do when a request is credible (e.g., restrict access while reviewing)
+     - How you handle third-party embedded content captured inside a government page
+   - Make it explicit you don’t promise removal of public-interest government material unless there’s a compelling reason.
+
+6) **Non-affiliation + “not medical advice”**
+   - Reference footer disclaimers.
+   - Make the “what this is / isn’t” block visible.
+
+7) **Advisory circle**
+   - Charter summary and cadence.
+   - If not yet formed: “seeking advisors” + what backgrounds you’re looking for.
+
+Examples to include (short, non-interpretive):
+
+- “Researchers: cite what was visible on Jan 01, 2025.”
+- “Journalists: track when wording on a guidance page changed.”
+
+Deliverables:
+
+- Draft Governance copy ready for implementation as a new public route.
+
+Acceptance criteria:
+
+- A first-time visitor can read only the headings and understand: purpose, scope, provenance, corrections, takedown, and non-advice posture.
+
+#### Sub-phase 1C — Add public pages and navigation (frontend) (1–2 days)
+
+**Goal:** Make governance + policies discoverable without cluttering the primary nav.
+
+Recommended new frontend routes:
+
+- `/governance` (main page; anchored sections)
+- `/terms`
+- `/privacy`
+- `/changelog`
+- `/report` (or `/report-issue`)
+
+Navigation/linking strategy:
+
+- Add links in the **footer** (preferred) under a small “Project” or “Policies” column.
+- Keep the header nav unchanged for now (avoid overwhelming top-level IA).
+- Ensure each of these pages repeats the core disclaimers (reuse canonical copy + the existing footer).
+
+Changelog page content model (choose one):
+
+- **Option A (simplest):** A Markdown file committed in the frontend repo and rendered by the page.
+- **Option B:** A lightweight JSON/YAML content file with date/title/body entries.
+
+Deliverables:
+
+- Public pages implemented with consistent typography and accessible structure.
+- Footer links added.
+
+Acceptance criteria:
+
+- All pages build on Vercel, pass lint/tests, and do not introduce third-party scripts or weaken CSP.
+
+#### Sub-phase 1D — “Report an issue” intake UX (frontend) (1 day)
+
+**Goal:** Structured intake without collecting sensitive info.
+
+Form fields (recommended):
+
+- Category (dropdown):
+  - Broken snapshot/replay
+  - Incorrect metadata (date/source/URL)
+  - Missing snapshot / request a capture
+  - Takedown / content concern
+  - General feedback
+- Optional context:
+  - Snapshot ID (if applicable)
+  - Original URL (if known)
+  - Description (required; include “Do not include personal/health info” warning)
+- Optional contact email (explicitly optional; users can also just email `contact@healtharchive.ca`)
+
+Failover behavior:
+
+- If backend API is reachable: submit the form and return a short “received” confirmation with a reference ID.
+- If backend API is unreachable: provide a “mailto” fallback that pre-fills subject/body with the selected category + details.
+
+Deliverables:
+
+- A clear “Report an issue” page that explains what happens next and expected response times.
+
+Acceptance criteria:
+
+- A user can report an issue even if the live API is down (offline fallback still works).
+
+#### Sub-phase 1E — Minimal backend support for issue intake (1–2 days)
+
+**Goal:** Make reports actionable and auditable, without creating a large moderation system.
+
+Recommended backend capabilities:
+
+- A small DB-backed “issue report” record with:
+  - category, description, optional snapshot_id, optional original_url, created_at
+  - optional reporter_email (nullable)
+  - status (new / triaged / resolved)
+  - internal notes (admin-only)
+- A **public** POST endpoint for submissions (with input validation and spam protection).
+- An **admin-only** endpoint to list and view reports, protected by existing admin token rules.
+
+Spam/risk controls (pick a minimal set you can sustain):
+
+- Rate limit by IP (coarse) and/or a “honey pot” hidden field.
+- Hard cap payload sizes.
+- Explicitly reject submissions that look like they include personal health information (at minimum, a warning plus optional keyword heuristics).
+
+Deliverables:
+
+- Issue intake pipeline exists end-to-end (frontend → backend → admin view).
+
+Acceptance criteria:
+
+- Public submissions work from production origin(s) without weakening CORS.
+- Admin token remains required for browsing report details.
+
+#### Sub-phase 1F — Advisory circle (non-code) (ongoing; start in Phase 1)
+
+**Goal:** Create real external credibility.
+
+Steps:
+
+- Draft a 1-page advisory charter:
+  - Purpose (scope/risk/governance review, not operations)
+  - Cadence (quarterly)
+  - What advisors do and don’t do
+- Identify and contact candidates:
+  - librarian/archivist, public health researcher, science communication/journalism
+- Publish either:
+  - Names/titles (with permission), or
+  - A “seeking advisors” section until you have consent to publish names
+
+Deliverables:
+
+- Charter text included on `/governance` (or linked from it).
+
+#### Sub-phase 1G — Update docs and prove maintenance (½ day)
+
+**Goal:** Make Phase 1 changes easy for a future maintainer to understand.
+
+- Update:
+  - Frontend docs index or implementation guide (where the new routes live)
+  - Backend docs index (new issue intake endpoints, if added)
+- Add a “Phase 1 complete” entry to `/changelog` with date + bullet list.
+
+**Definition of done (Phase 1, detailed)**
+
+- New public pages exist and are linked from the site: `/governance`, `/terms`, `/privacy`, `/changelog`, `/report` (or equivalent).
+- Policies describe how HealthArchive actually operates today, including annual editions, constrained scope, and replay limitations.
+- Issue reporting is structured and works even when the API is down (via fallback).
+- No new sensitive data is collected; privacy page matches reality.
+- All tests pass (frontend + backend) and CSP/CORS/admin protections are not weakened.
+
+**Status (Phase 1 implementation)**
+
+- Implemented on 2025-12-21.
+- Public pages added: `/governance`, `/terms`, `/privacy`, `/changelog`, `/report`.
+- Issue intake pipeline implemented with a backend `/api/reports` endpoint and admin views.
+- Frontend uses a same-origin proxy route (`/api/report`) so reporting works even when the backend CORS policy remains strict.
+- Footer and snapshot/browse views link to the report flow.
+
+--- 
 
 ## Phase 2 — Make Impact Measurable + Visible (build on what you already have)
 
