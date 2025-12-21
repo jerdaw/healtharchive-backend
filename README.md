@@ -187,6 +187,9 @@ Key public endpoints (all prefixed with `/api`):
   When `HEALTHARCHIVE_REPLAY_BASE_URL` is set, this includes a `browseUrl`
   suitable for embedding a replay engine (pywb) for full-fidelity browsing.
 
+- `GET /api/usage`  
+  Aggregated usage metrics (daily counts) for public reporting.
+
 - `POST /api/reports`  
   Public issue intake endpoint for broken snapshots, metadata errors, missing coverage, or takedown requests.
 

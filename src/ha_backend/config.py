@@ -48,6 +48,13 @@ DEFAULT_REPLAY_PREVIEW_DIR = ""
 # materialized "pages" table for faster browsing.
 DEFAULT_PAGES_FASTPATH_ENABLED = True
 
+# === Usage metrics ===
+
+# Aggregate-only usage metrics (daily counts). Disable if you want a strictly
+# metrics-free deployment.
+DEFAULT_USAGE_METRICS_ENABLED = True
+DEFAULT_USAGE_METRICS_WINDOW_DAYS = 30
+
 
 @dataclass
 class ArchiveToolConfig:
@@ -171,3 +178,30 @@ def get_pages_fastpath_enabled() -> bool:
     default = "1" if DEFAULT_PAGES_FASTPATH_ENABLED else "0"
     raw = os.environ.get("HA_PAGES_FASTPATH", default).strip().lower()
     return raw not in ("0", "false", "no", "off")
+
+
+def get_usage_metrics_enabled() -> bool:
+    """
+    Return whether aggregated usage metrics should be recorded.
+
+    Controlled via HEALTHARCHIVE_USAGE_METRICS_ENABLED (truthy/falsey).
+    Defaults to enabled.
+    """
+    default = "1" if DEFAULT_USAGE_METRICS_ENABLED else "0"
+    raw = os.environ.get("HEALTHARCHIVE_USAGE_METRICS_ENABLED", default).strip().lower()
+    return raw not in ("0", "false", "no", "off")
+
+
+def get_usage_metrics_window_days() -> int:
+    """
+    Return the rolling window size (in days) for usage metrics summaries.
+    """
+    raw = os.environ.get(
+        "HEALTHARCHIVE_USAGE_METRICS_WINDOW_DAYS",
+        str(DEFAULT_USAGE_METRICS_WINDOW_DAYS),
+    ).strip()
+    try:
+        value = int(raw)
+    except ValueError:
+        value = DEFAULT_USAGE_METRICS_WINDOW_DAYS
+    return max(1, min(value, 365))

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any, Dict, List, Optional
 
 from sqlalchemy import (
@@ -8,6 +8,7 @@ from sqlalchemy import (
     BigInteger,
     Boolean,
     Column,
+    Date,
     DateTime,
     Float,
     ForeignKey,
@@ -281,6 +282,42 @@ class IssueReport(TimestampMixin, Base):
         return f"<IssueReport id={self.id!r} category={self.category!r}>"
 
 
+class UsageMetric(TimestampMixin, Base):
+    """
+    Aggregated daily usage counts (privacy-preserving).
+    """
+
+    __tablename__ = "usage_metrics"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    metric_date: Mapped[date] = mapped_column(
+        Date,
+        nullable=False,
+        index=True,
+    )
+    event: Mapped[str] = mapped_column(
+        String(64),
+        nullable=False,
+        index=True,
+    )
+    count: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        server_default=text("0"),
+    )
+
+    __table_args__ = (
+        UniqueConstraint(
+            "metric_date",
+            "event",
+            name="uq_usage_metrics_date_event",
+        ),
+    )
+
+    def __repr__(self) -> str:
+        return f"<UsageMetric date={self.metric_date!r} event={self.event!r} count={self.count!r}>"
+
+
 class Page(TimestampMixin, Base):
     """
     Canonical "page" concept, grouping multiple Snapshot captures.
@@ -407,6 +444,7 @@ __all__ = [
     "ArchiveJob",
     "Snapshot",
     "IssueReport",
+    "UsageMetric",
     "Page",
     "SnapshotOutlink",
     "PageSignal",
