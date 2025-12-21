@@ -2171,6 +2171,32 @@ def export_snapshots(
     )
 
 
+@router.head("/exports/snapshots")
+def export_snapshots_head(
+    format: str = Query(default="jsonl"),
+    compressed: bool = Query(default=True),
+) -> Response:
+    """
+    Return headers for snapshot exports without streaming a body.
+
+    Some clients use HEAD requests (`curl -I`) to inspect download headers.
+    """
+    if not get_exports_enabled():
+        raise HTTPException(status_code=403, detail="Exports are disabled.")
+
+    export_format = _normalize_export_format(format)
+    content_type = _EXPORT_CONTENT_TYPES[export_format]
+    filename = "healtharchive-snapshots.jsonl" if export_format == "jsonl" else "healtharchive-snapshots.csv"
+
+    headers: dict[str, str] = {}
+    if compressed:
+        headers["Content-Encoding"] = "gzip"
+        filename = f"{filename}.gz"
+    headers["Content-Disposition"] = f'attachment; filename="{filename}"'
+
+    return Response(content=b"", media_type=content_type, headers=headers)
+
+
 @router.get("/exports/changes")
 def export_changes(
     format: str = Query(default="jsonl"),
@@ -2226,6 +2252,37 @@ def export_changes(
         fieldnames=_CHANGE_EXPORT_FIELDS,
         compressed=compressed,
     )
+
+
+@router.head("/exports/changes")
+def export_changes_head(
+    format: str = Query(default="jsonl"),
+    compressed: bool = Query(default=True),
+) -> Response:
+    """
+    Return headers for change exports without streaming a body.
+
+    Some clients use HEAD requests (`curl -I`) to inspect download headers.
+    """
+    if not get_exports_enabled():
+        raise HTTPException(status_code=403, detail="Exports are disabled.")
+    if not get_change_tracking_enabled():
+        raise HTTPException(
+            status_code=403,
+            detail="Change tracking is disabled; change exports are unavailable.",
+        )
+
+    export_format = _normalize_export_format(format)
+    content_type = _EXPORT_CONTENT_TYPES[export_format]
+    filename = "healtharchive-changes.jsonl" if export_format == "jsonl" else "healtharchive-changes.csv"
+
+    headers: dict[str, str] = {}
+    if compressed:
+        headers["Content-Encoding"] = "gzip"
+        filename = f"{filename}.gz"
+    headers["Content-Disposition"] = f'attachment; filename="{filename}"'
+
+    return Response(content=b"", media_type=content_type, headers=headers)
 
 
 @router.get("/changes", response_model=ChangeFeedSchema)

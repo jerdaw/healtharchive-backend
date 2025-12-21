@@ -199,3 +199,33 @@ def test_exports_invalid_format(tmp_path, monkeypatch) -> None:
 
     resp = client.get("/api/exports/snapshots", params={"format": "xlsx"})
     assert resp.status_code == 422
+
+
+def test_snapshot_exports_head_returns_download_headers(tmp_path, monkeypatch) -> None:
+    client = _init_test_app(tmp_path, monkeypatch)
+    _seed_export_data()
+
+    resp = client.head(
+        "/api/exports/snapshots",
+        params={"format": "jsonl", "compressed": "false", "limit": 1},
+    )
+    assert resp.status_code == 200
+    assert resp.headers["content-type"].startswith("application/x-ndjson")
+    assert "content-encoding" not in resp.headers
+    assert "attachment" in resp.headers.get("content-disposition", "").lower()
+    assert resp.headers.get("content-disposition", "").endswith('.jsonl"')
+
+
+def test_change_exports_head_returns_download_headers(tmp_path, monkeypatch) -> None:
+    client = _init_test_app(tmp_path, monkeypatch)
+    _seed_export_data()
+
+    resp = client.head(
+        "/api/exports/changes",
+        params={"format": "csv", "compressed": "true", "limit": 1},
+    )
+    assert resp.status_code == 200
+    assert resp.headers["content-type"].startswith("text/csv")
+    assert resp.headers.get("content-encoding") == "gzip"
+    assert "attachment" in resp.headers.get("content-disposition", "").lower()
+    assert resp.headers.get("content-disposition", "").endswith('.csv.gz"')
