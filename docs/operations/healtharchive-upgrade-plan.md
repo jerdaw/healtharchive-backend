@@ -20,6 +20,26 @@ Status: **active roadmap** (Phases 0–6 implemented (core); remaining work is m
 - Phase 5: decide dataset release cadence + publish first versioned release (checksums); track real external research adoption
 - Phase 6: decide/enable annual scheduling + replay reconcile timers (if desired) and complete + log the first quarterly restore test
 
+**Decision tracker (update as you go; keep public-safe)**
+
+- Dataset release cadence: **TBD** (monthly vs quarterly; should match actual capture rhythm)
+- Dataset release scope: **TBD** (full-to-date vs rolling window vs incremental)
+- Dataset release venue: **TBD** (GitHub Releases recommended; decide which repo/org hosts it)
+- Restore test logging: **TBD** (where the public-safe log lives; repo vs private ops directory)
+- Production timers (record what is enabled today):
+  - Change tracking: **TBD** (expected: enabled when `/etc/healtharchive/change-tracking-enabled` exists)
+  - Annual scheduling: **TBD** (gated by `/etc/healtharchive/automation-enabled`)
+  - Replay reconcile: **TBD** (gated by `/etc/healtharchive/replay-automation-enabled`; only if replay enabled/stable)
+  - Annual search verification capture: **TBD** (optional)
+
+**Next steps (small, safe, sequential)**
+
+1) Decide dataset cadence + scope (Phase 5) and record the decision.
+2) Publish the first versioned dataset release (Phase 5) with `manifest.json` + `SHA256SUMS`.
+3) Run the first quarterly restore test (Phase 6) and record a public-safe result log.
+4) Run systemd dry-runs and decide whether to enable annual scheduling and/or replay reconcile timers (Phase 6).
+5) Do Phase 4 outreach: secure 1 partner link + 1 verifier (with permission to name), and start the mentions log discipline.
+
 ## Production Toggles / Enablement (what must be set on the VPS)
 
 Backend env file: `/etc/healtharchive/backend.env` (do not commit; keep `.env.example` in sync for dev).

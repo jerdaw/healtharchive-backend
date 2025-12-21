@@ -54,7 +54,7 @@ Run these against the restored DB:
 If you need a quick CLI-only check, run:
 
 ```bash
-/opt/healtharchive-backend/.venv/bin/ha-backend stats
+/opt/healtharchive-backend/.venv/bin/ha-backend check-db
 ```
 
 ## Step 5 — Record results
@@ -76,4 +76,3 @@ dropdb healtharchive_restore_test
 ```
 
 If you used a staging host, remove any temporary credentials or files.
-
