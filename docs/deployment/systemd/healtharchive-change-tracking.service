@@ -1,0 +1,23 @@
+[Unit]
+Description=HealthArchive change tracking (compute snapshot diffs)
+Wants=network-online.target
+After=network-online.target postgresql.service
+ConditionPathExists=/etc/healtharchive/backend.env
+ConditionPathExists=/etc/healtharchive/change-tracking-enabled
+
+[Service]
+Type=oneshot
+User=haadmin
+WorkingDirectory=/opt/healtharchive-backend
+EnvironmentFile=/etc/healtharchive/backend.env
+EnvironmentFile=-/etc/healtharchive/healthchecks.env
+
+# Keep impact low on the single VPS.
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=6
+
+# Diffing runs can be long when new editions are indexed.
+TimeoutStartSec=2h
+
+ExecStart=/opt/healtharchive-backend/scripts/systemd-healthchecks-wrapper.sh --ping-var HEALTHARCHIVE_HC_PING_CHANGE_TRACKING -- /opt/healtharchive-backend/.venv/bin/ha-backend compute-changes --since-days 400 --max-events 200

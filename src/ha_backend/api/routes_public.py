@@ -15,7 +15,9 @@ from sqlalchemy.orm import Session, joinedload, load_only
 from threading import Lock
 
 from ha_backend.config import (
+    get_change_tracking_enabled,
     get_pages_fastpath_enabled,
+    get_public_site_base_url,
     get_replay_base_url,
     get_replay_preview_dir,
     get_usage_metrics_enabled,
@@ -23,7 +25,15 @@ from ha_backend.config import (
 )
 from ha_backend.db import get_session
 from ha_backend.indexing.viewer import find_record_for_snapshot
-from ha_backend.models import ArchiveJob, IssueReport, Page, PageSignal, Snapshot, Source
+from ha_backend.models import (
+    ArchiveJob,
+    IssueReport,
+    Page,
+    PageSignal,
+    Snapshot,
+    SnapshotChange,
+    Source,
+)
 from ha_backend.search import TS_CONFIG, build_search_vector
 from ha_backend.search_ranking import (
     QueryMode,
@@ -51,6 +61,7 @@ from ha_backend.search_fuzzy import (
 )
 from ha_backend.url_normalization import normalize_url_for_grouping
 from ha_backend.runtime_metrics import observe_search_request
+from ha_backend.changes import CHANGE_TYPE_UNCHANGED, get_latest_job_ids_by_source
 from ha_backend.usage_metrics import (
     EVENT_REPORT_SUBMITTED,
     EVENT_SEARCH_REQUEST,
@@ -73,6 +84,12 @@ from .schemas import (
     UsageMetricsCountsSchema,
     UsageMetricsDaySchema,
     UsageMetricsSchema,
+    ChangeEventSchema,
+    ChangeFeedSchema,
+    ChangeCompareSchema,
+    ChangeCompareSnapshotSchema,
+    SnapshotTimelineItemSchema,
+    SnapshotTimelineSchema,
 )
 
 router = APIRouter()
@@ -1667,6 +1684,32 @@ def _build_usage_counts(raw: dict[str, int]) -> UsageMetricsCountsSchema:
     )
 
 
+def _build_change_event_schema(change: SnapshotChange) -> ChangeEventSchema:
+    source = change.source
+    return ChangeEventSchema(
+        changeId=change.id,
+        changeType=change.change_type,
+        summary=change.summary,
+        highNoise=bool(change.high_noise),
+        diffAvailable=bool(change.diff_html),
+        sourceCode=source.code if source else None,
+        sourceName=source.name if source else None,
+        normalizedUrlGroup=change.normalized_url_group,
+        fromSnapshotId=change.from_snapshot_id,
+        toSnapshotId=change.to_snapshot_id,
+        fromCaptureTimestamp=_format_capture_timestamp(change.from_capture_timestamp),
+        toCaptureTimestamp=_format_capture_timestamp(change.to_capture_timestamp),
+        fromJobId=change.from_job_id,
+        toJobId=change.to_job_id,
+        addedSections=change.added_sections,
+        removedSections=change.removed_sections,
+        changedSections=change.changed_sections,
+        addedLines=change.added_lines,
+        removedLines=change.removed_lines,
+        changeRatio=change.change_ratio,
+    )
+
+
 @router.post("/reports", response_model=IssueReportReceiptSchema, status_code=201)
 def submit_issue_report(
     payload: IssueReportCreateSchema, db: Session = Depends(get_db)
@@ -1766,6 +1809,374 @@ def get_usage_metrics(db: Session = Depends(get_db)) -> UsageMetricsSchema:
         totals=totals,
         daily=daily,
     )
+
+
+@router.get("/changes", response_model=ChangeFeedSchema)
+def list_changes(
+    source: Optional[str] = Query(default=None),
+    jobId: Optional[int] = Query(default=None, ge=1),
+    latest: bool = Query(default=False),
+    includeUnchanged: bool = Query(default=False),
+    from_: Optional[date] = Query(default=None, alias="from"),
+    to: Optional[date] = Query(default=None),
+    page: int = Query(default=1, ge=1),
+    pageSize: int = Query(default=20, ge=1, le=100),
+    db: Session = Depends(get_db),
+) -> ChangeFeedSchema:
+    """
+    Return a feed of precomputed change events.
+    """
+    if not get_change_tracking_enabled():
+        return ChangeFeedSchema(
+            enabled=False,
+            total=0,
+            page=page,
+            pageSize=pageSize,
+            results=[],
+        )
+
+    if not (source or jobId or from_ or to or latest):
+        latest = True
+
+    if from_ and to and from_ > to:
+        raise HTTPException(
+            status_code=422,
+            detail="Invalid date range: 'from' must be <= 'to'.",
+        )
+
+    range_start: datetime | None = None
+    range_end_exclusive: datetime | None = None
+    if from_:
+        range_start = datetime(from_.year, from_.month, from_.day, tzinfo=timezone.utc)
+    if to:
+        range_end_exclusive = datetime(to.year, to.month, to.day, tzinfo=timezone.utc) + timedelta(days=1)
+
+    dialect_name = db.get_bind().dialect.name
+    if dialect_name == "sqlite":
+        if range_start is not None:
+            range_start = range_start.replace(tzinfo=None)
+        if range_end_exclusive is not None:
+            range_end_exclusive = range_end_exclusive.replace(tzinfo=None)
+
+    query = db.query(SnapshotChange).join(
+        Source, SnapshotChange.source_id == Source.id, isouter=True
+    )
+    query = query.filter(
+        or_(Source.code.is_(None), ~Source.code.in_(_PUBLIC_EXCLUDED_SOURCE_CODES))
+    )
+
+    source_id: Optional[int] = None
+    if source:
+        normalized_code = source.strip().lower()
+        if not normalized_code or normalized_code in _PUBLIC_EXCLUDED_SOURCE_CODES:
+            raise HTTPException(status_code=404, detail="Source not found")
+        source_row = db.query(Source).filter(Source.code == normalized_code).first()
+        if not source_row:
+            raise HTTPException(status_code=404, detail="Source not found")
+        source_id = source_row.id
+        query = query.filter(SnapshotChange.source_id == source_id)
+
+    if jobId is not None:
+        query = query.filter(SnapshotChange.to_job_id == jobId)
+    elif latest:
+        latest_jobs = get_latest_job_ids_by_source(db, source_id=source_id)
+        job_ids = list(latest_jobs.values())
+        if not job_ids:
+            return ChangeFeedSchema(
+                enabled=True,
+                total=0,
+                page=page,
+                pageSize=pageSize,
+                results=[],
+            )
+        query = query.filter(SnapshotChange.to_job_id.in_(job_ids))
+
+    if range_start is not None:
+        query = query.filter(SnapshotChange.to_capture_timestamp >= range_start)
+    if range_end_exclusive is not None:
+        query = query.filter(SnapshotChange.to_capture_timestamp < range_end_exclusive)
+
+    if not includeUnchanged:
+        query = query.filter(SnapshotChange.change_type != CHANGE_TYPE_UNCHANGED)
+
+    total = query.count()
+    offset = (page - 1) * pageSize
+    rows = (
+        query.order_by(
+            SnapshotChange.to_capture_timestamp.desc(),
+            SnapshotChange.id.desc(),
+        )
+        .offset(offset)
+        .limit(pageSize)
+        .all()
+    )
+
+    return ChangeFeedSchema(
+        enabled=True,
+        total=total,
+        page=page,
+        pageSize=pageSize,
+        results=[_build_change_event_schema(row) for row in rows],
+    )
+
+
+@router.get("/changes/compare", response_model=ChangeCompareSchema)
+def get_change_compare(
+    toSnapshotId: int = Query(..., ge=1),
+    fromSnapshotId: Optional[int] = Query(default=None, ge=1),
+    db: Session = Depends(get_db),
+) -> ChangeCompareSchema:
+    """
+    Return a precomputed diff between two snapshots.
+    """
+    if not get_change_tracking_enabled():
+        raise HTTPException(status_code=404, detail="Change tracking not enabled")
+
+    change = (
+        db.query(SnapshotChange)
+        .filter(SnapshotChange.to_snapshot_id == toSnapshotId)
+        .first()
+    )
+    if not change:
+        raise HTTPException(status_code=404, detail="Change event not found")
+    if fromSnapshotId and change.from_snapshot_id != fromSnapshotId:
+        raise HTTPException(status_code=400, detail="Snapshot pair not available")
+
+    to_snapshot = (
+        db.query(Snapshot)
+        .filter(Snapshot.id == change.to_snapshot_id)
+        .first()
+    )
+    if not to_snapshot:
+        raise HTTPException(status_code=404, detail="Snapshot not found")
+
+    from_snapshot: Optional[Snapshot] = None
+    if change.from_snapshot_id:
+        from_snapshot = (
+            db.query(Snapshot)
+            .filter(Snapshot.id == change.from_snapshot_id)
+            .first()
+        )
+
+    job_ids = {jid for jid in [to_snapshot.job_id, from_snapshot.job_id if from_snapshot else None] if jid}
+    job_names: Dict[int, str] = {}
+    if job_ids:
+        rows = db.query(ArchiveJob.id, ArchiveJob.name).filter(ArchiveJob.id.in_(job_ids)).all()
+        job_names = {int(job_id): job_name for job_id, job_name in rows}
+
+    def _build_compare_snapshot(snapshot: Snapshot) -> ChangeCompareSnapshotSchema:
+        capture_date = (
+            snapshot.capture_timestamp.date().isoformat()
+            if isinstance(snapshot.capture_timestamp, datetime)
+            else str(snapshot.capture_timestamp)
+        )
+        return ChangeCompareSnapshotSchema(
+            snapshotId=snapshot.id,
+            title=snapshot.title,
+            captureDate=capture_date,
+            captureTimestamp=_format_capture_timestamp(snapshot.capture_timestamp),
+            originalUrl=snapshot.url,
+            jobId=snapshot.job_id,
+            jobName=job_names.get(snapshot.job_id) if snapshot.job_id else None,
+        )
+
+    return ChangeCompareSchema(
+        event=_build_change_event_schema(change),
+        fromSnapshot=_build_compare_snapshot(from_snapshot) if from_snapshot else None,
+        toSnapshot=_build_compare_snapshot(to_snapshot),
+        diffFormat=change.diff_format,
+        diffHtml=change.diff_html,
+        diffTruncated=bool(change.diff_truncated),
+        diffVersion=change.diff_version,
+        normalizationVersion=change.normalization_version,
+    )
+
+
+@router.get(
+    "/snapshots/{snapshot_id}/timeline",
+    response_model=SnapshotTimelineSchema,
+)
+def get_snapshot_timeline(
+    snapshot_id: int,
+    db: Session = Depends(get_db),
+) -> SnapshotTimelineSchema:
+    """
+    Return a timeline of captures for the same normalized URL group.
+    """
+    snap = (
+        db.query(Snapshot)
+        .options(joinedload(Snapshot.source))
+        .filter(Snapshot.id == snapshot_id)
+        .first()
+    )
+    if not snap:
+        raise HTTPException(status_code=404, detail="Snapshot not found")
+
+    group = snap.normalized_url_group or normalize_url_for_grouping(snap.url)
+    if not group:
+        raise HTTPException(status_code=404, detail="Snapshot not grouped")
+
+    snapshots = (
+        db.query(Snapshot)
+        .filter(Snapshot.source_id == snap.source_id)
+        .filter(Snapshot.normalized_url_group == group)
+        .order_by(Snapshot.capture_timestamp.asc(), Snapshot.id.asc())
+        .all()
+    )
+
+    snapshot_ids = [row.id for row in snapshots]
+    change_rows = (
+        db.query(SnapshotChange.to_snapshot_id, SnapshotChange.from_snapshot_id)
+        .filter(SnapshotChange.to_snapshot_id.in_(snapshot_ids))
+        .all()
+    )
+    compare_map = {row[0]: row[1] for row in change_rows}
+
+    job_ids = {row.job_id for row in snapshots if row.job_id}
+    job_names: Dict[int, str] = {}
+    if job_ids:
+        rows = (
+            db.query(ArchiveJob.id, ArchiveJob.name)
+            .filter(ArchiveJob.id.in_(job_ids))
+            .all()
+        )
+        job_names = {int(job_id): job_name for job_id, job_name in rows}
+
+    items: List[SnapshotTimelineItemSchema] = []
+    for row in snapshots:
+        capture_date = (
+            row.capture_timestamp.date().isoformat()
+            if isinstance(row.capture_timestamp, datetime)
+            else str(row.capture_timestamp)
+        )
+        items.append(
+            SnapshotTimelineItemSchema(
+                snapshotId=row.id,
+                captureDate=capture_date,
+                captureTimestamp=_format_capture_timestamp(row.capture_timestamp),
+                jobId=row.job_id,
+                jobName=job_names.get(row.job_id) if row.job_id else None,
+                title=row.title,
+                statusCode=row.status_code,
+                compareFromSnapshotId=compare_map.get(row.id),
+            )
+        )
+
+    return SnapshotTimelineSchema(
+        sourceCode=snap.source.code if snap.source else None,
+        sourceName=snap.source.name if snap.source else None,
+        normalizedUrlGroup=group,
+        snapshots=items,
+    )
+
+
+@router.get("/changes/rss")
+def get_changes_rss(
+    source: Optional[str] = Query(default=None),
+    db: Session = Depends(get_db),
+) -> Response:
+    """
+    Return an RSS feed for the latest change events.
+    """
+    if not get_change_tracking_enabled():
+        raise HTTPException(status_code=404, detail="Change tracking not enabled")
+
+    source_id: Optional[int] = None
+    source_name: Optional[str] = None
+    if source:
+        normalized_code = source.strip().lower()
+        if not normalized_code or normalized_code in _PUBLIC_EXCLUDED_SOURCE_CODES:
+            raise HTTPException(status_code=404, detail="Source not found")
+        source_row = db.query(Source).filter(Source.code == normalized_code).first()
+        if not source_row:
+            raise HTTPException(status_code=404, detail="Source not found")
+        source_id = source_row.id
+        source_name = source_row.name
+
+    latest_jobs = get_latest_job_ids_by_source(db, source_id=source_id)
+    job_ids = list(latest_jobs.values())
+    if not job_ids:
+        raise HTTPException(status_code=404, detail="No change events available")
+
+    query = db.query(SnapshotChange).join(
+        Source, SnapshotChange.source_id == Source.id, isouter=True
+    )
+    query = query.filter(SnapshotChange.to_job_id.in_(job_ids))
+    query = query.filter(SnapshotChange.change_type != CHANGE_TYPE_UNCHANGED)
+    query = query.order_by(
+        SnapshotChange.to_capture_timestamp.desc(),
+        SnapshotChange.id.desc(),
+    )
+
+    rows = query.limit(50).all()
+
+    site_base = get_public_site_base_url()
+    api_base = "https://api.healtharchive.ca"
+    if source_name:
+        title = f"HealthArchive changes - {source_name}"
+    else:
+        title = "HealthArchive changes - latest editions"
+
+    from email.utils import format_datetime
+    from xml.sax.saxutils import escape as xml_escape
+
+    items = []
+    for row in rows:
+        source_label = row.source.name if row.source else "HealthArchive"
+        summary = row.summary or "Archived text updated"
+        link = f"{site_base}/compare?to={row.to_snapshot_id}"
+        if row.from_snapshot_id is None:
+            link = f"{site_base}/snapshot/{row.to_snapshot_id}"
+
+        pub_date = None
+        if isinstance(row.to_capture_timestamp, datetime):
+            ts = row.to_capture_timestamp
+            if ts.tzinfo is None:
+                ts = ts.replace(tzinfo=timezone.utc)
+            pub_date = format_datetime(ts)
+
+        items.append(
+            {
+                "title": xml_escape(f"{source_label}: {summary}"),
+                "link": xml_escape(link),
+                "guid": xml_escape(
+                    f"{api_base}/api/changes/compare?toSnapshotId={row.to_snapshot_id}"
+                ),
+                "pubDate": pub_date or format_datetime(datetime.now(timezone.utc)),
+                "description": xml_escape(summary),
+            }
+        )
+
+    rss_items = "\n".join(
+        "\n".join(
+            [
+                "<item>",
+                f"<title>{item['title']}</title>",
+                f"<link>{item['link']}</link>",
+                f"<guid>{item['guid']}</guid>",
+                f"<pubDate>{item['pubDate']}</pubDate>",
+                f"<description>{item['description']}</description>",
+                "</item>",
+            ]
+        )
+        for item in items
+    )
+
+    rss = "\n".join(
+        [
+            '<?xml version="1.0" encoding="UTF-8"?>',
+            '<rss version="2.0">',
+            "<channel>",
+            f"<title>{xml_escape(title)}</title>",
+            f"<link>{xml_escape(site_base)}</link>",
+            "<description>Recent archived text changes between captured editions.</description>",
+            rss_items,
+            "</channel>",
+            "</rss>",
+        ]
+    )
+
+    return Response(content=rss, media_type="application/rss+xml")
 
 
 @router.get("/health")

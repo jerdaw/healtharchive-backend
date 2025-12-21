@@ -124,6 +124,12 @@ HA_PAGES_FASTPATH=1
 HEALTHARCHIVE_USAGE_METRICS_ENABLED=1
 HEALTHARCHIVE_USAGE_METRICS_WINDOW_DAYS=30
 
+# Optional: change tracking + diff feeds (Phase 3).
+HEALTHARCHIVE_CHANGE_TRACKING_ENABLED=1
+
+# Public site base URL for RSS feed links and public compare URLs.
+HEALTHARCHIVE_PUBLIC_SITE_URL=https://healtharchive.ca
+
 # Optional: replay integration (pywb). Enables `browseUrl` fields in the public API.
 # HEALTHARCHIVE_REPLAY_BASE_URL=https://replay.healtharchive.ca
 
@@ -157,6 +163,8 @@ Optional systemd automation (recommended):
 - Annual scheduling timer (Jan 01 UTC) + worker priority drop-in:
   - Templates + install steps: `deployment/systemd/README.md`
 - Replay reconciliation timer (pywb indexing; capped, optional):
+  - Templates + install steps: `deployment/systemd/README.md`
+- Change tracking timer (edition-aware diffs; capped):
   - Templates + install steps: `deployment/systemd/README.md`
 
 Enable + start:

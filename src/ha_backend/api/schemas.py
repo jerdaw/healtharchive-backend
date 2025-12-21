@@ -104,6 +104,76 @@ class UsageMetricsSchema(BaseModel):
     daily: List[UsageMetricsDaySchema]
 
 
+class ChangeEventSchema(BaseModel):
+    changeId: int
+    changeType: str
+    summary: Optional[str]
+    highNoise: bool
+    diffAvailable: bool
+    sourceCode: Optional[str]
+    sourceName: Optional[str]
+    normalizedUrlGroup: Optional[str]
+    fromSnapshotId: Optional[int]
+    toSnapshotId: int
+    fromCaptureTimestamp: Optional[str]
+    toCaptureTimestamp: Optional[str]
+    fromJobId: Optional[int]
+    toJobId: Optional[int]
+    addedSections: Optional[int]
+    removedSections: Optional[int]
+    changedSections: Optional[int]
+    addedLines: Optional[int]
+    removedLines: Optional[int]
+    changeRatio: Optional[float]
+
+
+class ChangeFeedSchema(BaseModel):
+    enabled: bool
+    total: int
+    page: int
+    pageSize: int
+    results: List[ChangeEventSchema]
+
+
+class ChangeCompareSnapshotSchema(BaseModel):
+    snapshotId: int
+    title: Optional[str]
+    captureDate: str
+    captureTimestamp: Optional[str]
+    originalUrl: str
+    jobId: Optional[int]
+    jobName: Optional[str]
+
+
+class ChangeCompareSchema(BaseModel):
+    event: ChangeEventSchema
+    fromSnapshot: Optional[ChangeCompareSnapshotSchema]
+    toSnapshot: ChangeCompareSnapshotSchema
+    diffFormat: Optional[str]
+    diffHtml: Optional[str]
+    diffTruncated: bool
+    diffVersion: Optional[str]
+    normalizationVersion: Optional[str]
+
+
+class SnapshotTimelineItemSchema(BaseModel):
+    snapshotId: int
+    captureDate: str
+    captureTimestamp: Optional[str]
+    jobId: Optional[int]
+    jobName: Optional[str]
+    title: Optional[str]
+    statusCode: Optional[int]
+    compareFromSnapshotId: Optional[int]
+
+
+class SnapshotTimelineSchema(BaseModel):
+    sourceCode: Optional[str]
+    sourceName: Optional[str]
+    normalizedUrlGroup: Optional[str]
+    snapshots: List[SnapshotTimelineItemSchema]
+
+
 class IssueReportCategory(str, Enum):
     broken_snapshot = "broken_snapshot"
     incorrect_metadata = "incorrect_metadata"
@@ -139,6 +209,12 @@ __all__ = [
     "UsageMetricsCountsSchema",
     "UsageMetricsDaySchema",
     "UsageMetricsSchema",
+    "ChangeEventSchema",
+    "ChangeFeedSchema",
+    "ChangeCompareSnapshotSchema",
+    "ChangeCompareSchema",
+    "SnapshotTimelineItemSchema",
+    "SnapshotTimelineSchema",
     "IssueReportCategory",
     "IssueReportCreateSchema",
     "IssueReportReceiptSchema",

@@ -160,6 +160,10 @@ Public routes (for the frontend):
 * `GET /api/snapshot/{id}` – metadata for one snapshot.
 * `GET /api/snapshots/raw/{id}` – raw HTML replay.
 * `GET /api/usage` – aggregated daily usage metrics for public reporting.
+* `GET /api/changes` – change-event feed (edition-aware by default).
+* `GET /api/changes/compare` – precomputed diff between adjacent captures.
+* `GET /api/changes/rss` – RSS feed for change events.
+* `GET /api/snapshots/{id}/timeline` – timeline for a page group.
 * `POST /api/reports` – public issue report intake.
 
 Admin & metrics:

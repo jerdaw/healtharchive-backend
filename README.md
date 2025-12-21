@@ -190,11 +190,23 @@ Key public endpoints (all prefixed with `/api`):
 - `GET /api/usage`  
   Aggregated usage metrics (daily counts) for public reporting.
 
+- `GET /api/changes`  
+  Precomputed change events feed (filters by source, edition/job, date range).
+
+- `GET /api/changes/compare`  
+  Precomputed diff between two adjacent captures (A → B).
+
+- `GET /api/changes/rss`  
+  RSS feed for the latest edition-aware change events.
+
 - `POST /api/reports`  
   Public issue intake endpoint for broken snapshots, metadata errors, missing coverage, or takedown requests.
 
 - `GET /api/snapshots/raw/{id}`  
   Returns the archived HTML document for embedding in the frontend.
+
+- `GET /api/snapshots/{id}/timeline`  
+  Timeline of captures for the same normalized URL group.
 
 Admin + observability endpoints (protected by a simple admin token):
 
@@ -340,6 +352,21 @@ ha-backend index-job --id <printed ID>
 enable `relax_perms` so temp WARCs are chmod’d readable after the crawl, allowing
 indexing without a host-side `sudo chown`. If you disable `relax_perms`, you may
 need to chown `.tmp*` before indexing.
+
+### Compute change events (diffs)
+
+Change tracking is computed off the request path using precomputed events.
+
+```bash
+# Incremental (last 30 days by default)
+ha-backend compute-changes --max-events 200
+
+# Backfill historical changes
+ha-backend compute-changes --backfill --max-events 500
+```
+
+These commands populate `snapshot_changes` rows used by `/api/changes` and
+`/api/changes/compare`.
 
 ### List and inspect jobs
 

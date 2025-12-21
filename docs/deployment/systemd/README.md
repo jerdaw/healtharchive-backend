@@ -8,6 +8,7 @@ They implement:
 - Phase 5: annual scheduling timer (Jan 01 UTC)
 - Phase 6: worker priority lowering during campaign (always-on, low-risk)
 - Phase 8: replay reconciliation timer (pywb indexing; capped)
+- Phase 3: change tracking timer (edition-aware diffs; capped)
 - Phase 4: optional "timer ran" pings (Healthchecks-style)
 - Phase 5 (ops): annual search verification capture (optional, safe)
 
@@ -43,6 +44,14 @@ Assumptions (adjust paths/user if your VPS differs):
   - `Persistent=true` (runs on next boot if missed)
 - `healtharchive-replay-reconcile-dry-run.service`
   - Safe validation service (no docker exec, no filesystem writes beyond the lock file dir).
+- `healtharchive-change-tracking.service`
+  - **Apply mode**: runs `ha-backend compute-changes` (edition-aware diffs).
+  - Gated by `ConditionPathExists=/etc/healtharchive/change-tracking-enabled`.
+- `healtharchive-change-tracking.timer`
+  - Daily at `*-*-* 03:40:00 UTC`
+  - `Persistent=true` (runs on next boot if missed)
+- `healtharchive-change-tracking-dry-run.service`
+  - Safe validation service (no DB writes; reports how many diffs would be computed).
 - `scripts/systemd-healthchecks-wrapper.sh`
   - Helper for optional Healthchecks-style pings without embedding ping URLs in unit files.
 - `healtharchive-annual-search-verify.service`
@@ -80,6 +89,18 @@ sudo install -m 0644 -o root -g root \
 sudo install -m 0644 -o root -g root \
   /opt/healtharchive-backend/docs/deployment/systemd/healtharchive-replay-reconcile-dry-run.service \
   /etc/systemd/system/healtharchive-replay-reconcile-dry-run.service
+
+sudo install -m 0644 -o root -g root \
+  /opt/healtharchive-backend/docs/deployment/systemd/healtharchive-change-tracking.service \
+  /etc/systemd/system/healtharchive-change-tracking.service
+
+sudo install -m 0644 -o root -g root \
+  /opt/healtharchive-backend/docs/deployment/systemd/healtharchive-change-tracking.timer \
+  /etc/systemd/system/healtharchive-change-tracking.timer
+
+sudo install -m 0644 -o root -g root \
+  /opt/healtharchive-backend/docs/deployment/systemd/healtharchive-change-tracking-dry-run.service \
+  /etc/systemd/system/healtharchive-change-tracking-dry-run.service
 
 sudo install -m 0644 -o root -g root \
   /opt/healtharchive-backend/docs/deployment/systemd/healtharchive-annual-search-verify.service \
@@ -134,6 +155,7 @@ Edit `/etc/healtharchive/healthchecks.env` and set (examples):
 ```bash
 HEALTHARCHIVE_HC_PING_REPLAY_RECONCILE=https://hc-ping.com/<uuid>
 HEALTHARCHIVE_HC_PING_SCHEDULE_ANNUAL=https://hc-ping.com/<uuid>
+HEALTHARCHIVE_HC_PING_CHANGE_TRACKING=https://hc-ping.com/<uuid>
 ```
 
 Notes:
@@ -171,6 +193,18 @@ without running any docker exec commands:
 ```bash
 sudo systemctl start healtharchive-replay-reconcile-dry-run.service
 sudo journalctl -u healtharchive-replay-reconcile-dry-run.service -n 200 --no-pager
+```
+
+---
+
+## Validate change tracking (safe)
+
+This dry-run service exercises DB connectivity and reports how many diffs would
+be computed:
+
+```bash
+sudo systemctl start healtharchive-change-tracking-dry-run.service
+sudo journalctl -u healtharchive-change-tracking-dry-run.service -n 200 --no-pager
 ```
 
 ---
@@ -213,6 +247,23 @@ systemctl list-timers | rg healtharchive-replay-reconcile || systemctl list-time
 Note: by default, the timer only reconciles **replay indexing**. Preview image
 generation is intentionally left manual/capped until you decide it’s stable
 enough to automate.
+
+---
+
+## Enable change tracking automation (optional)
+
+Create the change tracking sentinel file:
+
+```bash
+sudo install -m 0644 -o root -g root /dev/null /etc/healtharchive/change-tracking-enabled
+```
+
+Enable the timer:
+
+```bash
+sudo systemctl enable --now healtharchive-change-tracking.timer
+systemctl list-timers | rg healtharchive-change-tracking || systemctl list-timers | grep healtharchive-change-tracking
+```
 
 ---
 
