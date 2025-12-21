@@ -1343,7 +1343,168 @@ Digest disclaimer:
 - Compare output is descriptive, provenance-rich, and clearly non-authoritative.
 - Heavy processing happens off the request path (no slow compare pages that compute diffs live).
 
----
+### Phase 3 Implementation Plan (Detailed; sub-phases)
+
+Phase 3 turns HealthArchive from “a searchable archive” into “a living audit tool”.
+The goal is to let a user answer: **what changed, when, and between which captures** — without
+implying medical interpretation.
+
+#### Design principles (Phase 3)
+
+- **Descriptive only:** show *text diffs*, not “meaning” or “recommendations”.
+- **Provenance-first:** every change event must be anchored to two snapshot IDs (A → B) with timestamps and the source URL/group.
+- **No heavy work on requests:** diff computation must happen in background/ops workflows, not inside normal page loads.
+- **Noise-aware:** explicitly label high-noise pages and avoid overconfident summaries.
+- **Versioned methodology:** store a `diff_version`/`normalization_version` so later improvements don’t silently rewrite history.
+- **Scope fits the annual edition model:** a user should still get value even when captures are annual (timeline + compare remain useful even if “weekly changes” are sparse).
+
+#### Sub-phase 3A — Define “change events” and user stories (½–1 day)
+
+Define the minimum set of user-facing questions and map each to an artifact:
+
+- **Timeline:** “Show me all captures for this page over time.” → *page timeline dataset*
+- **Compare:** “Show changes between capture A and B.” → *diff artifact for (A,B)*
+- **Recent changes:** “What changed recently?” → *changes feed over computed events*
+- **Digest:** “Summarize changes for a period.” → *web + RSS output derived from the feed*
+
+Also define change types and guardrails:
+
+- `updated` (content changed between two captures)
+- `unchanged` (hash identical; no diff needed)
+- `new_page` (first-ever capture for a page group)
+- `removed_page` (optional; requires edition-to-edition set comparison)
+- `error` (diff could not be computed; still track the event)
+
+Deliverable: a short “Phase 3 semantics” section (internal) that is used consistently in API/UI copy.
+
+#### Sub-phase 3B — Data model + migration plan (1–2 days)
+
+Create a minimal, future-proof storage model for change tracking:
+
+- **Snapshot pair anchor:** store `from_snapshot_id` and `to_snapshot_id` (or `a_snapshot_id`/`b_snapshot_id`).
+- **Page anchor:** store `source_id` + `normalized_url_group` (and/or `page_id` if you choose to make pages mandatory).
+- **Summary fields (fast feed rendering):**
+  - timestamps, diff size signals (e.g., “changed characters”, “changed sections count”),
+  - coarse “noise score” / “high-noise” boolean,
+  - short, descriptive “what changed” sentence that never implies interpretation (e.g., “3 sections changed; 2 added; 1 removed”).
+- **Diff artifact fields (for compare rendering):**
+  - a rendered HTML diff or structured diff blocks,
+  - optional “section list” for navigation.
+- **Version fields:** `diff_version`, `normalization_version`, `computed_at`, `computed_by`.
+
+Deliverable: one Alembic migration introducing change-event storage (plus indexes needed for feeds and timelines).
+
+#### Sub-phase 3C — Change detection pipeline (background compute) (2–5 days)
+
+Build a staged pipeline that minimizes work:
+
+1) **Identify candidates cheaply**
+   - Use existing `normalized_url_group` + `capture_timestamp` ordering to find “adjacent captures”.
+   - Use `content_hash` to classify `unchanged` vs `candidate` (skip expensive diff when hashes match).
+2) **Normalize HTML to “diffable text”**
+   - Reuse the project’s text extraction approach where possible.
+   - Add noise-reduction rules (e.g., drop headers/footers/nav/cookie banners/“last updated” chrome where detectable).
+3) **Compute diff**
+   - Produce a human-readable diff with stable formatting.
+   - Emit “summary stats” (counts only, no interpretations).
+4) **Persist artifacts**
+   - Store event row + (optional) rendered diff artifact for fast compare pages.
+
+Operational requirement: the pipeline must be **idempotent**, resumable, and rate-limited so it doesn’t overwhelm the VPS after big crawls.
+
+Deliverables:
+
+- A command or background task that computes diffs for:
+  - “newly indexed snapshots”, and
+  - a backfill range (for existing data).
+- A consistent way to measure backlog and error rate (even if only as counts).
+
+#### Sub-phase 3D — Public API contract (1–3 days)
+
+Expose a public-only contract that supports UI and research workflows:
+
+- **Changes feed endpoint**
+  - filterable by source, date range, and (optionally) URL/group.
+  - supports pagination.
+  - returns summary + provenance fields (snapshot IDs A/B, timestamps, source, URL/group).
+- **Compare endpoint**
+  - fetch a diff artifact for two snapshots (or a precomputed diff ID).
+  - returns:
+    - provenance,
+    - summary stats,
+    - diff content (renderable).
+- **Page timeline endpoint**
+  - list captures for a given URL group (or snapshot ID → group resolution).
+  - enables UI selection of A and B.
+
+Deliverables: updated schema docs (Pydantic) and a short API section in the backend README (public endpoints only).
+
+#### Sub-phase 3E — Frontend UX: timeline, compare, changes (2–6 days)
+
+Implement three user-facing surfaces:
+
+1) **Changes page** (`/changes`)
+   - “Recent changes” feed with filters (source + date range).
+   - Each entry shows:
+     - what changed (descriptive summary),
+     - capture timestamps (UTC labeling),
+     - links to compare and to each snapshot.
+2) **Compare view** (`/compare` or equivalent)
+   - Clear A/B selection and provenance.
+   - Diff display with:
+     - obvious “archived content” banner,
+     - navigation by changed sections (if available),
+     - warnings for high-noise pages.
+3) **Snapshot timeline integration**
+   - On snapshot pages, add “Other captures of this page” (timeline list).
+   - Allow selecting a second snapshot to compare.
+
+Guardrail copy must be present on compare and changes pages (descriptive-only; link to official sources for current guidance).
+
+#### Sub-phase 3F — Digest MVP: web + RSS (1–3 days)
+
+Start with low-ops digest channels:
+
+- **Digest index page** (`/digest`)
+  - Explains what the digest is (a list of changed pages) and what it is not (guidance).
+  - Links to RSS feeds.
+- **RSS feeds**
+  - “Global changes” RSS.
+  - Optional per-source RSS.
+
+Deliverable: a digest archive concept that doesn’t require email infrastructure yet.
+
+#### Sub-phase 3G — Documentation and governance alignment (½–1 day)
+
+Update public-facing docs to match the new capability:
+
+- Methods/governance text explaining:
+  - what “change tracking” means,
+  - limitations (noise, missing captures, replay limitations),
+  - “descriptive only” stance.
+- Researcher guidance:
+  - how to cite a compare view (A and B snapshot IDs + timestamps).
+
+#### Sub-phase 3H — Tests + performance gates (1–3 days)
+
+Add tests that protect the core promise:
+
+- Backend:
+  - candidate detection logic (hash match skips diff),
+  - changes feed pagination and filtering,
+  - compare endpoint returns stable provenance,
+  - disabled modes (feature flag off) behave predictably.
+- Frontend:
+  - `/changes` renders with mocked API data,
+  - compare view renders provenance and disclaimer,
+  - graceful behavior when API is unavailable (fallback messaging).
+
+Performance gates:
+
+- No compare request should trigger heavy diff computation synchronously.
+- Feed endpoints should be index-backed and fast for large datasets.
+
+--- 
 
 ## Phase 4 — Distribution + External Validation (expanded)
 
