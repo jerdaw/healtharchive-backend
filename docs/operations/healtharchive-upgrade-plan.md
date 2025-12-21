@@ -1,6 +1,39 @@
 # HealthArchive Upgrade Plan (Agent-Ready)
 
-Status: **active roadmap** (Phases 0-4 implemented; Phase 5 core research exports implemented; Phase 6 cadence + ops runbooks in progress).
+Status: **active roadmap** (Phases 0–6 implemented (core); remaining work is mostly non-code: Phase 4 outreach/verifier, Phase 5 dataset releases + adoption, Phase 6 automation enablement + restore-test logs).
+
+## Current Status Snapshot (high signal; update as you go)
+
+**Implemented (code + public surfaces)**
+
+- Phase 0: canonical copy + “archive/not guidance” consistency (`healtharchive-frontend/src/lib/siteCopy.ts` and updated pages)
+- Phase 1: governance + policies + report intake (frontend pages + backend `/api/reports`)
+- Phase 2: status/impact pages + aggregated usage metrics (`/api/usage`)
+- Phase 3: edition-aware change tracking + compare + digest + RSS (backend `snapshot_changes`, compute pipeline, public APIs)
+- Phase 4: partner kit assets published (`/brief`, `/cite`, templates)
+- Phase 5: metadata-only research exports + data dictionary (`/api/exports/*`, `/exports`) + methods note outline
+- Phase 6: public cadence clarity + ops cadence docs + growth constraints + restore-test procedure + safer deploy helper
+
+**Still pending (decisions / operations / external validation)**
+
+- Phase 4: secure 1+ distribution partner and 1+ verifier (with permission to name them)
+- Phase 5: decide dataset release cadence + publish first versioned release (checksums); track real external research adoption
+- Phase 6: decide/enable annual scheduling + replay reconcile timers (if desired) and complete + log the first quarterly restore test
+
+## Production Toggles / Enablement (what must be set on the VPS)
+
+Backend env file: `/etc/healtharchive/backend.env` (do not commit; keep `.env.example` in sync for dev).
+
+- Usage metrics (Phase 2): `HEALTHARCHIVE_USAGE_METRICS_ENABLED=1`, `HEALTHARCHIVE_USAGE_METRICS_WINDOW_DAYS=30`
+- Change tracking APIs (Phase 3): `HEALTHARCHIVE_CHANGE_TRACKING_ENABLED=1`
+- Research exports (Phase 5): `HEALTHARCHIVE_EXPORTS_ENABLED=1`, `HEALTHARCHIVE_EXPORTS_DEFAULT_LIMIT`, `HEALTHARCHIVE_EXPORTS_MAX_LIMIT`
+- Public site base URL (Phase 3/5): `HEALTHARCHIVE_PUBLIC_SITE_URL=https://healtharchive.ca`
+
+Automation gates (systemd `ConditionPathExists`; create files to enable):
+
+- Change tracking timer: `/etc/healtharchive/change-tracking-enabled` (already required if running the timer)
+- Annual scheduler timer: `/etc/healtharchive/automation-enabled` (optional; only enable when ready)
+- Replay reconcile timer: `/etc/healtharchive/replay-automation-enabled` (optional; only if replay is enabled and stable)
 
 This file is intentionally written so you can hand it to another LLM/AI (or a human contributor) and they will understand:
 
@@ -1247,6 +1280,7 @@ Acceptance criteria:
 - Implemented on 2025-12-21.
 - Added `/status` and `/impact` pages to the frontend.
 - Added `/api/usage` to the backend with daily aggregate counts (search, snapshot detail, raw snapshot, reports).
+- Enabled/controlled via backend env: `HEALTHARCHIVE_USAGE_METRICS_ENABLED` and `HEALTHARCHIVE_USAGE_METRICS_WINDOW_DAYS`.
 - Updated `/privacy` to disclose aggregate usage counts.
 - Added a baseline impact report and changelog entry for Phase 2.
 
@@ -1513,6 +1547,7 @@ Performance gates:
 - Added a `snapshot_changes` table and precomputed diff artifacts.
 - Introduced `ha-backend compute-changes` for backfill + incremental diffing.
 - Added public APIs: `/api/changes`, `/api/changes/compare`, `/api/changes/rss`, `/api/snapshots/{id}/timeline`.
+- Enabled/controlled via backend env: `HEALTHARCHIVE_CHANGE_TRACKING_ENABLED` (API surfaces) and `/etc/healtharchive/change-tracking-enabled` (systemd timer gate).
 - Added frontend pages `/changes`, `/compare`, `/digest` plus snapshot timeline UX.
 - Updated governance/methods/researcher copy and changelog to reflect change tracking.
 - Added systemd timer templates for scheduled change tracking runs (see `docs/deployment/systemd/README.md`).
@@ -2005,10 +2040,12 @@ Stretch goals:
 **Status (Phase 5 assets implemented)**
 
 - Public export manifest and endpoints: `/api/exports`, `/api/exports/snapshots`, `/api/exports/changes`.
+- Export endpoints support `HEAD` requests for header inspection (e.g., `curl -I`).
 - Public data dictionary page: `https://www.healtharchive.ca/exports` (+ downloadable Markdown).
 - `/researchers` updated with research access workflow and export manifest link.
 - `/cite` linked from `/snapshot`, `/compare`, `/changes`, and `/digest`.
 - Export schema documented in `healtharchive-backend/docs/operations/exports-data-dictionary.md`.
+- Methods note outline published: `healtharchive-backend/docs/operations/phase-5-methods-note-outline.md`.
 - Export env toggles documented (`HEALTHARCHIVE_EXPORTS_ENABLED`, defaults, and limits).
 
 Remaining Phase 5 work: dataset release cadence + external research adoption.
@@ -2067,6 +2104,7 @@ explicit and sustainable.
   - `docs/operations/restore-test-procedure.md`
   - `docs/operations/restore-test-log-template.md`
 - Systemd deployment guide updated with Phase 6 enablement guidance.
+- Deploy helper now retries health checks during restarts to avoid transient false negatives: `scripts/vps-deploy.sh`.
 
 Remaining Phase 6 work: enable/confirm automation timers (annual scheduling, replay reconcile) where desired, and execute the first quarterly restore test with a logged result.
 
