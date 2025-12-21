@@ -1339,7 +1339,7 @@ Digest disclaimer:
 
 ### Acceptance criteria
 
-- A user can answer “what changed this week for PHAC?” without manual searching.
+- A user can answer “what changed since the last edition (or between editions)?” without manual searching.
 - Compare output is descriptive, provenance-rich, and clearly non-authoritative.
 - Heavy processing happens off the request path (no slow compare pages that compute diffs live).
 
@@ -1444,7 +1444,9 @@ Deliverables: updated schema docs (Pydantic) and a short API section in the back
 Implement three user-facing surfaces:
 
 1) **Changes page** (`/changes`)
-   - “Recent changes” feed with filters (source + date range).
+   - “Changes” feed with filters (source + date range).
+   - Default view should be **edition-aware** (e.g., “changes in the latest edition” or “between edition A and B”), because the project’s default capture cadence is annual.
+   - A “last N days” view can exist, but must be labeled as **recently archived** (capture time), not “recently updated by the source.”
    - Each entry shows:
      - what changed (descriptive summary),
      - capture timestamps (UTC labeling),
