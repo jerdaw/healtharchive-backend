@@ -22,6 +22,7 @@ This folder contains the canonical documentation for the **HealthArchive backend
 4. Operations (how to keep it healthy)
    - `operations/monitoring-and-ci-checklist.md`
    - `operations/annual-campaign.md` (canonical annual scope + seeds; Jan 01 UTC)
+   - `operations/healtharchive-upgrade-plan.md` (cross-repo upgrade roadmap; includes Phase 0 narrative/safety work)
    - `operations/automation-implementation-plan.md` (detailed phased plan for production-only automation)
    - `operations/replay-and-preview-automation-plan.md` (design plan + guardrails; reconciler exists as `ha-backend replay-reconcile`)
    - `operations/search-quality.md` (how to evaluate relevance changes)
