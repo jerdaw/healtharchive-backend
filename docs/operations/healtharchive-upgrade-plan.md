@@ -528,9 +528,9 @@ Digest categories (aligned with your current project goals):
 **4.1 Partner target list + pitch assets**
 You already have strong narrative copy; formalize it into partner-ready material:
 
--   1-page brief (mission, safety posture, screenshots, metrics)
--   “How to cite a snapshot” (you already have a draft on Researchers; refine it)
--   Example compare + example digest page (once Phase 3 exists)
+-   1-page brief (mission, safety posture, screenshots, metrics) — now published at `/brief`
+-   Citation guidance (snapshots + compare views) — now published at `/cite`
+-   Example compare + digest pages — now published at `/compare` and `/digest`
 
 **4.2 Secure one distribution partner + one verifier**
 Treat them as different roles:
@@ -555,7 +555,7 @@ Start with the lowest-friction distribution format:
 **Goal:** Your backend is already closer to “research API” than most projects; now package it safely.
 
 **5.1 Formal citation guidance**
-You already have a citation section (`healtharchive-frontend/src/app/researchers/page.tsx:65`), but it should match live reality:
+Citation guidance is now published at `/cite`, but Phase 5 should make it harder to misuse and easier to reuse:
 
 -   Ensure the recommended archived URL format corresponds to what production serves.
 -   Include capture timestamp (with timezone) and original URL.
@@ -577,6 +577,7 @@ Once Phase 3 exists, you have publishable material:
 **Definition of done (Phase 5)**
 
 -   A researcher can cite snapshots correctly and request or retrieve structured metadata and change-event data without bespoke coordination.
+    See the expanded Phase 5 implementation plan later in this document for sub-phases and acceptance criteria.
 
 ---
 
@@ -1770,28 +1771,195 @@ HealthArchive’s strongest natural audience is research/journalism. Making it �
 
 ### What already exists
 
-- Researcher page already includes citation guidance and planned features (`healtharchive-frontend/src/app/researchers/page.tsx`).
-- Backend already exposes stable, structured APIs for search and snapshot detail.
+- A public citation page exists (`/cite`) and is linked from `/researchers`.
+- Change tracking exists (edition-aware `/changes`, `/compare`, `/digest` with RSS).
+- Backend exposes stable, structured APIs for search, sources, snapshots, timeline, and changes.
 
-### Deliverables
+### Design principles (Phase 5)
 
-1) **Formal citation guidance**
-   - A stable recommended citation format that matches how the site actually works.
-   - Include: snapshot URL, capture timestamp (timezone), original URL, source, and (optional) edition/job.
+- **Research-first, not “consumer guidance.”** Optimize for reproducibility, auditability, and stable references.
+- **No medical interpretation.** Outputs are descriptive and methodological; avoid “what this means medically.”
+- **No personal data.** Exports must not include IP addresses, emails, user agents, or raw report submissions.
+- **Stable identifiers + clear versioning.** Prefer durable URLs and explicit “edition” framing over “latest” unless carefully labeled.
+- **Sustainable access.** Default to lightweight endpoints and cached/exported files; heavy requests go through a human workflow first.
+- **Public methods + limitations.** Avoid overclaiming completeness or authoritative status.
 
-2) **Research access pathway**
-   - A clear public “how to request” workflow (human)
-   - A stable “metadata export” concept (machine)
-   - Sustainability constraints (rate limits, fair use, “no guarantees of completeness”)
+### Phase 5 Implementation Plan (Detailed; sub-phases)
 
-3) **One scholarly output**
-   - Poster, preprint, or methods note once change tracking exists.
-   - Focus on provenance + change visibility, not medical interpretation.
+Phase 5 has two parallel goals:
 
-### Acceptance criteria
+1) make HealthArchive easier to cite, reuse, and defend in research/journalism, and  
+2) create “proof artifacts” that demonstrate sustained, measurable public-interest value.
 
-- A researcher can cite a snapshot correctly without guessing.
-- Bulk access is possible through an explicit process (even if manual initially).
+#### Sub-phase 5A — Citation guidance (stabilize + make it unambiguous)
+
+**Goal:** A researcher should be able to cite a snapshot or comparison correctly in under 60 seconds.
+
+Deliverables:
+
+- Keep `/cite` as the canonical citation page, and ensure it covers:
+  - snapshot citations,
+  - compare-view citations (two snapshot IDs + both capture timestamps),
+  - a short “fields glossary” (title, original URL, capture timestamp, snapshot URL).
+- Add a “How to cite” link from relevant surfaces:
+  - `/snapshot/[id]` (near metadata)
+  - `/compare` (near the comparison header)
+  - `/changes` and `/digest` (as “for researchers” guidance)
+- Add a lightweight citation “ready-to-copy” format (descriptive only):
+  - snapshot citation template populated from snapshot metadata
+  - compare citation template populated from both snapshot IDs/timestamps
+
+Non-goals / guardrails:
+
+- Do not suggest citation formats that imply endorsement or “official guidance.”
+- Do not add any user tracking to measure citations; citations are measured by mentions/logs.
+
+Acceptance criteria:
+
+- Citation formats match the site’s actual stable URLs and timestamps (UTC).
+- A neutral user can follow the instructions without needing to infer missing fields.
+
+#### Sub-phase 5B — Research access pathway (public “how to request” + expectations)
+
+**Goal:** Make bulk/research access possible without promising infinite bandwidth or completeness.
+
+Deliverables:
+
+- A public “Research access” section (could live on `/researchers` or a new `/research` page) that states:
+  - what data is available today (UI + public API endpoints + exports when available),
+  - what isn’t available yet (and why),
+  - how to request bulk access or a targeted export (email or a structured request form),
+  - sustainability constraints (rate limits, caching, reasonable use).
+- A standardized request checklist (for the requester to provide):
+  - source(s) and date range(s),
+  - whether they want per-snapshot vs per-page grouping,
+  - whether they want “edition-to-edition” changes or within-edition diffs,
+  - intended use (paper, class project, journalism piece).
+
+Examples (plain-language):
+
+- “I need all Health Canada snapshots between Apr 1–May 1, 2025, plus change events between editions.”
+- “I need diffs for these 25 URLs and the two most recent captures of each.”
+
+Acceptance criteria:
+
+- Someone unfamiliar with the codebase can understand how to request research access and what they’ll receive.
+
+#### Sub-phase 5C — Machine-readable exports (metadata first, then diffs)
+
+**Goal:** Provide research-friendly data without turning the public API into an unbounded bulk download service.
+
+Export tiers (recommended):
+
+- Tier 0 (public, lightweight, always on):
+  - Snapshot metadata export (no raw HTML content).
+  - Change event export (no full diff bodies unless already computed and safe to expose).
+  - Clear schema/field definitions (“data dictionary”).
+- Tier 1 (public, cached files):
+  - Pre-generated exports per edition or per month, hosted as static files.
+- Tier 2 (by request):
+  - Larger custom exports prepared offline for a study/class/journalism project.
+
+Deliverables:
+
+- Define a stable export format (CSV and/or JSON Lines) with consistent fields:
+  - Snapshots: id, source, original URL, normalized group key, capture timestamp (UTC), language, status code, content type, edition/job identifiers, and stable snapshot URL.
+  - Changes: change id, source, group key, from/to snapshot IDs, from/to capture timestamps, change type, summary, counts (added/removed/changed sections/lines), “high noise” flag, diff version.
+- Add a “data dictionary” page in docs and link to it from the export endpoint and `/researchers`.
+- Add clear limitations:
+  - coverage depends on scope rules and capture success,
+  - replay fidelity varies,
+  - change tracking reflects what was captured, not what changed on the source site in real time.
+
+Acceptance criteria:
+
+- Exports are stable, documented, and do not expose personal data or admin-only fields.
+- Exports are edition-aware by default, to avoid misleading “recent changes” claims.
+
+#### Sub-phase 5D — Dataset releases (versioned, citable artifacts)
+
+**Goal:** Create periodic “research objects” that can be cited and referenced over time.
+
+Deliverables:
+
+- A simple release cadence (monthly or quarterly) for:
+  - snapshot metadata dumps,
+  - change event dumps,
+  - a short release note/changelog entry summarizing what changed.
+- Versioning approach (example):
+  - `healtharchive-dataset-YYYY-MM` with checksums.
+- A release checklist:
+  - schema version,
+  - date range included,
+  - source list included,
+  - checksums generated,
+  - known limitations noted.
+
+Where to publish:
+
+- Prefer GitHub Releases (with checksums) or a dedicated static dataset page, depending on file sizes and operational comfort.
+
+Acceptance criteria:
+
+- A researcher can cite “Dataset release YYYY-MM” and reproduce the exact file they used.
+
+#### Sub-phase 5E — Methods note / poster (scholarship output)
+
+**Goal:** Produce one scholarly artifact that is methodological and defensible.
+
+Recommended topic framing (non-interpretive):
+
+- “A provenance-first pipeline for archiving Canadian public health webpages.”
+- “Edition-aware change tracking for public health web guidance: methods and limitations.”
+
+Deliverables:
+
+- A methods note outline with:
+  - motivation (reproducibility + auditability),
+  - capture methodology (WARCs + indexing),
+  - provenance labeling policy,
+  - change tracking approach (normalization + diff),
+  - limitations and non-goals (not guidance, not medical advice),
+  - ethics/privacy posture (no PHI; aggregated usage metrics only),
+  - a small descriptive results section (counts and examples, not interpretation).
+- A “figure plan”:
+  - architecture diagram (high-level),
+  - example change timeline for a single URL,
+  - coverage table (sources + capture windows).
+
+Acceptance criteria:
+
+- The artifact can be shared publicly without creating medical guidance liability.
+
+#### Sub-phase 5F — Measurability (research adoption signals)
+
+**Goal:** Collect defensible evidence that research-grade outputs are used.
+
+Deliverables:
+
+- A mentions/citations log process (already templated in Phase 4) updated monthly.
+- A “research use” section in monthly impact reports:
+  - number of research inquiries,
+  - number of bulk exports delivered (if any),
+  - any public citations/mentions (with links).
+
+Acceptance criteria:
+
+- You can point to concrete, verifiable research adoption signals without tracking individuals.
+
+### Definition of done (Phase 5)
+
+Minimum viable “Phase 5 complete”:
+
+- `/cite` is canonical and linked from snapshot/compare/changes surfaces.
+- A public research access pathway exists (how to request bulk access + constraints).
+- A v1 export exists (snapshot metadata + change events) with a documented schema.
+- One “methods note” outline exists and is ready to submit as a poster/preprint/blog-style methods write-up.
+
+Stretch goals:
+
+- Versioned dataset releases on a fixed cadence (monthly/quarterly) with checksums.
+- At least one external research/journalism project uses an export and can be cited in the mentions log.
 
 ---
 
