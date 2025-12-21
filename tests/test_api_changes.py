@@ -145,3 +145,30 @@ def test_changes_feed_and_compare(tmp_path, monkeypatch) -> None:
     timeline_body = timeline.json()
     assert len(timeline_body["snapshots"]) == 2
     assert timeline_body["snapshots"][1]["compareFromSnapshotId"] == ids["snap_a"]
+
+
+def test_changes_rss_escapes_xml(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("HEALTHARCHIVE_CHANGE_TRACKING_ENABLED", "1")
+    client = _init_test_app(tmp_path, monkeypatch)
+    ids = _seed_change_data()
+
+    # Add an RSS-visible change summary that would break XML if not escaped.
+    with get_session() as session:
+        change = (
+            session.query(SnapshotChange)
+            .filter(SnapshotChange.to_snapshot_id == ids["snap_b"])
+            .first()
+        )
+        assert change is not None
+        change.summary = 'Updated guidance: 1 <section> & 2 "quotes"'
+        session.add(change)
+
+    resp = client.get("/api/changes/rss?source=hc")
+    assert resp.status_code == 200
+    assert resp.headers["content-type"].startswith("application/rss+xml")
+
+    body = resp.text
+    assert "<rss" in body
+    assert "<channel>" in body
+    assert "&lt;section&gt;" in body
+    assert "&amp;" in body
