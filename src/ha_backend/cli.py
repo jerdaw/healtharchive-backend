@@ -1635,7 +1635,7 @@ def cmd_cleanup_job(args: argparse.Namespace) -> None:
             )
             sys.exit(1)
 
-        output_dir = Path(job.output_dir)
+        output_dir = Path(job.output_dir).resolve()
         if not output_dir.is_dir():
             print(
                 f"ERROR: Output directory {output_dir} does not exist or is not a directory.",
@@ -1701,10 +1701,11 @@ def cmd_cleanup_job(args: argparse.Namespace) -> None:
         )
 
         # Determine whether this job's snapshots still reference `.tmp*` WARC paths.
+        tmp_warc_prefix = f"{output_dir.as_posix()}/.tmp"
         tmp_ref_count = (
             session.query(Snapshot.id)
             .filter(Snapshot.job_id == job.id)
-            .filter(Snapshot.warc_path.like("%/.tmp%"))
+            .filter(Snapshot.warc_path.like(f"{tmp_warc_prefix}%"))
             .count()
         )
 
@@ -1781,7 +1782,7 @@ def cmd_cleanup_job(args: argparse.Namespace) -> None:
             remaining_tmp_refs = (
                 session.query(Snapshot.id)
                 .filter(Snapshot.job_id == job.id)
-                .filter(Snapshot.warc_path.like("%/.tmp%"))
+                .filter(Snapshot.warc_path.like(f"{tmp_warc_prefix}%"))
                 .limit(1)
                 .all()
             )

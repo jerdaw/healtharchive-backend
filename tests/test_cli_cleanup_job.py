@@ -259,7 +259,9 @@ def test_cleanup_job_temp_nonwarc_consolidates_warcs_and_rewrites_snapshot_paths
         assert job.cleaned_at is not None
 
         snap = session.query(Snapshot).filter(Snapshot.job_id == job_id).one()
-        assert "/.tmp" not in snap.warc_path
+        output_dir_abs = output_dir.resolve()
+        tmp_warc_prefix = f"{output_dir_abs.as_posix()}/.tmp"
+        assert not Path(snap.warc_path).resolve().as_posix().startswith(tmp_warc_prefix)
         assert "/warcs/" in snap.warc_path
 
     assert not any(output_dir.glob(".tmp*"))
