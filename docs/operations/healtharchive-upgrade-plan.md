@@ -1,6 +1,6 @@
 # HealthArchive Upgrade Plan (Agent-Ready)
 
-Status: **active roadmap** (Phases 0-4 implemented; Phase 5 core research exports implemented; Phase 5 releases + Phase 6 pending).
+Status: **active roadmap** (Phases 0-4 implemented; Phase 5 core research exports implemented; Phase 6 cadence + ops runbooks in progress).
 
 This file is intentionally written so you can hand it to another LLM/AI (or a human contributor) and they will understand:
 
@@ -2057,6 +2057,18 @@ explicit and sustainable.
 
 - There is a clearly documented “how we operate” routine that does not require heroics.
 - The public-facing cadence statement matches what you actually do.
+
+**Status (Phase 6 assets implemented)**
+
+- Public cadence language updated in: `/methods`, `/governance`, `/changes`, `/digest`, `/status`.
+- Internal ops cadence checklist published: `docs/operations/ops-cadence-checklist.md`.
+- Growth constraints documented: `docs/operations/growth-constraints.md`.
+- Restore test procedure + log template published:
+  - `docs/operations/restore-test-procedure.md`
+  - `docs/operations/restore-test-log-template.md`
+- Systemd deployment guide updated with Phase 6 enablement guidance.
+
+Remaining Phase 6 work: enable/confirm automation timers (annual scheduling, replay reconcile) where desired, and execute the first quarterly restore test with a logged result.
 
 ### Phase 6 Implementation Plan (Detailed; sub-phases)
 
