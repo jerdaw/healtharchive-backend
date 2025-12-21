@@ -119,6 +119,11 @@ HEALTHARCHIVE_LOG_LEVEL=INFO
 HA_SEARCH_RANKING_VERSION=v2
 HA_PAGES_FASTPATH=1
 
+# Optional: aggregated, privacy-preserving usage metrics (daily counts only).
+# Drives the public reporting pages (`/status` and `/impact`) via `GET /api/usage`.
+HEALTHARCHIVE_USAGE_METRICS_ENABLED=1
+HEALTHARCHIVE_USAGE_METRICS_WINDOW_DAYS=30
+
 # Optional: replay integration (pywb). Enables `browseUrl` fields in the public API.
 # HEALTHARCHIVE_REPLAY_BASE_URL=https://replay.healtharchive.ca
 
