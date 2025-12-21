@@ -7,7 +7,7 @@ from sqlalchemy import Float, Integer, and_, case, cast, func, inspect, literal,
 from sqlalchemy.orm import Session, joinedload, load_only
 
 from ha_backend.db import get_session
-from ha_backend.models import ArchiveJob, PageSignal, Snapshot, Source
+from ha_backend.models import ArchiveJob, IssueReport, PageSignal, Snapshot, Source
 from ha_backend.search import TS_CONFIG, build_search_vector
 from ha_backend.search_ranking import (
     QueryMode,
@@ -19,10 +19,18 @@ from ha_backend.search_ranking import (
 )
 
 from .deps import require_admin
-from .schemas_admin import (JobDetailSchema, JobListResponseSchema,
-                            JobSnapshotSummarySchema, JobStatusCountsSchema,
-                            JobSummarySchema, SearchDebugItemSchema,
-                            SearchDebugResponseSchema)
+from .schemas_admin import (
+    IssueReportDetailSchema,
+    IssueReportListResponseSchema,
+    IssueReportSummarySchema,
+    JobDetailSchema,
+    JobListResponseSchema,
+    JobSnapshotSummarySchema,
+    JobStatusCountsSchema,
+    JobSummarySchema,
+    SearchDebugItemSchema,
+    SearchDebugResponseSchema,
+)
 from .routes_public import SearchSort, SearchView
 
 router = APIRouter(
@@ -220,6 +228,81 @@ def list_job_snapshots(
         )
         for snap in snapshots
     ]
+
+
+@router.get("/reports", response_model=IssueReportListResponseSchema)
+def list_issue_reports(
+    status: Optional[str] = Query(default=None),
+    category: Optional[str] = Query(default=None),
+    limit: int = Query(default=50, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
+    db: Session = Depends(get_db),
+) -> IssueReportListResponseSchema:
+    """
+    List issue reports submitted via the public intake form.
+    """
+    query = db.query(IssueReport)
+
+    if status:
+        query = query.filter(IssueReport.status == status)
+
+    if category:
+        query = query.filter(IssueReport.category == category)
+
+    total = query.count()
+    rows = (
+        query.order_by(IssueReport.created_at.desc())
+        .offset(offset)
+        .limit(limit)
+        .all()
+    )
+
+    items = [
+        IssueReportSummarySchema(
+            id=report.id,
+            category=report.category,
+            status=report.status,
+            createdAt=report.created_at,
+            snapshotId=report.snapshot_id,
+            originalUrl=report.original_url,
+            pageUrl=report.page_url,
+        )
+        for report in rows
+    ]
+
+    return IssueReportListResponseSchema(
+        items=items,
+        total=total,
+        limit=limit,
+        offset=offset,
+    )
+
+
+@router.get("/reports/{report_id}", response_model=IssueReportDetailSchema)
+def get_issue_report(
+    report_id: int,
+    db: Session = Depends(get_db),
+) -> IssueReportDetailSchema:
+    """
+    Fetch a single issue report by ID.
+    """
+    report = db.query(IssueReport).filter(IssueReport.id == report_id).first()
+    if report is None:
+        raise HTTPException(status_code=404, detail="Report not found")
+
+    return IssueReportDetailSchema(
+        id=report.id,
+        category=report.category,
+        status=report.status,
+        createdAt=report.created_at,
+        updatedAt=report.updated_at,
+        snapshotId=report.snapshot_id,
+        originalUrl=report.original_url,
+        pageUrl=report.page_url,
+        reporterEmail=report.reporter_email,
+        description=report.description,
+        internalNotes=report.internal_notes,
+    )
 
 
 def _has_table(db: Session, table_name: str) -> bool:

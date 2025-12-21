@@ -187,6 +187,9 @@ Key public endpoints (all prefixed with `/api`):
   When `HEALTHARCHIVE_REPLAY_BASE_URL` is set, this includes a `browseUrl`
   suitable for embedding a replay engine (pywb) for full-fidelity browsing.
 
+- `POST /api/reports`  
+  Public issue intake endpoint for broken snapshots, metadata errors, missing coverage, or takedown requests.
+
 - `GET /api/snapshots/raw/{id}`  
   Returns the archived HTML document for embedding in the frontend.
 
@@ -197,6 +200,8 @@ Admin + observability endpoints (protected by a simple admin token):
 - `GET /api/admin/jobs/status-counts` – job counts by status
 - `GET /api/admin/jobs/{id}/snapshots` – list snapshots for a job
 - `GET /api/admin/search-debug` – admin-only search scoring breakdown
+- `GET /api/admin/reports` – list issue reports (admin)
+- `GET /api/admin/reports/{id}` – issue report detail (admin)
 - `GET /metrics` – Prometheus-style metrics (jobs, cleanup_status, snapshots)
 
 Admin endpoints require a token when `HEALTHARCHIVE_ADMIN_TOKEN` is set (see

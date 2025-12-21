@@ -132,6 +132,37 @@ class SearchDebugResponseSchema(BaseModel):
     usedPagerank: bool
 
 
+class IssueReportSummarySchema(BaseModel):
+    id: int
+    category: str
+    status: str
+    createdAt: datetime
+    snapshotId: Optional[int]
+    originalUrl: Optional[str]
+    pageUrl: Optional[str]
+
+
+class IssueReportDetailSchema(BaseModel):
+    id: int
+    category: str
+    status: str
+    createdAt: datetime
+    updatedAt: datetime
+    snapshotId: Optional[int]
+    originalUrl: Optional[str]
+    pageUrl: Optional[str]
+    reporterEmail: Optional[str]
+    description: str
+    internalNotes: Optional[str]
+
+
+class IssueReportListResponseSchema(BaseModel):
+    items: List[IssueReportSummarySchema]
+    total: int
+    limit: int
+    offset: int
+
+
 __all__ = [
     "JobSummarySchema",
     "JobDetailSchema",
@@ -140,4 +171,7 @@ __all__ = [
     "JobStatusCountsSchema",
     "SearchDebugItemSchema",
     "SearchDebugResponseSchema",
+    "IssueReportSummarySchema",
+    "IssueReportDetailSchema",
+    "IssueReportListResponseSchema",
 ]
