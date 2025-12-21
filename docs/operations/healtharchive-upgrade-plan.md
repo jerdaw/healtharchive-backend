@@ -1,6 +1,6 @@
 # HealthArchive Upgrade Plan (Agent-Ready)
 
-Status: **active roadmap** (Phases 0-3 implemented; Phase 4 partner assets + public brief/citation pages implemented; phases 5-6 pending).
+Status: **active roadmap** (Phases 0-4 implemented; Phase 5 core research exports implemented; Phase 5 releases + Phase 6 pending).
 
 This file is intentionally written so you can hand it to another LLM/AI (or a human contributor) and they will understand:
 
@@ -2001,6 +2001,17 @@ Stretch goals:
 
 - Versioned dataset releases on a fixed cadence (monthly/quarterly) with checksums.
 - At least one external research/journalism project uses an export and can be cited in the mentions log.
+
+**Status (Phase 5 assets implemented)**
+
+- Public export manifest and endpoints: `/api/exports`, `/api/exports/snapshots`, `/api/exports/changes`.
+- Public data dictionary page: `https://www.healtharchive.ca/exports` (+ downloadable Markdown).
+- `/researchers` updated with research access workflow and export manifest link.
+- `/cite` linked from `/snapshot`, `/compare`, `/changes`, and `/digest`.
+- Export schema documented in `healtharchive-backend/docs/operations/exports-data-dictionary.md`.
+- Export env toggles documented (`HEALTHARCHIVE_EXPORTS_ENABLED`, defaults, and limits).
+
+Remaining Phase 5 work: dataset release cadence + methods note + external research adoption.
 
 ---
 

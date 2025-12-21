@@ -2,10 +2,18 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from ha_backend.config import (DEFAULT_ARCHIVE_ROOT, DEFAULT_ARCHIVE_TOOL_CMD,
-                               DEFAULT_DATABASE_URL, ArchiveToolConfig,
-                               DatabaseConfig, get_archive_tool_config,
-                               get_database_config)
+from ha_backend.config import (
+    DEFAULT_ARCHIVE_ROOT,
+    DEFAULT_ARCHIVE_TOOL_CMD,
+    DEFAULT_DATABASE_URL,
+    ArchiveToolConfig,
+    DatabaseConfig,
+    get_archive_tool_config,
+    get_database_config,
+    get_exports_default_limit,
+    get_exports_enabled,
+    get_exports_max_limit,
+)
 
 
 def test_archive_tool_config_defaults(monkeypatch) -> None:
@@ -53,3 +61,23 @@ def test_database_config_env_override(monkeypatch) -> None:
     monkeypatch.setenv("HEALTHARCHIVE_DATABASE_URL", custom_url)
     cfg = get_database_config()
     assert cfg.database_url == custom_url
+
+
+def test_exports_config_defaults(monkeypatch) -> None:
+    monkeypatch.delenv("HEALTHARCHIVE_EXPORTS_ENABLED", raising=False)
+    monkeypatch.delenv("HEALTHARCHIVE_EXPORTS_DEFAULT_LIMIT", raising=False)
+    monkeypatch.delenv("HEALTHARCHIVE_EXPORTS_MAX_LIMIT", raising=False)
+
+    assert get_exports_enabled() is True
+    assert get_exports_default_limit() > 0
+    assert get_exports_max_limit() >= get_exports_default_limit()
+
+
+def test_exports_config_overrides(monkeypatch) -> None:
+    monkeypatch.setenv("HEALTHARCHIVE_EXPORTS_ENABLED", "0")
+    monkeypatch.setenv("HEALTHARCHIVE_EXPORTS_DEFAULT_LIMIT", "50")
+    monkeypatch.setenv("HEALTHARCHIVE_EXPORTS_MAX_LIMIT", "75")
+
+    assert get_exports_enabled() is False
+    assert get_exports_default_limit() == 50
+    assert get_exports_max_limit() == 75

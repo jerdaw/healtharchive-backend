@@ -199,6 +199,15 @@ Key public endpoints (all prefixed with `/api`):
 - `GET /api/changes/rss`  
   RSS feed for the latest edition-aware change events.
 
+- `GET /api/exports`  
+  Export manifest describing available research exports and limits.
+
+- `GET /api/exports/snapshots`  
+  Snapshot metadata export (JSONL/CSV, metadata-only).
+
+- `GET /api/exports/changes`  
+  Change event export (JSONL/CSV, metadata-only).
+
 - `POST /api/reports`  
   Public issue intake endpoint for broken snapshots, metadata errors, missing coverage, or takedown requests.
 
