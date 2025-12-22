@@ -15,7 +15,7 @@
 - Restore test procedure (quarterly): `restore-test-procedure.md`
 - Restore test log template: `restore-test-log-template.md`
 - Adoption signals log template (public-safe, quarterly): `adoption-signals-log-template.md`
-- HealthArchive upgrade todo (remaining tasks): `healtharchive-upgrade-plan.md`
+- HealthArchive ops roadmap + todo (remaining tasks): `healtharchive-ops-roadmap.md`
 - Phase 4 partner kit (brief + citation + screenshots): `phase-4-partner-kit.md`
 - Phase 4 one-page brief (shareable): `phase-4-one-page-brief.md`
 - Phase 4 citation handout (shareable): `phase-4-citation-handout.md`

@@ -1,10 +1,10 @@
-# HealthArchive Upgrade TODO (internal)
+# HealthArchive Ops Roadmap + TODO (internal)
 
-This file is **only** the remaining todo list.
+This file tracks the current ops roadmap/todo items only. Keep it short and current.
 
-For the full roadmap history and background, see:
+For historical roadmaps and upgrade context, see:
 
-- `docs/roadmaps/healtharchive-upgrade-2025.md` (backend repo)
+- `docs/roadmaps/README.md` (backend repo)
 
 ## Recurring ops (non-IRL, ongoing)
 
