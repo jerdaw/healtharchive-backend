@@ -14,10 +14,10 @@ Status: **historical reference**. If anything in this document conflicts with op
 1) **Confirm current state first (don’t guess).** This repo is split across:
    - `healtharchive-frontend/` (Next.js 16 UI on Vercel)
    - `healtharchive-backend/` (FastAPI + worker + indexing + in-tree crawler)
-   - `healtharchive-backend/docs/deployment/environment-matrix.md` (cross-repo env wiring; canonical)
+   - `healtharchive-backend/docs/deployment/environments-and-configuration.md` (cross-repo env wiring; canonical)
 
 2) **Read the canonical docs (high signal).**
-   - Cross-repo wiring: `healtharchive-backend/docs/deployment/environment-matrix.md`
+   - Cross-repo wiring: `healtharchive-backend/docs/deployment/environments-and-configuration.md`
    - Backend architecture: `healtharchive-backend/docs/architecture.md`
    - Backend production runbook: `healtharchive-backend/docs/deployment/production-single-vps.md`
    - Annual campaign scope/policy: `healtharchive-backend/docs/operations/annual-campaign.md`

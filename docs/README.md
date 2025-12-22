@@ -18,7 +18,7 @@ This folder contains the canonical documentation for the **HealthArchive backend
    - `deployment/search-rollout.md` (enable v2 search + rollback)
    - `deployment/pages-table-rollout.md` (pages table backfill + browse fast path)
    - `deployment/hosting-and-live-server-to-dos.md` (deployment checklist + Vercel wiring)
-   - `deployment/environment-matrix.md` (cross‑repo env var + host matrix)
+   - `deployment/environments-and-configuration.md` (cross‑repo env vars + host matrix)
    - `deployment/production-rollout-checklist.md` (generic production checklist)
    - `deployment/staging-rollout-checklist.md` (optional future staging)
 5. Operations (how to keep it healthy)

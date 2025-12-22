@@ -20,7 +20,7 @@ and in Vercel / GitHub.
 For background, see:
 
 - `hosting-and-live-server-to-dos.md`
-- `environment-matrix.md`
+- `environments-and-configuration.md`
 - `healtharchive-frontend/docs/deployment/verification.md`
 
 ---
