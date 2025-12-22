@@ -67,4 +67,3 @@ def downgrade() -> None:
     op.drop_column("archive_jobs", "tmp_bytes_total")
     op.drop_column("archive_jobs", "output_bytes_total")
     op.drop_column("archive_jobs", "warc_bytes_total")
-

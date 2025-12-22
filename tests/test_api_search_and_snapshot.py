@@ -26,7 +26,11 @@ def _init_test_app(tmp_path: Path, monkeypatch):
 
     from ha_backend.api import app
 
-    return TestClient(app)
+    try:
+        import uvloop  # noqa: F401
+    except Exception:
+        return TestClient(app)
+    return TestClient(app, backend_options={"use_uvloop": True})
 
 
 def _seed_search_data() -> None:
@@ -617,15 +621,11 @@ def test_search_default_relevance_sort_and_filters_non_2xx(tmp_path, monkeypatch
     assert "COVID-19 not found (404)" not in titles
 
 
-def test_search_include_non_2xx_includes_error_pages_but_ranks_lower(
-    tmp_path, monkeypatch
-) -> None:
+def test_search_include_non_2xx_includes_error_pages_but_ranks_lower(tmp_path, monkeypatch) -> None:
     client = _init_test_app(tmp_path, monkeypatch)
     _seed_search_quality_data()
 
-    resp = client.get(
-        "/api/search", params={"q": "COVID-19", "includeNon2xx": True}
-    )
+    resp = client.get("/api/search", params={"q": "COVID-19", "includeNon2xx": True})
     assert resp.status_code == 200
     data = resp.json()
 
@@ -779,9 +779,7 @@ def test_search_view_pages_dedupes_by_normalized_url_group(tmp_path, monkeypatch
     assert urls.count("https://www.canada.ca/en/health-canada/covid19.html") == 1
 
 
-def test_search_view_pages_fastpath_uses_pages_table_when_populated(
-    tmp_path, monkeypatch
-) -> None:
+def test_search_view_pages_fastpath_uses_pages_table_when_populated(tmp_path, monkeypatch) -> None:
     client = _init_test_app(tmp_path, monkeypatch)
     monkeypatch.setenv("HA_PAGES_FASTPATH", "1")
     _seed_pages_view_data()
@@ -877,9 +875,7 @@ def test_search_invalid_date_range_returns_422(tmp_path, monkeypatch) -> None:
     assert resp.json()["detail"] == "Invalid date range: 'from' must be <= 'to'."
 
 
-def test_search_view_pages_ranking_v2_scores_best_snapshot_for_group(
-    tmp_path, monkeypatch
-) -> None:
+def test_search_view_pages_ranking_v2_scores_best_snapshot_for_group(tmp_path, monkeypatch) -> None:
     client = _init_test_app(tmp_path, monkeypatch)
     _seed_pages_view_best_match_ranking_data()
 
@@ -1011,9 +1007,7 @@ def test_search_view_pages_dedupes_querystring_variants_without_normalized_group
     assert data_pages["results"][0]["originalUrl"] == "https://example.org/covid"
 
 
-def test_search_accepts_url_queries_and_matches_common_variants(
-    tmp_path, monkeypatch
-) -> None:
+def test_search_accepts_url_queries_and_matches_common_variants(tmp_path, monkeypatch) -> None:
     client = _init_test_app(tmp_path, monkeypatch)
 
     with get_session() as session:
@@ -1083,9 +1077,7 @@ def test_search_accepts_url_queries_and_matches_common_variants(
     assert data["total"] == 1
 
 
-def test_search_relevance_uses_page_signal_boost_for_tie_breaks(
-    tmp_path, monkeypatch
-) -> None:
+def test_search_relevance_uses_page_signal_boost_for_tie_breaks(tmp_path, monkeypatch) -> None:
     client = _init_test_app(tmp_path, monkeypatch)
     _seed_authority_ranking_data()
 
@@ -1131,6 +1123,7 @@ def test_snapshot_detail_endpoint(tmp_path, monkeypatch) -> None:
     # Grab a snapshot id directly from the DB.
     with get_session() as session:
         snap = session.query(Snapshot).first()
+        assert snap is not None
         snap_id = snap.id
 
     resp = client.get(f"/api/snapshot/{snap_id}")
@@ -1142,9 +1135,7 @@ def test_snapshot_detail_endpoint(tmp_path, monkeypatch) -> None:
     assert "topics" not in body
 
 
-def test_snapshot_detail_includes_browse_url_when_replay_configured(
-    tmp_path, monkeypatch
-) -> None:
+def test_snapshot_detail_includes_browse_url_when_replay_configured(tmp_path, monkeypatch) -> None:
     monkeypatch.setenv("HEALTHARCHIVE_REPLAY_BASE_URL", "https://replay.healtharchive.ca/")
     client = _init_test_app(tmp_path, monkeypatch)
     snap_id = _seed_replay_browse_url_data()

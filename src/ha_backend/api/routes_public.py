@@ -1,23 +1,24 @@
 from __future__ import annotations
 
-import time
-from datetime import date, datetime, timedelta, timezone
-from enum import Enum
-from pathlib import Path
-import re
-from typing import Any, Dict, Iterable, Iterator, List, Optional
-from urllib.parse import urlsplit, urlunsplit
 import csv
 import gzip
 import io
 import json
+import re
+import time
+from datetime import date, datetime, timedelta, timezone
+from enum import Enum
+from pathlib import Path
+from threading import Lock
+from typing import Any, Dict, Iterable, Iterator, List, Optional, Sequence
+from urllib.parse import urlsplit, urlunsplit
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, StreamingResponse
-from sqlalchemy import String, and_, case, cast, func, inspect, or_, text
+from sqlalchemy import String, and_, case, cast, func, inspect, literal, or_, text
 from sqlalchemy.orm import Session, joinedload, load_only
-from threading import Lock
 
+from ha_backend.changes import CHANGE_TYPE_UNCHANGED, get_latest_job_ids_by_source
 from ha_backend.config import (
     get_change_tracking_enabled,
     get_exports_default_limit,
@@ -41,7 +42,34 @@ from ha_backend.models import (
     SnapshotChange,
     Source,
 )
+from ha_backend.runtime_metrics import observe_search_request
 from ha_backend.search import TS_CONFIG, build_search_vector
+from ha_backend.search_fuzzy import (
+    pick_word_similarity_threshold,
+    should_use_url_similarity,
+    token_variants,
+)
+from ha_backend.search_query import (
+    And as BoolAnd,
+)
+from ha_backend.search_query import (
+    Not as BoolNot,
+)
+from ha_backend.search_query import (
+    Or as BoolOr,
+)
+from ha_backend.search_query import (
+    QueryNode as BoolNode,
+)
+from ha_backend.search_query import (
+    QueryParseError,
+    iter_positive_terms,
+    looks_like_advanced_query,
+    parse_query,
+)
+from ha_backend.search_query import (
+    Term as BoolTerm,
+)
 from ha_backend.search_ranking import (
     QueryMode,
     RankingVersion,
@@ -50,25 +78,7 @@ from ha_backend.search_ranking import (
     get_ranking_version,
     tokenize_query,
 )
-from ha_backend.search_query import (
-    And as BoolAnd,
-    Not as BoolNot,
-    Or as BoolOr,
-    QueryNode as BoolNode,
-    QueryParseError,
-    Term as BoolTerm,
-    iter_positive_terms,
-    looks_like_advanced_query,
-    parse_query,
-)
-from ha_backend.search_fuzzy import (
-    pick_word_similarity_threshold,
-    should_use_url_similarity,
-    token_variants,
-)
 from ha_backend.url_normalization import normalize_url_for_grouping
-from ha_backend.runtime_metrics import observe_search_request
-from ha_backend.changes import CHANGE_TYPE_UNCHANGED, get_latest_job_ids_by_source
 from ha_backend.usage_metrics import (
     EVENT_REPORT_SUBMITTED,
     EVENT_SEARCH_REQUEST,
@@ -80,6 +90,10 @@ from ha_backend.usage_metrics import (
 
 from .schemas import (
     ArchiveStatsSchema,
+    ChangeCompareSchema,
+    ChangeCompareSnapshotSchema,
+    ChangeEventSchema,
+    ChangeFeedSchema,
     ExportManifestSchema,
     ExportResourceSchema,
     IssueReportCreateSchema,
@@ -88,17 +102,13 @@ from .schemas import (
     SearchResponseSchema,
     SnapshotDetailSchema,
     SnapshotSummarySchema,
+    SnapshotTimelineItemSchema,
+    SnapshotTimelineSchema,
     SourceEditionSchema,
     SourceSummarySchema,
     UsageMetricsCountsSchema,
     UsageMetricsDaySchema,
     UsageMetricsSchema,
-    ChangeEventSchema,
-    ChangeFeedSchema,
-    ChangeCompareSchema,
-    ChangeCompareSnapshotSchema,
-    SnapshotTimelineItemSchema,
-    SnapshotTimelineSchema,
 )
 
 router = APIRouter()
@@ -232,7 +242,9 @@ def _build_date_range(
     if from_:
         range_start = datetime(from_.year, from_.month, from_.day, tzinfo=timezone.utc)
     if to:
-        range_end_exclusive = datetime(to.year, to.month, to.day, tzinfo=timezone.utc) + timedelta(days=1)
+        range_end_exclusive = datetime(to.year, to.month, to.day, tzinfo=timezone.utc) + timedelta(
+            days=1
+        )
 
     if dialect_name == "sqlite":
         if range_start is not None:
@@ -312,9 +324,8 @@ def _iter_change_export_rows(
     range_end_exclusive: datetime | None,
     public_base: str,
 ) -> Iterable[dict[str, Any]]:
-    query = (
-        db.query(SnapshotChange, Source)
-        .join(Source, SnapshotChange.source_id == Source.id, isouter=True)
+    query = db.query(SnapshotChange, Source).join(
+        Source, SnapshotChange.source_id == Source.id, isouter=True
     )
     query = query.filter(
         or_(Source.code.is_(None), ~Source.code.in_(_PUBLIC_EXCLUDED_SOURCE_CODES))
@@ -334,8 +345,7 @@ def _iter_change_export_rows(
         compare_url = f"{public_base}/compare?to={change.to_snapshot_id}"
         if change.from_snapshot_id is not None:
             compare_url = (
-                f"{public_base}/compare?from={change.from_snapshot_id}"
-                f"&to={change.to_snapshot_id}"
+                f"{public_base}/compare?from={change.from_snapshot_id}&to={change.to_snapshot_id}"
             )
         yield {
             "change_id": change.id,
@@ -521,11 +531,7 @@ def _escape_like(value: str) -> str:
     """
     Escape LIKE wildcards so user input is treated as a literal substring.
     """
-    return (
-        value.replace("\\", "\\\\")
-        .replace("%", "\\%")
-        .replace("_", "\\_")
-    )
+    return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
 
 
 _URL_QUERY_PREFIX_RE = re.compile(r"^url:\s*", re.IGNORECASE)
@@ -615,7 +621,11 @@ def _extract_url_search_targets(q_clean: str) -> list[str] | None:
         lowered = raw.lower()
         if '"' in raw or " " in raw:
             return None
-        if not (lowered.startswith("http://") or lowered.startswith("https://") or lowered.startswith("www.")):
+        if not (
+            lowered.startswith("http://")
+            or lowered.startswith("https://")
+            or lowered.startswith("www.")
+        ):
             return None
 
     if not _looks_like_url_query(raw):
@@ -705,15 +715,13 @@ def _candidate_resolve_urls(original_url: str) -> List[str]:
         for host_value in host_variants:
             netloc_value = f"{host_value}{sep}{port}" if port else host_value
             for path_value in path_variants:
-                candidates.add(
-                    urlunsplit((scheme_value, netloc_value, path_value, query, ""))
-                )
+                candidates.add(urlunsplit((scheme_value, netloc_value, path_value, query, "")))
 
     return sorted(candidates)
 
 
 def _select_best_replay_candidate(
-    rows: List[tuple[int, str, Any, Optional[int]]],
+    rows: Iterable[Sequence[Any]],
     anchor: Optional[datetime],
 ) -> Optional[tuple[int, str, Any, Optional[int]]]:
     best: Optional[tuple[int, str, Any, Optional[int]]] = None
@@ -954,9 +962,7 @@ def _search_snapshots_inner(
     if raw_q == "":
         raw_q = None
 
-    url_search_targets: list[str] | None = (
-        _extract_url_search_targets(raw_q) if raw_q else None
-    )
+    url_search_targets: list[str] | None = _extract_url_search_targets(raw_q) if raw_q else None
     boolean_query: BoolNode | None = None
 
     q_filter = raw_q
@@ -999,7 +1005,9 @@ def _search_snapshots_inner(
     if from_date:
         range_start = datetime(from_date.year, from_date.month, from_date.day, tzinfo=timezone.utc)
     if to_date:
-        range_end_exclusive = datetime(to_date.year, to_date.month, to_date.day, tzinfo=timezone.utc) + timedelta(days=1)
+        range_end_exclusive = datetime(
+            to_date.year, to_date.month, to_date.day, tzinfo=timezone.utc
+        ) + timedelta(days=1)
 
     # SQLite often round-trips timezone-aware datetimes as naive. Use naive bounds
     # for consistent filtering in tests/dev when running on SQLite.
@@ -1213,7 +1221,6 @@ def _search_snapshots_inner(
     page_partition_key = (Snapshot.source_id, group_key)
 
     pages_url_length = func.length(group_key)
-    snapshots_url_length = func.length(strip_query_fragment_expr(Snapshot.url))
 
     def compute_total(query: Any) -> int:
         if effective_view == SearchView.pages:
@@ -1225,17 +1232,12 @@ def _search_snapshots_inner(
                 .distinct()
                 .subquery()
             )
-            return (
-                db.query(func.count())
-                .select_from(distinct_pages)
-                .scalar()
-                or 0
-            )
+            return db.query(func.count()).select_from(distinct_pages).scalar() or 0
         if effective_view == SearchView.snapshots and not includeDuplicates:
             capture_day = capture_date_expr(Snapshot.capture_timestamp).label("capture_day")
-            content_key = cast(func.coalesce(Snapshot.content_hash, cast(Snapshot.id, String)), String).label(
-                "content_key"
-            )
+            content_key = cast(
+                func.coalesce(Snapshot.content_hash, cast(Snapshot.id, String)), String
+            ).label("content_key")
             distinct_items = (
                 query.with_entities(
                     Snapshot.source_id.label("source_id"),
@@ -1246,12 +1248,7 @@ def _search_snapshots_inner(
                 .distinct()
                 .subquery()
             )
-            return (
-                db.query(func.count())
-                .select_from(distinct_items)
-                .scalar()
-                or 0
-            )
+            return db.query(func.count()).select_from(distinct_items).scalar() or 0
         return query.with_entities(func.count(Snapshot.id)).scalar() or 0
 
     def apply_snapshot_dedup(query: Any) -> Any:
@@ -1261,10 +1258,14 @@ def _search_snapshots_inner(
             String,
         )
         partition_key = (Snapshot.source_id, Snapshot.url, content_key, capture_day)
-        row_number = func.row_number().over(
-            partition_by=partition_key,
-            order_by=(Snapshot.capture_timestamp.desc(), Snapshot.id.desc()),
-        ).label("rn")
+        row_number = (
+            func.row_number()
+            .over(
+                partition_by=partition_key,
+                order_by=(Snapshot.capture_timestamp.desc(), Snapshot.id.desc()),
+            )
+            .label("rn")
+        )
         dedup_subq = query.with_entities(
             Snapshot.id.label("id"),
             row_number,
@@ -1278,7 +1279,7 @@ def _search_snapshots_inner(
     query = base_query
     tsquery = None
     vector_expr = None
-    score_override = None
+    score_override: Any | None = None
     search_mode: str | None = None
 
     def apply_substring_filter(qry: Any) -> Any:
@@ -1371,6 +1372,7 @@ def _search_snapshots_inner(
         total = compute_total(query)
         search_mode = "url"
     elif boolean_query:
+
         def build_term_expr(term: BoolTerm) -> Any:
             text_value = term.text.strip()
             if not text_value:
@@ -1431,7 +1433,9 @@ def _search_snapshots_inner(
         else:
             query = apply_substring_filter(query)
             total = compute_total(query)
-            search_mode = "relevance_fallback" if effective_sort == SearchSort.relevance else "newest"
+            search_mode = (
+                "relevance_fallback" if effective_sort == SearchSort.relevance else "newest"
+            )
 
             if total == 0 and use_postgres_fts and len(q_filter) >= 4 and _has_pg_trgm(db):
                 score_override = None
@@ -1468,9 +1472,7 @@ def _search_snapshots_inner(
     )
     use_authority = use_page_signals
 
-    has_ps_outlink_count = use_page_signals and _has_column(
-        db, "page_signals", "outlink_count"
-    )
+    has_ps_outlink_count = use_page_signals and _has_column(db, "page_signals", "outlink_count")
     has_ps_pagerank = use_page_signals and _has_column(db, "page_signals", "pagerank")
 
     use_hubness = (
@@ -1687,9 +1689,7 @@ def _search_snapshots_inner(
             0,
         )
         phrase_boost = (
-            case((Snapshot.title.ilike(f"%{phrase_query}%"), 2), else_=0)
-            if phrase_query
-            else 0
+            case((Snapshot.title.ilike(f"%{phrase_query}%"), 2), else_=0) if phrase_query else 0
         )
         score = 3 * title_hits + 2 * url_hits + snippet_hits + phrase_boost
 
@@ -1709,10 +1709,14 @@ def _search_snapshots_inner(
     snapshot_score = build_snapshot_score()
 
     def build_item_query_for_pages_v1() -> Any:
-        row_number = func.row_number().over(
-            partition_by=page_partition_key,
-            order_by=(Snapshot.capture_timestamp.desc(), Snapshot.id.desc()),
-        ).label("rn")
+        row_number = (
+            func.row_number()
+            .over(
+                partition_by=page_partition_key,
+                order_by=(Snapshot.capture_timestamp.desc(), Snapshot.id.desc()),
+            )
+            .label("rn")
+        )
         latest_ids_subq = query.with_entities(
             Snapshot.id.label("id"),
             row_number,
@@ -1727,28 +1731,28 @@ def _search_snapshots_inner(
         if snapshot_score is None:
             return build_item_query_for_pages_v1()
 
-        row_number = func.row_number().over(
-            partition_by=page_partition_key,
-            order_by=(Snapshot.capture_timestamp.desc(), Snapshot.id.desc()),
-        ).label("rn")
+        row_number = (
+            func.row_number()
+            .over(
+                partition_by=page_partition_key,
+                order_by=(Snapshot.capture_timestamp.desc(), Snapshot.id.desc()),
+            )
+            .label("rn")
+        )
         candidates_query = query
         if use_page_signals:
             candidates_query = candidates_query.outerjoin(
                 PageSignal, PageSignal.normalized_url_group == group_key
             )
 
-        candidates_subq = (
-            candidates_query
-            .with_entities(
-                Snapshot.id.label("id"),
-                Snapshot.source_id.label("source_id"),
-                group_key.label("group_key"),
-                Snapshot.capture_timestamp.label("capture_timestamp"),
-                row_number,
-                snapshot_score.label("snapshot_score"),
-            )
-            .subquery()
-        )
+        candidates_subq = candidates_query.with_entities(
+            Snapshot.id.label("id"),
+            Snapshot.source_id.label("source_id"),
+            group_key.label("group_key"),
+            Snapshot.capture_timestamp.label("capture_timestamp"),
+            row_number,
+            snapshot_score.label("snapshot_score"),
+        ).subquery()
 
         group_scores_subq = (
             db.query(
@@ -1760,15 +1764,12 @@ def _search_snapshots_inner(
             .subquery()
         )
 
-        latest_ids_subq = (
-            db.query(
-                candidates_subq.c.id.label("id"),
-                candidates_subq.c.source_id.label("source_id"),
-                candidates_subq.c.group_key.label("group_key"),
-                candidates_subq.c.rn.label("rn"),
-            )
-            .subquery()
-        )
+        latest_ids_subq = db.query(
+            candidates_subq.c.id.label("id"),
+            candidates_subq.c.source_id.label("source_id"),
+            candidates_subq.c.group_key.label("group_key"),
+            candidates_subq.c.rn.label("rn"),
+        ).subquery()
 
         return (
             db.query(Snapshot)
@@ -1807,7 +1808,7 @@ def _search_snapshots_inner(
                 )
 
             if effective_sort == SearchSort.relevance and rank_text:
-                rank_score = snapshot_score if snapshot_score is not None else 0.0
+                rank_score = snapshot_score if snapshot_score is not None else literal(0.0)
                 ordered = item_query.order_by(
                     status_quality.desc(),
                     rank_score.desc(),
@@ -1828,7 +1829,7 @@ def _search_snapshots_inner(
                 PageSignal, PageSignal.normalized_url_group == group_key
             )
         if effective_sort == SearchSort.relevance and rank_text:
-            rank_score = snapshot_score if snapshot_score is not None else 0.0
+            rank_score = snapshot_score if snapshot_score is not None else literal(0.0)
             ordered = item_query.order_by(
                 status_quality.desc(),
                 rank_score.desc(),
@@ -1865,7 +1866,7 @@ def _search_snapshots_inner(
         .all()
     )
 
-    results: List[SnapshotSummarySchema] = []
+    search_results: List[SnapshotSummarySchema] = []
     page_counts_by_key: dict[tuple[int, str], int] = {}
     if effective_view == SearchView.pages and _has_table(db, "pages"):
         pairs: set[tuple[int, str]] = set()
@@ -1882,14 +1883,14 @@ def _search_snapshots_inner(
                 and_(Page.source_id == sid, Page.normalized_url_group == group)
                 for sid, group in pairs
             ]
-            rows = (
+            page_rows = (
                 db.query(Page.source_id, Page.normalized_url_group, Page.snapshot_count)
                 .filter(or_(*conditions))
                 .all()
             )
             page_counts_by_key = {
                 (int(sid), str(group)): int(count)
-                for sid, group, count in rows
+                for sid, group, count in page_rows
                 if sid is not None and group and count is not None
             }
 
@@ -1918,7 +1919,7 @@ def _search_snapshots_inner(
             if group_val:
                 page_snapshots_count = page_counts_by_key.get((int(snap.source_id), group_val))
 
-        results.append(
+        search_results.append(
             SnapshotSummarySchema(
                 id=snap.id,
                 title=snap.title,
@@ -1940,7 +1941,7 @@ def _search_snapshots_inner(
 
     return (
         SearchResponseSchema(
-            results=results,
+            results=search_results,
             total=total,
             page=page,
             pageSize=pageSize,
@@ -1949,7 +1950,7 @@ def _search_snapshots_inner(
     )
 
 
-def get_db() -> Session:
+def get_db() -> Iterator[Session]:
     """
     FastAPI dependency that yields a DB session.
     """
@@ -2014,9 +2015,7 @@ def submit_issue_report(
 
     description = payload.description.strip()
     if len(description) < 20:
-        raise HTTPException(
-            status_code=400, detail="Description must be at least 20 characters."
-        )
+        raise HTTPException(status_code=400, detail="Description must be at least 20 characters.")
 
     original_url = payload.originalUrl.strip() if payload.originalUrl else None
     if original_url == "":
@@ -2076,11 +2075,11 @@ def get_usage_metrics(db: Session = Depends(get_db)) -> UsageMetricsSchema:
     totals = _build_usage_counts(totals_raw)
     daily = [
         UsageMetricsDaySchema(
-            date=row["date"],
-            searchRequests=row.get(EVENT_SEARCH_REQUEST, 0),
-            snapshotDetailViews=row.get(EVENT_SNAPSHOT_DETAIL, 0),
-            rawSnapshotViews=row.get(EVENT_SNAPSHOT_RAW, 0),
-            reportSubmissions=row.get(EVENT_REPORT_SUBMITTED, 0),
+            date=str(row["date"]),
+            searchRequests=int(row.get(EVENT_SEARCH_REQUEST, 0) or 0),
+            snapshotDetailViews=int(row.get(EVENT_SNAPSHOT_DETAIL, 0) or 0),
+            rawSnapshotViews=int(row.get(EVENT_SNAPSHOT_RAW, 0) or 0),
+            reportSubmissions=int(row.get(EVENT_REPORT_SUBMITTED, 0) or 0),
         )
         for row in daily_raw
     ]
@@ -2186,7 +2185,11 @@ def export_snapshots_head(
 
     export_format = _normalize_export_format(format)
     content_type = _EXPORT_CONTENT_TYPES[export_format]
-    filename = "healtharchive-snapshots.jsonl" if export_format == "jsonl" else "healtharchive-snapshots.csv"
+    filename = (
+        "healtharchive-snapshots.jsonl"
+        if export_format == "jsonl"
+        else "healtharchive-snapshots.csv"
+    )
 
     headers: dict[str, str] = {}
     if compressed:
@@ -2274,7 +2277,9 @@ def export_changes_head(
 
     export_format = _normalize_export_format(format)
     content_type = _EXPORT_CONTENT_TYPES[export_format]
-    filename = "healtharchive-changes.jsonl" if export_format == "jsonl" else "healtharchive-changes.csv"
+    filename = (
+        "healtharchive-changes.jsonl" if export_format == "jsonl" else "healtharchive-changes.csv"
+    )
 
     headers: dict[str, str] = {}
     if compressed:
@@ -2323,7 +2328,9 @@ def list_changes(
     if from_:
         range_start = datetime(from_.year, from_.month, from_.day, tzinfo=timezone.utc)
     if to:
-        range_end_exclusive = datetime(to.year, to.month, to.day, tzinfo=timezone.utc) + timedelta(days=1)
+        range_end_exclusive = datetime(to.year, to.month, to.day, tzinfo=timezone.utc) + timedelta(
+            days=1
+        )
 
     dialect_name = db.get_bind().dialect.name
     if dialect_name == "sqlite":
@@ -2406,33 +2413,23 @@ def get_change_compare(
     if not get_change_tracking_enabled():
         raise HTTPException(status_code=404, detail="Change tracking not enabled")
 
-    change = (
-        db.query(SnapshotChange)
-        .filter(SnapshotChange.to_snapshot_id == toSnapshotId)
-        .first()
-    )
+    change = db.query(SnapshotChange).filter(SnapshotChange.to_snapshot_id == toSnapshotId).first()
     if not change:
         raise HTTPException(status_code=404, detail="Change event not found")
     if fromSnapshotId and change.from_snapshot_id != fromSnapshotId:
         raise HTTPException(status_code=400, detail="Snapshot pair not available")
 
-    to_snapshot = (
-        db.query(Snapshot)
-        .filter(Snapshot.id == change.to_snapshot_id)
-        .first()
-    )
+    to_snapshot = db.query(Snapshot).filter(Snapshot.id == change.to_snapshot_id).first()
     if not to_snapshot:
         raise HTTPException(status_code=404, detail="Snapshot not found")
 
     from_snapshot: Optional[Snapshot] = None
     if change.from_snapshot_id:
-        from_snapshot = (
-            db.query(Snapshot)
-            .filter(Snapshot.id == change.from_snapshot_id)
-            .first()
-        )
+        from_snapshot = db.query(Snapshot).filter(Snapshot.id == change.from_snapshot_id).first()
 
-    job_ids = {jid for jid in [to_snapshot.job_id, from_snapshot.job_id if from_snapshot else None] if jid}
+    job_ids = {
+        jid for jid in [to_snapshot.job_id, from_snapshot.job_id if from_snapshot else None] if jid
+    }
     job_names: Dict[int, str] = {}
     if job_ids:
         rows = db.query(ArchiveJob.id, ArchiveJob.name).filter(ArchiveJob.id.in_(job_ids)).all()
@@ -2509,11 +2506,7 @@ def get_snapshot_timeline(
     job_ids = {row.job_id for row in snapshots if row.job_id}
     job_names: Dict[int, str] = {}
     if job_ids:
-        rows = (
-            db.query(ArchiveJob.id, ArchiveJob.name)
-            .filter(ArchiveJob.id.in_(job_ids))
-            .all()
-        )
+        rows = db.query(ArchiveJob.id, ArchiveJob.name).filter(ArchiveJob.id.in_(job_ids)).all()
         job_names = {int(job_id): job_name for job_id, job_name in rows}
 
     items: List[SnapshotTimelineItemSchema] = []
@@ -2676,9 +2669,7 @@ def health_check(db: Session = Depends(get_db)) -> JSONResponse:
 
     # Job status counts
     job_rows = (
-        db.query(ArchiveJob.status, func.count(ArchiveJob.id))
-        .group_by(ArchiveJob.status)
-        .all()
+        db.query(ArchiveJob.status, func.count(ArchiveJob.id)).group_by(ArchiveJob.status).all()
     )
     checks["jobs"] = {job_status: count for job_status, count in job_rows}
 
@@ -2723,9 +2714,7 @@ def get_archive_stats(response: Response, db: Session = Depends(get_db)) -> Arch
         .distinct()
         .subquery()
     )
-    pages_total = int(
-        db.query(func.count()).select_from(distinct_pages).scalar() or 0
-    )
+    pages_total = int(db.query(func.count()).select_from(distinct_pages).scalar() or 0)
 
     sources_total = int(
         db.query(func.count(func.distinct(Snapshot.source_id)))
@@ -2796,9 +2785,7 @@ def list_sources(db: Session = Depends(get_db)) -> List[SourceSummarySchema]:
             .order_by(Snapshot.capture_timestamp.desc(), Snapshot.id.desc())
             .first()
         )
-        latest_record_id: Optional[int] = (
-            latest_snapshot[0] if latest_snapshot else None
-        )
+        latest_record_id: Optional[int] = latest_snapshot[0] if latest_snapshot else None
 
         entry_record_id: Optional[int] = None
         entry_job_id: Optional[int] = None
@@ -2848,7 +2835,7 @@ def list_sources(db: Session = Depends(get_db)) -> List[SourceSummarySchema]:
         # the source homepage).
         if entry_record_id is None and source.base_url:
             host_variants = _candidate_entry_hosts(source.base_url)
-            host_filters = []
+            host_filters: list[Any] = []
             for host in host_variants:
                 for scheme in ("https", "http"):
                     prefix = f"{scheme}://{host}"
@@ -2923,9 +2910,7 @@ def list_sources(db: Session = Depends(get_db)) -> List[SourceSummarySchema]:
     return summaries
 
 
-@router.get(
-    "/sources/{source_code}/editions", response_model=List[SourceEditionSchema]
-)
+@router.get("/sources/{source_code}/editions", response_model=List[SourceEditionSchema])
 def list_source_editions(
     source_code: str, db: Session = Depends(get_db)
 ) -> List[SourceEditionSchema]:
@@ -3012,7 +2997,7 @@ def list_source_editions(
                     entry_snapshot_id, entry_url, entry_ts = entry_snapshot
 
             if entry_url is None and host_variants:
-                host_filters = []
+                host_filters: list[Any] = []
                 for host in host_variants:
                     for scheme in ("https", "http"):
                         prefix = f"{scheme}://{host}"
@@ -3053,9 +3038,7 @@ def list_source_editions(
                         entry_snapshot_id, entry_url, entry_ts = best
 
             if entry_url is not None:
-                entry_browse_url = _build_browse_url(
-                    job_id, entry_url, entry_ts, entry_snapshot_id
-                )
+                entry_browse_url = _build_browse_url(job_id, entry_url, entry_ts, entry_snapshot_id)
 
         editions.append(
             SourceEditionSchema(
@@ -3148,9 +3131,7 @@ def resolve_replay_url(
     if timestamp is not None:
         anchor_dt = _parse_timestamp14(timestamp)
         if anchor_dt is None:
-            raise HTTPException(
-                status_code=400, detail="timestamp must be a 14-digit UTC value"
-            )
+            raise HTTPException(status_code=400, detail="timestamp must be a 14-digit UTC value")
 
     candidate_urls = _candidate_resolve_urls(cleaned_url)
     if not candidate_urls:
@@ -3362,9 +3343,7 @@ def get_snapshot_raw(
         raise HTTPException(status_code=404, detail="Snapshot not found")
 
     if not snap.warc_path:
-        raise HTTPException(
-            status_code=404, detail="No WARC path associated with this snapshot"
-        )
+        raise HTTPException(status_code=404, detail="No WARC path associated with this snapshot")
 
     warc_path = Path(snap.warc_path)
     if not warc_path.is_file():

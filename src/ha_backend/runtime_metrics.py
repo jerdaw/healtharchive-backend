@@ -92,11 +92,15 @@ def render_search_metrics_prometheus() -> list[str]:
         lines.append("# TYPE healtharchive_search_requests_total counter")
         lines.append(f"healtharchive_search_requests_total {m.count}")
 
-        lines.append("# HELP healtharchive_search_errors_total Total /api/search requests that raised an error")
+        lines.append(
+            "# HELP healtharchive_search_errors_total Total /api/search requests that raised an error"
+        )
         lines.append("# TYPE healtharchive_search_errors_total counter")
         lines.append(f"healtharchive_search_errors_total {m.error_count}")
 
-        lines.append("# HELP healtharchive_search_duration_seconds /api/search latency histogram (per-process)")
+        lines.append(
+            "# HELP healtharchive_search_duration_seconds /api/search latency histogram (per-process)"
+        )
         lines.append("# TYPE healtharchive_search_duration_seconds histogram")
         lines.append(f'healtharchive_search_duration_seconds_bucket{{le="0.05"}} {m.bucket_le_005}')
         lines.append(f'healtharchive_search_duration_seconds_bucket{{le="0.1"}} {m.bucket_le_01}')
@@ -107,17 +111,25 @@ def render_search_metrics_prometheus() -> list[str]:
         lines.append(f"healtharchive_search_duration_seconds_sum {m.duration_seconds_sum}")
         lines.append(f"healtharchive_search_duration_seconds_count {m.count}")
 
-        lines.append("# HELP healtharchive_search_mode_total /api/search mode breakdown (per-process)")
+        lines.append(
+            "# HELP healtharchive_search_mode_total /api/search mode breakdown (per-process)"
+        )
         lines.append("# TYPE healtharchive_search_mode_total counter")
         lines.append(f'healtharchive_search_mode_total{{mode="relevance_fts"}} {m.relevance_fts}')
-        lines.append(f'healtharchive_search_mode_total{{mode="relevance_fallback"}} {m.relevance_fallback}')
-        lines.append(f'healtharchive_search_mode_total{{mode="relevance_fuzzy"}} {m.relevance_fuzzy}')
+        lines.append(
+            f'healtharchive_search_mode_total{{mode="relevance_fallback"}} {m.relevance_fallback}'
+        )
+        lines.append(
+            f'healtharchive_search_mode_total{{mode="relevance_fuzzy"}} {m.relevance_fuzzy}'
+        )
         lines.append(f'healtharchive_search_mode_total{{mode="boolean"}} {m.boolean}')
         lines.append(f'healtharchive_search_mode_total{{mode="url"}} {m.url}')
         lines.append(f'healtharchive_search_mode_total{{mode="pages_fastpath"}} {m.pages_fastpath}')
         lines.append(f'healtharchive_search_mode_total{{mode="newest"}} {m.newest}')
 
-        lines.append("# HELP healtharchive_search_duration_seconds_max Max observed /api/search latency (seconds)")
+        lines.append(
+            "# HELP healtharchive_search_duration_seconds_max Max observed /api/search latency (seconds)"
+        )
         lines.append("# TYPE healtharchive_search_duration_seconds_max gauge")
         lines.append(f"healtharchive_search_duration_seconds_max {m.duration_seconds_max}")
 

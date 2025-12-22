@@ -1,20 +1,21 @@
 # archive_tool/utils.py
-import glob
 import json
 import logging
 import os
 import re
 import subprocess
-import time
 from pathlib import Path
-from typing import (Any, Dict, List,  # Ensure necessary types are imported
-                    Optional, Tuple)
+from typing import (
+    Any,
+    Dict,
+    List,  # Ensure necessary types are imported
+    Optional,
+)
 
 # Use absolute imports
 from . import constants  # Import constants module
+
 # Import specific constants used here for clarity
-from .constants import (CONTAINER_OUTPUT_DIR, REQUIRED_FINAL_ARGS_PREFIXES,
-                        STATS_REGEX, TEMP_DIR_PREFIX)
 
 logger = logging.getLogger("website_archiver.utils")
 
@@ -44,9 +45,7 @@ def check_docker() -> bool:
         return False
 
 
-def container_to_host_path(
-    container_path_str: str, host_output_dir: Path
-) -> Path | None:
+def container_to_host_path(container_path_str: str, host_output_dir: Path) -> Path | None:
     """Converts a container path within CONTAINER_OUTPUT_DIR to a host path."""
     try:
         container_path = Path(container_path_str)
@@ -57,9 +56,7 @@ def container_to_host_path(
             ) or container_path_str.startswith(constants.CONTAINER_OUTPUT_DIR.name):
                 container_path = Path("/", container_path_str)
             else:
-                logger.warning(
-                    f"Cannot convert relative container path: {container_path_str}"
-                )
+                logger.warning(f"Cannot convert relative container path: {container_path_str}")
                 return None
 
         if not str(container_path).startswith(str(constants.CONTAINER_OUTPUT_DIR)):
@@ -105,17 +102,13 @@ def host_to_container_path(host_path: Path, host_output_dir: Path) -> str | None
         return None
 
 
-def parse_temp_dir_from_log_file(
-    log_file_path: Path, host_output_dir: Path
-) -> Optional[Path]:
+def parse_temp_dir_from_log_file(log_file_path: Path, host_output_dir: Path) -> Optional[Path]:
     """Parses zimit log file for the temp directory path."""
     temp_dir_regex = re.compile(
         r"Output to tempdir:\s*\"?([/\\]?output[/\\]\.tmp\w+)\"?", re.IGNORECASE
     )
     if not log_file_path or not log_file_path.is_file():
-        logger.warning(
-            f"Log file not found or invalid for parsing temp dir: {log_file_path}"
-        )
+        logger.warning(f"Log file not found or invalid for parsing temp dir: {log_file_path}")
         return find_latest_temp_dir_fallback(host_output_dir)
     try:
         with open(log_file_path, "r", encoding="utf-8", errors="replace") as f:
@@ -138,9 +131,7 @@ def parse_temp_dir_from_log_file(
             elif host_path:
                 logger.warning(f"Parsed host temp dir is not a directory: {host_path}")
             else:
-                logger.warning(
-                    f"Could not convert parsed path '{container_temp_dir_str}'"
-                )
+                logger.warning(f"Could not convert parsed path '{container_temp_dir_str}'")
         else:
             logger.warning(f"Could not parse temp dir pattern from {log_file_path}.")
     except Exception as e:
@@ -170,9 +161,7 @@ def find_latest_temp_dir_fallback(host_output_dir: Path) -> Optional[Path]:
         logger.info(f"Fallback found latest temp dir: {latest_temp_dir.resolve()}")
         return latest_temp_dir.resolve()
     else:
-        logger.info(
-            f"Fallback did not find any '{constants.TEMP_DIR_PREFIX}*' directories."
-        )
+        logger.info(f"Fallback did not find any '{constants.TEMP_DIR_PREFIX}*' directories.")
         return None
 
 
@@ -181,9 +170,7 @@ def find_latest_config_yaml(temp_dir_path: Path) -> Optional[Path]:
     latest_mod_time: float = 0.0  # Correct type
     latest_yaml = None
     search_pattern_str = "collections/crawl-*/crawls/crawl-*.yaml"
-    logger.debug(
-        f"Searching for pattern '{search_pattern_str}' in directory: {temp_dir_path}"
-    )
+    logger.debug(f"Searching for pattern '{search_pattern_str}' in directory: {temp_dir_path}")
     if not temp_dir_path or not temp_dir_path.is_dir():
         logger.warning(f"Cannot search for YAML, invalid temp dir: {temp_dir_path}")
         return None
@@ -208,9 +195,7 @@ def find_latest_config_yaml(temp_dir_path: Path) -> Optional[Path]:
         logger.info(f"Found latest config YAML: {latest_yaml.resolve()}")
         return latest_yaml.resolve()
     else:
-        logger.warning(
-            f"Found files matching pattern but none were valid in {temp_dir_path}."
-        )
+        logger.warning(f"Found files matching pattern but none were valid in {temp_dir_path}.")
         return None
 
 
@@ -219,9 +204,7 @@ def find_all_warc_files(temp_dir_paths: List[Path]) -> List[Path]:
     all_warcs = set()
     if not temp_dir_paths:
         return []
-    logger.info(
-        f"Searching for WARC files in {len(temp_dir_paths)} temp dir path(s)..."
-    )
+    logger.info(f"Searching for WARC files in {len(temp_dir_paths)} temp dir path(s)...")
     for temp_dir in temp_dir_paths:
         if not temp_dir.is_dir():
             logger.warning(f"Skipping WARC search in non-existent dir: {temp_dir}")
@@ -229,9 +212,7 @@ def find_all_warc_files(temp_dir_paths: List[Path]) -> List[Path]:
         try:
             archive_dirs = list(temp_dir.glob("collections/crawl-*/archive"))
             if not archive_dirs:
-                logger.info(
-                    f"  No 'archive' subdirectory found within collections in {temp_dir}"
-                )
+                logger.info(f"  No 'archive' subdirectory found within collections in {temp_dir}")
                 continue
             found_in_temp_dir = 0
             for archive_dir in archive_dirs:
@@ -242,14 +223,10 @@ def find_all_warc_files(temp_dir_paths: List[Path]) -> List[Path]:
                                 all_warcs.add(warc_file.resolve())
                                 found_in_temp_dir += 1
                         except OSError as stat_e:
-                            logger.warning(
-                                f"Could not stat WARC file {warc_file}: {stat_e}"
-                            )
+                            logger.warning(f"Could not stat WARC file {warc_file}: {stat_e}")
                 else:
                     logger.warning(f"  Path is not a directory: {archive_dir}")
-            logger.info(
-                f"  Found {found_in_temp_dir} WARC file(s) in subdirs of {temp_dir}"
-            )
+            logger.info(f"  Found {found_in_temp_dir} WARC file(s) in subdirs of {temp_dir}")
         except Exception as e:
             logger.error(f"Error searching WARCs in {temp_dir}: {e}")
     unique_warc_list = sorted(list(all_warcs))
@@ -276,9 +253,7 @@ def parse_last_stats_from_log(log_file_path: Path) -> Optional[Dict[str, Any]]:
         if matches:
             last_stats_json_str = matches[-1].group(1)
         else:
-            logger.info(
-                f"No 'Crawl statistics' message found in the end of {log_file_path.name}."
-            )
+            logger.info(f"No 'Crawl statistics' message found in the end of {log_file_path.name}.")
             return None
         stats_details = json.loads(last_stats_json_str)
         extracted_stats = {
@@ -308,11 +283,7 @@ def cleanup_temp_dirs(temp_dir_paths: List[Path], state_file_path: Path):
     logger.info("--- Starting Cleanup ---")
     deleted_count = 0
     for temp_dir in temp_dir_paths:
-        if (
-            temp_dir
-            and temp_dir.is_dir()
-            and temp_dir.name.startswith(constants.TEMP_DIR_PREFIX)
-        ):
+        if temp_dir and temp_dir.is_dir() and temp_dir.name.startswith(constants.TEMP_DIR_PREFIX):
             try:
                 shutil.rmtree(temp_dir)
                 logger.info(f"Deleted: {temp_dir}")
@@ -340,9 +311,7 @@ def relax_permissions(host_output_dir: Path, temp_dirs: List[Path]) -> None:
         return
 
     if not host_output_dir.exists():
-        logger.warning(
-            f"relax_permissions: output dir {host_output_dir} does not exist; skipping."
-        )
+        logger.warning(f"relax_permissions: output dir {host_output_dir} does not exist; skipping.")
         return
 
     try:
@@ -360,9 +329,7 @@ def relax_permissions(host_output_dir: Path, temp_dirs: List[Path]) -> None:
         ]
         subprocess.run(cmd, check=False, capture_output=True, text=True)
     except FileNotFoundError:
-        logger.warning(
-            "relax_permissions: docker not available; cannot adjust permissions."
-        )
+        logger.warning("relax_permissions: docker not available; cannot adjust permissions.")
     except Exception as exc:
         logger.warning(f"relax_permissions: unexpected error: {exc}")
 
@@ -372,8 +339,6 @@ def filter_args_for_final_run(passthrough_args: List[str]) -> List[str]:
     # --- Initialize filtered ---
     filtered: List[str] = []
     # --- End Initialization ---
-    args_to_remove = {"--workers"}
-    skip_next = False
     i = 0  # Ensure i is initialized
     while i < len(passthrough_args):
         arg = passthrough_args[i]
@@ -387,9 +352,7 @@ def filter_args_for_final_run(passthrough_args: List[str]) -> List[str]:
             filtered.append(arg)
             if not arg.startswith("--") or "=" in arg:
                 i += 1
-            elif i + 1 < len(passthrough_args) and not passthrough_args[
-                i + 1
-            ].startswith("-"):
+            elif i + 1 < len(passthrough_args) and not passthrough_args[i + 1].startswith("-"):
                 filtered.append(passthrough_args[i + 1])
                 i += 2
             else:
@@ -397,9 +360,7 @@ def filter_args_for_final_run(passthrough_args: List[str]) -> List[str]:
         else:  # Skip arg if not required for final run
             if not arg.startswith("--") or "=" in arg:
                 i += 1
-            elif i + 1 < len(passthrough_args) and not passthrough_args[
-                i + 1
-            ].startswith("-"):
+            elif i + 1 < len(passthrough_args) and not passthrough_args[i + 1].startswith("-"):
                 i += 2
             else:
                 i += 1
@@ -414,9 +375,7 @@ def execute_external_command(command: str, description: str) -> bool:
     logger.info(f"Executing {description} command: {command}")
     try:
         args = shlex.split(command)
-        process = subprocess.run(
-            args, capture_output=True, text=True, check=True, timeout=120
-        )
+        process = subprocess.run(args, capture_output=True, text=True, check=True, timeout=120)
         logger.info(f"{description} STDOUT:\n{process.stdout.strip()}")
         if process.stderr.strip():
             logger.warning(f"{description} STDERR:\n{process.stderr.strip()}")

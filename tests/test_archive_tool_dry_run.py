@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import sys
-from pathlib import Path
 
 import archive_tool.main as archive_main
 import archive_tool.state as state_mod
@@ -51,4 +50,3 @@ def test_archive_tool_dry_run_exits_before_crawl(tmp_path, monkeypatch, capsys) 
     captured = capsys.readouterr()
     # We don't assert exact wording, just that "Dry run" appears somewhere.
     assert "Dry run" in captured.out or "Dry run" in captured.err
-

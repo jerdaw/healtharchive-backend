@@ -1,9 +1,9 @@
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
-import logging
-from typing import Dict, Iterable, List, Optional, Sequence
+from typing import Dict, List, Optional
 
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -87,9 +87,7 @@ def _summarize_change(
         parts.append(f"{removed_sections} removed")
 
     if not parts and (added_lines or removed_lines):
-        parts.append(
-            f"{added_lines or 0} lines added; {removed_lines or 0} removed"
-        )
+        parts.append(f"{added_lines or 0} lines added; {removed_lines or 0} removed")
 
     if not parts:
         parts.append("Archived text updated")
@@ -163,9 +161,7 @@ def _build_change_event(
         change_ratio=change_ratio,
         high_noise=high_noise,
         diff_version=DIFF_VERSION if diff_html is not None else None,
-        normalization_version=(
-            NORMALIZATION_VERSION if diff_html is not None else None
-        ),
+        normalization_version=(NORMALIZATION_VERSION if diff_html is not None else None),
         computed_at=_today_utc(),
         computed_by=computed_by,
         error_message=error_message,
@@ -281,9 +277,7 @@ def compute_changes_backfill(
         return ChangeComputeResult(created=0, skipped=0, errors=0)
 
     existing_to_ids = {
-        row[0]
-        for row in db.query(SnapshotChange.to_snapshot_id).all()
-        if row[0] is not None
+        row[0] for row in db.query(SnapshotChange.to_snapshot_id).all() if row[0] is not None
     }
 
     query = db.query(Snapshot).filter(Snapshot.normalized_url_group.isnot(None))
@@ -375,9 +369,7 @@ def compute_changes_since(
 
     for snap in query.yield_per(200):
         exists = (
-            db.query(SnapshotChange.id)
-            .filter(SnapshotChange.to_snapshot_id == snap.id)
-            .first()
+            db.query(SnapshotChange.id).filter(SnapshotChange.to_snapshot_id == snap.id).first()
         )
         if exists:
             skipped += 1

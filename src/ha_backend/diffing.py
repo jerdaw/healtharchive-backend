@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import difflib
+import re
 from dataclasses import dataclass
 from html import escape
-import re
 from typing import List, Tuple
 
 from bs4 import BeautifulSoup
@@ -48,7 +48,15 @@ def _normalize_whitespace(value: str) -> str:
 
 def _is_noise_tag(tag: Tag) -> bool:
     tag_id = tag.get("id") or ""
-    classes = " ".join(tag.get("class", []))
+    class_value = tag.get("class")
+    class_tokens: list[str]
+    if isinstance(class_value, list):
+        class_tokens = [str(token) for token in class_value]
+    elif isinstance(class_value, str):
+        class_tokens = [class_value]
+    else:
+        class_tokens = []
+    classes = " ".join(class_tokens)
     haystack = f"{tag_id} {classes}".lower()
     return any(token in haystack for token in _NOISE_KEYWORDS)
 
@@ -109,9 +117,7 @@ def normalize_html_for_diff(html: str) -> DiffDocument:
 
     raw_text = root.get_text(separator="\n", strip=True)
     lines = [
-        _normalize_whitespace(line)
-        for line in raw_text.splitlines()
-        if _normalize_whitespace(line)
+        _normalize_whitespace(line) for line in raw_text.splitlines() if _normalize_whitespace(line)
     ]
 
     sections = _extract_sections(root)
@@ -150,14 +156,10 @@ def compute_diff(doc_a: DiffDocument, doc_b: DiffDocument) -> DiffResult:
         diff_truncated = True
 
     added_lines = sum(
-        1
-        for line in diff_lines
-        if line.startswith("+") and not line.startswith("+++")
+        1 for line in diff_lines if line.startswith("+") and not line.startswith("+++")
     )
     removed_lines = sum(
-        1
-        for line in diff_lines
-        if line.startswith("-") and not line.startswith("---")
+        1 for line in diff_lines if line.startswith("-") and not line.startswith("---")
     )
 
     ratio = difflib.SequenceMatcher(None, doc_a.lines, doc_b.lines).ratio()

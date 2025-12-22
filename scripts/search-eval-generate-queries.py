@@ -16,7 +16,6 @@ if str(SRC_DIR) not in sys.path:
 from ha_backend.db import get_session  # noqa: E402
 from ha_backend.models import Snapshot  # noqa: E402
 
-
 _WORD_RE = re.compile(r"[a-z0-9]+(?:'[a-z0-9]+)?", re.IGNORECASE)
 
 
@@ -264,9 +263,7 @@ def main(argv: list[str]) -> int:
     with open(out_path, "w", encoding="utf-8") as f:
         f.write("# Auto-generated corpus-derived queries (Snapshot.title)\n")
         f.write("# Regenerate with:\n")
-        f.write(
-            "#   python scripts/search-eval-generate-queries.py --out <file>\n"
-        )
+        f.write("#   python scripts/search-eval-generate-queries.py --out <file>\n")
         f.write(f"# processed_titles={processed}\n")
         f.write(f"# min_token_len={args.min_token_len} min_count={args.min_count}\n")
         f.write("\n")

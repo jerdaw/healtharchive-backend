@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import timezone
+from typing import Iterator
 
 from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -24,6 +25,7 @@ app = FastAPI(
     title="HealthArchive Backend API",
     version="0.1.0",
 )
+
 
 @app.middleware("http")
 async def security_headers_middleware(request: Request, call_next):
@@ -60,7 +62,7 @@ app.add_middleware(
 )
 
 
-def _metrics_get_db() -> Session:
+def _metrics_get_db() -> Iterator[Session]:
     with get_session() as session:
         yield session
 
@@ -77,9 +79,7 @@ async def metrics(
 
     # Job counts by status
     job_rows = (
-        db.query(ArchiveJob.status, func.count(ArchiveJob.id))
-        .group_by(ArchiveJob.status)
-        .all()
+        db.query(ArchiveJob.status, func.count(ArchiveJob.id)).group_by(ArchiveJob.status).all()
     )
     lines.append("# HELP healtharchive_jobs_total Number of archive jobs by status")
     lines.append("# TYPE healtharchive_jobs_total gauge")
@@ -150,9 +150,7 @@ async def metrics(
         "# HELP healtharchive_jobs_tmp_non_warc_bytes_total Total non-WARC bytes under .tmp* across jobs (from last persisted scan)"
     )
     lines.append("# TYPE healtharchive_jobs_tmp_non_warc_bytes_total gauge")
-    lines.append(
-        f"healtharchive_jobs_tmp_non_warc_bytes_total {int(total_tmp_non_warc_bytes)}"
-    )
+    lines.append(f"healtharchive_jobs_tmp_non_warc_bytes_total {int(total_tmp_non_warc_bytes)}")
 
     per_source_storage = (
         db.query(
@@ -193,17 +191,23 @@ async def metrics(
 
     insp = inspect(db.get_bind())
     pages_table_present = bool(insp.has_table("pages"))
-    lines.append("# HELP healtharchive_pages_table_present Whether the pages table exists in the DB")
+    lines.append(
+        "# HELP healtharchive_pages_table_present Whether the pages table exists in the DB"
+    )
     lines.append("# TYPE healtharchive_pages_table_present gauge")
     lines.append(f"healtharchive_pages_table_present {1 if pages_table_present else 0}")
 
-    lines.append("# HELP healtharchive_pages_fastpath_enabled Whether /api/search can use the pages-table browse fast path")
+    lines.append(
+        "# HELP healtharchive_pages_fastpath_enabled Whether /api/search can use the pages-table browse fast path"
+    )
     lines.append("# TYPE healtharchive_pages_fastpath_enabled gauge")
     lines.append(f"healtharchive_pages_fastpath_enabled {1 if get_pages_fastpath_enabled() else 0}")
 
     if pages_table_present:
         total_pages = db.query(func.count(Page.id)).scalar() or 0
-        lines.append("# HELP healtharchive_pages_total Number of pages (URL groups) in the pages table")
+        lines.append(
+            "# HELP healtharchive_pages_total Number of pages (URL groups) in the pages table"
+        )
         lines.append("# TYPE healtharchive_pages_total gauge")
         lines.append(f"healtharchive_pages_total {int(total_pages)}")
 
@@ -222,7 +226,9 @@ async def metrics(
             if max_updated_at.tzinfo is None:
                 max_updated_at = max_updated_at.replace(tzinfo=timezone.utc)
             max_updated_at_seconds = int(max_updated_at.timestamp())
-        lines.append("# HELP healtharchive_pages_updated_at_max_seconds Max pages.updated_at (Unix epoch seconds, UTC)")
+        lines.append(
+            "# HELP healtharchive_pages_updated_at_max_seconds Max pages.updated_at (Unix epoch seconds, UTC)"
+        )
         lines.append("# TYPE healtharchive_pages_updated_at_max_seconds gauge")
         lines.append(f"healtharchive_pages_updated_at_max_seconds {max_updated_at_seconds}")
 

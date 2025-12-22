@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from ha_backend.archive_contract import (ArchiveJobConfig, ArchiveToolOptions,
-                                         validate_tool_options)
+from ha_backend.archive_contract import ArchiveJobConfig, ArchiveToolOptions, validate_tool_options
 
 
 def test_archive_tool_options_round_trip_defaults() -> None:
@@ -145,4 +144,3 @@ def test_validate_tool_options_enforces_invariants() -> None:
         vpn_connect_command="vpn connect",
     )
     validate_tool_options(opts)
-

@@ -142,7 +142,7 @@ class RuntimeArchiveJob:
                 # Stream directly to this terminal.
                 # Command and arguments are derived from configuration and job
                 # metadata, not raw end-user input.
-                result = subprocess.run(cmd)  # nosec: B603
+                result = subprocess.run(cmd, text=True)  # nosec: B603
             else:
                 # Capture output (not used yet, but ready for future log piping).
                 result = subprocess.run(  # nosec: B603
@@ -228,9 +228,7 @@ def _build_tool_extra_args(tool_options: ArchiveToolOptions) -> list[str]:
         extra_tool_args.append("--enable-vpn-rotation")
         extra_tool_args.extend(["--vpn-connect-command", str(vpn_connect_command)])
         if tool_options.max_vpn_rotations is not None:
-            extra_tool_args.extend(
-                ["--max-vpn-rotations", str(tool_options.max_vpn_rotations)]
-            )
+            extra_tool_args.extend(["--max-vpn-rotations", str(tool_options.max_vpn_rotations)])
         if tool_options.vpn_rotation_frequency_minutes is not None:
             extra_tool_args.extend(
                 [
@@ -240,9 +238,7 @@ def _build_tool_extra_args(tool_options: ArchiveToolOptions) -> list[str]:
             )
 
     if enable_monitoring and tool_options.backoff_delay_minutes is not None:
-        extra_tool_args.extend(
-            ["--backoff-delay-minutes", str(tool_options.backoff_delay_minutes)]
-        )
+        extra_tool_args.extend(["--backoff-delay-minutes", str(tool_options.backoff_delay_minutes)])
 
     if bool(tool_options.relax_perms):
         extra_tool_args.append("--relax-perms")
@@ -276,9 +272,7 @@ def run_persistent_job(job_id: int) -> int:
         job_row = _load_job_for_update(session, job_id)
 
         if job_row.status not in ("queued", "retryable"):
-            raise ValueError(
-                f"Job {job_id} has status {job_row.status!r} and is not runnable."
-            )
+            raise ValueError(f"Job {job_id} has status {job_row.status!r} and is not runnable.")
 
         raw_config = job_row.config or {}
         job_cfg = ArchiveJobConfig.from_dict(raw_config)

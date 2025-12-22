@@ -27,7 +27,11 @@ def _init_test_app(tmp_path: Path, monkeypatch):
 
     from ha_backend.api import app
 
-    return TestClient(app)
+    try:
+        import uvloop  # noqa: F401
+    except Exception:
+        return TestClient(app)
+    return TestClient(app, backend_options={"use_uvloop": True})
 
 
 def test_health_endpoint(tmp_path, monkeypatch) -> None:
@@ -39,9 +43,7 @@ def test_health_endpoint(tmp_path, monkeypatch) -> None:
 
     # Basic security headers should be present on the health response.
     assert resp.headers["X-Content-Type-Options"] == "nosniff"
-    assert (
-        resp.headers["Referrer-Policy"] == "strict-origin-when-cross-origin"
-    )
+    assert resp.headers["Referrer-Policy"] == "strict-origin-when-cross-origin"
     assert resp.headers["X-Frame-Options"] == "SAMEORIGIN"
 
     head_resp = client.head("/api/health")
@@ -139,12 +141,8 @@ def test_sources_endpoint_with_data(tmp_path, monkeypatch) -> None:
     assert phac_payload["entryRecordId"] == phac_payload["latestRecordId"]
 
 
-def test_sources_entry_record_prefers_base_url_over_latest_snapshot(
-    tmp_path, monkeypatch
-) -> None:
-    monkeypatch.setenv(
-        "HEALTHARCHIVE_REPLAY_BASE_URL", "https://replay.healtharchive.ca/"
-    )
+def test_sources_entry_record_prefers_base_url_over_latest_snapshot(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("HEALTHARCHIVE_REPLAY_BASE_URL", "https://replay.healtharchive.ca/")
     client = _init_test_app(tmp_path, monkeypatch)
 
     with get_session() as session:
@@ -351,9 +349,7 @@ def test_sources_endpoint_excludes_test_source(tmp_path, monkeypatch) -> None:
     assert "hc" in codes
 
 
-def test_sources_advertises_preview_url_when_cached_preview_exists(
-    tmp_path, monkeypatch
-) -> None:
+def test_sources_advertises_preview_url_when_cached_preview_exists(tmp_path, monkeypatch) -> None:
     preview_dir = tmp_path / "previews"
     preview_dir.mkdir(parents=True, exist_ok=True)
     monkeypatch.setenv("HEALTHARCHIVE_REPLAY_PREVIEW_DIR", str(preview_dir))
@@ -408,10 +404,7 @@ def test_sources_advertises_preview_url_when_cached_preview_exists(
     sources = resp.json()
     hc_payload = next(s for s in sources if s["sourceCode"] == "hc")
 
-    assert (
-        hc_payload["entryPreviewUrl"]
-        == f"/api/sources/hc/preview?jobId={job_id}"
-    )
+    assert hc_payload["entryPreviewUrl"] == f"/api/sources/hc/preview?jobId={job_id}"
 
 
 def test_source_preview_endpoint_serves_cached_image(tmp_path, monkeypatch) -> None:
@@ -435,9 +428,7 @@ def test_source_preview_endpoint_serves_cached_image(tmp_path, monkeypatch) -> N
     assert resp.headers.get("cache-control") is not None
 
 
-def test_source_preview_endpoint_serves_jpeg_when_available(
-    tmp_path, monkeypatch
-) -> None:
+def test_source_preview_endpoint_serves_jpeg_when_available(tmp_path, monkeypatch) -> None:
     preview_dir = tmp_path / "previews"
     preview_dir.mkdir(parents=True, exist_ok=True)
     monkeypatch.setenv("HEALTHARCHIVE_REPLAY_PREVIEW_DIR", str(preview_dir))
@@ -563,9 +554,7 @@ def test_source_editions_endpoint_lists_indexed_jobs_sorted_by_recency(
 def test_source_editions_endpoint_includes_entry_browse_url_when_replay_enabled(
     tmp_path, monkeypatch
 ) -> None:
-    monkeypatch.setenv(
-        "HEALTHARCHIVE_REPLAY_BASE_URL", "https://replay.healtharchive.ca"
-    )
+    monkeypatch.setenv("HEALTHARCHIVE_REPLAY_BASE_URL", "https://replay.healtharchive.ca")
     client = _init_test_app(tmp_path, monkeypatch)
 
     with get_session() as session:
@@ -627,12 +616,8 @@ def test_source_editions_endpoint_includes_entry_browse_url_when_replay_enabled(
     )
 
 
-def test_replay_resolve_endpoint_finds_capture_across_www_variants(
-    tmp_path, monkeypatch
-) -> None:
-    monkeypatch.setenv(
-        "HEALTHARCHIVE_REPLAY_BASE_URL", "https://replay.healtharchive.ca"
-    )
+def test_replay_resolve_endpoint_finds_capture_across_www_variants(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("HEALTHARCHIVE_REPLAY_BASE_URL", "https://replay.healtharchive.ca")
     client = _init_test_app(tmp_path, monkeypatch)
 
     with get_session() as session:
@@ -689,12 +674,8 @@ def test_replay_resolve_endpoint_finds_capture_across_www_variants(
     )
 
 
-def test_replay_resolve_endpoint_falls_back_to_url_group_match(
-    tmp_path, monkeypatch
-) -> None:
-    monkeypatch.setenv(
-        "HEALTHARCHIVE_REPLAY_BASE_URL", "https://replay.healtharchive.ca"
-    )
+def test_replay_resolve_endpoint_falls_back_to_url_group_match(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("HEALTHARCHIVE_REPLAY_BASE_URL", "https://replay.healtharchive.ca")
     client = _init_test_app(tmp_path, monkeypatch)
 
     with get_session() as session:
@@ -750,9 +731,7 @@ def test_replay_resolve_endpoint_falls_back_to_url_group_match(
     )
 
 
-def test_source_editions_endpoint_returns_404_for_missing_source(
-    tmp_path, monkeypatch
-) -> None:
+def test_source_editions_endpoint_returns_404_for_missing_source(tmp_path, monkeypatch) -> None:
     client = _init_test_app(tmp_path, monkeypatch)
     resp = client.get("/api/sources/does-not-exist/editions")
     assert resp.status_code == 404
@@ -843,8 +822,5 @@ def test_stats_endpoint_with_data(tmp_path, monkeypatch) -> None:
     assert body["latestCaptureDate"] == "2025-02-01"
     assert body["latestCaptureAgeDays"] == max(
         0,
-        (
-            datetime.now(timezone.utc).date()
-            - datetime(2025, 2, 1, tzinfo=timezone.utc).date()
-        ).days,
+        (datetime.now(timezone.utc).date() - datetime(2025, 2, 1, tzinfo=timezone.utc).date()).days,
     )

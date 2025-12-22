@@ -201,7 +201,9 @@ def consolidate_warcs(
 
         source_key = str(src)
         existing = by_source.get(source_key)
-        stable_name = str(existing.get("stable_name")) if existing and existing.get("stable_name") else ""
+        stable_name = (
+            str(existing.get("stable_name")) if existing and existing.get("stable_name") else ""
+        )
         if stable_name:
             dest = warcs_dir / stable_name
             if dest.exists() and not dest.is_file():
@@ -212,7 +214,7 @@ def consolidate_warcs(
                 reused += 1
                 stable_paths.append(dest.resolve())
                 by_source[source_key] = {
-                    **existing,
+                    **(existing or {}),
                     "source_path": source_key,
                     "stable_name": stable_name,
                     "size_bytes": int(src.stat().st_size),

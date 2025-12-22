@@ -32,4 +32,3 @@ def normalize_url_for_grouping(url: str) -> str | None:
 
 
 __all__ = ["normalize_url_for_grouping"]
-

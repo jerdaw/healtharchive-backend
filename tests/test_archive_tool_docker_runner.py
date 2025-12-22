@@ -27,4 +27,3 @@ def test_build_zimit_args_multiple_seeds_uses_single_csv_seeds_flag() -> None:
     assert args[workers_idx + 1] == "3"
 
     assert args[-2:] == ["--output", str(CONTAINER_OUTPUT_DIR)]
-

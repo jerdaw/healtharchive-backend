@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 from typing import Dict, Optional
+from urllib.parse import urljoin, urlsplit
 
 from bs4 import BeautifulSoup
-from urllib.parse import urljoin, urlsplit
 
 from ha_backend.indexing.mapping import normalize_url_for_grouping
 
@@ -88,6 +88,7 @@ def detect_language(text: str, headers: Optional[Dict[str, str]] = None) -> str:
 
     return "und"
 
+
 _ASSET_EXTENSIONS = (
     ".7z",
     ".avi",
@@ -152,10 +153,10 @@ def extract_outlink_groups(
     groups: set[str] = set()
 
     for a in root.find_all("a", href=True):
-        href = a.get("href")
-        if not href:
+        href_value = a.get("href")
+        if not isinstance(href_value, str):
             continue
-        href = href.strip()
+        href = href_value.strip()
         if not href or href.startswith("#"):
             continue
 
@@ -173,6 +174,8 @@ def extract_outlink_groups(
             continue
 
         group = normalize_url_for_grouping(abs_url)
+        if group is None:
+            continue
         if from_group and group == from_group:
             continue
 

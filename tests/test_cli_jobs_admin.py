@@ -67,9 +67,7 @@ def test_create_job_injects_zimit_passthrough_args(tmp_path, monkeypatch) -> Non
         seed_sources(session)
 
     parser = cli_module.build_parser()
-    args = parser.parse_args(
-        ["create-job", "--source", "hc", "--page-limit", "5", "--depth", "1"]
-    )
+    args = parser.parse_args(["create-job", "--source", "hc", "--page-limit", "5", "--depth", "1"])
 
     # Run the CLI handler; we do not care about stdout here.
     args.func(args)
@@ -194,5 +192,6 @@ def test_retry_job_marks_failed_as_retryable(tmp_path, monkeypatch) -> None:
         sys.stdout = old_stdout
 
     with get_session() as session:
-        job = session.get(ArchiveJob, job_id)
-        assert job.status == "retryable"
+        loaded_job = session.get(ArchiveJob, job_id)
+        assert loaded_job is not None
+        assert loaded_job.status == "retryable"

@@ -59,6 +59,7 @@ def test_worker_processes_queued_job_and_indexes(monkeypatch, tmp_path) -> None:
     def fake_run_persistent_job(jid: int) -> int:
         with get_session() as session:
             j = session.get(ArchiveJob, jid)
+            assert j is not None
             j.status = "completed"
             j.crawler_exit_code = 0
         return 0
@@ -66,23 +67,23 @@ def test_worker_processes_queued_job_and_indexes(monkeypatch, tmp_path) -> None:
     def fake_index_job(jid: int) -> int:
         with get_session() as session:
             j = session.get(ArchiveJob, jid)
+            assert j is not None
             j.status = "indexed"
             j.indexed_page_count = 42
         return 0
 
-    monkeypatch.setattr(
-        "ha_backend.worker.main.run_persistent_job", fake_run_persistent_job
-    )
+    monkeypatch.setattr("ha_backend.worker.main.run_persistent_job", fake_run_persistent_job)
     monkeypatch.setattr("ha_backend.worker.main.index_job", fake_index_job)
 
     # Single iteration should process the job fully.
     run_worker_loop(poll_interval=1, run_once=True)
 
     with get_session() as session:
-        job = session.get(ArchiveJob, job_id)
-        assert job.status == "indexed"
-        assert job.retry_count == 0
-        assert job.indexed_page_count == 42
+        loaded_job = session.get(ArchiveJob, job_id)
+        assert loaded_job is not None
+        assert loaded_job.status == "indexed"
+        assert loaded_job.retry_count == 0
+        assert loaded_job.indexed_page_count == 42
 
 
 def test_worker_marks_failed_job_retryable_until_limit(monkeypatch, tmp_path) -> None:
@@ -120,32 +121,34 @@ def test_worker_marks_failed_job_retryable_until_limit(monkeypatch, tmp_path) ->
     def failing_run_persistent_job(jid: int) -> int:
         with get_session() as session:
             j = session.get(ArchiveJob, jid)
+            assert j is not None
             j.status = "failed"
             j.crawler_exit_code = 1
         return 1
 
-    monkeypatch.setattr(
-        "ha_backend.worker.main.run_persistent_job", failing_run_persistent_job
-    )
+    monkeypatch.setattr("ha_backend.worker.main.run_persistent_job", failing_run_persistent_job)
 
     # First attempt: should mark as retryable and increment retry_count.
     run_worker_loop(poll_interval=1, run_once=True)
     with get_session() as session:
-        job = session.get(ArchiveJob, job_id)
-        assert job.status == "retryable"
-        assert job.retry_count == 1
+        loaded_job = session.get(ArchiveJob, job_id)
+        assert loaded_job is not None
+        assert loaded_job.status == "retryable"
+        assert loaded_job.retry_count == 1
 
     # Set retry_count just below the max and run again, then once more to
     # verify that we eventually stop retrying.
     with get_session() as session:
-        job = session.get(ArchiveJob, job_id)
-        job.status = "retryable"
-        job.retry_count = MAX_CRAWL_RETRIES - 1
+        loaded_job = session.get(ArchiveJob, job_id)
+        assert loaded_job is not None
+        loaded_job.status = "retryable"
+        loaded_job.retry_count = MAX_CRAWL_RETRIES - 1
 
     run_worker_loop(poll_interval=1, run_once=True)
     run_worker_loop(poll_interval=1, run_once=True)
     with get_session() as session:
-        job = session.get(ArchiveJob, job_id)
+        loaded_job = session.get(ArchiveJob, job_id)
+        assert loaded_job is not None
         # After exceeding the max retries, job should remain failed.
-        assert job.retry_count >= MAX_CRAWL_RETRIES
-        assert job.status == "failed"
+        assert loaded_job.retry_count >= MAX_CRAWL_RETRIES
+        assert loaded_job.status == "failed"

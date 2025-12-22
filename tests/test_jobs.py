@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from ha_backend.config import get_archive_tool_config
 from ha_backend.jobs import ArchiveJob
 
 

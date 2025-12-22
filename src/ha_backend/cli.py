@@ -6,10 +6,11 @@ import re
 import subprocess  # nosec: B404 - controlled CLI invocation of external tool
 import sys
 from pathlib import Path
-from typing import Sequence
+from typing import Any, ContextManager, Sequence, cast
 
 from sqlalchemy import text
 
+from .changes import compute_changes_backfill, compute_changes_since
 from .config import (
     REPO_ROOT,
     get_archive_tool_config,
@@ -22,7 +23,6 @@ from .indexing import index_job
 from .job_registry import create_job_for_source
 from .jobs import create_job, run_persistent_job
 from .logging_config import configure_logging
-from .changes import compute_changes_backfill, compute_changes_since
 from .seeds import seed_sources
 from .worker import run_worker_loop
 
@@ -81,7 +81,7 @@ def cmd_check_db(args: argparse.Namespace) -> None:
     print(f"Database URL: {db_cfg.database_url}")
 
     try:
-        engine = get_engine()
+        get_engine()
         with get_session() as session:
             # Issue a trivial query to ensure the connection is usable.
             session.execute(text("SELECT 1"))
@@ -136,8 +136,7 @@ def cmd_create_job(args: argparse.Namespace) -> None:
     """
     source_code = args.source
 
-    from .models import \
-        ArchiveJob as ORMArchiveJob  # local import to avoid cycles
+    from .models import ArchiveJob as ORMArchiveJob  # local import to avoid cycles
 
     # Build any per-job Zimit passthrough args for dev/testing (page limit,
     # crawl depth, etc.).
@@ -332,9 +331,7 @@ def cmd_schedule_annual(args: argparse.Namespace) -> None:
     print("------------------------------------------------")
     print(f"Mode:            {'APPLY' if apply_mode else 'DRY-RUN'}")
     print(f"Campaign date:   {campaign_date} (Jan 01 UTC)")
-    print(
-        f"Sources:         {', '.join(sources_in_order) if sources_in_order else '(none)'}"
-    )
+    print(f"Sources:         {', '.join(sources_in_order) if sources_in_order else '(none)'}")
     print(f"Max creates:     {max_create_per_run}")
     print(f"Archive root:    {tool_cfg.archive_root}")
     print("")
@@ -462,11 +459,12 @@ def cmd_schedule_annual(args: argparse.Namespace) -> None:
 
             if action == "create":
                 job_name = str(item.get("job_name"))
-                output_dir = str(item.get("output_dir"))
-                seeds = (item.get("job_config") or {}).get("seeds")  # type: ignore[union-attr]
+                output_dir_str = str(item.get("output_dir"))
+                job_config_data = item.get("job_config")
+                seeds = job_config_data.get("seeds") if isinstance(job_config_data, dict) else None
                 seed_count = len(seeds) if isinstance(seeds, list) else 0
                 print(f"{src}: WOULD CREATE {job_name} (seeds={seed_count})")
-                print(f"     output_dir={output_dir}")
+                print(f"     output_dir={output_dir_str}")
             elif action == "skip":
                 print(f"{src}: SKIP - {reason}")
             else:
@@ -492,12 +490,24 @@ def cmd_schedule_annual(args: argparse.Namespace) -> None:
             if created >= max_create_per_run:
                 break
 
-            source_id = int(item["source_id"])  # type: ignore[arg-type]
+            source_id_value = item.get("source_id")
+            if not isinstance(source_id_value, int):
+                raise RuntimeError(
+                    f"Internal error: expected source_id int, got {type(source_id_value).__name__}"
+                )
+            source_id = source_id_value
             source = session.get(Source, source_id)
             if source is None:
                 raise RuntimeError(
                     f"Internal error: planned Source id={source_id} disappeared during apply."
                 )
+
+            job_config_value = item.get("job_config")
+            if not isinstance(job_config_value, dict):
+                raise RuntimeError(
+                    f"Internal error: expected job_config dict, got {type(job_config_value).__name__}"
+                )
+            job_config = job_config_value
 
             job = ORMArchiveJob(
                 source=source,
@@ -505,7 +515,7 @@ def cmd_schedule_annual(args: argparse.Namespace) -> None:
                 output_dir=str(item["output_dir"]),
                 status="queued",
                 queued_at=scheduled_at,
-                config=item["job_config"],  # type: ignore[arg-type]
+                config=job_config,
             )
             session.add(job)
             session.flush()
@@ -732,11 +742,11 @@ def cmd_annual_status(args: argparse.Namespace) -> None:
         status = str(r.get("status"))
 
         if status == "missing":
-            blocking_job = r.get("blockingJob")
-            if isinstance(blocking_job, dict) and blocking_job:
+            blocking_job_data = r.get("blockingJob")
+            if isinstance(blocking_job_data, dict) and blocking_job_data:
                 print(
                     f"{source_code}: MISSING annual job for {year} (expected {r.get('expectedJobName')}); "
-                    f"active_job={blocking_job.get('jobId')}({blocking_job.get('status')}) {blocking_job.get('jobName')}"
+                    f"active_job={blocking_job_data.get('jobId')}({blocking_job_data.get('status')}) {blocking_job_data.get('jobName')}"
                 )
             else:
                 print(
@@ -747,10 +757,12 @@ def cmd_annual_status(args: argparse.Namespace) -> None:
         if status == "error":
             err = r.get("error") or "Unknown error"
             print(f"{source_code}: ERROR - {err}")
-            candidates = r.get("candidates") or []
-            if isinstance(candidates, list) and candidates:
+            candidate_payloads = r.get("candidates") or []
+            if isinstance(candidate_payloads, list) and candidate_payloads:
                 ids = ", ".join(
-                    f"{c.get('jobId')}({c.get('status')})" for c in candidates if isinstance(c, dict)
+                    f"{c.get('jobId')}({c.get('status')})"
+                    for c in candidate_payloads
+                    if isinstance(c, dict)
                 )
                 if ids:
                     print(f"     candidates: {ids}")
@@ -788,9 +800,7 @@ def cmd_backfill_search_vector(args: argparse.Namespace) -> None:
     with get_session() as session:
         dialect_name = session.get_bind().dialect.name
         if dialect_name != "postgresql":
-            print(
-                f"Database dialect is {dialect_name!r}; Postgres FTS backfill is skipped."
-            )
+            print(f"Database dialect is {dialect_name!r}; Postgres FTS backfill is skipped.")
             return
 
         last_id = start_id
@@ -830,10 +840,10 @@ def cmd_backfill_search_vector(args: argparse.Namespace) -> None:
                     )
                 )
             )
-            result = session.execute(stmt)
+            exec_result = cast(Any, session.execute(stmt))
             session.commit()
 
-            batch_updated = int(result.rowcount or 0)
+            batch_updated = int(exec_result.rowcount or 0)
             total_updated += batch_updated
             print(
                 f"Backfilled search_vector for ids ({last_id}, {max_id}] "
@@ -951,9 +961,7 @@ def cmd_rebuild_pages(args: argparse.Namespace) -> None:
             source_id = None
             if normalized_source:
                 row = (
-                    session.query(Source.id)
-                    .filter(Source.code == normalized_source)
-                    .one_or_none()
+                    session.query(Source.id).filter(Source.code == normalized_source).one_or_none()
                 )
                 if row is None:
                     raise SystemExit(f"Source {normalized_source!r} not found.")
@@ -1116,7 +1124,7 @@ def cmd_refresh_snapshot_metadata(args: argparse.Namespace) -> None:
                     )
 
                 if len(updates) >= batch_size:
-                    session.bulk_update_mappings(Snapshot, updates)
+                    session.bulk_update_mappings(Snapshot, updates)  # type: ignore[arg-type]
                     if not dry_run:
                         session.commit()
                     updated_count += len(updates)
@@ -1126,7 +1134,7 @@ def cmd_refresh_snapshot_metadata(args: argparse.Namespace) -> None:
                 break
 
         if updates:
-            session.bulk_update_mappings(Snapshot, updates)
+            session.bulk_update_mappings(Snapshot, updates)  # type: ignore[arg-type]
             if not dry_run:
                 session.commit()
             updated_count += len(updates)
@@ -1276,7 +1284,8 @@ def cmd_backfill_outlinks(args: argparse.Namespace) -> None:
 
                 html = rec.body_bytes.decode("utf-8", errors="replace")
                 from_group = normalize_url_for_grouping(rec.url)
-                impacted_groups.add(from_group)
+                if from_group is not None:
+                    impacted_groups.add(from_group)
                 outlink_groups = extract_outlink_groups(
                     html,
                     base_url=rec.url,
@@ -1298,7 +1307,7 @@ def cmd_backfill_outlinks(args: argparse.Namespace) -> None:
                         )
 
                 if len(pending) >= batch_size:
-                    session.bulk_insert_mappings(SnapshotOutlink, pending)
+                    session.bulk_insert_mappings(SnapshotOutlink, pending)  # type: ignore[arg-type]
                     if not dry_run:
                         session.flush()
                     inserted_rows += len(pending)
@@ -1308,7 +1317,7 @@ def cmd_backfill_outlinks(args: argparse.Namespace) -> None:
                 break
 
         if pending:
-            session.bulk_insert_mappings(SnapshotOutlink, pending)
+            session.bulk_insert_mappings(SnapshotOutlink, pending)  # type: ignore[arg-type]
             if not dry_run:
                 session.flush()
             inserted_rows += len(pending)
@@ -1336,9 +1345,7 @@ def cmd_recompute_page_signals(args: argparse.Namespace) -> None:
 
     with get_session() as session:
         inspector = inspect(session.get_bind())
-        if not inspector.has_table("snapshot_outlinks") or not inspector.has_table(
-            "page_signals"
-        ):
+        if not inspector.has_table("snapshot_outlinks") or not inspector.has_table("page_signals"):
             print(
                 "ERROR: authority tables not found; run 'alembic upgrade head' first.",
                 file=sys.stderr,
@@ -1587,17 +1594,21 @@ def cmd_cleanup_job(args: argparse.Namespace) -> None:
     because deleting temp dirs also deletes WARCs required for replay. The
     `temp-nonwarc` mode is allowed because it preserves WARCs.
     """
+    import shutil
     from datetime import datetime, timezone
     from pathlib import Path
 
-    import shutil
-
     from archive_tool.state import CrawlState
-    from archive_tool.utils import find_all_warc_files, find_latest_temp_dir_fallback
+    from archive_tool.utils import find_all_warc_files
 
-    from .archive_storage import (build_warc_path_mapping, consolidate_warcs,
-                                  get_job_provenance_dir, get_job_warcs_dir,
-                                  snapshot_crawl_configs, snapshot_state_file)
+    from .archive_storage import (
+        build_warc_path_mapping,
+        consolidate_warcs,
+        get_job_provenance_dir,
+        get_job_warcs_dir,
+        snapshot_crawl_configs,
+        snapshot_state_file,
+    )
     from .models import ArchiveJob as ORMArchiveJob
     from .models import Snapshot
 
@@ -1663,8 +1674,7 @@ def cmd_cleanup_job(args: argparse.Namespace) -> None:
         if mode == "temp":
             if not temp_dirs and not had_state_file:
                 print(
-                    f"No temp dirs or state file discovered for job {job.id}; "
-                    "nothing to cleanup.",
+                    f"No temp dirs or state file discovered for job {job.id}; nothing to cleanup.",
                     file=sys.stderr,
                 )
                 return
@@ -1689,8 +1699,7 @@ def cmd_cleanup_job(args: argparse.Namespace) -> None:
         # then delete `.tmp*` directories.
         if not temp_dirs and not had_state_file:
             print(
-                f"No temp dirs or state file discovered for job {job.id}; "
-                "nothing to cleanup.",
+                f"No temp dirs or state file discovered for job {job.id}; nothing to cleanup.",
                 file=sys.stderr,
             )
             return
@@ -1742,7 +1751,7 @@ def cmd_cleanup_job(args: argparse.Namespace) -> None:
             consolidate_warcs(
                 output_dir=output_dir,
                 source_warc_paths=source_warcs,
-                allow_copy_fallback=False,
+                allow_copy_fallback=True,
                 dry_run=False,
             )
 
@@ -1758,10 +1767,7 @@ def cmd_cleanup_job(args: argparse.Namespace) -> None:
                 sys.exit(1)
 
             distinct_paths = (
-                session.query(Snapshot.warc_path)
-                .filter(Snapshot.job_id == job.id)
-                .distinct()
-                .all()
+                session.query(Snapshot.warc_path).filter(Snapshot.job_id == job.id).distinct().all()
             )
             warc_paths_in_db = sorted({p for (p,) in distinct_paths if p})
             updated = 0
@@ -1900,10 +1906,7 @@ def cmd_consolidate_warcs(args: argparse.Namespace) -> None:
                 sys.exit(1)
 
             distinct_paths = (
-                session.query(Snapshot.warc_path)
-                .filter(Snapshot.job_id == job.id)
-                .distinct()
-                .all()
+                session.query(Snapshot.warc_path).filter(Snapshot.job_id == job.id).distinct().all()
             )
             warc_paths_in_db = sorted({p for (p,) in distinct_paths if p})
             updated = 0
@@ -1975,7 +1978,9 @@ def cmd_job_storage_report(args: argparse.Namespace) -> None:
             "outputBytesTotal": int(job.output_bytes_total),
             "tmpBytesTotal": int(job.tmp_bytes_total),
             "tmpNonWarcBytesTotal": int(job.tmp_non_warc_bytes_total),
-            "storageScannedAt": job.storage_scanned_at.isoformat() if job.storage_scanned_at else None,
+            "storageScannedAt": job.storage_scanned_at.isoformat()
+            if job.storage_scanned_at
+            else None,
         }
 
         if as_json:
@@ -1998,6 +2003,7 @@ def cmd_job_storage_report(args: argparse.Namespace) -> None:
         ):
             print(f"{k}: {payload[k]}")
 
+
 def cmd_replay_index_job(args: argparse.Namespace) -> None:
     """
     Create or refresh a pywb replay collection for an existing ArchiveJob.
@@ -2010,10 +2016,10 @@ def cmd_replay_index_job(args: argparse.Namespace) -> None:
     It is designed for the production deployment described in
     `docs/deployment/replay-service-pywb.md`.
     """
-    from pathlib import Path
     import getpass
     import hashlib
     from datetime import datetime, timezone
+    from pathlib import Path
 
     from .indexing.warc_discovery import discover_warcs_for_job
     from .models import ArchiveJob as ORMArchiveJob
@@ -2104,9 +2110,7 @@ def cmd_replay_index_job(args: argparse.Namespace) -> None:
 
         if not collection_root.exists():
             print(f"Initializing collection via wb-manager: {collection_name}")
-            run_docker(
-                ["docker", "exec", container_name, "wb-manager", "init", collection_name]
-            )
+            run_docker(["docker", "exec", container_name, "wb-manager", "init", collection_name])
 
         archive_dir.mkdir(parents=True, exist_ok=True)
         indexes_dir.mkdir(parents=True, exist_ok=True)
@@ -2114,9 +2118,7 @@ def cmd_replay_index_job(args: argparse.Namespace) -> None:
     # Remove existing stable WARC links for idempotency.
     existing_links = sorted(archive_dir.glob("warc-*"))
     if existing_links:
-        print(
-            f"Removing {len(existing_links)} existing WARC link(s) from {archive_dir}"
-        )
+        print(f"Removing {len(existing_links)} existing WARC link(s) from {archive_dir}")
     for path in existing_links:
         if dry_run:
             print(f"  would remove {path}")
@@ -2189,15 +2191,11 @@ def cmd_replay_index_job(args: argparse.Namespace) -> None:
 
     if dry_run:
         print("")
-        print(
-            f"Would run: docker exec {container_name} wb-manager reindex {collection_name}"
-        )
+        print(f"Would run: docker exec {container_name} wb-manager reindex {collection_name}")
         return
 
     print("Rebuilding pywb CDX index (wb-manager reindex)...")
-    run_docker(
-        ["docker", "exec", container_name, "wb-manager", "reindex", collection_name]
-    )
+    run_docker(["docker", "exec", container_name, "wb-manager", "reindex", collection_name])
     warc_list_hash = hashlib.sha256(
         "\n".join(sorted(rel_paths_for_hash)).encode("utf-8")
     ).hexdigest()
@@ -2399,9 +2397,7 @@ def cmd_replay_generate_previews(args: argparse.Namespace) -> None:
         )
         if existing is not None and not args.overwrite:
             skipped += 1
-            print(
-                f"- {source.sourceCode}: exists ({existing.name}); use --overwrite to regenerate"
-            )
+            print(f"- {source.sourceCode}: exists ({existing.name}); use --overwrite to regenerate")
             continue
 
         ext = ".jpg" if format_normalized == "jpeg" else ".png"
@@ -2442,7 +2438,7 @@ def cmd_replay_generate_previews(args: argparse.Namespace) -> None:
             "set -euo pipefail; "
             f"if [ ! -d node_modules/playwright ]; then "
             "npm init -y >/dev/null 2>&1; "
-            'npm install --silent --no-progress --no-audit --no-fund '
+            "npm install --silent --no-progress --no-audit --no-fund "
             f"playwright@{shlex.quote(playwright_npm_version)}; "
             "fi; "
             f"{node_cmd}"
@@ -2511,11 +2507,11 @@ def cmd_replay_reconcile(args: argparse.Namespace) -> None:
 
     It is designed to align with `docs/operations/replay-and-preview-automation-plan.md`.
     """
+    import hashlib
+    import os
     from dataclasses import dataclass
     from datetime import datetime, timezone
     from pathlib import Path
-    import hashlib
-    import os
 
     from .api.routes_public import _find_replay_preview_file, list_sources
     from .indexing.warc_discovery import discover_warcs_for_job
@@ -2567,15 +2563,16 @@ def cmd_replay_reconcile(args: argparse.Namespace) -> None:
         has_index: bool
         has_warc_links: bool
 
-    def _lock_or_exit() -> object:
+    def _lock_or_exit() -> ContextManager[object]:
         lock_file.parent.mkdir(parents=True, exist_ok=True)
 
+        fcntl_module: Any | None
         try:
-            import fcntl  # type: ignore
+            import fcntl as fcntl_module
         except Exception:  # pragma: no cover - non-POSIX fallback
-            fcntl = None  # type: ignore
+            fcntl_module = None
 
-        if fcntl is None:
+        if fcntl_module is None:
             # Minimal cross-platform fallback: atomic create. Not crash-proof, but
             # better than no lock in dev environments.
             try:
@@ -2598,7 +2595,7 @@ def cmd_replay_reconcile(args: argparse.Namespace) -> None:
                 def __enter__(self) -> "_FallbackLock":
                     return self
 
-                def __exit__(self, exc_type, exc, tb) -> None:  # type: ignore[no-untyped-def]
+                def __exit__(self, exc_type: object, exc: object, tb: object) -> None:
                     try:
                         lock_file.unlink()
                     except FileNotFoundError:
@@ -2608,7 +2605,7 @@ def cmd_replay_reconcile(args: argparse.Namespace) -> None:
 
         fh = lock_file.open("a+")
         try:
-            fcntl.flock(fh.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+            fcntl_module.flock(fh.fileno(), fcntl_module.LOCK_EX | fcntl_module.LOCK_NB)
         except BlockingIOError:
             print(
                 f"ERROR: Another replay reconciler is already running (lock held): {lock_file}",
@@ -2626,7 +2623,7 @@ def cmd_replay_reconcile(args: argparse.Namespace) -> None:
             def __enter__(self) -> "_FlockLock":
                 return self
 
-            def __exit__(self, exc_type, exc, tb) -> None:  # type: ignore[no-untyped-def]
+            def __exit__(self, exc_type: object, exc: object, tb: object) -> None:
                 try:
                     fh.close()
                 except Exception:
@@ -2791,7 +2788,9 @@ def cmd_replay_reconcile(args: argparse.Namespace) -> None:
         collection_root = collections_dir / collection_name
         archive_dir = collection_root / "archive"
         index_file = collection_root / "indexes" / "index.cdxj"
-        return index_file.is_file() and archive_dir.is_dir() and bool(list(archive_dir.glob("warc-*")))
+        return (
+            index_file.is_file() and archive_dir.is_dir() and bool(list(archive_dir.glob("warc-*")))
+        )
 
     with _lock_or_exit():
         print("Replay reconcile")
@@ -2831,7 +2830,10 @@ def cmd_replay_reconcile(args: argparse.Namespace) -> None:
                     continue
                 if campaign_year is not None:
                     cfg = job.config or {}
-                    if cfg.get("campaign_kind") != "annual" or cfg.get("campaign_year") != campaign_year:
+                    if (
+                        cfg.get("campaign_kind") != "annual"
+                        or cfg.get("campaign_year") != campaign_year
+                    ):
                         continue
                 filtered.append((job, source_code))
 
@@ -2931,8 +2933,8 @@ def cmd_replay_reconcile(args: argparse.Namespace) -> None:
             blocked_preview_sources: list[str] = []
             planned_job_ids = {p.job_id for p in planned}
 
-            for src in wanted_sources:
-                browse_url = src.entryBrowseUrl or ""
+            for source_summary in wanted_sources:
+                browse_url = source_summary.entryBrowseUrl or ""
                 match = re.search(r"/job-(\d+)(?:/|$)", browse_url)
                 if not match:
                     continue
@@ -2944,12 +2946,12 @@ def cmd_replay_reconcile(args: argparse.Namespace) -> None:
                         # made replay-ready by the planned replay indexing actions above.
                         pass
                     else:
-                        blocked_preview_sources.append(src.sourceCode)
+                        blocked_preview_sources.append(source_summary.sourceCode)
                         continue
 
-                found = _find_replay_preview_file(preview_dir, src.sourceCode, job_id)
+                found = _find_replay_preview_file(preview_dir, source_summary.sourceCode, job_id)
                 if found is None:
-                    missing_preview_sources.append(src.sourceCode)
+                    missing_preview_sources.append(source_summary.sourceCode)
 
             if not missing_preview_sources:
                 print("Previews: all selected sources already have previews.")
@@ -2968,7 +2970,8 @@ def cmd_replay_reconcile(args: argparse.Namespace) -> None:
                 print(f"Capped: {len(capped_previews)} (use --max-previews to increase)")
             if blocked_preview_sources:
                 print(
-                    "Blocked (replay not ready yet): " + ", ".join(sorted(set(blocked_preview_sources))),
+                    "Blocked (replay not ready yet): "
+                    + ", ".join(sorted(set(blocked_preview_sources))),
                     file=sys.stderr,
                 )
             print("")
@@ -3012,8 +3015,7 @@ def cmd_register_job_dir(args: argparse.Namespace) -> None:
     from datetime import datetime, timezone
     from pathlib import Path
 
-    from .models import \
-        ArchiveJob as ORMArchiveJob  # local import to avoid cycles
+    from .models import ArchiveJob as ORMArchiveJob  # local import to avoid cycles
     from .models import Source
 
     output_dir = Path(args.output_dir).resolve()
@@ -3146,8 +3148,7 @@ def build_parser() -> argparse.ArgumentParser:
         "passthrough",
         nargs=argparse.REMAINDER,
         help=(
-            "Optional arguments to pass through directly to archive_tool "
-            "(after a literal '--')."
+            "Optional arguments to pass through directly to archive_tool (after a literal '--')."
         ),
     )
     p_run.set_defaults(func=cmd_run_job)
@@ -3566,8 +3567,7 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         default=False,
         help=(
-            "Override safety checks (for example: allow temp cleanup even when "
-            "replay is enabled)."
+            "Override safety checks (for example: allow temp cleanup even when replay is enabled)."
         ),
     )
     p_cleanup.add_argument(
@@ -3863,8 +3863,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_register = subparsers.add_parser(
         "register-job-dir",
         help=(
-            "Attach an ArchiveJob row to an existing archive_tool output "
-            "directory (advanced/dev)."
+            "Attach an ArchiveJob row to an existing archive_tool output directory (advanced/dev)."
         ),
     )
     p_register.add_argument(

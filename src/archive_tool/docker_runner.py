@@ -1,6 +1,5 @@
 # archive_tool/docker_runner.py
 import logging
-import os  # Import os for DEVNULL
 import subprocess
 import time
 import uuid
@@ -30,9 +29,7 @@ def build_zimit_args(
         # zimit expects multiple seeds as a single comma-separated string.
         # Passing repeated --seeds flags results in only the last seed being used.
         seeds = required_args["seeds"]
-        seeds_csv = (
-            ",".join(seeds) if isinstance(seeds, (list, tuple)) else str(seeds)
-        )
+        seeds_csv = ",".join(seeds) if isinstance(seeds, (list, tuple)) else str(seeds)
         zimit_args.extend(["--seeds", seeds_csv])
     if "name" in required_args:
         zimit_args.extend(["--name", required_args["name"]])
@@ -44,9 +41,7 @@ def build_zimit_args(
             skip_next = False
             continue
         if arg == "--workers":
-            if i + 1 < len(base_zimit_args) and not base_zimit_args[i + 1].startswith(
-                "-"
-            ):
+            if i + 1 < len(base_zimit_args) and not base_zimit_args[i + 1].startswith("-"):
                 skip_next = True
             continue
         if arg.startswith("--workers="):
@@ -117,9 +112,7 @@ def start_docker_container(
             if container_id:
                 break
             else:
-                logger.debug(
-                    f"Attempt {attempt+1}: Container ID not found yet for job {job_id}."
-                )
+                logger.debug(f"Attempt {attempt + 1}: Container ID not found yet for job {job_id}.")
 
         if container_id:
             current_container_id = container_id
@@ -158,9 +151,7 @@ def get_container_id_by_label(job_id: str) -> Optional[str]:
     try:
         ps_cmd = ["docker", "ps", "-q", "--filter", f"label=archive_job={job_id}"]
         logger.debug(f"Running command to find container: {' '.join(ps_cmd)}")
-        process = subprocess.run(
-            ps_cmd, capture_output=True, text=True, check=True, timeout=10
-        )
+        process = subprocess.run(ps_cmd, capture_output=True, text=True, check=True, timeout=10)
         container_id = process.stdout.strip()
         if container_id:
             first_id = container_id.split("\n")[0].strip()
@@ -170,9 +161,7 @@ def get_container_id_by_label(job_id: str) -> Optional[str]:
         return None
     except subprocess.CalledProcessError as e:
         # Expected if container not found yet or command fails slightly
-        logger.debug(
-            f"Error running 'docker ps' command (may be temporary): {e.stderr.strip()}"
-        )
+        logger.debug(f"Error running 'docker ps' command (may be temporary): {e.stderr.strip()}")
         return None
     except subprocess.TimeoutExpired:
         logger.error("Timed out running 'docker ps' command.")
@@ -193,9 +182,7 @@ def stop_docker_container(container_id: Optional[str]):
         logger.warning("No container ID available to stop.")
         return
 
-    logger.info(
-        f"Attempting to stop Docker container {target_id} (will wait up to 90s)..."
-    )
+    logger.info(f"Attempting to stop Docker container {target_id} (will wait up to 90s)...")
     stop_timeout_seconds = "90"  # Increased grace period
     stop_command_timeout = 100  # Slightly longer than stop timeout
     try:
@@ -214,9 +201,7 @@ def stop_docker_container(container_id: Optional[str]):
         else:
             logger.error(f"Failed to stop container {target_id}: {stderr_str}")
     except subprocess.TimeoutExpired:
-        logger.error(
-            f"Timed out waiting for container {target_id} to stop command to complete."
-        )
+        logger.error(f"Timed out waiting for container {target_id} to stop command to complete.")
     except FileNotFoundError:
         logger.error("Docker command not found.")
     except Exception as e:

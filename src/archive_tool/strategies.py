@@ -23,8 +23,7 @@ def attempt_worker_reduction(state: CrawlState, args: argparse.Namespace) -> boo
     Returns True if adaptation requiring restart was successfully initiated.
     """
     # --- Import needed here since it's conditionally used ---
-    from archive_tool.docker_runner import (current_container_id,
-                                            stop_docker_container)
+    from archive_tool.docker_runner import current_container_id, stop_docker_container
 
     # --- End Import ---
 
@@ -45,9 +44,7 @@ def attempt_worker_reduction(state: CrawlState, args: argparse.Namespace) -> boo
     logger.warning("Attempting adaptive worker reduction...")
     # --- Action: Stop the container ---
     logger.info("Stopping Docker container for worker reduction...")
-    stop_docker_container(
-        current_container_id
-    )  # Requires container ID from docker_runner
+    stop_docker_container(current_container_id)  # Requires container ID from docker_runner
     logger.info("Waiting briefly after container stop...")
     time.sleep(5)  # Allow time for container to fully stop
 
@@ -58,9 +55,7 @@ def attempt_worker_reduction(state: CrawlState, args: argparse.Namespace) -> boo
     state.reset_runtime_errors()  # Reset errors after adaptation
     state.save_persistent_state()  # Save updated state
 
-    logger.info(
-        f"Reduced worker count to {state.current_workers}. Main loop will handle restart."
-    )
+    logger.info(f"Reduced worker count to {state.current_workers}. Main loop will handle restart.")
     # Return True signifies an action requiring restart was taken
     return True
 
@@ -77,15 +72,11 @@ def attempt_vpn_rotation(
         logger.debug("VPN rotation strategy disabled.")
         return False
     if state.vpn_rotations_done >= args.max_vpn_rotations:
-        logger.warning(
-            f"VPN Rotation: Max rotations ({args.max_vpn_rotations}) already performed."
-        )
+        logger.warning(f"VPN Rotation: Max rotations ({args.max_vpn_rotations}) already performed.")
         return False
     # Ensure connect command is provided
     if not args.vpn_connect_command:
-        logger.error(
-            "VPN rotation strategy enabled, but --vpn-connect-command is not specified."
-        )
+        logger.error("VPN rotation strategy enabled, but --vpn-connect-command is not specified.")
         return False
     # Explicitly ignore disconnect command argument based on new requirement
     if args.vpn_disconnect_command:
@@ -107,17 +98,13 @@ def attempt_vpn_rotation(
             return False
         logger.debug(f"VPN connect command '{connect_cmd_base}' found.")
     except Exception as e:
-        logger.error(
-            f"Error parsing or checking VPN connect command: {e}", exc_info=True
-        )
+        logger.error(f"Error parsing or checking VPN connect command: {e}", exc_info=True)
         return False
 
     # --- Frequency Check ---
     now = time.monotonic()
     required_interval_sec = args.vpn_rotation_frequency_minutes * 60
-    logger.debug(
-        f"Checking VPN rotation frequency (min interval: {required_interval_sec}s)"
-    )
+    logger.debug(f"Checking VPN rotation frequency (min interval: {required_interval_sec}s)")
     if state.last_vpn_rotation_timestamp is not None and required_interval_sec > 0:
         time_since_last = now - state.last_vpn_rotation_timestamp
         if time_since_last < required_interval_sec:
@@ -128,9 +115,7 @@ def attempt_vpn_rotation(
             return False  # Indicate adaptation cannot proceed yet
         logger.debug("VPN rotation frequency requirement met.")
     else:
-        logger.debug(
-            "VPN rotation frequency check skipped (first rotation or interval is 0)."
-        )
+        logger.debug("VPN rotation frequency check skipped (first rotation or interval is 0).")
 
     # --- Attempt Rotation (Without Stopping Container) ---
     logger.warning("Attempting VPN rotation while container remains running...")
@@ -139,9 +124,7 @@ def attempt_vpn_rotation(
     # --- Step 1: Execute VPN Connect Command ---
     # Assumes 'nordvpn connect <region>' handles disconnect/reconnect implicitly.
     logger.info(f"Executing VPN connect/rotate command: {args.vpn_connect_command}")
-    vpn_command_success = execute_external_command(
-        args.vpn_connect_command, "VPN Connect/Rotate"
-    )
+    vpn_command_success = execute_external_command(args.vpn_connect_command, "VPN Connect/Rotate")
 
     # --- Step 2: Update State if Command Succeeded ---
     if vpn_command_success:
@@ -163,9 +146,7 @@ def attempt_vpn_rotation(
         logger.info("Post-VPN delay complete. Updating state.")
         # Update state
         state.vpn_rotations_done += 1
-        state.last_vpn_rotation_timestamp = (
-            now  # Record time *before* command execution
-        )
+        state.last_vpn_rotation_timestamp = now  # Record time *before* command execution
         state.reset_runtime_errors()  # Reset errors, hoping the new IP helps
         state.save_persistent_state()  # Save updated state
 
@@ -174,8 +155,6 @@ def attempt_vpn_rotation(
         )
         return True  # Signal that adaptation was performed
     else:
-        logger.error(
-            "VPN connect/rotate command failed. See command output above for details."
-        )
+        logger.error("VPN connect/rotate command failed. See command output above for details.")
         # Do not update counts or timestamp on failure
         return False  # Indicate adaptation failed

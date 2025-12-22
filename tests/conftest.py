@@ -21,4 +21,3 @@ def _isolate_process_env(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("HEALTHARCHIVE_ADMIN_TOKEN", raising=False)
     monkeypatch.delenv("HEALTHARCHIVE_REPLAY_BASE_URL", raising=False)
     monkeypatch.delenv("HA_SEARCH_RANKING_VERSION", raising=False)
-

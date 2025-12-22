@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 # run_archive.py
-import sys
 
 from archive_tool.main import main
 

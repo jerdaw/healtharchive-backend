@@ -29,9 +29,7 @@ def token_variants(token: str) -> list[str]:
     variants = {token}
     if token and token[0].isalpha():
         variants.add(token[0].upper() + token[1:])
-    if any(ch.isalpha() for ch in token) and (
-        any(ch.isdigit() for ch in token) or len(token) <= 6
-    ):
+    if any(ch.isalpha() for ch in token) and (any(ch.isdigit() for ch in token) or len(token) <= 6):
         variants.add(token.upper())
     return sorted(variants)
 

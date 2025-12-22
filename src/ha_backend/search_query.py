@@ -1,10 +1,9 @@
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from enum import Enum
-import re
-from typing import Iterable, Iterator, Literal, Sequence
-
+from typing import Iterable, Iterator, Literal, Sequence, cast
 
 FieldName = Literal["title", "snippet", "url"]
 
@@ -106,19 +105,19 @@ def tokenize(value: str, *, max_tokens: int = 128) -> list[Token]:
 
         if ch == '"':
             idx += 1
-            buf: list[str] = []
+            phrase_buf: list[str] = []
             while idx < len(raw):
                 cur = raw[idx]
                 if cur == "\\" and idx + 1 < len(raw):
-                    buf.append(raw[idx + 1])
+                    phrase_buf.append(raw[idx + 1])
                     idx += 2
                     continue
                 if cur == '"':
                     idx += 1
                     break
-                buf.append(cur)
+                phrase_buf.append(cur)
                 idx += 1
-            push(Token(TokenType.phrase, "".join(buf).strip()))
+            push(Token(TokenType.phrase, "".join(phrase_buf).strip()))
             continue
 
         # Consume a word-ish token, treating "field:" prefixes specially while
@@ -218,7 +217,11 @@ class _Parser:
                 nodes.append(self._parse_not())
                 continue
             tok = self._peek()
-            if tok is not None and tok.type not in {TokenType.op_or, TokenType.rparen} and self._starts_primary(tok):
+            if (
+                tok is not None
+                and tok.type not in {TokenType.op_or, TokenType.rparen}
+                and self._starts_primary(tok)
+            ):
                 nodes.append(self._parse_not())
                 continue
             break
@@ -242,9 +245,10 @@ class _Parser:
             raise QueryParseError("Expected a term.")
 
         if self._match(TokenType.colon):
-            field = (tok.value or "").lower()
-            if field not in _FIELD_SET:
-                raise QueryParseError(f"Unknown field: {field}")
+            field_value = (tok.value or "").lower()
+            if field_value not in _FIELD_SET:
+                raise QueryParseError(f"Unknown field: {field_value}")
+            field = cast(FieldName, field_value)
 
             rhs = self._advance()
             if rhs.type == TokenType.phrase:

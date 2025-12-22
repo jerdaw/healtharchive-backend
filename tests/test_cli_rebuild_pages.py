@@ -76,8 +76,8 @@ def test_rebuild_pages_dry_run_truncate_message(tmp_path, monkeypatch) -> None:
 def test_rebuild_pages_formats_negative_rowcount_as_unknown(tmp_path, monkeypatch) -> None:
     _init_test_db(tmp_path, monkeypatch)
 
-    from ha_backend.pages import PagesRebuildResult
     import ha_backend.pages as pages_module
+    from ha_backend.pages import PagesRebuildResult
 
     def fake_rebuild_pages(*_args, **_kwargs):
         return PagesRebuildResult(upserted_groups=-1, deleted_groups=0)
@@ -97,4 +97,3 @@ def test_rebuild_pages_formats_negative_rowcount_as_unknown(tmp_path, monkeypatc
 
     out = stdout.getvalue()
     assert "upserted unknown page group(s)" in out
-

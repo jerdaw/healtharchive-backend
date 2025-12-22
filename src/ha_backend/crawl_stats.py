@@ -5,7 +5,6 @@ from pathlib import Path
 from typing import Any, Dict, Optional
 
 from archive_tool.utils import parse_last_stats_from_log
-
 from ha_backend.models import ArchiveJob
 
 logger = logging.getLogger("healtharchive.crawl_stats")
@@ -66,9 +65,7 @@ def update_job_stats_from_logs(job: ArchiveJob) -> None:
 
         stats: Optional[Dict[str, Any]] = parse_last_stats_from_log(log_path)
         if not stats:
-            logger.debug(
-                "parse_last_stats_from_log returned no stats for %s; skipping.", log_path
-            )
+            logger.debug("parse_last_stats_from_log returned no stats for %s; skipping.", log_path)
             return
 
         job.last_stats_json = stats
@@ -93,4 +90,3 @@ def update_job_stats_from_logs(job: ArchiveJob) -> None:
 
 
 __all__ = ["update_job_stats_from_logs"]
-

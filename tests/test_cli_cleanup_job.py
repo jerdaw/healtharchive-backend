@@ -138,15 +138,13 @@ def test_cleanup_job_rejects_non_indexed_status(tmp_path, monkeypatch) -> None:
 
     # Status and cleanup_status should remain unchanged.
     with get_session() as session:
-        job = session.get(ArchiveJob, job_id)
-        assert job is not None
-        assert job.status == "running"
-        assert job.cleanup_status == "none"
+        loaded_job = session.get(ArchiveJob, job_id)
+        assert loaded_job is not None
+        assert loaded_job.status == "running"
+        assert loaded_job.cleanup_status == "none"
 
 
-def test_cleanup_job_refuses_temp_when_replay_enabled_without_force(
-    tmp_path, monkeypatch
-) -> None:
+def test_cleanup_job_refuses_temp_when_replay_enabled_without_force(tmp_path, monkeypatch) -> None:
     _init_test_db(tmp_path, monkeypatch)
     job_id = _seed_indexed_job(tmp_path)
 
@@ -176,9 +174,7 @@ def test_cleanup_job_refuses_temp_when_replay_enabled_without_force(
     assert state_path.is_file()
 
 
-def test_cleanup_job_allows_temp_with_force_when_replay_enabled(
-    tmp_path, monkeypatch
-) -> None:
+def test_cleanup_job_allows_temp_with_force_when_replay_enabled(tmp_path, monkeypatch) -> None:
     _init_test_db(tmp_path, monkeypatch)
     job_id = _seed_indexed_job(tmp_path)
 

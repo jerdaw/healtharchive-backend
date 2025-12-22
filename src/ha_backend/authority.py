@@ -131,12 +131,8 @@ def _compute_graph_signals(session: Session) -> _GraphSignals:
             if 0 <= to_idx < len(inlink_arr):
                 inlink_arr[to_idx] += 1
 
-    inlink_count: dict[str, int] = {
-        nodes_list[i]: inlink_arr[i] for i in range(len(nodes_list))
-    }
-    outlink_count: dict[str, int] = {
-        nodes_list[i]: outlink_arr[i] for i in range(len(nodes_list))
-    }
+    inlink_count: dict[str, int] = {nodes_list[i]: inlink_arr[i] for i in range(len(nodes_list))}
+    outlink_count: dict[str, int] = {nodes_list[i]: outlink_arr[i] for i in range(len(nodes_list))}
 
     return _GraphSignals(
         inlink_count=inlink_count,
@@ -188,18 +184,18 @@ def recompute_page_signals(
 
         rows: list[dict[str, object]] = []
         for group, pr in signals.pagerank_scaled.items():
-            row: dict[str, object] = {
+            mapping: dict[str, object] = {
                 "normalized_url_group": group,
                 "inlink_count": int(signals.inlink_count.get(group, 0) or 0),
             }
             if has_outlink_count:
-                row["outlink_count"] = int(signals.outlink_count.get(group, 0) or 0)
+                mapping["outlink_count"] = int(signals.outlink_count.get(group, 0) or 0)
             if has_pagerank:
-                row["pagerank"] = float(pr or 0.0)
-            rows.append(row)
+                mapping["pagerank"] = float(pr or 0.0)
+            rows.append(mapping)
 
         if rows:
-            session.bulk_insert_mappings(PageSignal, rows)
+            session.bulk_insert_mappings(PageSignal, rows)  # type: ignore[arg-type]
             inserted = len(rows)
 
         return int(deleted) + inserted
@@ -232,9 +228,7 @@ def recompute_page_signals(
             .filter(from_group.in_(normalized_groups))
             .group_by(from_group)
         )
-        outlink_counts = {
-            group: int(outlinks or 0) for group, outlinks in outlink_query.all()
-        }
+        outlink_counts = {group: int(outlinks or 0) for group, outlinks in outlink_query.all()}
 
     existing = (
         session.query(PageSignal)
@@ -257,15 +251,15 @@ def recompute_page_signals(
             continue
 
         if existing_row is None:
-            row = PageSignal(
+            page_signal = PageSignal(
                 normalized_url_group=group,
                 inlink_count=inlinks,
             )
             if has_outlink_count:
-                row.outlink_count = outlinks
+                page_signal.outlink_count = outlinks
             if has_pagerank:
-                row.pagerank = 1.0
-            session.add(row)
+                page_signal.pagerank = 1.0
+            session.add(page_signal)
             touched += 1
             continue
 
@@ -283,4 +277,3 @@ def recompute_page_signals(
 
 
 __all__ = ["recompute_page_signals"]
-

@@ -74,9 +74,7 @@ class ArchiveToolOptions:
         if self.max_vpn_rotations is not None:
             data["max_vpn_rotations"] = self.max_vpn_rotations
         if self.vpn_rotation_frequency_minutes is not None:
-            data["vpn_rotation_frequency_minutes"] = (
-                self.vpn_rotation_frequency_minutes
-            )
+            data["vpn_rotation_frequency_minutes"] = self.vpn_rotation_frequency_minutes
         if self.backoff_delay_minutes is not None:
             data["backoff_delay_minutes"] = self.backoff_delay_minutes
 
@@ -105,9 +103,7 @@ class ArchiveToolOptions:
             max_worker_reductions=data.get("max_worker_reductions"),
             vpn_connect_command=data.get("vpn_connect_command"),
             max_vpn_rotations=data.get("max_vpn_rotations"),
-            vpn_rotation_frequency_minutes=data.get(
-                "vpn_rotation_frequency_minutes"
-            ),
+            vpn_rotation_frequency_minutes=data.get("vpn_rotation_frequency_minutes"),
             backoff_delay_minutes=data.get("backoff_delay_minutes"),
             relax_perms=bool(data.get("relax_perms", False)),
         )
@@ -154,20 +150,13 @@ def validate_tool_options(opts: ArchiveToolOptions) -> None:
     - enable_vpn_rotation requires enable_monitoring and vpn_connect_command.
     """
     if opts.enable_adaptive_workers and not opts.enable_monitoring:
-        raise ValueError(
-            "tool_options.enable_adaptive_workers requires enable_monitoring=True"
-        )
+        raise ValueError("tool_options.enable_adaptive_workers requires enable_monitoring=True")
 
     if opts.enable_vpn_rotation and not opts.enable_monitoring:
-        raise ValueError(
-            "tool_options.enable_vpn_rotation requires enable_monitoring=True"
-        )
+        raise ValueError("tool_options.enable_vpn_rotation requires enable_monitoring=True")
 
     if opts.enable_vpn_rotation and not (opts.vpn_connect_command or "").strip():
-        raise ValueError(
-            "tool_options.enable_vpn_rotation requires vpn_connect_command to be set"
-        )
+        raise ValueError("tool_options.enable_vpn_rotation requires vpn_connect_command to be set")
 
 
 __all__ = ["ArchiveToolOptions", "ArchiveJobConfig", "validate_tool_options"]
-

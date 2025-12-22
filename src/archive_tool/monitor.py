@@ -9,9 +9,9 @@ import subprocess
 import threading
 import time
 from queue import Queue
-from typing import Dict, Optional
 
 from .constants import HTTP_ERROR_PATTERNS, TIMEOUT_PATTERNS
+
 # Use absolute imports within the package
 from .state import CrawlState
 
@@ -53,9 +53,7 @@ class CrawlMonitor(threading.Thread):
         last_progress_report_time = time.monotonic()
         processed_lines = 0
         log_process = None
-        preexec_fn = (
-            os.setsid if hasattr(os, "setsid") else None
-        )  # For killing process group later
+        preexec_fn = os.setsid if hasattr(os, "setsid") else None  # For killing process group later
 
         # Add a small delay before the very first check
         time.sleep(2)
@@ -81,9 +79,7 @@ class CrawlMonitor(threading.Thread):
 
             while not self.stop_event.is_set():
                 # Check the Popen object passed during initialization
-                main_process_poll_result = (
-                    self.process_handle.poll()
-                )  # Use self.process_handle
+                main_process_poll_result = self.process_handle.poll()  # Use self.process_handle
 
                 # --- Modified Check ---
                 if main_process_poll_result is not None:
@@ -101,9 +97,7 @@ class CrawlMonitor(threading.Thread):
                             "--filter",
                             f"id={self.container_id}",
                         ]
-                        logger.debug(
-                            f"Running docker ps check: {' '.join(ps_check_cmd)}"
-                        )
+                        logger.debug(f"Running docker ps check: {' '.join(ps_check_cmd)}")
                         ps_output = subprocess.check_output(
                             ps_check_cmd, text=True, timeout=5
                         ).strip()
@@ -127,9 +121,7 @@ class CrawlMonitor(threading.Thread):
 
                     # Only break the monitoring loop if docker ps confirms container is gone
                     if not container_still_running:
-                        logger.info(
-                            "Main Docker process appears to have exited. Stopping monitor."
-                        )
+                        logger.info("Main Docker process appears to have exited. Stopping monitor.")
                         break  # Break outer while loop
 
                 # If poll() was None, or if we decided not to break above, read logs
@@ -137,9 +129,7 @@ class CrawlMonitor(threading.Thread):
                     # Use non-blocking read if possible? No, readline() should block until data or EOF
                     line = log_process.stdout.readline() if log_process.stdout else None
                 except Exception as read_e:
-                    logger.warning(
-                        f"Error reading log stream: {read_e}. Assuming logs ended."
-                    )
+                    logger.warning(f"Error reading log stream: {read_e}. Assuming logs ended.")
                     line = None
 
                 if not line:
@@ -149,9 +139,7 @@ class CrawlMonitor(threading.Thread):
                         break
                     else:
                         # If main process is still running but no log line, wait briefly
-                        if (
-                            self.process_handle.poll() is None
-                        ):  # Check main process again
+                        if self.process_handle.poll() is None:  # Check main process again
                             time.sleep(0.1)
                             continue
                         else:  # Main process poll showed exit, but log stream was slow? Break.
@@ -172,7 +160,9 @@ class CrawlMonitor(threading.Thread):
                     ):  # Check returns True if intervention needed
                         # Signal sent, reset check time
                         last_check_time = now
-                        last_progress_report_time = now  # Also reset progress report to avoid immediate duplicate message
+                        last_progress_report_time = (
+                            now  # Also reset progress report to avoid immediate duplicate message
+                        )
                         # Let main loop handle intervention based on queue message
                     else:
                         # No condition met, just update check time
@@ -188,32 +178,22 @@ class CrawlMonitor(threading.Thread):
 
         except FileNotFoundError:
             logger.error("Docker command not found for log monitoring.")
-            self.output_queue.put(
-                {"status": "error", "message": "Docker not found for logs"}
-            )
+            self.output_queue.put({"status": "error", "message": "Docker not found for logs"})
         except Exception as e:
             # Only report error if stop wasn't requested
             if not self.stop_event.is_set():
                 logger.exception(f"Error in monitoring thread: {e}")
-                self.output_queue.put(
-                    {"status": "error", "message": f"Monitoring failed: {e}"}
-                )
+                self.output_queue.put({"status": "error", "message": f"Monitoring failed: {e}"})
         finally:
             # Clean up the 'docker logs -f' process
             if log_process and log_process.poll() is None:
                 logger.debug("Terminating docker logs process...")
                 try:
                     # Kill process group on Unix-like systems, just terminate on others
-                    use_pg = (
-                        hasattr(os, "killpg")
-                        and hasattr(log_process, "pid")
-                        and preexec_fn
-                    )
+                    use_pg = hasattr(os, "killpg") and hasattr(log_process, "pid") and preexec_fn
                     if use_pg:
                         os.killpg(os.getpgid(log_process.pid), signal.SIGTERM)
-                        logger.debug(
-                            f"Sent SIGTERM to process group {os.getpgid(log_process.pid)}"
-                        )
+                        logger.debug(f"Sent SIGTERM to process group {os.getpgid(log_process.pid)}")
                     else:
                         log_process.terminate()
                         logger.debug(f"Sent SIGTERM to process {log_process.pid}")
@@ -221,18 +201,14 @@ class CrawlMonitor(threading.Thread):
                     log_process.wait(timeout=5)
                     logger.debug("Docker logs process terminated.")
                 except Exception as e_kill:
-                    logger.warning(
-                        f"Could not cleanly terminate docker logs process: {e_kill}"
-                    )
+                    logger.warning(f"Could not cleanly terminate docker logs process: {e_kill}")
                     # Ensure it's killed if terminate failed
                     if log_process.poll() is None:
                         try:
                             log_process.kill()
                             logger.warning("Force-killed docker logs process.")
                         except Exception as e_force_kill:
-                            logger.error(
-                                f"Force kill of log process failed: {e_force_kill}"
-                            )
+                            logger.error(f"Force kill of log process failed: {e_force_kill}")
             logger.info("Monitoring thread stopped.")
 
     def _parse_log_line(self, line: str, timestamp: float):
@@ -261,9 +237,7 @@ class CrawlMonitor(threading.Thread):
                     logger.warning(f"Timeout reported by pageStatus: {line[:200]}...")
                 elif self.http_error_pattern.search(error_msg):
                     self.state.record_error("http", timestamp)
-                    logger.warning(
-                        f"HTTP/Network error reported by pageStatus: {line[:200]}..."
-                    )
+                    logger.warning(f"HTTP/Network error reported by pageStatus: {line[:200]}...")
                 else:
                     self.state.record_error("other", timestamp)
                     logger.warning(f"Unknown page load failure: {line[:200]}...")
@@ -276,13 +250,11 @@ class CrawlMonitor(threading.Thread):
                 ):
                     self.state.record_error("timeout", timestamp)
                     logger.warning(f"Timeout detected in logs: {line[:200]}...")
-                elif self.http_error_pattern.search(
-                    message
-                ) or self.http_error_pattern.search(full_log_check):
+                elif self.http_error_pattern.search(message) or self.http_error_pattern.search(
+                    full_log_check
+                ):
                     self.state.record_error("http", timestamp)
-                    logger.warning(
-                        f"HTTP/Network error detected in logs: {line[:200]}..."
-                    )
+                    logger.warning(f"HTTP/Network error detected in logs: {line[:200]}...")
                 elif level == "error":
                     self.state.record_error("other", timestamp)
                     logger.error(f"Generic error detected in logs: {line[:200]}...")
@@ -292,9 +264,7 @@ class CrawlMonitor(threading.Thread):
                 logger.warning(f"Timeout detected in non-JSON log: {line[:200]}...")
             elif self.http_error_pattern.search(line):
                 self.state.record_error("http", timestamp)
-                logger.warning(
-                    f"HTTP/Network error detected in non-JSON log: {line[:200]}..."
-                )
+                logger.warning(f"HTTP/Network error detected in non-JSON log: {line[:200]}...")
         except Exception as e:
             logger.error(f"Error parsing log line: '{line[:100]}...' - {e}")
 
@@ -324,21 +294,13 @@ class CrawlMonitor(threading.Thread):
                 signaled = True
 
         # Error Threshold Checks
-        if (
-            not signaled
-            and self.state.error_counts["timeout"] >= self.args.error_threshold_timeout
-        ):
-            logger.warning(
-                f"Error Condition Met: {self.state.error_counts['timeout']} timeouts."
-            )
+        if not signaled and self.state.error_counts["timeout"] >= self.args.error_threshold_timeout:
+            logger.warning(f"Error Condition Met: {self.state.error_counts['timeout']} timeouts.")
             self.output_queue.put({"status": "error", "reason": "timeout_threshold"})
             self.state.reset_runtime_errors()
             self.state.last_progress_timestamp = now
             signaled = True
-        if (
-            not signaled
-            and self.state.error_counts["http"] >= self.args.error_threshold_http
-        ):
+        if not signaled and self.state.error_counts["http"] >= self.args.error_threshold_http:
             logger.warning(
                 f"Error Condition Met: {self.state.error_counts['http']} HTTP/network errors."
             )

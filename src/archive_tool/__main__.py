@@ -1,5 +1,4 @@
 # archive_tool/__main__.py
-import sys
 
 # Use absolute import from the package root
 from archive_tool.main import main

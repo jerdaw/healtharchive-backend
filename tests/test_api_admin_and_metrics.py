@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -28,7 +27,11 @@ def _init_test_app(tmp_path: Path, monkeypatch) -> TestClient:
 
     from ha_backend.api import app
 
-    return TestClient(app)
+    try:
+        import uvloop  # noqa: F401
+    except Exception:
+        return TestClient(app)
+    return TestClient(app, backend_options={"use_uvloop": True})
 
 
 def _seed_basic_data() -> None:
@@ -225,16 +228,16 @@ def test_metrics_include_cleanup_status_labels(tmp_path, monkeypatch) -> None:
     # Mark one job as temp_cleaned to exercise the label.
     with get_session() as session:
         job = session.query(ArchiveJob).first()
+        assert job is not None
         job.cleanup_status = "temp_cleaned"
+        session.commit()
 
     resp = client.get("/metrics")
     assert resp.status_code == 200
     body = resp.text
 
     assert 'healtharchive_jobs_cleanup_status_total{cleanup_status="none"}' in body
-    assert (
-        'healtharchive_jobs_cleanup_status_total{cleanup_status="temp_cleaned"}' in body
-    )
+    assert 'healtharchive_jobs_cleanup_status_total{cleanup_status="temp_cleaned"}' in body
 
 
 def test_metrics_include_page_totals_and_per_source(tmp_path, monkeypatch) -> None:

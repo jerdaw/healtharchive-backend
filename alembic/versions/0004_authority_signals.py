@@ -86,4 +86,3 @@ def downgrade() -> None:
     )
     op.drop_index("ix_snapshot_outlinks_snapshot_id", table_name="snapshot_outlinks")
     op.drop_table("snapshot_outlinks")
-

@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+import re
 from datetime import datetime, timezone
 from pathlib import Path
-import re
 
 import pytest
 
@@ -18,7 +18,7 @@ from ha_backend.job_registry import (
     generate_job_name,
     get_config_for_source,
 )
-from ha_backend.models import ArchiveJob, Source
+from ha_backend.models import ArchiveJob
 from ha_backend.seeds import seed_sources
 
 
@@ -93,9 +93,7 @@ def test_build_job_config_merges_defaults_and_overrides() -> None:
     cfg = SOURCE_JOB_CONFIGS["hc"]
     overrides = {"cleanup": True, "initial_workers": 4}
 
-    config = build_job_config(
-        cfg, extra_seeds=["https://extra.example"], overrides=overrides
-    )
+    config = build_job_config(cfg, extra_seeds=["https://extra.example"], overrides=overrides)
 
     assert "seeds" in config
     assert "zimit_passthrough_args" in config
@@ -121,30 +119,18 @@ def test_canada_ca_scope_regexes_match_expected_urls() -> None:
 
     assert hc_rx.match("https://www.canada.ca/en/health-canada.html")
     assert hc_rx.match("https://www.canada.ca/fr/sante-canada.html")
-    assert hc_rx.match(
-        "https://www.canada.ca/en/health-canada/services/drugs-health-products.html"
-    )
-    assert hc_rx.match(
-        "https://www.canada.ca/content/dam/hc-sc/images/corporate/example.jpg"
-    )
-    assert hc_rx.match(
-        "https://www.canada.ca/etc/designs/canada/wet-boew/js/theme.min.js"
-    )
+    assert hc_rx.match("https://www.canada.ca/en/health-canada/services/drugs-health-products.html")
+    assert hc_rx.match("https://www.canada.ca/content/dam/hc-sc/images/corporate/example.jpg")
+    assert hc_rx.match("https://www.canada.ca/etc/designs/canada/wet-boew/js/theme.min.js")
     assert not hc_rx.match("https://www.canada.ca/en/services/benefits.html")
     assert not hc_rx.match("https://www.canada.ca/en/public-health.html")
     assert not hc_rx.match("https://www.canada.ca/content/dam/phac-aspc/example.jpg")
 
     assert phac_rx.match("https://www.canada.ca/en/public-health.html")
     assert phac_rx.match("https://www.canada.ca/fr/sante-publique.html")
-    assert phac_rx.match(
-        "https://www.canada.ca/en/public-health/services/diseases/measles.html"
-    )
-    assert phac_rx.match(
-        "https://www.canada.ca/content/dam/phac-aspc/images/corporate/example.jpg"
-    )
-    assert phac_rx.match(
-        "https://www.canada.ca/etc/designs/canada/wet-boew/css/theme.min.css"
-    )
+    assert phac_rx.match("https://www.canada.ca/en/public-health/services/diseases/measles.html")
+    assert phac_rx.match("https://www.canada.ca/content/dam/phac-aspc/images/corporate/example.jpg")
+    assert phac_rx.match("https://www.canada.ca/etc/designs/canada/wet-boew/css/theme.min.css")
     assert not phac_rx.match("https://www.canada.ca/en/services/benefits.html")
     assert not phac_rx.match("https://www.canada.ca/en/health-canada.html")
     assert not phac_rx.match("https://www.canada.ca/content/dam/hc-sc/example.jpg")
