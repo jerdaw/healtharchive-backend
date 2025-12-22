@@ -24,7 +24,7 @@ Canonical docs to consult first:
 - `docs/deployment/production-rollout-checklist.md` – production rollout steps.
 - `docs/operations/monitoring-and-ci-checklist.md` – monitoring, uptime, and CI guidance.
 - `docs/deployment/production-single-vps.md` – current production runbook (Hetzner + Tailscale-only SSH, nightly backups, NAS pull).
-- `docs/operations/healtharchive-upgrade-reference.md` – full internal upgrade reference; todo list lives in `docs/operations/healtharchive-upgrade-plan.md`.
+- `docs/roadmaps/healtharchive-upgrade-2025.md` – historical upgrade roadmap; todo list lives in `docs/operations/healtharchive-upgrade-plan.md`.
 
 When you’re doing anything beyond tiny local changes, **open those docs and sync your mental model first**.
 

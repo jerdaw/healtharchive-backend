@@ -3,13 +3,19 @@
 - Annual capture campaign (scope + seeds): `annual-campaign.md`
 - Automation implementation plan (phased, production-only): `automation-implementation-plan.md`
 - Monitoring + uptime + CI checklist: `monitoring-and-ci-checklist.md`
+- Agent handoff guidelines (internal rules): `agent-handoff-guidelines.md`
+- Claims registry (proof artifacts): `claims-registry.md`
+- Data handling & retention (internal contract): `data-handling-retention.md`
+- Export integrity contract (manifest + immutability): `export-integrity-contract.md`
+- Automation verification rituals (timer checks): `automation-verification-rituals.md`
+- Dataset release runbook (verification checklist): `dataset-release-runbook.md`
+- Risk register (top risks + mitigations): `risk-register.md`
 - Ops cadence checklist (internal routine): `ops-cadence-checklist.md`
 - Growth constraints (storage + scope budgets): `growth-constraints.md`
 - Restore test procedure (quarterly): `restore-test-procedure.md`
 - Restore test log template: `restore-test-log-template.md`
 - Adoption signals log template (public-safe, quarterly): `adoption-signals-log-template.md`
 - HealthArchive upgrade todo (remaining tasks): `healtharchive-upgrade-plan.md`
-- HealthArchive upgrade reference (full internal): `healtharchive-upgrade-reference.md`
 - Phase 4 partner kit (brief + citation + screenshots): `phase-4-partner-kit.md`
 - Phase 4 one-page brief (shareable): `phase-4-one-page-brief.md`
 - Phase 4 citation handout (shareable): `phase-4-citation-handout.md`

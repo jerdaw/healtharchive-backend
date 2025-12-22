@@ -1,0 +1,48 @@
+# Claims Registry (internal)
+
+Use this to back any reliability/automation/privacy/reproducibility claims with proof artifacts.
+
+- **Claim:** Quarterly dataset releases run automatically (metadata-only).
+  - Evidence:
+    - GitHub Releases: `https://github.com/jerdaw/healtharchive-datasets/releases` (tags `healtharchive-dataset-YYYY-MM-DD`)
+    - Release assets: `manifest.json` + `SHA256SUMS` + `healtharchive-*.jsonl.gz`
+    - Workflow: `jerdaw/healtharchive-datasets` → Actions → “Publish dataset release”
+  - Cadence: quarterly (Jan/Apr/Jul/Oct)
+  - Recorded in: dataset repo Releases + `/srv/healtharchive/ops/adoption/`
+- **Claim:** Dataset releases are integrity-verifiable.
+  - Evidence:
+    - Download assets into one directory and run `sha256sum -c SHA256SUMS`
+    - `manifest.json` includes artifact SHA256s and row counts
+  - Cadence: per release
+  - Recorded in: release assets + `/srv/healtharchive/ops/adoption/`
+- **Claim:** Change tracking is computed on schedule.
+  - Evidence:
+    - systemd timer: `healtharchive-change-tracking.timer` (plus sentinel `/etc/healtharchive/change-tracking-enabled`)
+    - logs: `journalctl -u healtharchive-change-tracking.service`
+    - public surface: `/changes` + `/api/changes`
+  - Cadence: daily
+  - Recorded in: journald (+ optional Healthchecks ping)
+- **Claim:** Replay indexes are reconciled on schedule (when replay enabled).
+  - Evidence:
+    - systemd timer: `healtharchive-replay-reconcile.timer` (plus sentinel `/etc/healtharchive/replay-automation-enabled`)
+    - logs: `journalctl -u healtharchive-replay-reconcile.service`
+  - Cadence: daily
+  - Recorded in: journald (+ optional Healthchecks ping)
+- **Claim:** Annual campaign scheduling is automated and gated.
+  - Evidence:
+    - systemd timer: `healtharchive-schedule-annual.timer` (plus sentinel `/etc/healtharchive/automation-enabled`)
+    - logs: `journalctl -u healtharchive-schedule-annual.service`
+  - Cadence: annually (Jan 01 UTC)
+  - Recorded in: journald
+- **Claim:** Quarterly restore tests are performed (backups are usable).
+  - Evidence:
+    - restore-test logs: `/srv/healtharchive/ops/restore-tests/restore-test-YYYY-MM-DD.md`
+    - procedure reference: `docs/operations/restore-test-procedure.md`
+  - Cadence: quarterly
+  - Recorded in: `/srv/healtharchive/ops/restore-tests/`
+- **Claim:** Public usage metrics are privacy-preserving and aggregated.
+  - Evidence:
+    - DB table: `usage_metrics` (aggregated daily counts only)
+    - API: `GET /api/usage` (windowed aggregates; no personal identifiers)
+  - Cadence: daily aggregation; public reporting window is configurable
+  - Recorded in: DB + `/api/usage`
