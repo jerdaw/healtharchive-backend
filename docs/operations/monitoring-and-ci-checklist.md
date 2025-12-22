@@ -14,7 +14,7 @@ It is meant to complement:
 
 ---
 
-## 0. Implementation phases (CI + external monitoring)
+## 0. Implementation steps (CI + external monitoring)
 
 This section is a **practical, sequential** setup plan for enforcing CI and
 configuring external monitoring in the real world (GitHub + UptimeRobot, etc.).
@@ -24,7 +24,7 @@ Important: most of this is **not** “code you deploy” — it is configuration
 - GitHub repository settings (branch protection)
 - Your monitoring provider (UptimeRobot, Healthchecks, etc.)
 
-### Phase 0 — Baseline audit + decisions (operator)
+### Step 0 — Baseline audit + decisions (operator)
 
 Objective: avoid duplicate monitors, avoid alert noise, and avoid “unknown
 settings drift”.
@@ -49,7 +49,7 @@ Verification:
 - You can point to a quick note (even in a personal doc) listing current
   monitors + what each covers.
 
-### Phase 1 — Verify CI runs and learn the exact check name (operator)
+### Step 1 — Verify CI runs and learn the exact check name (operator)
 
 Objective: make sure you require the **correct** status check in branch
 protection (GitHub requires the exact check name string).
@@ -66,7 +66,7 @@ Verification:
 
 - The PR shows the backend CI check running and passing.
 
-### Phase 2 — Enforce PR-only merges into `main` (operator; GitHub settings)
+### Step 2 — Enforce PR-only merges into `main` (operator; GitHub settings)
 
 Objective: prevent broken deploys by requiring CI to pass before merge.
 
@@ -74,7 +74,7 @@ GitHub → Repo → Settings → Branches → Branch protection rules → Add/ed
 
 1. Enable **Require a pull request before merging**.
 2. Enable **Require status checks to pass before merging**.
-3. Select the required check(s) captured in Phase 1 (e.g. `Backend CI / test`).
+3. Select the required check(s) captured in Step 1 (e.g. `Backend CI / test`).
 4. Recommended (low friction, high value):
    - Enable **Require branches to be up to date before merging**.
    - Disable force pushes.
@@ -92,7 +92,7 @@ Emergency bypass protocol (recommended):
 - Immediately follow up with a PR containing the same change (or a cherry-pick)
   so the “real” history shows CI passing on the fix.
 
-### Phase 3 — External uptime monitoring (operator; UptimeRobot settings)
+### Step 3 — External uptime monitoring (operator; UptimeRobot settings)
 
 Objective: catch real, user-visible failures with minimal noise.
 
@@ -128,12 +128,12 @@ Verification:
 
 ---
 
-### Phase 4 — Timer ran monitoring (Healthchecks-style; optional but recommended)
+### Step 4 — Timer ran monitoring (Healthchecks-style; optional but recommended)
 
 Objective: get alerted if systemd timers stop running (even when the site is up).
 
 This is intentionally optional: you already have high-value uptime checks in
-Phase 3, but "timer ran" alerts are useful for catching silent failures (timer
+Step 3, but "timer ran" alerts are useful for catching silent failures (timer
 disabled, unit failing, disk low refusal, etc.).
 
 Recommended checks to monitor:
@@ -168,7 +168,7 @@ Verification (VPS):
 
 ---
 
-### Phase 5 — Automated post-campaign search verification capture (optional)
+### Step 5 — Automated post-campaign search verification capture (optional)
 
 Objective: once the annual campaign becomes search-ready, automatically capture
 golden-query `/api/search` JSON into a year-tagged directory for later diffing
@@ -211,7 +211,7 @@ Verification (VPS):
 
 ---
 
-### Phase 6 — Optional GitHub-driven deploys (CD) (infrastructure project)
+### Step 6 — Optional GitHub-driven deploys (CD) (infrastructure project)
 
 Objective: reduce deploy mistakes without expanding the production attack
 surface.
