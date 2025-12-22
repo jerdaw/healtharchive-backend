@@ -2,88 +2,22 @@
 
 This is the **historical roadmap** for the 6-phase upgrade program (Phases 0–6).
 
-For the **current ops roadmap/todo only**, see: `docs/operations/healtharchive-ops-roadmap.md`.
+It is not the current ops checklist. For live state and remaining ops tasks, see:
 
-Status: **active roadmap** (Phases 0–6 shipped (core product + ops scaffolding); remaining work is mostly non-code: Phase 4 outreach/verifier, Phase 5 dataset releases + adoption, Phase 6 ongoing automation + restore-test discipline).
+- `docs/operations/healtharchive-ops-roadmap.md`
+- `docs/operations/README.md`
 
-## Current Status Snapshot (high signal; update as you go)
-
-**Implemented (code + public surfaces)**
-
-- Phase 0: canonical copy + “archive/not guidance” consistency (`healtharchive-frontend/src/lib/siteCopy.ts` and updated pages)
-- Phase 1: governance + policies + report intake (frontend pages + backend `/api/reports`)
-- Phase 2: status/impact pages + aggregated usage metrics (`/api/usage`)
-- Phase 3: edition-aware change tracking + compare + digest + RSS (backend `snapshot_changes`, compute pipeline, public APIs)
-- Phase 4: partner kit assets published (`/brief`, `/cite`, templates)
-- Phase 5: metadata-only research exports + data dictionary (`/api/exports/*`, `/exports`) + methods note outline
-- Phase 6: public cadence clarity + ops cadence docs + growth constraints + restore-test procedure + safer deploy helper
-
-**Still pending (decisions / operations / external validation)**
-
-- Phase 4: secure 1+ distribution partner and 1+ verifier (with permission to name them)
-- Phase 5: keep quarterly dataset releases running via `jerdaw/healtharchive-datasets`; track real external research adoption
-- Phase 6: keep automation + restore-test discipline running (and record results)
-
-**Decision tracker (update as you go; keep public-safe)**
-
-- Dataset release cadence: **Quarterly** (automated; runs Jan/Apr/Jul/Oct)
-- Dataset release scope: **Full-to-date** (metadata-only; paginated via `afterId`; no rolling window)
-- Dataset release venue: **GitHub Releases** in `jerdaw/healtharchive-datasets`
-- Dataset release tag format: **`healtharchive-dataset-YYYY-MM-DD`**
-- Dataset release artifacts: **`healtharchive-snapshots.jsonl.gz`, `healtharchive-changes.jsonl.gz`, `manifest.json`, `SHA256SUMS`** (no CSV)
-- First dataset release published: **2025-12-22** (`healtharchive-dataset-2025-12-22`)
-- Dataset workflow keepalive: **Enabled** (weekly keepalive to avoid GitHub schedule auto-disable)
-- Restore test logging: **`/srv/healtharchive/ops/restore-tests/`** (private VPS ops directory; public-safe Markdown entries)
-- First restore test completed: **2025-12-22** (Pass; log file `restore-test-2025-12-22.md`)
-- Adoption signals log: **`/srv/healtharchive/ops/adoption/`** (private VPS ops directory; public-safe; quarterly)
-- Production timers (record what is enabled today):
-  - Change tracking: **Enabled** (`healtharchive-change-tracking.timer`; gated by `/etc/healtharchive/change-tracking-enabled`)
-  - Annual scheduling: **Enabled** (`healtharchive-schedule-annual.timer`; gated by `/etc/healtharchive/automation-enabled`)
-  - Replay reconcile: **Enabled** (`healtharchive-replay-reconcile.timer`; gated by `/etc/healtharchive/replay-automation-enabled`; replay base URL configured)
-  - Annual search verification capture: **Enabled** (`healtharchive-annual-search-verify.timer`)
-## Production Toggles / Enablement (what must be set on the VPS)
-
-Backend env file: `/etc/healtharchive/backend.env` (do not commit; keep `.env.example` in sync for dev).
-
-- Usage metrics (Phase 2): `HEALTHARCHIVE_USAGE_METRICS_ENABLED=1`, `HEALTHARCHIVE_USAGE_METRICS_WINDOW_DAYS=30`
-- Change tracking APIs (Phase 3): `HEALTHARCHIVE_CHANGE_TRACKING_ENABLED=1`
-- Research exports (Phase 5): `HEALTHARCHIVE_EXPORTS_ENABLED=1`, `HEALTHARCHIVE_EXPORTS_DEFAULT_LIMIT`, `HEALTHARCHIVE_EXPORTS_MAX_LIMIT`
-- Public site base URL (Phase 3/5): `HEALTHARCHIVE_PUBLIC_SITE_URL=https://healtharchive.ca`
-
-Automation gates (systemd `ConditionPathExists`; create files to enable):
-
-- Change tracking timer: `/etc/healtharchive/change-tracking-enabled` (already required if running the timer)
-- Annual scheduler timer: `/etc/healtharchive/automation-enabled` (optional; only enable when ready)
-- Replay reconcile timer: `/etc/healtharchive/replay-automation-enabled` (optional; only if replay is enabled and stable)
-
-## Internal Ops References
-
-Operational guardrails and proof artifacts live in dedicated ops docs:
-
-- `docs/operations/agent-handoff-guidelines.md`
-- `docs/operations/claims-registry.md`
-- `docs/operations/data-handling-retention.md`
-- `docs/operations/export-integrity-contract.md`
-- `docs/operations/automation-verification-rituals.md`
-- `docs/operations/dataset-release-runbook.md`
-- `docs/operations/risk-register.md`
-
-This file is intentionally written so you can hand it to another LLM/AI (or a human contributor) and they will understand:
-
-- What HealthArchive.ca is today (from repo evidence).
-- What gaps remain versus a “public-interest service” posture.
-- What to build, in what order, and why.
-- What constraints and guardrails must not be broken (especially “not medical advice” + security).
+Status: **historical reference**. If anything in this document conflicts with ops docs, the ops docs win.
 
 ## How To Use This Document (for a future agent)
 
 1) **Confirm current state first (don’t guess).** This repo is split across:
    - `healtharchive-frontend/` (Next.js 16 UI on Vercel)
    - `healtharchive-backend/` (FastAPI + worker + indexing + in-tree crawler)
-   - Root `ENVIRONMENTS.md` (cross-repo environment matrix / current deployment notes)
+   - `healtharchive-backend/docs/deployment/environment-matrix.md` (cross-repo env wiring; canonical)
 
 2) **Read the canonical docs (high signal).**
-   - Cross-repo wiring: `ENVIRONMENTS.md`
+   - Cross-repo wiring: `healtharchive-backend/docs/deployment/environment-matrix.md`
    - Backend architecture: `healtharchive-backend/docs/architecture.md`
    - Backend production runbook: `healtharchive-backend/docs/deployment/production-single-vps.md`
    - Annual campaign scope/policy: `healtharchive-backend/docs/operations/annual-campaign.md`
@@ -2079,7 +2013,7 @@ Stretch goals:
 - Public data dictionary page: `https://www.healtharchive.ca/exports` (+ downloadable Markdown).
 - `/researchers` updated with research access workflow and export manifest link.
 - `/cite` linked from `/snapshot`, `/compare`, `/changes`, and `/digest`.
-- Export schema documented in `healtharchive-backend/docs/operations/exports-data-dictionary.md`.
+- Export schema documented in `healtharchive-frontend/public/exports/healtharchive-data-dictionary.md` (public `/exports` page).
 - Methods note outline published: `healtharchive-backend/docs/operations/phase-5-methods-note-outline.md`.
 - Export env toggles documented (`HEALTHARCHIVE_EXPORTS_ENABLED`, defaults, and limits).
 
