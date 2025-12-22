@@ -7,9 +7,11 @@ This folder contains the canonical documentation for the **HealthArchive backend
 
 1. Architecture & implementation (how the code works)
    - `architecture.md`
-2. Local development / live testing (how to run it locally)
+2. Documentation guidelines (how docs stay sane)
+   - `documentation-guidelines.md`
+3. Local development / live testing (how to run it locally)
    - `development/live-testing.md`
-3. Deployment (how to run it on a server)
+4. Deployment (how to run it on a server)
    - `deployment/production-single-vps.md` (current production runbook)
    - `deployment/systemd/README.md` (systemd units: annual scheduler timer, worker priority, replay reconcile)
    - `deployment/replay-service-pywb.md` (pywb replay service for full-fidelity browsing)
@@ -19,9 +21,9 @@ This folder contains the canonical documentation for the **HealthArchive backend
    - `deployment/environment-matrix.md` (cross‑repo env var + host matrix)
    - `deployment/production-rollout-checklist.md` (generic production checklist)
    - `deployment/staging-rollout-checklist.md` (optional future staging)
-4. Operations (how to keep it healthy)
+5. Operations (how to keep it healthy)
    - `operations/README.md` (index of ops docs)
-5. Roadmaps (historical)
+6. Roadmaps (historical)
    - `roadmaps/README.md`
 
 ## Notes

@@ -64,7 +64,7 @@ Related context:
 
 ---
 
-## Phase 1 (of 9) — Define annual scope + seeds (docs only)
+## Step 1 (of 9) — Define annual scope + seeds (docs only)
 
 **Objective**
 
@@ -78,7 +78,7 @@ Lock the annual campaign’s scope so automation is deterministic and auditable.
   - scope boundary notes,
   - recommended crawl ordering.
 
-**No code and no infrastructure changes** in this phase.
+**No code and no infrastructure changes** in this step.
 
 **Acceptance criteria**
 
@@ -90,7 +90,7 @@ Lock the annual campaign’s scope so automation is deterministic and auditable.
 
 ---
 
-## Phase 2 (of 9) — Align backend registry + seeding with v1 sources (code)
+## Step 2 (of 9) — Align backend registry + seeding with v1 sources (code)
 
 **Objective**
 
@@ -120,7 +120,7 @@ Ensure the backend’s canonical configuration matches the annual campaign:
 4. Encode the `annual-campaign.md` in-scope URL rules into job configs:
    - for `hc` and `phac`: host + path allowlist scope on `www.canada.ca`
    - for `cihr`: host scope on `cihr-irsc.gc.ca`
-5. Ensure naming templates can represent annual campaigns (see Phase 3).
+5. Ensure naming templates can represent annual campaigns (see Step 3).
 
 **Tests**
 
@@ -142,7 +142,7 @@ Ensure the backend’s canonical configuration matches the annual campaign:
 
 ---
 
-## Phase 3 (of 9) — Implement annual scheduler CLI (production-only logic, dry-run first)
+## Step 3 (of 9) — Implement annual scheduler CLI (production-only logic, dry-run first)
 
 **Objective**
 
@@ -210,7 +210,7 @@ For each source in the allowlist:
 
 ---
 
-## Phase 4 (of 9) — Add annual status/reporting CLI (operability)
+## Step 4 (of 9) — Add annual status/reporting CLI (operability)
 
 **Objective**
 
@@ -256,7 +256,7 @@ Campaign-level summary:
 
 ---
 
-## Phase 5 (of 9) — Production systemd timer for Jan 01 scheduling (infrastructure)
+## Step 5 (of 9) — Production systemd timer for Jan 01 scheduling (infrastructure)
 
 **Objective**
 
@@ -298,7 +298,7 @@ Templates live in: `../deployment/systemd/`
 
 ---
 
-## Phase 6 (of 9) — Resource policy during campaign (keep site up without “safe window”)
+## Step 6 (of 9) — Resource policy during campaign (keep site up without “safe window”)
 
 **Objective**
 
@@ -329,7 +329,7 @@ Actions:
 
 ---
 
-## Phase 7 (of 9) — Post-campaign “search readiness” verification (light automation)
+## Step 7 (of 9) — Post-campaign “search readiness” verification (light automation)
 
 **Objective**
 
@@ -377,7 +377,7 @@ confident it won’t starve IO for user traffic.
 
 ---
 
-## Phase 8 (of 9) — Replay/preview reconciliation (after search is stable)
+## Step 8 (of 9) — Replay/preview reconciliation (after search is stable)
 
 **Objective**
 
@@ -406,7 +406,7 @@ Implementation (v1) (aligns with `replay-and-preview-automation-plan.md`):
   - `replay-reconcile --verify-warc-hash` can use the marker to detect drift
     (slower; optional).
 
-Phased rollout:
+Staged rollout:
 
 1. Dry-run:
    - `ha-backend replay-reconcile --collections-dir /srv/healtharchive/replay/collections`
@@ -417,7 +417,7 @@ Phased rollout:
 
 ---
 
-## Phase 9 (of 9) — Deployment automation (low-cost, low-risk first)
+## Step 9 (of 9) — Deployment automation (low-cost, low-risk first)
 
 **Objective**
 
