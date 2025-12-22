@@ -28,3 +28,4 @@ Keep documentation accurate, minimal, and easy to maintain across repos.
 - Put historical plans in `docs/roadmaps`.
 - Put operational procedures in `docs/operations`.
 - Put deployment/runbooks in `docs/deployment`.
+- Put developer workflows (local setup, testing, debugging) in `docs/development`.
