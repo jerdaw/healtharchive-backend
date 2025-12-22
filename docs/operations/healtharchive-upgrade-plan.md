@@ -17,7 +17,7 @@ Status: **active roadmap** (Phases 0–6 implemented (core); remaining work is m
 **Still pending (decisions / operations / external validation)**
 
 - Phase 4: secure 1+ distribution partner and 1+ verifier (with permission to name them)
-- Phase 5: decide dataset release cadence + publish first versioned release (checksums); track real external research adoption
+- Phase 5: publish first versioned dataset release (checksums) via `jerdaw/healtharchive-datasets`; track real external research adoption
 - Phase 6: decide/enable annual scheduling + replay reconcile timers (if desired) and complete + log the first quarterly restore test
 
 **Decision tracker (update as you go; keep public-safe)**
@@ -35,8 +35,8 @@ Status: **active roadmap** (Phases 0–6 implemented (core); remaining work is m
   - Annual search verification capture: **TBD** (optional)
 **Next steps (small, safe, sequential)**
 
-1) Decide dataset cadence + scope (Phase 5) and record the decision.
-2) Publish the first versioned dataset release (Phase 5) with `manifest.json` + `SHA256SUMS`.
+1) Run the first dataset release workflow in `jerdaw/healtharchive-datasets` and verify the artifacts.
+2) Add a public-facing note linking to dataset releases (e.g., `/changelog` and/or `/exports`).
 3) Run the first quarterly restore test (Phase 6) and record a public-safe result log.
 4) Run systemd dry-runs and decide whether to enable annual scheduling and/or replay reconcile timers (Phase 6).
 5) Do Phase 4 outreach: secure 1 partner link + 1 verifier (with permission to name), and start the mentions log discipline.
