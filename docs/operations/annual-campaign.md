@@ -194,7 +194,7 @@ the “search is ready” definition for the annual campaign.
 
 ---
 
-## 6) Post-campaign verification (Phase 7)
+## 6) Post-campaign verification
 
 Once **all** annual jobs are `indexed`, capture “search readiness” evidence as a
 timestamped artifact directory:

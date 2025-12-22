@@ -8,7 +8,7 @@ This document is an in‑depth walkthrough of the **HealthArchive.ca backend**
 - The data model and job lifecycle.
 - The indexing pipeline (WARCs → snapshots).
 - HTTP APIs (public + admin) and metrics.
-- Worker loop, retries, and cleanup/retention (Phase 9).
+- Worker loop, retries, and cleanup/retention (future).
 
 For `archive_tool` internals (log parsing, Docker orchestration, run modes),
 see `src/archive_tool/docs/documentation.md`. For a shorter, task‑oriented
@@ -259,7 +259,7 @@ Key fields:
   - `combined_log_path: str | None` – path to the latest combined log, used for stats/debugging.
   - `state_file_path: str | None` – path to `.archive_state.json` within `output_dir` (may be `None` after cleanup).
 
-- Cleanup state (Phase 9):
+- Cleanup state (future):
   - `cleanup_status: str` – describes whether any cleanup has occurred:
     - `"none"` (default) – temp dirs & state still present (or never existed).
     - `"temp_cleaned"` – `cleanup-job` or an equivalent operation removed temp dirs/state.
@@ -1138,7 +1138,7 @@ Returns `True` if a job was processed, `False` if no jobs were found.
 
 ---
 
-## 10. Cleanup & retention (Phase 9)
+## 10. Cleanup & retention (future)
 
 Job‑level cleanup is focused on removing **temporary crawl artifacts** (`.tmp*`
 dirs and `.archive_state.json`) after indexing is complete.

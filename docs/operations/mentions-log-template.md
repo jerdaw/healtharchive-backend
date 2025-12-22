@@ -1,4 +1,4 @@
-# Phase 4 Mentions Log (template)
+# Mentions Log (template)
 
 Purpose: A lightweight, public-safe log of mentions, links, or citations.
 Populate this only with information that is already public and permitted.

@@ -1,4 +1,4 @@
-# Phase 6 — Growth Constraints (internal policy)
+# Growth Constraints (internal policy)
 
 Purpose: prevent slow scope creep from undermining reliability on a single-VPS architecture.
 
@@ -39,4 +39,3 @@ If p95 exceeds targets for multiple weeks, pause new scope additions and priorit
 ## Public-facing summary (use in governance)
 
 Reliability and provenance take priority over expanding coverage. Sources are added deliberately within storage and operational capacity, and the archive does not attempt to crawl the entire internet.
-

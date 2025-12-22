@@ -1,4 +1,4 @@
-# Phase 5 — Methods Note Outline (public-safe)
+# Methods Note Outline (public-safe)
 
 This outline is designed to become a poster, short preprint, or blog-style methods write-up that is:
 

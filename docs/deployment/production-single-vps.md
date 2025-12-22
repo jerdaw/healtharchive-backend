@@ -124,10 +124,10 @@ HA_PAGES_FASTPATH=1
 HEALTHARCHIVE_USAGE_METRICS_ENABLED=1
 HEALTHARCHIVE_USAGE_METRICS_WINDOW_DAYS=30
 
-# Optional: change tracking + diff feeds (Phase 3).
+# Optional: change tracking + diff feeds.
 HEALTHARCHIVE_CHANGE_TRACKING_ENABLED=1
 
-# Optional: research exports (Phase 5).
+# Optional: research exports.
 # Controls the public metadata export endpoints under `/api/exports`.
 HEALTHARCHIVE_EXPORTS_ENABLED=1
 HEALTHARCHIVE_EXPORTS_DEFAULT_LIMIT=1000

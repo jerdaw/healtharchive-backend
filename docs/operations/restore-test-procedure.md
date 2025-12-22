@@ -1,4 +1,4 @@
-# Phase 6 — Restore Test Procedure (quarterly)
+# Restore Test Procedure (quarterly)
 
 Purpose: prove backups are usable by performing a clean restore and verifying core API behavior.
 

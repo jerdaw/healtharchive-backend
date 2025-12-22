@@ -1,4 +1,4 @@
-# Phase 4 Verification Packet (draft outline)
+# Verification Packet (draft outline)
 
 Purpose: A short, shareable summary for a verifier (librarian, researcher,
 or editor) to review and potentially confirm your role and the project's value.
