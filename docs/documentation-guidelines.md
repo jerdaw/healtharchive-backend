@@ -24,6 +24,7 @@ Keep documentation accurate, minimal, and easy to maintain across repos.
 ## Naming and organization
 
 - Use descriptive filenames (`runbook`, `checklist`, `guidelines`) and avoid phase prefixes.
+- File titles and filenames should reflect the document’s actual purpose. If the purpose changes, rename the file and update links.
 - Put historical plans in `docs/roadmaps`.
 - Put operational procedures in `docs/operations`.
 - Put deployment/runbooks in `docs/deployment`.
