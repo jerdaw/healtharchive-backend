@@ -16,14 +16,14 @@
 - Restore test log template: `restore-test-log-template.md`
 - Adoption signals log template (public-safe, quarterly): `adoption-signals-log-template.md`
 - HealthArchive ops roadmap + todo (remaining tasks): `healtharchive-ops-roadmap.md`
-- Phase 4 partner kit (brief + citation + screenshots): `phase-4-partner-kit.md`
-- Phase 4 one-page brief (pointer to frontend public asset): `phase-4-one-page-brief.md`
-- Phase 4 citation handout (pointer to frontend public asset): `phase-4-citation-handout.md`
-- Phase 4 outreach templates (email copy): `phase-4-outreach-templates.md`
-- Phase 4 verification packet (verifier handoff): `phase-4-verification-packet.md`
-- Phase 4 mentions log template (public-safe): `phase-4-mentions-log-template.md`
-- Phase 5 exports data dictionary (pointer to public asset): `exports-data-dictionary.md`
-- Phase 5 methods note outline (poster/preprint scaffold): `phase-5-methods-note-outline.md`
+- Partner kit (brief + citation + screenshots): `partner-kit.md`
+- One-page brief (pointer to frontend public asset): `one-page-brief.md`
+- Citation handout (pointer to frontend public asset): `citation-handout.md`
+- Outreach templates (email copy): `outreach-templates.md`
+- Verification packet (verifier handoff): `verification-packet.md`
+- Mentions log template (public-safe): `mentions-log-template.md`
+- Exports data dictionary (pointer to public asset): `exports-data-dictionary.md`
+- Methods note outline (poster/preprint scaffold): `methods-note-outline.md`
 - Search relevance evaluation (process + commands): `search-quality.md`
 - Golden queries + expected results (living checklist): `search-golden-queries.md`
 - Replay + preview automation plan (design + guardrails; includes `replay-reconcile`): `replay-and-preview-automation-plan.md`

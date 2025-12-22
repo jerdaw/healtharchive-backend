@@ -61,7 +61,7 @@ Assumptions (adjust paths/user if your VPS differs):
 
 ---
 
-## Recommended enablement (Phase 6 guidance)
+## Recommended enablement guidance
 
 These timers are safe-by-default and gated by sentinel files. Enable only what
 matches your operational readiness.

@@ -1753,12 +1753,12 @@ Stretch goals (high value if feasible):
 
 - Public one-page brief page: `https://www.healtharchive.ca/brief` (downloadable Markdown at `/partner-kit/healtharchive-brief.md`)
 - Public citation guidance page: `https://www.healtharchive.ca/cite` (downloadable Markdown at `/partner-kit/healtharchive-citation.md`)
-- Partner kit draft: `healtharchive-backend/docs/operations/phase-4-partner-kit.md`
-- One-page brief (source copy): `healtharchive-backend/docs/operations/phase-4-one-page-brief.md`
-- Citation handout (source copy): `healtharchive-backend/docs/operations/phase-4-citation-handout.md`
-- Outreach templates: `healtharchive-backend/docs/operations/phase-4-outreach-templates.md`
-- Verification packet outline: `healtharchive-backend/docs/operations/phase-4-verification-packet.md`
-- Mentions log template: `healtharchive-backend/docs/operations/phase-4-mentions-log-template.md`
+- Partner kit draft: `healtharchive-backend/docs/operations/partner-kit.md`
+- One-page brief (source copy): `healtharchive-backend/docs/operations/one-page-brief.md`
+- Citation handout (source copy): `healtharchive-backend/docs/operations/citation-handout.md`
+- Outreach templates: `healtharchive-backend/docs/operations/outreach-templates.md`
+- Verification packet outline: `healtharchive-backend/docs/operations/verification-packet.md`
+- Mentions log template: `healtharchive-backend/docs/operations/mentions-log-template.md`
 
 Remaining Phase 4 work is outreach and external validation.
 ## Phase 5 — Research-Grade Outputs (expanded)
@@ -2014,7 +2014,7 @@ Stretch goals:
 - `/researchers` updated with research access workflow and export manifest link.
 - `/cite` linked from `/snapshot`, `/compare`, `/changes`, and `/digest`.
 - Export schema documented in `healtharchive-frontend/public/exports/healtharchive-data-dictionary.md` (public `/exports` page).
-- Methods note outline published: `healtharchive-backend/docs/operations/phase-5-methods-note-outline.md`.
+- Methods note outline published: `healtharchive-backend/docs/operations/methods-note-outline.md`.
 - Export env toggles documented (`HEALTHARCHIVE_EXPORTS_ENABLED`, defaults, and limits).
 
 Remaining Phase 5 work: keep quarterly dataset releases running + track external research adoption signals.

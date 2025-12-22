@@ -553,11 +553,11 @@ For a full walkthrough of:
 - ORM models and status lifecycle
 - Job registry and how per-source jobs are configured
 - `archive_tool` integration and adaptive strategies
--- Indexing pipeline and snapshot schema
--- HTTP API routes and JSON schemas
--- Worker loop and retry semantics
--- Cleanup and retention strategy (Phase 9)
--- How the backend integrates with the in-repo `archive_tool` crawler
+- Indexing pipeline and snapshot schema
+- HTTP API routes and JSON schemas
+- Worker loop and retry semantics
+- Cleanup and retention strategy (future)
+- How the backend integrates with the in-repo `archive_tool` crawler
 
 see `docs/architecture.md`.
 

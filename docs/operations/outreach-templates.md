@@ -1,4 +1,4 @@
-# Phase 4 Outreach Templates (draft, public-safe)
+# Outreach Templates (draft, public-safe)
 
 Purpose: Ready-to-send templates for partner outreach. Keep these generic and
 non-committal until you have permission to name partners publicly.

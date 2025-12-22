@@ -1,4 +1,4 @@
-# Phase 6 — Ops Cadence Checklist (internal)
+# Ops Cadence Checklist (internal)
 
 Purpose: make routine operations repeatable and low-friction so the project can be maintained without heroics.
 
@@ -52,4 +52,3 @@ This checklist is intentionally short. If a task feels too heavy to do regularly
 - **Changelog**: public-facing changes and policy updates.
 - **Impact report**: monthly coverage + reliability + usage snapshot.
 - **Internal ops log**: optional private notes (date + key checks + issues).
-
