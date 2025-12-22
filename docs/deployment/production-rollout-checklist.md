@@ -20,7 +20,7 @@ Nothing in this file requires changes to your local dev environment.
 For background, see:
 
 - `hosting-and-live-server-to-dos.md`
-- `environment-matrix.md`
+- `environments-and-configuration.md`
 - `production-single-vps.md` (current production runbook)
 - `staging-rollout-checklist.md` (optional future)
 

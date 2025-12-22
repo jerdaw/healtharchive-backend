@@ -1,4 +1,4 @@
-# Environment & configuration matrix (frontend + backend)
+# Environments and configuration (frontend + backend)
 
 This document is the **canonical cross-repo reference** for how the backend
 (`healtharchive-backend`) and frontend (`healtharchive-frontend`) are wired

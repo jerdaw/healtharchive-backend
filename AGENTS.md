@@ -17,7 +17,7 @@ Canonical docs to consult first:
 - `docs/README.md` – docs index.
 - `docs/architecture.md` – architecture & implementation details.
 - `docs/development/live-testing.md` – step-by-step local testing flows.
-- `docs/deployment/environment-matrix.md` – cross-repo env var and host matrix.
+- `docs/deployment/environments-and-configuration.md` – cross-repo env vars and host matrix.
 - `src/archive_tool/docs/documentation.md` – internals of the `archive_tool` crawler CLI.
 - `docs/deployment/hosting-and-live-server-to-dos.md` – hosting/env/DNS/CORS checklist.
 - `docs/deployment/staging-rollout-checklist.md` – staging rollout steps.

@@ -502,7 +502,7 @@ For a more complete checklist covering staging/production configuration,
 DNS, and Vercel env vars, see:
 
 - `docs/deployment/hosting-and-live-server-to-dos.md`
-- `docs/deployment/environment-matrix.md`
+- `docs/deployment/environments-and-configuration.md`
 - `docs/deployment/production-single-vps.md`
 - `docs/deployment/staging-rollout-checklist.md`
 - `docs/deployment/production-rollout-checklist.md`
