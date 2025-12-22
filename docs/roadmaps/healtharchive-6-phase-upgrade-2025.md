@@ -1,8 +1,8 @@
-# HealthArchive Upgrade Roadmap (2025)
+# HealthArchive 6-Phase Upgrade Roadmap (2025)
 
-This is the **historical roadmap** for the 2025 upgrade (Phases 0–6).
+This is the **historical roadmap** for the 6-phase upgrade program (Phases 0–6).
 
-For the **current todo list only**, see: `docs/operations/healtharchive-upgrade-plan.md`.
+For the **current ops roadmap/todo only**, see: `docs/operations/healtharchive-ops-roadmap.md`.
 
 Status: **active roadmap** (Phases 0–6 shipped (core product + ops scaffolding); remaining work is mostly non-code: Phase 4 outreach/verifier, Phase 5 dataset releases + adoption, Phase 6 ongoing automation + restore-test discipline).
 
