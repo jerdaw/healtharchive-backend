@@ -1,6 +1,6 @@
 # HealthArchive Upgrade Plan (Agent-Ready)
 
-Status: **active roadmap** (Phases 0–6 implemented (core); remaining work is mostly non-code: Phase 4 outreach/verifier, Phase 5 dataset releases + adoption, Phase 6 automation + restore-test discipline).
+Status: **active roadmap** (Phases 0–6 shipped (core product + ops scaffolding); remaining work is mostly non-code: Phase 4 outreach/verifier, Phase 5 dataset releases + adoption, Phase 6 ongoing automation + restore-test discipline).
 
 ## Current Status Snapshot (high signal; update as you go)
 
@@ -57,6 +57,156 @@ Automation gates (systemd `ConditionPathExists`; create files to enable):
 - Change tracking timer: `/etc/healtharchive/change-tracking-enabled` (already required if running the timer)
 - Annual scheduler timer: `/etc/healtharchive/automation-enabled` (optional; only enable when ready)
 - Replay reconcile timer: `/etc/healtharchive/replay-automation-enabled` (optional; only if replay is enabled and stable)
+
+## Agent-Readiness + Drift-Proofing (internal)
+
+This document is an **internal operating / handoff spec** that lives in git. Keep it **public-safe**:
+
+- Do not include secrets, tokens, private emails, internal IPs, or private names.
+- Prefer stable identifiers over prose (“timer name”, “release tag”, “file path”, “commit SHA”).
+- When recording “firsts”, treat them as **historical facts** and include stable IDs (e.g., release tag, log filename).
+
+### Claims Registry (ABS/verification-proof scaffolding)
+
+If you ever make a claim about reliability, automation, privacy, or reproducibility, tie it to **specific proof artifacts**.
+
+- **Claim:** Quarterly dataset releases run automatically (metadata-only).
+  - Evidence:
+    - GitHub Releases: `https://github.com/jerdaw/healtharchive-datasets/releases` (tags `healtharchive-dataset-YYYY-MM-DD`)
+    - Release assets: `manifest.json` + `SHA256SUMS` + `healtharchive-*.jsonl.gz`
+    - Workflow: `jerdaw/healtharchive-datasets` → Actions → “Publish dataset release”
+  - Cadence: quarterly (Jan/Apr/Jul/Oct)
+  - Recorded in: dataset repo Releases + `/srv/healtharchive/ops/adoption/`
+- **Claim:** Dataset releases are integrity-verifiable.
+  - Evidence:
+    - Download all release assets into one directory and run `sha256sum -c SHA256SUMS`
+    - `manifest.json` includes artifact SHA256s and row counts
+  - Cadence: per release
+  - Recorded in: release assets + `/srv/healtharchive/ops/adoption/`
+- **Claim:** Change tracking is computed on schedule.
+  - Evidence:
+    - systemd timer: `healtharchive-change-tracking.timer` (plus sentinel `/etc/healtharchive/change-tracking-enabled`)
+    - logs: `journalctl -u healtharchive-change-tracking.service`
+    - public surface: `/changes` + `/api/changes` (reflects computed rows)
+  - Cadence: daily
+  - Recorded in: journald (+ optional Healthchecks ping)
+- **Claim:** Replay indexes are reconciled on schedule (when replay enabled).
+  - Evidence:
+    - systemd timer: `healtharchive-replay-reconcile.timer` (plus sentinel `/etc/healtharchive/replay-automation-enabled`)
+    - logs: `journalctl -u healtharchive-replay-reconcile.service`
+  - Cadence: daily
+  - Recorded in: journald (+ optional Healthchecks ping)
+- **Claim:** Annual campaign scheduling is automated and gated.
+  - Evidence:
+    - systemd timer: `healtharchive-schedule-annual.timer` (plus sentinel `/etc/healtharchive/automation-enabled`)
+    - logs: `journalctl -u healtharchive-schedule-annual.service`
+  - Cadence: annually (Jan 01 UTC)
+  - Recorded in: journald
+- **Claim:** Quarterly restore tests are performed (backups are usable).
+  - Evidence:
+    - restore-test logs: `/srv/healtharchive/ops/restore-tests/restore-test-YYYY-MM-DD.md`
+    - procedure reference: `docs/operations/restore-test-procedure.md`
+  - Cadence: quarterly
+  - Recorded in: `/srv/healtharchive/ops/restore-tests/`
+- **Claim:** Public usage metrics are privacy-preserving and aggregated.
+  - Evidence:
+    - DB table: `usage_metrics` (aggregated daily counts only)
+    - API: `GET /api/usage` (windowed aggregates; no personal identifiers)
+  - Cadence: daily aggregation; public reporting window is configurable
+  - Recorded in: DB + `/api/usage`
+
+### Data Handling & Retention (public-safe, internal contract)
+
+This section is about preventing accidental collection/retention creep and PHI risk.
+
+- **Issue reports** (`POST /api/reports`, stored in DB table `issue_reports`)
+  - Stored fields include: `category`, `description` (free text), optional `reporter_email`, optional `snapshot_id`, `original_url`, `page_url`, plus `status` and `internal_notes`.
+  - PHI risk: `description` / `reporter_email` are user-supplied; treat as potentially sensitive.
+  - Policy:
+    - Public UI should warn users **not** to submit personal health information.
+    - Admin views are operator-only; do not expose reports to the public UI.
+    - If a report contains PHI, do not copy it into other systems/logs; delete/redact as needed and record a public-safe note in ops logs.
+  - Retention: keep minimal; if in doubt, retain only what’s needed to resolve the issue.
+- **Usage metrics** (`GET /api/usage`, stored in DB table `usage_metrics`)
+  - Aggregated daily counts by event name (`metric_date`, `event`, `count`).
+  - No IP addresses or user IDs are stored in `usage_metrics`.
+  - Public API returns a rolling window (`HEALTHARCHIVE_USAGE_METRICS_WINDOW_DAYS`).
+- **Backups**
+  - Postgres dumps (custom-format) are stored on the VPS (see `docs/deployment/production-single-vps.md`).
+  - Treat dumps as sensitive: they may contain report text/emails and should not be shared publicly.
+- **Server/application logs**
+  - System logs (journald) and web server logs may contain IP addresses and request details.
+  - Treat as sensitive; do not paste raw logs into public issues or git.
+- **Ops logs**
+  - Restore tests: `/srv/healtharchive/ops/restore-tests/` (public-safe Markdown entries only).
+  - Adoption signals: `/srv/healtharchive/ops/adoption/` (public-safe; quarterly; links + aggregates only).
+  - Mentions log (Phase 4): keep public-safe; do not store private contact details.
+
+### Export Integrity Contract (research-grade; drift-proof)
+
+Exports and dataset releases should be defensible over time.
+
+- **Export endpoints are ordered + paginatable**
+  - `GET /api/exports/snapshots` is ordered by `snapshot_id` ascending and paginates via `afterId`.
+  - `GET /api/exports/changes` is ordered by `change_id` ascending and paginates via `afterId`.
+- **Dataset release manifest contract (`manifest.json`)**
+  - Required fields:
+    - `version` (schema version for the manifest itself)
+    - `tag` (release tag)
+    - `releasedAtUtc` (ISO-8601 UTC timestamp)
+    - `apiBase` and `exportsManifest` (from `GET /api/exports`)
+    - `artifacts.snapshots` and `artifacts.changes` including:
+      - `rows`, `minId`, `maxId`, `requestsMade`, `limitPerRequest`, `truncated`
+      - `sha256` for each artifact
+  - Integrity rule: `SHA256SUMS` must match the files in the release.
+  - Completeness rule: `truncated` should be `false` for both exports; if `true`, treat the release as incomplete and re-run.
+- **Immutability / corrections**
+  - Prefer treating published dataset release tags as immutable research objects.
+  - If a correction requires re-generating a release, record what changed in the release notes and (if possible) prefer a new tag over silently rewriting an old one.
+- **Diff recomputation policy**
+  - Change export rows include `diff_version` and `normalization_version`.
+  - If change tracking methodology changes, bump versions and document it (methods note/changelog) rather than silently rewriting history.
+
+### Verification Rituals (how we know automation is actually on)
+
+Use these quick checks before claiming automation is “running”.
+
+- **systemd timers**
+  - `systemctl is-enabled <timer>` (should be `enabled`)
+  - sentinel file exists under `/etc/healtharchive/*enabled`
+  - `systemctl list-timers --all | grep healtharchive-` (shows next/last run)
+  - `journalctl -u <service> -n 200` (shows last run success)
+- **Dataset releases**
+  - Confirm GitHub Actions are enabled in `jerdaw/healtharchive-datasets`
+  - Confirm a release exists for the expected quarter/date
+  - Download assets and verify: `sha256sum -c SHA256SUMS`
+- **Restore tests**
+  - Confirm a dated log file exists in `/srv/healtharchive/ops/restore-tests/`
+  - Ensure it includes: backup source, schema check, API checks, pass/fail, follow-ups
+
+### Runbooks (two boring routines)
+
+- **Dataset release (normally hands-off)**
+  1) Check `https://github.com/jerdaw/healtharchive-datasets/releases` for the latest tag.
+  2) Download all assets to one directory; run `sha256sum -c SHA256SUMS`.
+  3) Inspect `manifest.json` for `truncated=false` and plausible row counts.
+  4) Record a quarterly entry in `/srv/healtharchive/ops/adoption/` (links + aggregates only).
+- **Restore test (quarterly)**
+  - Follow `docs/operations/restore-test-procedure.md`.
+  - Record the result in `/srv/healtharchive/ops/restore-tests/` using `docs/operations/restore-test-log-template.md`.
+
+### Risk Register (internal)
+
+- **Misinterpretation risk (archive mistaken for current guidance)**
+  - Mitigation: strong disclaimers; never add “interpretation” features; keep high-risk pages (`/browse`, `/snapshot`) explicit.
+- **PHI submission risk (issue reports)**
+  - Mitigation: clear warnings; minimize storage; admin-only access; delete/redact if PHI appears.
+- **Proxy/CORS misuse risk**
+  - Mitigation: keep the frontend same-origin report proxy narrow; do not turn it into a general proxy; keep backend CORS allowlist strict.
+- **Single-VPS availability risk**
+  - Mitigation: backups + restore tests; conservative automation caps; disk monitoring; clear rollback procedures.
+- **Export integrity / reproducibility risk**
+  - Mitigation: checksums + manifest; stable ordering/pagination; version fields (`diff_version`, `normalization_version`); avoid rewriting releases.
 
 This file is intentionally written so you can hand it to another LLM/AI (or a human contributor) and they will understand:
 
@@ -1911,7 +2061,7 @@ Acceptance criteria:
 
 - **Canonical format:** `JSON Lines` (`.jsonl`) compressed with `gzip` (`.jsonl.gz`)
   - Why: streamable, append-friendly, handles optional fields cleanly, works well for large datasets, and is robust to schema evolution.
-- **Convenience format:** `CSV` compressed with `gzip` (`.csv.gz`)
+- **Convenience format:** `CSV` compressed with `gzip` (`.csv.gz`) (supported by the export API; dataset releases currently publish JSONL only)
   - Why: easy for non-programmers (Excel/R), still compact when gzipped.
 - **Release packaging:** always include a small `manifest.json` alongside exports
   - Why: makes releases citable and reproducible (schema version, date ranges, source list, row counts, checksums).
@@ -1970,23 +2120,25 @@ Acceptance criteria:
 
 **Goal:** Create periodic “research objects” that can be cited and referenced over time.
 
-**Recommended defaults (decisions)**
+**Current decisions (implemented)**
 
-- **Where to publish:** GitHub Releases (initially)
-  - Why: simple, already in your workflow, supports attaching files + checksums, and provides stable URLs for citation.
-- **Release cadence:** monthly if the archive is actively changing; quarterly if updates are mostly annual
-  - Why: cadence should reflect real capture rhythm to avoid “activity theatre.”
-- **Release contents:** `snapshots.jsonl.gz`, `snapshots.csv.gz`, `changes.jsonl.gz`, `changes.csv.gz`, `manifest.json`, `SHA256SUMS`
-  - Why: two common formats + reproducible integrity metadata.
+- **Where to publish:** GitHub Releases in `jerdaw/healtharchive-datasets`
+  - Why: stable URLs for citation + straightforward distribution.
+- **Release cadence:** quarterly (Jan/Apr/Jul/Oct) via GitHub Actions (plus a keepalive workflow to avoid schedule auto-disable)
+  - Why: matches annual-edition reality and keeps ops low-touch.
+- **Release contents (metadata-only):** `healtharchive-snapshots.jsonl.gz`, `healtharchive-changes.jsonl.gz`, `manifest.json`, `SHA256SUMS` (no CSV)
+  - Why: lean artifacts with reproducible integrity metadata (checksums + manifest).
+- **Release tags:** `healtharchive-dataset-YYYY-MM-DD`
+  - Why: date-based tags allow finer cadence later without renaming history.
 
 Deliverables:
 
-- A simple release cadence (monthly or quarterly) for:
+- A simple release cadence (quarterly) for:
   - snapshot metadata dumps,
   - change event dumps,
-  - a short release note/changelog entry summarizing what changed.
-- Versioning approach (example):
-  - `healtharchive-dataset-YYYY-MM` with checksums.
+  - stable release artifacts with checksums + manifest.
+- Versioning approach:
+  - `healtharchive-dataset-YYYY-MM-DD` with checksums.
 - A release checklist:
   - schema version,
   - date range included,
@@ -2000,7 +2152,7 @@ Where to publish:
 
 Acceptance criteria:
 
-- A researcher can cite “Dataset release YYYY-MM” and reproduce the exact file they used.
+- A researcher can cite “Dataset release YYYY-MM-DD” and reproduce the exact file they used.
 
 #### Sub-phase 5E — Methods note / poster (scholarship output)
 
@@ -2057,7 +2209,7 @@ Minimum viable “Phase 5 complete”:
 
 Stretch goals:
 
-- Versioned dataset releases on a fixed cadence (monthly/quarterly) with checksums.
+- Versioned dataset releases on a fixed cadence (quarterly) with checksums.
 - At least one external research/journalism project uses an export and can be cited in the mentions log.
 
 **Status (Phase 5 assets implemented)**
@@ -2129,7 +2281,7 @@ explicit and sustainable.
 - Systemd deployment guide updated with Phase 6 enablement guidance.
 - Deploy helper now retries health checks during restarts to avoid transient false negatives: `scripts/vps-deploy.sh`.
 
-Remaining Phase 6 work: enable/confirm automation timers (annual scheduling, replay reconcile) where desired, and keep quarterly restore tests running with logged results.
+Remaining Phase 6 work: keep automation healthy (verify timers continue running) and keep quarterly restore tests running with logged results.
 
 ### Phase 6 Implementation Plan (Detailed; sub-phases)
 
