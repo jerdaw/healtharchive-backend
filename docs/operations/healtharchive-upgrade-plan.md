@@ -28,7 +28,8 @@ Status: **active roadmap** (Phases 0–6 implemented (core); remaining work is m
 - Dataset release tag format: **`healtharchive-dataset-YYYY-MM-DD`**
 - Dataset release artifacts: **`healtharchive-snapshots.jsonl.gz`, `healtharchive-changes.jsonl.gz`, `manifest.json`, `SHA256SUMS`** (no CSV)
 - First dataset release published: **2025-12-22** (`healtharchive-dataset-2025-12-22`)
-- Restore test logging: **TBD** (where the public-safe log lives; repo vs private ops directory)
+- Restore test logging: **`/srv/healtharchive/ops/restore-tests/`** (private VPS ops directory; public-safe Markdown entries)
+- First restore test completed: **2025-12-22** (Pass; log file `restore-test-2025-12-22.md`)
 - Production timers (record what is enabled today):
   - Change tracking: **TBD** (expected: enabled when `/etc/healtharchive/change-tracking-enabled` exists)
   - Annual scheduling: **TBD** (gated by `/etc/healtharchive/automation-enabled`)
