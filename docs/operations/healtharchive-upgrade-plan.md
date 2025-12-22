@@ -1,6 +1,6 @@
 # HealthArchive Upgrade Plan (Agent-Ready)
 
-Status: **active roadmap** (Phases 0–6 implemented (core); remaining work is mostly non-code: Phase 4 outreach/verifier, Phase 5 dataset releases + adoption, Phase 6 automation enablement + restore-test logs).
+Status: **active roadmap** (Phases 0–6 implemented (core); remaining work is mostly non-code: Phase 4 outreach/verifier, Phase 5 dataset releases + adoption, Phase 6 automation + restore-test discipline).
 
 ## Current Status Snapshot (high signal; update as you go)
 
