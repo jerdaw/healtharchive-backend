@@ -63,4 +63,3 @@ def downgrade() -> None:
     op.drop_index("ix_snapshots_url_trgm", table_name="snapshots")
     op.drop_index("ix_snapshots_snippet_trgm", table_name="snapshots")
     op.drop_index("ix_snapshots_title_trgm", table_name="snapshots")
-

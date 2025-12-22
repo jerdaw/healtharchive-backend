@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-import os
 import hashlib
 import json
+import os
 import subprocess
 import sys
 from io import StringIO
@@ -79,7 +79,7 @@ def test_replay_index_job_creates_symlinks_and_runs_docker(tmp_path, monkeypatch
 
     calls: list[list[str]] = []
 
-    def fake_run(args_list, text=True, capture_output=True):  # type: ignore[no-untyped-def]
+    def fake_run(args_list: list[str], text: bool = True, capture_output: bool = True):
         calls.append(list(args_list))
         return subprocess.CompletedProcess(args_list, 0, stdout="", stderr="")
 
@@ -154,7 +154,7 @@ def test_replay_index_job_dry_run_does_not_modify_files_or_run_docker(
 
     calls: list[list[str]] = []
 
-    def fake_run(args_list, text=True, capture_output=True):  # type: ignore[no-untyped-def]
+    def fake_run(args_list: list[str], text: bool = True, capture_output: bool = True):
         calls.append(list(args_list))
         return subprocess.CompletedProcess(args_list, 0, stdout="", stderr="")
 

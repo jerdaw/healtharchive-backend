@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Iterable, Sequence
+from typing import Any, Iterable, Sequence, cast
 
 from sqlalchemy import and_, case, func, or_
 from sqlalchemy.orm import Session
@@ -48,16 +48,16 @@ def build_snapshot_page_group_key(*, dialect_name: str) -> Any:
 def _dialect_insert(session: Session):
     dialect = session.get_bind().dialect.name
     if dialect == "postgresql":
-        from sqlalchemy.dialects.postgresql import insert as dialect_insert
+        from sqlalchemy.dialects.postgresql import insert as pg_insert
 
-        return dialect_insert
+        return pg_insert
     if dialect == "sqlite":
-        from sqlalchemy.dialects.sqlite import insert as dialect_insert
+        from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 
-        return dialect_insert
-    from sqlalchemy import insert as dialect_insert
+        return sqlite_insert
+    from sqlalchemy import insert as generic_insert
 
-    return dialect_insert
+    return generic_insert
 
 
 def rebuild_pages(
@@ -94,15 +94,15 @@ def rebuild_pages(
             total_deleted = 0
             for i in range(0, len(groups_list), chunk_size):
                 chunk = groups_list[i : i + chunk_size]
-                result = rebuild_pages(
+                chunk_result = rebuild_pages(
                     session,
                     source_id=source_id,
                     job_id=job_id,
                     groups=chunk,
                     delete_missing=delete_missing,
                 )
-                total_upserted += result.upserted_groups
-                total_deleted += result.deleted_groups
+                total_upserted += chunk_result.upserted_groups
+                total_deleted += chunk_result.deleted_groups
 
             return PagesRebuildResult(
                 upserted_groups=total_upserted,
@@ -137,10 +137,14 @@ def rebuild_pages(
         .subquery()
     )
 
-    latest_rn = func.row_number().over(
-        partition_by=(Snapshot.source_id, group_key),
-        order_by=(Snapshot.capture_timestamp.desc(), Snapshot.id.desc()),
-    ).label("rn")
+    latest_rn = (
+        func.row_number()
+        .over(
+            partition_by=(Snapshot.source_id, group_key),
+            order_by=(Snapshot.capture_timestamp.desc(), Snapshot.id.desc()),
+        )
+        .label("rn")
+    )
     latest_subq = (
         session.query(
             Snapshot.source_id.label("source_id"),
@@ -161,10 +165,14 @@ def rebuild_pages(
         .subquery()
     )
 
-    latest_ok_rn = func.row_number().over(
-        partition_by=(Snapshot.source_id, group_key),
-        order_by=(Snapshot.capture_timestamp.desc(), Snapshot.id.desc()),
-    ).label("rn")
+    latest_ok_rn = (
+        func.row_number()
+        .over(
+            partition_by=(Snapshot.source_id, group_key),
+            order_by=(Snapshot.capture_timestamp.desc(), Snapshot.id.desc()),
+        )
+        .label("rn")
+    )
     latest_ok_subq = (
         session.query(
             Snapshot.source_id.label("source_id"),
@@ -240,11 +248,11 @@ def rebuild_pages(
                 "updated_at": func.now(),
             },
         )
-        result = session.execute(upsert_stmt)
-        upserted_groups = int(result.rowcount or 0)
+        exec_result = cast(Any, session.execute(upsert_stmt))
+        upserted_groups = int(exec_result.rowcount or 0)
     else:
-        result = session.execute(insert_stmt)
-        upserted_groups = int(result.rowcount or 0)
+        exec_result = cast(Any, session.execute(insert_stmt))
+        upserted_groups = int(exec_result.rowcount or 0)
 
     deleted_groups = 0
     if delete_missing and source_id is not None:
@@ -254,9 +262,9 @@ def rebuild_pages(
             delete_query = delete_query.filter(Page.normalized_url_group.in_(groups_list))
 
         deleted_groups = int(
-            delete_query
-            .filter(~Page.normalized_url_group.in_(session.query(present_subq.c.group_key)))
-            .delete(synchronize_session=False)
+            delete_query.filter(
+                ~Page.normalized_url_group.in_(session.query(present_subq.c.group_key))
+            ).delete(synchronize_session=False)
             or 0
         )
 

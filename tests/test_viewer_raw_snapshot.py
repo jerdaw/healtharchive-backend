@@ -28,7 +28,11 @@ def _init_test_app(tmp_path: Path, monkeypatch):
 
     from ha_backend.api import app
 
-    return TestClient(app)
+    try:
+        import uvloop  # noqa: F401
+    except Exception:
+        return TestClient(app)
+    return TestClient(app, backend_options={"use_uvloop": True})
 
 
 def _write_test_warc(warc_path: Path, url: str, html: str) -> str:

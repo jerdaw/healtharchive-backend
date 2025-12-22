@@ -15,8 +15,7 @@ from queue import Empty, Queue
 from typing import Any, Dict, List, Optional, Tuple
 
 # Use absolute imports within the package
-from archive_tool import (cli, constants, docker_runner, monitor, state,
-                          strategies, utils)
+from archive_tool import cli, constants, docker_runner, monitor, state, strategies, utils
 
 # Setup logger for this module
 # Note: Root logger is configured in main(), this just gets the specific logger
@@ -43,10 +42,7 @@ def signal_handler(signum, frame):
         logger.info("No active container ID known to stop gracefully.")
 
     # Check the Popen process object for the docker run command
-    if (
-        docker_runner.current_docker_process
-        and docker_runner.current_docker_process.poll() is None
-    ):
+    if docker_runner.current_docker_process and docker_runner.current_docker_process.poll() is None:
         logger.info(
             f"Terminating main Docker process (PID: {docker_runner.current_docker_process.pid})..."
         )
@@ -56,9 +52,7 @@ def signal_handler(signum, frame):
             docker_runner.current_docker_process.wait(timeout=10)
             logger.info("Docker process terminated.")
         except subprocess.TimeoutExpired:
-            logger.warning(
-                "Docker process did not terminate gracefully, attempting kill..."
-            )
+            logger.warning("Docker process did not terminate gracefully, attempting kill...")
             try:
                 docker_runner.current_docker_process.kill()
                 docker_runner.current_docker_process.wait(timeout=5)  # Wait for kill
@@ -116,18 +110,14 @@ def run_final_build_stage_sync(
     name_present = any(a.startswith("--name") for a in final_build_args)
     if not name_present and "name" in required_args:
         final_build_args.extend(["--name", required_args["name"]])
-        logger.debug(
-            f"Added missing --name='{required_args['name']}' for build_zimit_args."
-        )
+        logger.debug(f"Added missing --name='{required_args['name']}' for build_zimit_args.")
 
     # Add the first seed URL as a workaround (as observed)
     if script_args.seeds:
         seed_arg_present = any(a == "--seeds" for a in final_build_args)
         if not seed_arg_present:
             final_build_args.extend(["--seeds", script_args.seeds[0]])
-            logger.debug(
-                f"Added first seed '{script_args.seeds[0]}' for final build workaround."
-            )
+            logger.debug(f"Added first seed '{script_args.seeds[0]}' for final build workaround.")
     else:
         logger.error("Cannot determine seed URL needed for final build! Aborting.")
         return "failed", None
@@ -155,9 +145,7 @@ def run_final_build_stage_sync(
     logger.info(f"Executing Final Build Docker command:\n{' '.join(docker_cmd)}")
 
     # Prepare log file paths
-    log_base = (
-        host_output_dir / f"archive_{stage_name.replace(' ', '_').lower()}_{timestamp}"
-    )
+    log_base = host_output_dir / f"archive_{stage_name.replace(' ', '_').lower()}_{timestamp}"
     stdout_log_path = log_base.with_suffix(".stdout.log")
     stderr_log_path = log_base.with_suffix(".stderr.log")
     combined_log_path = log_base.with_suffix(".combined.log")
@@ -200,9 +188,7 @@ def run_final_build_stage_sync(
                 f3.write(combined_content)
             logger.info(f"Logs for {stage_name} saved successfully.")
         except IOError as e:
-            logger.error(
-                f"Failed to write log files for {stage_name}: {e}", exc_info=True
-            )
+            logger.error(f"Failed to write log files for {stage_name}: {e}", exc_info=True)
 
         # Log snippets
         logger.info(f"--- {stage_name} STDOUT Snippet (Last 10 lines) ---")
@@ -215,13 +201,9 @@ def run_final_build_stage_sync(
 
         # Try to find the temp dir from the logs (may not exist for final build)
         logger.debug(f"Parsing combined log for temp dir: {combined_log_path}")
-        temp_dir_host_path = utils.parse_temp_dir_from_log_file(
-            combined_log_path, host_output_dir
-        )
+        temp_dir_host_path = utils.parse_temp_dir_from_log_file(combined_log_path, host_output_dir)
         if temp_dir_host_path:
-            logger.info(
-                f"Found temp dir path from final build logs: {temp_dir_host_path}"
-            )
+            logger.info(f"Found temp dir path from final build logs: {temp_dir_host_path}")
         else:
             logger.info(
                 "No specific temp dir path found in final build logs (this might be normal)."
@@ -254,15 +236,11 @@ def run_final_build_stage_sync(
         )
         stage_status = "failed"
     except Exception as e:
-        logger.error(
-            f"An unexpected exception occurred during {stage_name}: {e}", exc_info=True
-        )
+        logger.error(f"An unexpected exception occurred during {stage_name}: {e}", exc_info=True)
         logger.error(traceback.format_exc())  # Log full traceback
         stage_status = "failed"
 
-    logger.info(
-        f"--- Finished Stage: {stage_name} (Determined Status: {stage_status}) ---"
-    )
+    logger.info(f"--- Finished Stage: {stage_name} (Determined Status: {stage_status}) ---")
     return stage_status, temp_dir_host_path
 
 
@@ -290,9 +268,7 @@ def main():
     logging.getLogger("website_archiver.utils").setLevel(log_level_int)
 
     start_time_dt = datetime.datetime.now()
-    logger.info(
-        f"--- Enhanced Website Archiver Started: {start_time_dt:%Y-%m-%d %H:%M:%S} ---"
-    )
+    logger.info(f"--- Enhanced Website Archiver Started: {start_time_dt:%Y-%m-%d %H:%M:%S} ---")
     logger.info(f"Log Level Set To: {log_level_name}")
     logger.debug(f"Parsed Script Arguments: {script_args}")
     logger.debug(f"Raw Passthrough Zimit Arguments: {zimit_passthrough_args}")
@@ -330,10 +306,7 @@ def main():
     initial_workers_arg = script_args.initial_workers
     for i, arg in enumerate(zimit_passthrough_args):
         if arg == "--workers":
-            if (
-                i + 1 < len(zimit_passthrough_args)
-                and zimit_passthrough_args[i + 1].isdigit()
-            ):
+            if i + 1 < len(zimit_passthrough_args) and zimit_passthrough_args[i + 1].isdigit():
                 try:
                     passthrough_workers = int(zimit_passthrough_args[i + 1])
                     logger.info(
@@ -348,15 +321,11 @@ def main():
         elif arg.startswith("--workers="):
             try:
                 passthrough_workers = int(arg.split("=", 1)[1])
-                logger.info(
-                    f"Found passthrough '{arg}', overriding initial workers setting."
-                )
+                logger.info(f"Found passthrough '{arg}', overriding initial workers setting.")
                 initial_workers_arg = passthrough_workers
                 break
             except (ValueError, IndexError):
-                logger.warning(
-                    f"Found '{arg}' but could not parse integer value. Ignoring."
-                )
+                logger.warning(f"Found '{arg}' but could not parse integer value. Ignoring.")
     effective_initial_workers = max(1, initial_workers_arg)  # Ensure at least 1 worker
     logger.info(f"Effective initial worker count set to: {effective_initial_workers}")
 
@@ -370,9 +339,7 @@ def main():
         logger.info("  Output directory: %s", host_output_dir)
         logger.info("  Effective initial workers: %s", effective_initial_workers)
         logger.info("  Monitoring enabled: %s", script_args.enable_monitoring)
-        logger.info(
-            "  Adaptive workers enabled: %s", script_args.enable_adaptive_workers
-        )
+        logger.info("  Adaptive workers enabled: %s", script_args.enable_adaptive_workers)
         logger.info("  VPN rotation enabled: %s", script_args.enable_vpn_rotation)
         if zimit_passthrough_args:
             logger.info(
@@ -383,9 +350,7 @@ def main():
 
     logger.info("Step 2: Loading or Initializing Crawl State")
     try:
-        crawl_state = state.CrawlState(
-            host_output_dir, initial_workers=effective_initial_workers
-        )
+        crawl_state = state.CrawlState(host_output_dir, initial_workers=effective_initial_workers)
         logger.debug("CrawlState object initialized.")
     except Exception as e:
         logger.critical(f"Failed to initialize CrawlState: {e}", exc_info=True)
@@ -401,9 +366,7 @@ def main():
     config_yaml_path: Optional[Path] = None  # Ensure type hint
     warc_files: List[Path] = []  # Initialize
 
-    existing_temp_dirs = (
-        crawl_state.get_temp_dir_paths()
-    )  # Get validated paths from state
+    existing_temp_dirs = crawl_state.get_temp_dir_paths()  # Get validated paths from state
     logger.debug(f"Temp directories managed by state: {existing_temp_dirs}")
     latest_temp_dir = existing_temp_dirs[-1] if existing_temp_dirs else None
     logger.debug(f"Latest temp directory from state (if any): {latest_temp_dir}")
@@ -415,7 +378,7 @@ def main():
             logger.info(f"Found potential resume config YAML: {config_yaml_path}")
             can_resume_crawl = True
         else:
-            logger.info(f"No resume config YAML found in latest temp dir.")
+            logger.info("No resume config YAML found in latest temp dir.")
     else:
         logger.info("No existing temp directories tracked, cannot resume from YAML.")
 
@@ -448,20 +411,14 @@ def main():
                 else:
                     logger.debug("Could not parse stats from the latest log file.")
             else:
-                logger.debug(
-                    "No 'archive_*.combined.log' files found to parse stats from."
-                )
+                logger.debug("No 'archive_*.combined.log' files found to parse stats from.")
         except Exception as e:
-            logger.warning(
-                f"Error finding or parsing last log file: {e}", exc_info=True
-            )
+            logger.warning(f"Error finding or parsing last log file: {e}", exc_info=True)
 
     # Check for existing ZIM file and --overwrite flag
     final_zim_path = host_output_dir / f"{script_args.name}.zim"
     final_zim_exists = final_zim_path.exists()
-    logger.debug(
-        f"Checking for final ZIM file: {final_zim_path} (Exists: {final_zim_exists})"
-    )
+    logger.debug(f"Checking for final ZIM file: {final_zim_path} (Exists: {final_zim_exists})")
 
     logger.info("--- Initial Run Status Determination ---")
     last_status_str = ""
@@ -483,9 +440,7 @@ def main():
             )
             sys.exit(1)
         else:
-            logger.warning(
-                f"Target ZIM file exists and --overwrite specified: {final_zim_path}"
-            )
+            logger.warning(f"Target ZIM file exists and --overwrite specified: {final_zim_path}")
             logger.warning(
                 "Resetting persistent state values (temp dirs, adaptation counts) for a completely fresh crawl due to --overwrite."
             )
@@ -499,9 +454,7 @@ def main():
             initial_run_mode = "Fresh Crawl (Overwrite)"
     # Check resume/consolidate possibilities only if not overwriting
     elif can_resume_crawl:
-        logger.info(
-            f"Run Mode: RESUME crawl using configuration: {config_yaml_path.name}"
-        )
+        logger.info(f"Run Mode: RESUME crawl using configuration: {config_yaml_path.name}")
         logger.info(
             f"Will also use {warc_file_count} previously found WARC file(s) in final build."
         )
@@ -513,9 +466,7 @@ def main():
         logger.info(
             f"Run Mode: NEW crawl phase, but will consolidate {warc_file_count} previous WARC file(s)."
         )
-        logger.info(
-            "No valid resume configuration (.yaml) found to continue previous queue."
-        )
+        logger.info("No valid resume configuration (.yaml) found to continue previous queue.")
         logger.info(
             f"Current State: Workers={crawl_state.current_workers}, VPN Rotations={crawl_state.vpn_rotations_done}, Worker Reductions={crawl_state.worker_reductions_done}"
         )
@@ -547,9 +498,7 @@ def main():
 
     while stage_attempt <= max_crawl_stages and not stop_event.is_set():
         stage_name_with_attempt = f"{current_stage_name} - Attempt {stage_attempt}"
-        logger.info(
-            f"--- Starting Loop Iteration: Stage '{stage_name_with_attempt}' ---"
-        )
+        logger.info(f"--- Starting Loop Iteration: Stage '{stage_name_with_attempt}' ---")
         crawl_state.current_stage = stage_name_with_attempt
         crawl_state.stage_start_time = time.monotonic()  # Record stage start time
         extra_run_args = []  # Arguments specific to this run (e.g., --config)
@@ -560,20 +509,12 @@ def main():
             logger.debug("This is a Resume attempt. Need to find config YAML.")
             # Re-check for the latest YAML file path right before the attempt
             current_temp_dirs = crawl_state.get_temp_dir_paths()
-            current_latest_temp_dir = (
-                current_temp_dirs[-1] if current_temp_dirs else None
-            )
+            current_latest_temp_dir = current_temp_dirs[-1] if current_temp_dirs else None
             if current_latest_temp_dir:
-                config_yaml_path = utils.find_latest_config_yaml(
-                    current_latest_temp_dir
-                )
+                config_yaml_path = utils.find_latest_config_yaml(current_latest_temp_dir)
                 if config_yaml_path:
-                    logger.info(
-                        f"Found resume config YAML for this attempt: {config_yaml_path}"
-                    )
-                    container_yaml = utils.host_to_container_path(
-                        config_yaml_path, host_output_dir
-                    )
+                    logger.info(f"Found resume config YAML for this attempt: {config_yaml_path}")
+                    container_yaml = utils.host_to_container_path(config_yaml_path, host_output_dir)
                     if container_yaml:
                         extra_run_args = ["--config", container_yaml]
                         logger.info(f"Will use container config path: {container_yaml}")
@@ -587,21 +528,15 @@ def main():
                     logger.error(
                         "Resume requested for this stage, but could not find a valid config YAML file in the latest temp directory. Switching to 'New Crawl Phase'."
                     )
-                    current_stage_name = (
-                        "New Crawl Phase"  # Fallback if YAML disappears
-                    )
+                    current_stage_name = "New Crawl Phase"  # Fallback if YAML disappears
                     # Continue loop iteration to start as a new crawl phase
             else:
                 logger.error(
                     "Resume requested for this stage, but no temporary directory found. Switching to 'New Crawl Phase'."
                 )
-                current_stage_name = (
-                    "New Crawl Phase"  # Fallback if temp dir disappears
-                )
+                current_stage_name = "New Crawl Phase"  # Fallback if temp dir disappears
 
-        logger.debug(
-            f"Current worker count for this stage: {crawl_state.current_workers}"
-        )
+        logger.debug(f"Current worker count for this stage: {crawl_state.current_workers}")
         logger.debug(f"Base passthrough args: {zimit_passthrough_args}")
         logger.debug(f"Extra args for this run (e.g., --config): {extra_run_args}")
 
@@ -624,9 +559,7 @@ def main():
                 script_args.docker_image, host_output_dir, zimit_args, script_args.name
             )
             call_duration = time.monotonic() - start_container_time
-            logger.info(
-                f"Call to start_docker_container completed in {call_duration:.2f} seconds."
-            )
+            logger.info(f"Call to start_docker_container completed in {call_duration:.2f} seconds.")
         except Exception as e:
             logger.critical(
                 f"Unhandled exception during start_docker_container call: {e}",
@@ -703,18 +636,14 @@ def main():
             except Exception as e:
                 logger.error(f"Failed to start CrawlMonitor thread: {e}", exc_info=True)
                 # Continue without monitor? Or fail? Let's continue but warn heavily.
-                logger.warning(
-                    "Proceeding without monitoring due to thread start failure."
-                )
+                logger.warning("Proceeding without monitoring due to thread start failure.")
         elif not script_args.enable_monitoring:
             logger.info("Monitoring is disabled via script arguments.")
         elif not container_id:
             logger.warning("Cannot start monitor: Container ID was not identified.")
 
         # --- Inner Monitoring Loop (Runs while Docker process is alive) ---
-        logger.debug(
-            f"Entering inner monitoring loop for stage '{stage_name_with_attempt}'..."
-        )
+        logger.debug(f"Entering inner monitoring loop for stage '{stage_name_with_attempt}'...")
         last_print_time = 0
         print_interval_seconds = 60.0  # How often to print progress to console
         queue_check_timeout = 1.0  # How long to wait for monitor message
@@ -723,13 +652,9 @@ def main():
         stage_status = "running" if container_id else "running_no_monitor"
 
         while docker_process.poll() is None:
-            logger.log(
-                5, "Inner loop: Docker process still running."
-            )  # Trace level logging
+            logger.log(5, "Inner loop: Docker process still running.")  # Trace level logging
             if stop_event.is_set():
-                logger.warning(
-                    "Inner loop: Stop event detected. Breaking monitor loop."
-                )
+                logger.warning("Inner loop: Stop event detected. Breaking monitor loop.")
                 stage_status = "stopped"  # Mark status as stopped due to signal/event
                 break  # Exit inner loop
 
@@ -742,9 +667,7 @@ def main():
                         5, f"Inner loop: Received monitor message: {monitor_message}"
                     )  # Trace level
                 except Empty:
-                    logger.log(
-                        5, "Inner loop: No message from monitor queue."
-                    )  # Trace level
+                    logger.log(5, "Inner loop: No message from monitor queue.")  # Trace level
                     pass  # No message, continue loop
                 except Exception as e:
                     logger.error(
@@ -773,34 +696,22 @@ def main():
                     logger.warning(
                         f"Intervention Triggered! Condition: {event_status.upper()}, Reason: {event_reason}"
                     )
-                    adaptation_performed = (
-                        False  # Track if any adaptation strategy runs
-                    )
 
                     # --- Try Adaptive Strategies ---
                     logger.info("Attempting adaptive strategies...")
-                    adaptation_performed_type = (
-                        None  # Track *which* adaptation worked, if any
-                    )
+                    adaptation_performed_type = None  # Track *which* adaptation worked, if any
 
                     # 1. Try Worker Reduction (Requires Container Restart)
                     # Check this only if no adaptation has worked yet
-                    if (
-                        adaptation_performed_type is None
-                        and script_args.enable_adaptive_workers
-                    ):
+                    if adaptation_performed_type is None and script_args.enable_adaptive_workers:
                         logger.info("Attempting strategy: Worker Reduction")
                         try:
                             # Pass crawl_state and script_args
-                            if strategies.attempt_worker_reduction(
-                                crawl_state, script_args
-                            ):
+                            if strategies.attempt_worker_reduction(crawl_state, script_args):
                                 logger.info(
                                     "Worker reduction strategy SUCCESSFUL. Stopping current container to restart."
                                 )
-                                adaptation_performed_type = (
-                                    "worker_reduction"  # Mark which one
-                                )
+                                adaptation_performed_type = "worker_reduction"  # Mark which one
                                 stage_status = "stopped_for_adaptation"
                                 # Break inner loop ONLY for adaptations requiring restart
                                 break  # EXIT INNER LOOP
@@ -816,10 +727,7 @@ def main():
 
                     # 2. Try VPN Rotation (Does NOT require Container Restart Anymore)
                     # Check this only if no adaptation has worked yet
-                    if (
-                        adaptation_performed_type is None
-                        and script_args.enable_vpn_rotation
-                    ):
+                    if adaptation_performed_type is None and script_args.enable_vpn_rotation:
                         logger.info("Attempting strategy: VPN Rotation (Live)")
                         try:
                             # Pass crawl_state and script_args
@@ -829,9 +737,7 @@ def main():
                                 logger.info(
                                     "VPN rotation (Live) strategy SUCCESSFUL. Container continues running."
                                 )
-                                adaptation_performed_type = (
-                                    "vpn_rotation"  # Mark which one
-                                )
+                                adaptation_performed_type = "vpn_rotation"  # Mark which one
                                 # === IMPORTANT: DO NOT BREAK ===
                                 # Let the inner loop continue running
                             else:
@@ -847,9 +753,7 @@ def main():
                     # --- Handle Outcome Based on Adaptation Type ---
                     if adaptation_performed_type == "worker_reduction":
                         # Action already taken (break above), log is just for clarity
-                        logger.debug(
-                            "Worker reduction requires restart, inner loop broken."
-                        )
+                        logger.debug("Worker reduction requires restart, inner loop broken.")
                         pass  # Loop will exit due to break above
 
                     elif adaptation_performed_type == "vpn_rotation":
@@ -897,19 +801,13 @@ def main():
                             # Let the loop continue; if the condition persists, it will trigger again.
 
                 elif event_status == "error" and "message" in monitor_message:
-                    logger.error(
-                        f"Monitor thread reported an error: {monitor_message['message']}"
-                    )
+                    logger.error(f"Monitor thread reported an error: {monitor_message['message']}")
                     # Consider if this should cause the stage to fail? For now, just log it.
 
             # --- Periodic Progress Printing ---
             now = time.monotonic()
-            if script_args.enable_monitoring and (
-                now - last_print_time > print_interval_seconds
-            ):
-                if (
-                    crawl_state.last_crawled_count >= 0
-                ):  # Only print if we have valid stats
+            if script_args.enable_monitoring and (now - last_print_time > print_interval_seconds):
+                if crawl_state.last_crawled_count >= 0:  # Only print if we have valid stats
                     try:
                         stage_elapsed_str = format_duration(
                             now - (crawl_state.stage_start_time or now)
@@ -967,17 +865,11 @@ def main():
                             exc_info=False,
                         )  # Avoid spamming logs
                 else:
-                    logger.debug(
-                        "Skipping progress print: initial stats not yet received."
-                    )
-                    last_print_time = (
-                        now  # Update time anyway to avoid spamming this message
-                    )
+                    logger.debug("Skipping progress print: initial stats not yet received.")
+                    last_print_time = now  # Update time anyway to avoid spamming this message
 
         # --- End Inner Monitoring Loop (Docker process exited or loop broken) ---
-        logger.debug(
-            f"Exited inner monitoring loop for stage '{stage_name_with_attempt}'."
-        )
+        logger.debug(f"Exited inner monitoring loop for stage '{stage_name_with_attempt}'.")
 
         print()  # Ensure newline after final progress print or if loop breaks suddenly
         logger.info(f"Processing end of stage '{stage_name_with_attempt}'...")
@@ -989,15 +881,11 @@ def main():
             try:
                 active_monitor.join(timeout=5.0)  # Wait for thread to finish
                 if active_monitor.is_alive():
-                    logger.warning(
-                        "CrawlMonitor thread did not stop gracefully within timeout."
-                    )
+                    logger.warning("CrawlMonitor thread did not stop gracefully within timeout.")
                 else:
                     logger.info("CrawlMonitor thread stopped.")
             except Exception as e_join:
-                logger.error(
-                    f"Error joining CrawlMonitor thread: {e_join}", exc_info=True
-                )
+                logger.error(f"Error joining CrawlMonitor thread: {e_join}", exc_info=True)
         elif active_monitor:
             logger.debug("CrawlMonitor thread was already stopped.")
         else:
@@ -1018,9 +906,7 @@ def main():
                 logger.error(
                     "Docker process still seems to be running unexpectedly after monitoring loop!? Forcing status to 'failed'."
                 )
-                stage_status = (
-                    "failed"  # Override status if process didn't terminate as expected
-                )
+                stage_status = "failed"  # Override status if process didn't terminate as expected
                 # Attempt to terminate it again forcefully? Handled by signal handler mostly.
         crawl_state.exit_code = final_rc
         logger.info(
@@ -1040,23 +926,17 @@ def main():
         )
         if log_files:
             latest_stage_log = log_files[0]
-            logger.debug(
-                f"Trying to parse temp dir from latest log: {latest_stage_log}"
-            )
+            logger.debug(f"Trying to parse temp dir from latest log: {latest_stage_log}")
             temp_dir_host_path = utils.parse_temp_dir_from_log_file(
                 latest_stage_log, host_output_dir
             )
 
         if not temp_dir_host_path:
-            logger.warning(
-                "Could not parse temp dir from logs, falling back to directory scan."
-            )
+            logger.warning("Could not parse temp dir from logs, falling back to directory scan.")
             temp_dir_host_path = utils.find_latest_temp_dir_fallback(host_output_dir)
 
         if temp_dir_host_path:
-            logger.info(
-                f"Identified temp directory for this stage: {temp_dir_host_path}"
-            )
+            logger.info(f"Identified temp directory for this stage: {temp_dir_host_path}")
             crawl_state.add_temp_dir(temp_dir_host_path)  # Adds to state and saves
         else:
             # This is problematic if the stage should have created one
@@ -1073,9 +953,7 @@ def main():
             "running_no_monitor",
         ]:  # If loop finished because process exited normally
             if final_rc == 0:
-                logger.info(
-                    "Docker process finished with RC 0. Marking stage as SUCCESS."
-                )
+                logger.info("Docker process finished with RC 0. Marking stage as SUCCESS.")
                 stage_status = "success"
             elif final_rc in constants.ACCEPTABLE_CRAWLER_EXIT_CODES:
                 logger.warning(
@@ -1092,9 +970,7 @@ def main():
                 f"Stage '{stage_name_with_attempt}' was stopped by external signal/event."
             )
         elif stage_status == "stopped_for_adaptation":
-            logger.info(
-                f"Stage '{stage_name_with_attempt}' was stopped internally for adaptation."
-            )
+            logger.info(f"Stage '{stage_name_with_attempt}' was stopped internally for adaptation.")
         # else: stage_status already set to 'failed' if intervention failed etc.
 
         # --- Decide Next Action Based on Stage Status ---
@@ -1110,13 +986,9 @@ def main():
             logger.info(
                 f"Stage '{stage_name_with_attempt}' stopped for adaptation. Will attempt to resume."
             )
-            current_stage_name = (
-                "Resume Crawl"  # Ensure next stage is explicitly resume
-            )
+            current_stage_name = "Resume Crawl"  # Ensure next stage is explicitly resume
             # Do NOT increment stage_attempt, we are retrying the *same logical step* after adaptation
-            logger.info(
-                f"Next stage will be '{current_stage_name}' (Attempt {stage_attempt})."
-            )
+            logger.info(f"Next stage will be '{current_stage_name}' (Attempt {stage_attempt}).")
             # Optional: Apply backoff delay even after successful adaptation?
             backoff_minutes = script_args.backoff_delay_minutes
             if backoff_minutes > 0:
@@ -1147,16 +1019,12 @@ def main():
                 final_status = "failed_max_attempts"
                 break  # Exit outer loop
             else:
-                logger.info(
-                    "Attempting to recover by trying a 'Resume Crawl' in the next stage."
-                )
+                logger.info("Attempting to recover by trying a 'Resume Crawl' in the next stage.")
                 current_stage_name = (
                     "Resume Crawl"  # Try resuming even if previous stage wasn't resume
                 )
                 stage_attempt += 1  # Increment attempt counter
-                logger.info(
-                    f"Next stage will be '{current_stage_name}' (Attempt {stage_attempt})."
-                )
+                logger.info(f"Next stage will be '{current_stage_name}' (Attempt {stage_attempt}).")
                 # Apply backoff delay after failure
                 backoff_minutes = script_args.backoff_delay_minutes
                 if backoff_minutes > 0:
@@ -1182,10 +1050,7 @@ def main():
     # --- Stage 3: Final WARC Consolidation ---
     logger.info("Step 5: Checking if Final WARC Consolidation is needed")
     if final_status == "pending_final_build" and not stop_event.is_set():
-        logger.info(
-            "Crawl/Resume phase successful. Proceeding to final WARC consolidation stage."
-        )
-        final_build_start_time = time.monotonic()
+        logger.info("Crawl/Resume phase successful. Proceeding to final WARC consolidation stage.")
 
         logger.info("Finding all WARC files from all tracked temporary directories...")
         warc_host_paths = utils.find_all_warc_files(crawl_state.get_temp_dir_paths())
@@ -1216,17 +1081,11 @@ def main():
                 final_status = "failed_warc_path_conversion"
             else:
                 container_warc_paths_str = ",".join(container_warc_paths)
-                logger.debug(
-                    f"Comma-separated container WARC paths: {container_warc_paths_str}"
-                )
+                logger.debug(f"Comma-separated container WARC paths: {container_warc_paths_str}")
 
                 logger.info("Filtering passthrough arguments for final build...")
-                final_build_base_args = utils.filter_args_for_final_run(
-                    zimit_passthrough_args
-                )
-                logger.debug(
-                    f"Filtered base args for final build: {final_build_base_args}"
-                )
+                final_build_base_args = utils.filter_args_for_final_run(zimit_passthrough_args)
+                logger.debug(f"Filtered base args for final build: {final_build_base_args}")
 
                 extra_args_final = ["--warcs", container_warc_paths_str]
                 # Required args for the build stage function are just 'name'
@@ -1243,9 +1102,7 @@ def main():
                     required_args=final_required_args,  # Pass just name
                     extra_args=extra_args_final,  # Pass --warcs list
                 )
-                final_status = (
-                    build_status  # Update overall status based on build result
-                )
+                final_status = build_status  # Update overall status based on build result
 
                 # Add the temp dir from the final build stage to state for potential cleanup
                 if final_build_temp_dir:
@@ -1256,9 +1113,7 @@ def main():
 
     elif stop_event.is_set():
         logger.warning("Skipping final build stage because stop event was set.")
-        if (
-            final_status == "pending_final_build"
-        ):  # If we were going to build but got stopped
+        if final_status == "pending_final_build":  # If we were going to build but got stopped
             final_status = "stopped"
     else:  # Crawl/Resume loop failed or was stopped before reaching success
         logger.error(
@@ -1290,14 +1145,12 @@ def main():
             logger.info(f"Final ZIM file should be available at: {final_zim_path}")
             try:
                 logger.info(
-                    f"ZIM File Size: {final_zim_path.stat().st_size / (1024*1024):.2f} MB"
+                    f"ZIM File Size: {final_zim_path.stat().st_size / (1024 * 1024):.2f} MB"
                 )
             except Exception:
                 pass
         else:
-            logger.warning(
-                "Success reported, but final ZIM file check failed post-build!"
-            )
+            logger.warning("Success reported, but final ZIM file check failed post-build!")
 
         if script_args.cleanup:
             logger.info(
@@ -1313,9 +1166,7 @@ def main():
         logger.info("--- Archiver Finished ---")
         sys.exit(0)  # Exit with success code
     else:
-        logger.error(
-            f"Overall process FAILED or was STOPPED (Final Status: {final_status})."
-        )
+        logger.error(f"Overall process FAILED or was STOPPED (Final Status: {final_status}).")
         logger.info("Temporary files and state have been kept for debugging:")
         for p in temp_dir_paths:
             logger.info(f"  - Temp Dir: {p}")
@@ -1329,14 +1180,10 @@ def main():
 if __name__ == "__main__":
     # Setup logging basic config here temporarily for potential early errors
     # before main() fully configures it based on args
-    logging.basicConfig(
-        level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
-    )
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
     try:
         main()
     except Exception as e:
-        logger.critical(
-            f"A critical unhandled exception occurred in main: {e}", exc_info=True
-        )
+        logger.critical(f"A critical unhandled exception occurred in main: {e}", exc_info=True)
         logger.critical(traceback.format_exc())
         sys.exit(2)  # Different exit code for uncaught exception

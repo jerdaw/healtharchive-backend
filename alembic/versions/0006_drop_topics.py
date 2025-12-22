@@ -59,4 +59,3 @@ def downgrade() -> None:
             primary_key=True,
         ),
     )
-

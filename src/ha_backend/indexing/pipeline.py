@@ -6,16 +6,22 @@ from pathlib import Path
 from sqlalchemy import inspect
 from sqlalchemy.orm import Session
 
-from ha_backend.archive_storage import (compute_job_storage_stats,
-                                        consolidate_warcs, get_job_warcs_dir)
+from ha_backend.archive_storage import (
+    compute_job_storage_stats,
+    consolidate_warcs,
+    get_job_warcs_dir,
+)
 from ha_backend.authority import recompute_page_signals
 from ha_backend.db import get_session
 from ha_backend.indexing.mapping import record_to_snapshot
-from ha_backend.indexing.text_extraction import (detect_language, extract_text,
-                                                 extract_outlink_groups,
-                                                 extract_title, make_snippet)
-from ha_backend.indexing.warc_discovery import (discover_temp_warcs_for_job,
-                                                discover_warcs_for_job)
+from ha_backend.indexing.text_extraction import (
+    detect_language,
+    extract_outlink_groups,
+    extract_text,
+    extract_title,
+    make_snippet,
+)
+from ha_backend.indexing.warc_discovery import discover_temp_warcs_for_job, discover_warcs_for_job
 from ha_backend.indexing.warc_reader import iter_html_records
 from ha_backend.models import ArchiveJob, Snapshot, SnapshotOutlink
 
@@ -47,9 +53,7 @@ def index_job(job_id: int) -> int:
         has_pages = inspector.has_table("pages")
 
         if job.source is None:
-            raise ValueError(
-                f"ArchiveJob {job_id} has no associated Source; cannot index."
-            )
+            raise ValueError(f"ArchiveJob {job_id} has no associated Source; cannot index.")
 
         if job.status not in ("completed", "index_failed", "indexed"):
             raise ValueError(
@@ -71,8 +75,7 @@ def index_job(job_id: int) -> int:
         output_dir = output_dir.resolve()
         stable_warcs_dir = get_job_warcs_dir(output_dir)
         stable_present = stable_warcs_dir.is_dir() and (
-            any(stable_warcs_dir.rglob("*.warc.gz"))
-            or any(stable_warcs_dir.rglob("*.warc"))
+            any(stable_warcs_dir.rglob("*.warc.gz")) or any(stable_warcs_dir.rglob("*.warc"))
         )
         if not stable_present:
             temp_warcs = discover_temp_warcs_for_job(job)
@@ -103,17 +106,13 @@ def index_job(job_id: int) -> int:
         job.warc_file_count = len(warc_paths)
 
         if not warc_paths:
-            logger.warning(
-                "No WARC files discovered for job %s in %s", job_id, output_dir
-            )
+            logger.warning("No WARC files discovered for job %s in %s", job_id, output_dir)
             job.status = "index_failed"
             return 1
 
         # Mark job as indexing and clear any prior snapshots for this job to
         # make the operation idempotent.
-        logger.info(
-            "Starting indexing for job %s (%d WARC file(s))", job_id, len(warc_paths)
-        )
+        logger.info("Starting indexing for job %s (%d WARC file(s))", job_id, len(warc_paths))
 
         impacted_groups: set[str] = set()
         impacted_page_groups: set[str] = set()
@@ -139,9 +138,7 @@ def index_job(job_id: int) -> int:
                 SnapshotOutlink.snapshot_id.in_(snapshot_ids_subq)
             ).delete(synchronize_session=False)
 
-        session.query(Snapshot).filter(Snapshot.job_id == job.id).delete(
-            synchronize_session=False
-        )
+        session.query(Snapshot).filter(Snapshot.job_id == job.id).delete(synchronize_session=False)
         job.indexed_page_count = 0
         job.status = "indexing"
 
@@ -222,7 +219,7 @@ def index_job(job_id: int) -> int:
                 from ha_backend.pages import rebuild_pages
 
                 session.flush()
-                result = rebuild_pages(
+                pages_result = rebuild_pages(
                     session,
                     source_id=job.source_id,
                     groups=tuple(sorted(impacted_page_groups)),
@@ -230,8 +227,8 @@ def index_job(job_id: int) -> int:
                 )
                 logger.info(
                     "Rebuilt %d page group(s) (deleted %d) for job %s.",
-                    result.upserted_groups,
-                    result.deleted_groups,
+                    pages_result.upserted_groups,
+                    pages_result.deleted_groups,
                     job_id,
                 )
 

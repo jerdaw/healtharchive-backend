@@ -7,14 +7,12 @@ from sqlalchemy import (
     JSON,
     BigInteger,
     Boolean,
-    Column,
     Date,
     DateTime,
     Float,
     ForeignKey,
     Integer,
     String,
-    Table,
     Text,
     UniqueConstraint,
     text,
@@ -172,9 +170,7 @@ class ArchiveJob(TimestampMixin, Base):
         nullable=False,
         server_default=text("0"),
     )
-    storage_scanned_at: Mapped[Optional[datetime]] = mapped_column(
-        DateTime(timezone=True)
-    )
+    storage_scanned_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
 
     cleanup_status: Mapped[str] = mapped_column(
         String(50),
@@ -357,9 +353,7 @@ class SnapshotChange(TimestampMixin, Base):
         index=True,
     )
 
-    from_capture_timestamp: Mapped[Optional[datetime]] = mapped_column(
-        DateTime(timezone=True)
-    )
+    from_capture_timestamp: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     to_capture_timestamp: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True),
         index=True,
@@ -435,12 +429,8 @@ class Page(TimestampMixin, Base):
     )
     normalized_url_group: Mapped[str] = mapped_column(Text, nullable=False)
 
-    first_capture_timestamp: Mapped[Optional[datetime]] = mapped_column(
-        DateTime(timezone=True)
-    )
-    last_capture_timestamp: Mapped[Optional[datetime]] = mapped_column(
-        DateTime(timezone=True)
-    )
+    first_capture_timestamp: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    last_capture_timestamp: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     snapshot_count: Mapped[int] = mapped_column(
         Integer,
         nullable=False,

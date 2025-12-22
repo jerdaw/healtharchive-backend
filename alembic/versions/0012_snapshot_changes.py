@@ -152,17 +152,11 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     op.drop_index("ix_snapshot_changes_change_type", table_name="snapshot_changes")
-    op.drop_index(
-        "ix_snapshot_changes_to_capture_timestamp", table_name="snapshot_changes"
-    )
+    op.drop_index("ix_snapshot_changes_to_capture_timestamp", table_name="snapshot_changes")
     op.drop_index("ix_snapshot_changes_to_job_id", table_name="snapshot_changes")
     op.drop_index("ix_snapshot_changes_from_job_id", table_name="snapshot_changes")
     op.drop_index("ix_snapshot_changes_to_snapshot_id", table_name="snapshot_changes")
-    op.drop_index(
-        "ix_snapshot_changes_from_snapshot_id", table_name="snapshot_changes"
-    )
-    op.drop_index(
-        "ix_snapshot_changes_normalized_url_group", table_name="snapshot_changes"
-    )
+    op.drop_index("ix_snapshot_changes_from_snapshot_id", table_name="snapshot_changes")
+    op.drop_index("ix_snapshot_changes_normalized_url_group", table_name="snapshot_changes")
     op.drop_index("ix_snapshot_changes_source_id", table_name="snapshot_changes")
     op.drop_table("snapshot_changes")

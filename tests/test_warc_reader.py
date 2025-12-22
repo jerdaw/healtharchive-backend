@@ -41,4 +41,3 @@ def test_iter_html_records_parses_iso8601_warc_date(tmp_path: Path) -> None:
 
     rec = next(iter_html_records(warc_file))
     assert rec.capture_timestamp == datetime(2025, 1, 1, 12, 0, tzinfo=timezone.utc)
-

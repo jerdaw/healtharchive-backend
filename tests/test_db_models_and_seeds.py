@@ -100,8 +100,5 @@ def test_model_roundtrip_relationships(tmp_path, monkeypatch) -> None:
         loaded_snapshot = loaded_job.snapshots[0]
         assert loaded_snapshot.url == "https://example.org/page"
         # SQLite stores timezone-aware datetimes as naive; normalise before comparing.
-        assert (
-            loaded_snapshot.capture_timestamp.replace(tzinfo=timezone.utc)
-            == captured_at
-        )
+        assert loaded_snapshot.capture_timestamp.replace(tzinfo=timezone.utc) == captured_at
         assert loaded_snapshot.source is loaded_source

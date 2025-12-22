@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 import sys
 from datetime import datetime, timezone
 from io import StringIO
@@ -130,7 +131,7 @@ def test_replay_reconcile_apply_calls_replay_index_job(tmp_path, monkeypatch) ->
 
     calls: list[int] = []
 
-    def fake_replay_index_job(args) -> None:  # type: ignore[no-untyped-def]
+    def fake_replay_index_job(args: argparse.Namespace) -> None:
         calls.append(int(args.id))
 
     monkeypatch.setattr(cli_module, "cmd_replay_index_job", fake_replay_index_job)
@@ -215,7 +216,7 @@ def test_replay_reconcile_previews_apply_calls_generator(tmp_path, monkeypatch) 
 
     calls: list[list[str]] = []
 
-    def fake_generate_previews(args) -> None:  # type: ignore[no-untyped-def]
+    def fake_generate_previews(args: argparse.Namespace) -> None:
         calls.append(list(args.source or []))
 
     monkeypatch.setattr(cli_module, "cmd_replay_generate_previews", fake_generate_previews)
@@ -242,4 +243,3 @@ def test_replay_reconcile_previews_apply_calls_generator(tmp_path, monkeypatch) 
 
     assert calls == [["hc"]]
     assert "Replay indexing status" in out
-

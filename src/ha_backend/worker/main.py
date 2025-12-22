@@ -86,9 +86,7 @@ def _process_single_job() -> bool:
             return True
 
         # If we reach here, crawl succeeded and job.status should be 'completed'.
-        logger.info(
-            "Crawl for job %s completed successfully; starting indexing.", job_id
-        )
+        logger.info("Crawl for job %s completed successfully; starting indexing.", job_id)
 
     # Run indexing phase.
     index_rc = index_job(job_id)
@@ -100,9 +98,7 @@ def _process_single_job() -> bool:
     return True
 
 
-def run_worker_loop(
-    poll_interval: int = DEFAULT_POLL_INTERVAL, run_once: bool = False
-) -> None:
+def run_worker_loop(poll_interval: int = DEFAULT_POLL_INTERVAL, run_once: bool = False) -> None:
     """
     Main worker loop.
 
@@ -110,9 +106,7 @@ def run_worker_loop(
         poll_interval: Seconds to sleep between polls when no work is found.
         run_once: If True, perform a single iteration and return.
     """
-    logger.info(
-        "Worker starting (poll_interval=%s, run_once=%s).", poll_interval, run_once
-    )
+    logger.info("Worker starting (poll_interval=%s, run_once=%s).", poll_interval, run_once)
 
     try:
         while True:
@@ -126,9 +120,7 @@ def run_worker_loop(
                 break
 
             if not processed:
-                logger.info(
-                    "No queued jobs found; sleeping for %s seconds.", poll_interval
-                )
+                logger.info("No queued jobs found; sleeping for %s seconds.", poll_interval)
                 time.sleep(poll_interval)
     except KeyboardInterrupt:  # pragma: no cover - manual interruption
         logger.info("Worker interrupted by user; shutting down.")

@@ -15,9 +15,7 @@ def test_build_command_includes_core_args_and_cleanup(monkeypatch) -> None:
         archive_tool_cmd = "dummy-archive-tool"
         archive_root = Path("/tmp/archive-root")
 
-    monkeypatch.setattr(
-        "ha_backend.jobs.get_archive_tool_config", lambda: DummyCfg()
-    )
+    monkeypatch.setattr("ha_backend.jobs.get_archive_tool_config", lambda: DummyCfg())
 
     job = RuntimeArchiveJob(
         name="testjob",
@@ -65,9 +63,7 @@ def test_build_command_includes_overwrite_flag_when_set(monkeypatch) -> None:
         archive_tool_cmd = "dummy-archive-tool"
         archive_root = Path("/tmp/archive-root")
 
-    monkeypatch.setattr(
-        "ha_backend.jobs.get_archive_tool_config", lambda: DummyCfg()
-    )
+    monkeypatch.setattr("ha_backend.jobs.get_archive_tool_config", lambda: DummyCfg())
 
     job = RuntimeArchiveJob(
         name="overwrite-job",
@@ -87,4 +83,3 @@ def test_build_command_includes_overwrite_flag_when_set(monkeypatch) -> None:
     assert cmd[0] == "dummy-archive-tool"
     assert "--cleanup" not in cmd
     assert "--overwrite" in cmd
-

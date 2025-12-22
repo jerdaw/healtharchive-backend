@@ -66,7 +66,11 @@ def test_schedule_annual_apply_creates_jobs_ordered_and_labeled(tmp_path, monkey
         jobs = session.query(ArchiveJob).order_by(ArchiveJob.id).all()
 
         assert len(jobs) == 3
-        assert [job.source.code for job in jobs] == ["hc", "phac", "cihr"]
+        source_codes = []
+        for job in jobs:
+            assert job.source is not None
+            source_codes.append(job.source.code)
+        assert source_codes == ["hc", "phac", "cihr"]
         assert [job.name for job in jobs] == [
             "hc-20270101",
             "phac-20270101",
@@ -119,10 +123,12 @@ def test_schedule_annual_skips_source_with_active_job(tmp_path, monkeypatch) -> 
         jobs = session.query(ArchiveJob).order_by(ArchiveJob.id).all()
 
         assert len(jobs) == 3
-        annual_jobs = [
-            j for j in jobs if (j.config or {}).get("campaign_kind") == "annual"
-        ]
-        assert {j.source.code for j in annual_jobs} == {"phac", "cihr"}
+        annual_jobs = [j for j in jobs if (j.config or {}).get("campaign_kind") == "annual"]
+        annual_codes = set()
+        for job in annual_jobs:
+            assert job.source is not None
+            annual_codes.add(job.source.code)
+        assert annual_codes == {"phac", "cihr"}
 
 
 def test_schedule_annual_respects_max_create_per_run(tmp_path, monkeypatch) -> None:
@@ -138,5 +144,6 @@ def test_schedule_annual_respects_max_create_per_run(tmp_path, monkeypatch) -> N
         jobs = session.query(ArchiveJob).order_by(ArchiveJob.id).all()
 
         assert len(jobs) == 1
+        assert jobs[0].source is not None
         assert jobs[0].source.code == "hc"
         assert jobs[0].name == "hc-20270101"

@@ -7,12 +7,10 @@ from typing import Any, Dict, Iterable, List, Optional
 
 from sqlalchemy.orm import Session
 
-from .archive_contract import (ArchiveJobConfig, ArchiveToolOptions,
-                               validate_tool_options)
+from .archive_contract import ArchiveJobConfig, ArchiveToolOptions, validate_tool_options
 from .config import get_archive_tool_config
 from .models import ArchiveJob as ORMArchiveJob
 from .models import Source
-
 
 HC_CANADA_CA_SCOPE_INCLUDE_RX = (
     r"^https://www[.]canada[.]ca/"

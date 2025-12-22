@@ -8,9 +8,9 @@ Create Date: 2025-12-14 00:00:00
 from __future__ import annotations
 
 import sqlalchemy as sa
+from sqlalchemy.dialects import postgresql
 
 from alembic import op
-from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision = "0003_snapshot_search_vector"
@@ -48,4 +48,3 @@ def downgrade() -> None:
     if dialect_name == "postgresql":
         op.drop_index("ix_snapshots_search_vector", table_name="snapshots")
     op.drop_column("snapshots", "search_vector")
-

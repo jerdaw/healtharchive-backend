@@ -8,7 +8,7 @@ from ha_backend import cli as cli_module
 from ha_backend import db as db_module
 from ha_backend.db import Base, get_engine, get_session
 from ha_backend.job_registry import create_job_for_source
-from ha_backend.models import ArchiveJob, Source
+from ha_backend.models import ArchiveJob
 from ha_backend.seeds import seed_sources
 
 
