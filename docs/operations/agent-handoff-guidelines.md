@@ -14,4 +14,4 @@ Related docs:
 - `docs/operations/automation-verification-rituals.md`
 - `docs/operations/dataset-release-runbook.md`
 - `docs/operations/risk-register.md`
-- `docs/operations/healtharchive-upgrade-plan.md` (todo list)
+- `docs/operations/healtharchive-ops-roadmap.md` (todo list)
