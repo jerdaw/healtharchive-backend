@@ -2,9 +2,9 @@
 
 This file is **only** the remaining todo list.
 
-For the full internal reference (decisions, guardrails, and background), see:
+For the full roadmap history and background, see:
 
-- `docs/operations/healtharchive-upgrade-reference.md`
+- `docs/roadmaps/healtharchive-upgrade-2025.md` (backend repo)
 
 ## Recurring ops (non-IRL, ongoing)
 
