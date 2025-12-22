@@ -20,7 +20,7 @@ Keep documentation accurate, minimal, and easy to maintain across repos.
 -   Update the relevant docs index (`docs/README.md` or `docs/operations/README.md`).
 -   Avoid "phase" labels outside `docs/roadmaps` and explicit implementation plans; use "step" or "milestone".
 -   Keep public copy public-safe (no secrets, private emails, or internal IPs).
--   If you sync your workspace via Syncthing, treat `.stignore` as “sync ignore” (like `.gitignore`) and ensure it excludes build artifacts and local secrets (e.g., `.env*`, `.venv/`, `node_modules/`).
+-   If you sync your workspace via Syncthing, treat `.stignore` as “sync ignore” (like `.gitignore`) and ensure it excludes build artifacts and machine-local dev artifacts (e.g., `.venv/`, `node_modules/`, `.dev-archive-root/`). Secrets may sync via Syncthing, but must remain git-ignored.
 
 ## Naming and organization
 
