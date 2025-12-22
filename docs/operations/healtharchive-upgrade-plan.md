@@ -31,14 +31,14 @@ Status: **active roadmap** (Phases 0–6 implemented (core); remaining work is m
 - Restore test logging: **`/srv/healtharchive/ops/restore-tests/`** (private VPS ops directory; public-safe Markdown entries)
 - First restore test completed: **2025-12-22** (Pass; log file `restore-test-2025-12-22.md`)
 - Production timers (record what is enabled today):
-  - Change tracking: **TBD** (expected: enabled when `/etc/healtharchive/change-tracking-enabled` exists)
-  - Annual scheduling: **TBD** (gated by `/etc/healtharchive/automation-enabled`)
-  - Replay reconcile: **TBD** (gated by `/etc/healtharchive/replay-automation-enabled`; only if replay enabled/stable)
-  - Annual search verification capture: **TBD** (optional)
+  - Change tracking: **Enabled** (`healtharchive-change-tracking.timer`; gated by `/etc/healtharchive/change-tracking-enabled`)
+  - Annual scheduling: **Enabled** (`healtharchive-schedule-annual.timer`; gated by `/etc/healtharchive/automation-enabled`)
+  - Replay reconcile: **Enabled** (`healtharchive-replay-reconcile.timer`; gated by `/etc/healtharchive/replay-automation-enabled`; replay base URL configured)
+  - Annual search verification capture: **Enabled** (`healtharchive-annual-search-verify.timer`)
 **Next steps (small, safe, sequential)**
 
-1) Run systemd dry-runs and decide whether to enable annual scheduling and/or replay reconcile timers (Phase 6).
-2) Record which production timers are enabled (update this tracker).
+1) Confirm the last few runs of `healtharchive-change-tracking.service` are succeeding (not just dry-runs).
+2) Decide whether you want “keepalive” commits to prevent GitHub Actions schedule auto-disable in `jerdaw/healtharchive-datasets`.
 3) Do Phase 4 outreach: secure 1 partner link + 1 verifier (with permission to name them), and start the mentions log discipline.
 
 ## Production Toggles / Enablement (what must be set on the VPS)
