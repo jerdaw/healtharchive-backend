@@ -2069,7 +2069,7 @@ Stretch goals:
 - Methods note outline published: `healtharchive-backend/docs/operations/phase-5-methods-note-outline.md`.
 - Export env toggles documented (`HEALTHARCHIVE_EXPORTS_ENABLED`, defaults, and limits).
 
-Remaining Phase 5 work: dataset release cadence + external research adoption.
+Remaining Phase 5 work: keep quarterly dataset releases running + track external research adoption signals.
 
 ---
 
@@ -2127,7 +2127,7 @@ explicit and sustainable.
 - Systemd deployment guide updated with Phase 6 enablement guidance.
 - Deploy helper now retries health checks during restarts to avoid transient false negatives: `scripts/vps-deploy.sh`.
 
-Remaining Phase 6 work: enable/confirm automation timers (annual scheduling, replay reconcile) where desired, and execute the first quarterly restore test with a logged result.
+Remaining Phase 6 work: enable/confirm automation timers (annual scheduling, replay reconcile) where desired, and keep quarterly restore tests running with logged results.
 
 ### Phase 6 Implementation Plan (Detailed; sub-phases)
 
