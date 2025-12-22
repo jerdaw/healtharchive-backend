@@ -18,7 +18,7 @@ Status: **active roadmap** (Phases 0–6 implemented (core); remaining work is m
 
 - Phase 4: secure 1+ distribution partner and 1+ verifier (with permission to name them)
 - Phase 5: keep quarterly dataset releases running via `jerdaw/healtharchive-datasets`; track real external research adoption
-- Phase 6: decide/enable annual scheduling + replay reconcile timers (if desired), and keep quarterly restore tests running
+- Phase 6: keep automation + restore-test discipline running (and record results)
 
 **Decision tracker (update as you go; keep public-safe)**
 
@@ -28,8 +28,10 @@ Status: **active roadmap** (Phases 0–6 implemented (core); remaining work is m
 - Dataset release tag format: **`healtharchive-dataset-YYYY-MM-DD`**
 - Dataset release artifacts: **`healtharchive-snapshots.jsonl.gz`, `healtharchive-changes.jsonl.gz`, `manifest.json`, `SHA256SUMS`** (no CSV)
 - First dataset release published: **2025-12-22** (`healtharchive-dataset-2025-12-22`)
+- Dataset workflow keepalive: **Enabled** (weekly keepalive to avoid GitHub schedule auto-disable)
 - Restore test logging: **`/srv/healtharchive/ops/restore-tests/`** (private VPS ops directory; public-safe Markdown entries)
 - First restore test completed: **2025-12-22** (Pass; log file `restore-test-2025-12-22.md`)
+- Adoption signals log: **`/srv/healtharchive/ops/adoption/`** (private VPS ops directory; public-safe; quarterly)
 - Production timers (record what is enabled today):
   - Change tracking: **Enabled** (`healtharchive-change-tracking.timer`; gated by `/etc/healtharchive/change-tracking-enabled`)
   - Annual scheduling: **Enabled** (`healtharchive-schedule-annual.timer`; gated by `/etc/healtharchive/automation-enabled`)
@@ -37,8 +39,8 @@ Status: **active roadmap** (Phases 0–6 implemented (core); remaining work is m
   - Annual search verification capture: **Enabled** (`healtharchive-annual-search-verify.timer`)
 **Next steps (small, safe, sequential)**
 
-1) Confirm the last few runs of `healtharchive-change-tracking.service` are succeeding (not just dry-runs).
-2) Decide whether you want “keepalive” commits to prevent GitHub Actions schedule auto-disable in `jerdaw/healtharchive-datasets`.
+1) Create the first quarterly adoption log entry at `/srv/healtharchive/ops/adoption/` (public-safe; links + aggregates only).
+2) Keep quarterly dataset releases running (confirm GitHub Actions workflows are enabled in `jerdaw/healtharchive-datasets`).
 3) Do Phase 4 outreach: secure 1 partner link + 1 verifier (with permission to name them), and start the mentions log discipline.
 
 ## Production Toggles / Enablement (what must be set on the VPS)
