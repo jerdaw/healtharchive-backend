@@ -5,12 +5,12 @@ These files are **templates** meant to be copied onto the production VPS under
 
 They implement:
 
-- Phase 5: annual scheduling timer (Jan 01 UTC)
-- Phase 6: worker priority lowering during campaign (always-on, low-risk)
-- Phase 8: replay reconciliation timer (pywb indexing; capped)
-- Phase 3: change tracking timer (edition-aware diffs; capped)
-- Phase 4: optional "timer ran" pings (Healthchecks-style)
-- Phase 5 (ops): annual search verification capture (optional, safe)
+- Annual scheduling timer (Jan 01 UTC)
+- Worker priority lowering during campaign (always-on, low-risk)
+- Replay reconciliation timer (pywb indexing; capped)
+- Change tracking timer (edition-aware diffs; capped)
+- Optional "timer ran" pings (Healthchecks-style)
+- Annual search verification capture (optional, safe)
 
 Assumptions (adjust paths/user if your VPS differs):
 

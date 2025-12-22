@@ -1,8 +1,10 @@
 # Environment & configuration matrix (frontend + backend)
 
-This document is a **cross‑repo reference** for how the backend
+This document is the **canonical cross-repo reference** for how the backend
 (`healtharchive-backend`) and frontend (`healtharchive-frontend`) are wired
 together across environments.
+
+The root `ENVIRONMENTS.md` is a pointer to this file to avoid duplication.
 
 It is useful when:
 

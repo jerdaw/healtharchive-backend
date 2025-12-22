@@ -6,6 +6,11 @@ For historical roadmaps and upgrade context, see:
 
 - `docs/roadmaps/README.md` (backend repo)
 
+Keep the two synced copies of this file aligned:
+
+- Backend repo: `healtharchive-backend/docs/operations/healtharchive-ops-roadmap.md`
+- Root non-git copy: `/home/jer/LocalSync/healtharchive/docs/operations/healtharchive-ops-roadmap.md`
+
 ## Recurring ops (non-IRL, ongoing)
 
 - **Quarterly:** run a restore test and record a public-safe log entry in `/srv/healtharchive/ops/restore-tests/`.
