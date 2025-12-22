@@ -69,7 +69,6 @@ def upgrade() -> None:
     )
 
 
-
 def downgrade() -> None:
     op.drop_index("ix_issue_reports_snapshot_id", table_name="issue_reports")
     op.drop_index("ix_issue_reports_status", table_name="issue_reports")

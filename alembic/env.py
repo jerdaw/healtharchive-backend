@@ -2,8 +2,7 @@ from __future__ import annotations
 
 from logging.config import fileConfig
 
-from sqlalchemy import engine_from_config, pool
-from sqlalchemy.engine import Connection, Engine
+from sqlalchemy.engine import Engine
 
 from alembic import context
 from ha_backend import models  # noqa: F401

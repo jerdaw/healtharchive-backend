@@ -1,20 +1,24 @@
 from __future__ import annotations
 
+from typing import Any
+
 from sqlalchemy import func, literal_column
 from sqlalchemy.sql.elements import ColumnElement
 
 # For now we use the 'simple' text search config to avoid incorrect stemming for
 # bilingual content. We can later switch based on Snapshot.language ('english'
 # vs 'french') once we have a robust approach.
-TS_CONFIG = literal_column("'simple'")
-WEIGHT_A = literal_column("'A'")
-WEIGHT_B = literal_column("'B'")
-WEIGHT_C = literal_column("'C'")
+TS_CONFIG: ColumnElement[str] = literal_column("'simple'")
+WEIGHT_A: ColumnElement[str] = literal_column("'A'")
+WEIGHT_B: ColumnElement[str] = literal_column("'B'")
+WEIGHT_C: ColumnElement[str] = literal_column("'C'")
 
 
-def build_search_vector(title: ColumnElement | str | None,
-                        snippet: ColumnElement | str | None,
-                        url: ColumnElement | str | None) -> ColumnElement:
+def build_search_vector(
+    title: Any,
+    snippet: Any,
+    url: Any,
+) -> ColumnElement[Any]:
     """
     Return a weighted Postgres tsvector expression suitable for Snapshot.search_vector.
 

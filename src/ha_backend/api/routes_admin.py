@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from typing import List, Optional
+from typing import Any, Iterator, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import Float, Integer, and_, case, cast, func, inspect, literal, or_
-from sqlalchemy.orm import Session, joinedload, load_only
+from sqlalchemy.orm import Session, load_only
 
 from ha_backend.db import get_session
 from ha_backend.models import ArchiveJob, IssueReport, PageSignal, Snapshot, Source
@@ -19,6 +19,7 @@ from ha_backend.search_ranking import (
 )
 
 from .deps import require_admin
+from .routes_public import SearchSort, SearchView
 from .schemas_admin import (
     IssueReportDetailSchema,
     IssueReportListResponseSchema,
@@ -31,7 +32,6 @@ from .schemas_admin import (
     SearchDebugItemSchema,
     SearchDebugResponseSchema,
 )
-from .routes_public import SearchSort, SearchView
 
 router = APIRouter(
     prefix="/admin",
@@ -40,7 +40,7 @@ router = APIRouter(
 )
 
 
-def get_db() -> Session:
+def get_db() -> Iterator[Session]:
     """
     FastAPI dependency that yields a DB session for admin routes.
     """
@@ -71,9 +71,7 @@ def list_jobs(
 
     total = query.count()
 
-    rows = (
-        query.order_by(ArchiveJob.created_at.desc()).offset(offset).limit(limit).all()
-    )
+    rows = query.order_by(ArchiveJob.created_at.desc()).offset(offset).limit(limit).all()
 
     items: List[JobSummarySchema] = []
     for job, src in rows:
@@ -118,11 +116,7 @@ def job_status_counts(
     """
     Return counts of jobs grouped by status.
     """
-    rows = (
-        db.query(ArchiveJob.status, func.count(ArchiveJob.id))
-        .group_by(ArchiveJob.status)
-        .all()
-    )
+    rows = db.query(ArchiveJob.status, func.count(ArchiveJob.id)).group_by(ArchiveJob.status).all()
 
     counts = {status: count for status, count in rows}
     return JobStatusCountsSchema(counts=counts)
@@ -250,12 +244,7 @@ def list_issue_reports(
         query = query.filter(IssueReport.category == category)
 
     total = query.count()
-    rows = (
-        query.order_by(IssueReport.created_at.desc())
-        .offset(offset)
-        .limit(limit)
-        .all()
-    )
+    rows = query.order_by(IssueReport.created_at.desc()).offset(offset).limit(limit).all()
 
     items = [
         IssueReportSummarySchema(
@@ -447,7 +436,9 @@ def search_debug(
     )
 
     has_page_signals = (
-        effective_sort == SearchSort.relevance and q_clean is not None and _has_table(db, "page_signals")
+        effective_sort == SearchSort.relevance
+        and q_clean is not None
+        and _has_table(db, "page_signals")
     )
     has_ps_outlink_count = has_page_signals and _has_column(db, "page_signals", "outlink_count")
     has_ps_pagerank = has_page_signals and _has_column(db, "page_signals", "pagerank")
@@ -471,14 +462,18 @@ def search_debug(
 
     pagerank_expr = func.coalesce(PageSignal.pagerank, 0.0) if use_pagerank else None
 
-    def build_rank_text() -> object:
+    def build_rank_text() -> Any:
         if not (q_clean and use_postgres_fts and tsquery is not None and vector_expr is not None):
             return None
-        if ranking_version == RankingVersion.v2 and query_mode is not None and query_mode != QueryMode.specific:
+        if (
+            ranking_version == RankingVersion.v2
+            and query_mode is not None
+            and query_mode != QueryMode.specific
+        ):
             return func.ts_rank_cd(vector_expr, tsquery, 32)
         return func.ts_rank_cd(vector_expr, tsquery)
 
-    def build_title_boost() -> object:
+    def build_title_boost() -> Any:
         if not q_clean:
             return 0.0
         if ranking_version != RankingVersion.v2 or not query_tokens or ranking_cfg is None:
@@ -492,7 +487,7 @@ def search_debug(
             else_=0.0,
         )
 
-    def build_archived_penalty() -> object:
+    def build_archived_penalty() -> Any:
         if (
             ranking_version == RankingVersion.v2
             and ranking_cfg is not None
@@ -513,10 +508,10 @@ def search_debug(
             )
         return 0.0
 
-    def build_query_penalty(url_expr: object) -> object:
+    def build_query_penalty(url_expr: Any) -> Any:
         return case((url_expr.like("%?%"), -0.1), else_=0.0)
 
-    def build_tracking_penalty(url_expr: object) -> object:
+    def build_tracking_penalty(url_expr: Any) -> Any:
         return case(
             (
                 or_(
@@ -529,14 +524,18 @@ def search_debug(
             else_=0.0,
         )
 
-    def build_depth_penalty() -> object:
-        basis = group_key if (ranking_version == RankingVersion.v2 and ranking_cfg is not None) else Snapshot.url
+    def build_depth_penalty() -> Any:
+        basis = (
+            group_key
+            if (ranking_version == RankingVersion.v2 and ranking_cfg is not None)
+            else Snapshot.url
+        )
         slash_count = func.length(basis) - func.length(func.replace(basis, "/", ""))
         if ranking_version == RankingVersion.v2 and ranking_cfg is not None:
             return float(ranking_cfg.depth_coef) * slash_count
         return (-0.01) * slash_count
 
-    def build_authority_boost() -> object:
+    def build_authority_boost() -> Any:
         if not use_authority or inlink_count_expr is None:
             return 0.0
         if ranking_version == RankingVersion.v2 and ranking_cfg is not None:
@@ -559,7 +558,7 @@ def search_debug(
         )
         return tier
 
-    def build_hubness_boost() -> object:
+    def build_hubness_boost() -> Any:
         if not use_hubness or outlink_count_expr is None or ranking_cfg is None:
             return 0.0
         if use_postgres_fts:
@@ -572,7 +571,7 @@ def search_debug(
         )
         return float(ranking_cfg.hubness_coef) * tier
 
-    def build_pagerank_boost() -> object:
+    def build_pagerank_boost() -> Any:
         if not use_pagerank or pagerank_expr is None or ranking_cfg is None:
             return 0.0
         if use_postgres_fts:
@@ -598,9 +597,7 @@ def search_debug(
     hubness_boost = build_hubness_boost().label("hubness_boost")
     pagerank_boost = build_pagerank_boost().label("pagerank_boost")
 
-    rank_text_labeled = (
-        rank_text.label("rank_text") if rank_text is not None else None
-    )
+    rank_text_labeled = rank_text.label("rank_text") if rank_text is not None else None
 
     score_terms = [
         title_boost,
@@ -632,6 +629,10 @@ def search_debug(
             snap: Snapshot = row[0]
             source_code = getattr(row, "source_code", None)
             source_name = getattr(row, "source_name", None)
+            rank_text_value = getattr(row, "rank_text", None)
+            total_score_value = getattr(row, "total_score", None)
+            group_score_value = getattr(row, "group_score", None)
+            best_snapshot_id_value = getattr(row, "best_snapshot_id", None)
             if source_code is None or source_name is None:
                 # Fallback: may trigger lazy-load (fine for admin/debug).
                 if snap.source is not None:
@@ -651,10 +652,16 @@ def search_debug(
                     statusCode=snap.status_code,
                     originalUrl=snap.url,
                     normalizedUrlGroup=snap.normalized_url_group,
-                    inlinkCount=int(getattr(row, "inlink_count", None) or 0) if has_page_signals else None,
-                    outlinkCount=int(getattr(row, "outlink_count", None) or 0) if (has_page_signals and has_ps_outlink_count) else None,
-                    pagerank=float(getattr(row, "pagerank", None) or 0.0) if (has_page_signals and has_ps_pagerank) else None,
-                    rankText=float(getattr(row, "rank_text", None)) if getattr(row, "rank_text", None) is not None else None,
+                    inlinkCount=int(getattr(row, "inlink_count", None) or 0)
+                    if has_page_signals
+                    else None,
+                    outlinkCount=int(getattr(row, "outlink_count", None) or 0)
+                    if (has_page_signals and has_ps_outlink_count)
+                    else None,
+                    pagerank=float(getattr(row, "pagerank", None) or 0.0)
+                    if (has_page_signals and has_ps_pagerank)
+                    else None,
+                    rankText=float(rank_text_value) if rank_text_value is not None else None,
                     titleBoost=float(getattr(row, "title_boost", 0.0) or 0.0),
                     archivedPenalty=float(getattr(row, "archived_penalty", 0.0) or 0.0),
                     queryPenalty=float(getattr(row, "query_penalty", 0.0) or 0.0),
@@ -663,16 +670,18 @@ def search_debug(
                     authorityBoost=float(getattr(row, "authority_boost", 0.0) or 0.0),
                     hubnessBoost=float(getattr(row, "hubness_boost", 0.0) or 0.0),
                     pagerankBoost=float(getattr(row, "pagerank_boost", 0.0) or 0.0),
-                    totalScore=float(getattr(row, "total_score", None)) if getattr(row, "total_score", None) is not None else None,
-                    groupScore=float(getattr(row, "group_score", None)) if getattr(row, "group_score", None) is not None else None,
-                    bestSnapshotId=int(getattr(row, "best_snapshot_id", None)) if getattr(row, "best_snapshot_id", None) is not None else None,
+                    totalScore=float(total_score_value) if total_score_value is not None else None,
+                    groupScore=float(group_score_value) if group_score_value is not None else None,
+                    bestSnapshotId=int(best_snapshot_id_value)
+                    if best_snapshot_id_value is not None
+                    else None,
                 )
             )
         return items
 
     ordered_rows = []
     if effective_view == SearchView.snapshots:
-        ent = [Snapshot]
+        ent: list[Any] = [Snapshot]
         ent.extend(
             [
                 Source.code.label("source_code"),
@@ -722,17 +731,33 @@ def search_debug(
                 Snapshot.id.desc(),
             )
         ordered_rows = (
-            ordered.options(load_only(Snapshot.id, Snapshot.source_id, Snapshot.url, Snapshot.normalized_url_group, Snapshot.capture_timestamp, Snapshot.status_code, Snapshot.title, Snapshot.snippet, Snapshot.language))
+            ordered.options(
+                load_only(
+                    Snapshot.id,
+                    Snapshot.source_id,
+                    Snapshot.url,
+                    Snapshot.normalized_url_group,
+                    Snapshot.capture_timestamp,
+                    Snapshot.status_code,
+                    Snapshot.title,
+                    Snapshot.snippet,
+                    Snapshot.language,
+                )
+            )
             .offset(offset)
             .limit(pageSize)
             .all()
         )
     else:
         # pages: compute latest snapshot per group; v2 orders by group_score (best snapshot in group).
-        rn_latest = func.row_number().over(
-            partition_by=page_partition_key,
-            order_by=(Snapshot.capture_timestamp.desc(), Snapshot.id.desc()),
-        ).label("rn_latest")
+        rn_latest = (
+            func.row_number()
+            .over(
+                partition_by=page_partition_key,
+                order_by=(Snapshot.capture_timestamp.desc(), Snapshot.id.desc()),
+            )
+            .label("rn_latest")
+        )
 
         if snapshot_score is None:
             # No query: treat as newest pages
@@ -742,15 +767,29 @@ def search_debug(
                 group_key.label("group_key"),
                 rn_latest,
             ).subquery()
-            latest = db.query(Snapshot).join(candidates, Snapshot.id == candidates.c.id).filter(candidates.c.rn_latest == 1)
-            latest = latest.order_by(status_quality.desc(), Snapshot.capture_timestamp.desc(), Snapshot.id.desc())
+            latest = (
+                db.query(Snapshot)
+                .join(candidates, Snapshot.id == candidates.c.id)
+                .filter(candidates.c.rn_latest == 1)
+            )
+            latest = latest.order_by(
+                status_quality.desc(), Snapshot.capture_timestamp.desc(), Snapshot.id.desc()
+            )
             snaps = latest.offset(offset).limit(pageSize).all()
             ordered_rows = [(s,) for s in snaps]
         else:
-            rn_best = func.row_number().over(
-                partition_by=page_partition_key,
-                order_by=(snapshot_score.desc(), Snapshot.capture_timestamp.desc(), Snapshot.id.desc()),
-            ).label("rn_best")
+            rn_best = (
+                func.row_number()
+                .over(
+                    partition_by=page_partition_key,
+                    order_by=(
+                        snapshot_score.desc(),
+                        Snapshot.capture_timestamp.desc(),
+                        Snapshot.id.desc(),
+                    ),
+                )
+                .label("rn_best")
+            )
 
             candidates_subq = base_query.with_entities(
                 Snapshot.id.label("id"),
@@ -760,7 +799,11 @@ def search_debug(
                 rn_latest,
                 rn_best,
                 snapshot_score.label("snapshot_score"),
-                (rank_text_labeled if rank_text_labeled is not None else cast(literal(None), Float)).label("rank_text"),
+                (
+                    rank_text_labeled
+                    if rank_text_labeled is not None
+                    else cast(literal(None), Float)
+                ).label("rank_text"),
                 title_boost,
                 archived_penalty,
                 query_penalty,
@@ -769,15 +812,19 @@ def search_debug(
                 authority_boost,
                 hubness_boost,
                 pagerank_boost,
-                PageSignal.inlink_count.label("inlink_count") if has_page_signals else cast(literal(None), Integer).label("inlink_count"),
-                PageSignal.outlink_count.label("outlink_count") if has_ps_outlink_count else cast(literal(None), Integer).label("outlink_count"),
-                PageSignal.pagerank.label("pagerank") if has_ps_pagerank else cast(literal(None), Float).label("pagerank"),
+                PageSignal.inlink_count.label("inlink_count")
+                if has_page_signals
+                else cast(literal(None), Integer).label("inlink_count"),
+                PageSignal.outlink_count.label("outlink_count")
+                if has_ps_outlink_count
+                else cast(literal(None), Integer).label("outlink_count"),
+                PageSignal.pagerank.label("pagerank")
+                if has_ps_pagerank
+                else cast(literal(None), Float).label("pagerank"),
             ).subquery()
 
             latest_subq = (
-                db.query(candidates_subq)
-                .filter(candidates_subq.c.rn_latest == 1)
-                .subquery()
+                db.query(candidates_subq).filter(candidates_subq.c.rn_latest == 1).subquery()
             )
             best_subq = (
                 db.query(
@@ -823,7 +870,9 @@ def search_debug(
                 .join(Source, Snapshot.source_id == Source.id, isouter=True)
                 .order_by(
                     status_quality.desc(),
-                    best_subq.c.group_score.desc() if ranking_version == RankingVersion.v2 else latest_subq.c.snapshot_score.desc(),
+                    best_subq.c.group_score.desc()
+                    if ranking_version == RankingVersion.v2
+                    else latest_subq.c.snapshot_score.desc(),
                     Snapshot.capture_timestamp.desc(),
                     Snapshot.id.desc(),
                 )

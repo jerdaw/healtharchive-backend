@@ -21,7 +21,11 @@ def _init_test_app(tmp_path: Path, monkeypatch) -> TestClient:
 
     from ha_backend.api import app
 
-    return TestClient(app)
+    try:
+        import uvloop  # noqa: F401
+    except Exception:
+        return TestClient(app)
+    return TestClient(app, backend_options={"use_uvloop": True})
 
 
 def test_usage_metrics_disabled(tmp_path, monkeypatch) -> None:

@@ -124,9 +124,7 @@ def upgrade() -> None:
             server_default=sa.func.now(),
         ),
     )
-    op.create_index(
-        "ix_archive_jobs_source_id", "archive_jobs", ["source_id"], unique=False
-    )
+    op.create_index("ix_archive_jobs_source_id", "archive_jobs", ["source_id"], unique=False)
     op.create_index("ix_archive_jobs_status", "archive_jobs", ["status"], unique=False)
 
     # topics

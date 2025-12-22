@@ -1,13 +1,12 @@
 from __future__ import annotations
 
-from pathlib import Path
 from datetime import datetime, timezone
+from pathlib import Path
 
 from fastapi.testclient import TestClient
 
 from ha_backend import db as db_module
-from ha_backend.db import Base, get_engine
-from ha_backend.db import get_session
+from ha_backend.db import Base, get_engine, get_session
 from ha_backend.models import Snapshot, Source
 from ha_backend.search_ranking import classify_query_mode, get_ranking_config
 
@@ -25,7 +24,11 @@ def _init_test_app(tmp_path: Path, monkeypatch) -> TestClient:
 
     from ha_backend.api import app
 
-    return TestClient(app)
+    try:
+        import uvloop  # noqa: F401
+    except Exception:
+        return TestClient(app)
+    return TestClient(app, backend_options={"use_uvloop": True})
 
 
 def test_admin_search_debug_endpoint_shape(tmp_path, monkeypatch) -> None:

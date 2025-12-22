@@ -86,4 +86,3 @@ def downgrade() -> None:
     op.drop_index("ix_pages_normalized_url_group", table_name="pages")
     op.drop_index("ix_pages_source_id", table_name="pages")
     op.drop_table("pages")
-

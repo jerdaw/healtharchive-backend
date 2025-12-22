@@ -15,9 +15,7 @@ def parse_arguments() -> Tuple[argparse.Namespace, List[str]]:
     core_group = parser.add_argument_group("Core Arguments")
     core_group.add_argument("--seeds", nargs="+", required=True, help="Seed URLs.")
     core_group.add_argument("--name", required=True, help="Base name for ZIM file.")
-    core_group.add_argument(
-        "--output-dir", required=True, help="Host output directory path."
-    )
+    core_group.add_argument("--output-dir", required=True, help="Host output directory path.")
     core_group.add_argument(
         "--initial-workers",
         type=int,
@@ -36,9 +34,7 @@ def parse_arguments() -> Tuple[argparse.Namespace, List[str]]:
         action="store_true",
         help="Allow overwriting an existing ZIM file in the output directory.",
     )  # <-- NEW
-    tool_opts_group.add_argument(
-        "--docker-image", default=DOCKER_IMAGE, help="Zimit Docker image."
-    )
+    tool_opts_group.add_argument("--docker-image", default=DOCKER_IMAGE, help="Zimit Docker image.")
     tool_opts_group.add_argument(
         "--log-level",
         default="INFO",
@@ -48,10 +44,7 @@ def parse_arguments() -> Tuple[argparse.Namespace, List[str]]:
     tool_opts_group.add_argument(
         "--dry-run",
         action="store_true",
-        help=(
-            "Validate configuration and print a summary without running Docker "
-            "containers."
-        ),
+        help=("Validate configuration and print a summary without running Docker containers."),
     )
 
     monitor_group = parser.add_argument_group("Monitoring Configuration")
@@ -86,9 +79,7 @@ def parse_arguments() -> Tuple[argparse.Namespace, List[str]]:
         help="Number of consecutive HTTP/network errors to trigger action.",
     )
 
-    adapt_group = parser.add_argument_group(
-        "Adaptive Strategies (require --enable-monitoring)"
-    )
+    adapt_group = parser.add_argument_group("Adaptive Strategies (require --enable-monitoring)")
     # ... (adaptive worker args remain the same) ...
     adapt_group.add_argument(
         "--enable-adaptive-workers",
