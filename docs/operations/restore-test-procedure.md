@@ -21,15 +21,32 @@ Record the target in the restore test log.
 
 ## Step 2 — Restore the database dump
 
-Follow your standard backup tool instructions. Examples (adjust paths):
+Follow your standard backup tool instructions. In production, backups are typically created with:
+
+- `pg_dump -Fc` (custom-format dump)
+
+Examples (adjust paths):
 
 ```bash
-# Example: restore into a temporary database named healtharchive_restore_test
-createdb healtharchive_restore_test
-psql healtharchive_restore_test < /path/to/latest-backup.sql
+# Example: restore into a temporary database named healtharchive_restore_test_YYYYMMDD
+DBNAME="healtharchive_restore_test_$(date -u +%Y%m%d)"
+
+# Pick a backup file (example naming from the production runbook)
+BACKUP="/srv/healtharchive/backups/healtharchive_YYYY-MM-DDTHHMMSSZ.dump"
+
+sudo -u postgres createdb -O healtharchive "$DBNAME"
+
+# If backups live under a directory the `postgres` user cannot traverse, copy it first:
+TMPDUMP="/var/tmp/${DBNAME}.dump"
+sudo install -m 600 -o postgres -g postgres "$BACKUP" "$TMPDUMP"
+
+# Restore the custom-format dump:
+sudo -u postgres pg_restore --no-owner --role=healtharchive -d "$DBNAME" "$TMPDUMP"
+
+sudo rm -f "$TMPDUMP"
 ```
 
-If your backups are compressed, decompress first (or pipe through `gunzip`).
+If your backup is plain SQL (not custom-format), you can restore with `psql -f`, but production defaults are custom-format.
 
 ## Step 3 — Point the backend to the restored DB
 

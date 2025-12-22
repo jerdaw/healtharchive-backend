@@ -18,7 +18,7 @@ Status: **active roadmap** (Phases 0–6 implemented (core); remaining work is m
 
 - Phase 4: secure 1+ distribution partner and 1+ verifier (with permission to name them)
 - Phase 5: keep quarterly dataset releases running via `jerdaw/healtharchive-datasets`; track real external research adoption
-- Phase 6: decide/enable annual scheduling + replay reconcile timers (if desired) and complete + log the first quarterly restore test
+- Phase 6: decide/enable annual scheduling + replay reconcile timers (if desired), and keep quarterly restore tests running
 
 **Decision tracker (update as you go; keep public-safe)**
 
@@ -37,11 +37,9 @@ Status: **active roadmap** (Phases 0–6 implemented (core); remaining work is m
   - Annual search verification capture: **TBD** (optional)
 **Next steps (small, safe, sequential)**
 
-1) Add a public-facing note linking to dataset releases (e.g., `/changelog` and/or `/exports`).
-2) (Optional) Add a brief “dataset releases” note to `/changelog`.
-3) Run the first quarterly restore test (Phase 6) and record a public-safe result log.
-4) Run systemd dry-runs and decide whether to enable annual scheduling and/or replay reconcile timers (Phase 6).
-5) Do Phase 4 outreach: secure 1 partner link + 1 verifier (with permission to name), and start the mentions log discipline.
+1) Run systemd dry-runs and decide whether to enable annual scheduling and/or replay reconcile timers (Phase 6).
+2) Record which production timers are enabled (update this tracker).
+3) Do Phase 4 outreach: secure 1 partner link + 1 verifier (with permission to name them), and start the mentions log discipline.
 
 ## Production Toggles / Enablement (what must be set on the VPS)
 
