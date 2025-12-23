@@ -35,4 +35,4 @@ security:
 audit:
 	$(PIP_AUDIT) || true
 
-check: format-check lint typecheck test security
+check: format-check lint typecheck test security audit
