@@ -96,11 +96,11 @@ def cmd_run_job(args: argparse.Namespace) -> None:
     """
     Run a single archive_tool job immediately.
 
-    Example:
+        Example:
 
         ha-backend run-job \\
-          --name restoredcdc-2025-12-09 \\
-          --seeds https://www.cdc.gov \\
+          --name hc-2025-12-09 \\
+          --seeds https://www.canada.ca/en/health-canada.html \\
           --initial-workers 2 \\
           --log-level INFO \\
           --cleanup --overwrite \\
