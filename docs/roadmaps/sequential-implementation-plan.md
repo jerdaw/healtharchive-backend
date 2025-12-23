@@ -125,7 +125,8 @@ Implementation helpers (repo):
 3. Apply branch protection to `main`:
    - require PR
    - require status checks
-   - choose whether to include administrators
+   - enable “Include administrators” (recommended)
+   - enable “Require review from Code Owners” (recommended)
 4. Verify branch protection works (a failing PR cannot merge).
 
 **Exit criteria:** the default branch cannot accept changes without passing CI.
