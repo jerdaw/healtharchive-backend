@@ -121,15 +121,19 @@ Implementation helpers (repo):
 1. Ensure Actions workflows are enabled for both repos:
    - `healtharchive-backend/.github/workflows/backend-ci.yml`
    - `healtharchive-frontend/.github/workflows/frontend-ci.yml`
-2. Create a PR and record the exact check names GitHub shows.
-3. Apply branch protection to `main`:
+2. Solo-fast mode (recommended while you’re the only committer):
+   - allow direct pushes to `main`
+   - treat “green main” as the deploy gate
+3. Deploy gate (production):
+   - `dodeploy`
+   - `./scripts/check_baseline_drift.py --mode live`
+   - `./scripts/verify_public_surface.py`
+4. TODO (tighten later when there are multiple committers):
    - require PR
    - require status checks
-   - enable “Include administrators” (recommended)
-   - enable “Require review from Code Owners” (recommended)
-4. Verify branch protection works (a failing PR cannot merge).
+   - include administrators + require code owner review
 
-**Exit criteria:** the default branch cannot accept changes without passing CI.
+**Exit criteria:** deploys only happen from a green `main`, and post-deploy verification is routine.
 
 ## Phase 3 — External monitoring (site-up signal + low-noise alerts)
 

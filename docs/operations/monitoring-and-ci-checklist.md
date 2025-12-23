@@ -39,64 +39,51 @@ settings drift”.
    - Which alerts should page you vs. just email (recommended: only “site down”
      pages; everything else emails).
 3. Decide the `main` branch policy:
-   - **PR-only merges** into `main` (recommended).
-   - Whether admins should be subject to protection:
-     - Recommended best practice: enable **Include administrators** (prevents accidental bypass).
-     - If you intentionally want a “break glass” bypass, document it explicitly and keep it rare.
+   - **Solo-fast (recommended for this project right now): direct pushes to `main`**.
+     - CI still runs on every push to `main`.
+     - Deploys are gated by “green main” + VPS verification steps (below).
+   - **TODO (tighten later when there are multiple committers): PR-only merges** into `main`
+     with required status checks + code owners.
 
 Verification:
 
 - You can point to a quick note (even in a personal doc) listing current
   monitors + what each covers.
 
-### Step 1 — Verify CI runs and learn the exact check name (operator)
+### Step 1 — Verify CI runs on `main` pushes (operator)
 
-Objective: make sure you require the **correct** status check in branch
-protection (GitHub requires the exact check name string).
+Objective: ensure CI runs on pushes to `main` so you can treat “green main” as the deploy gate.
 
 1. Confirm GitHub Actions workflows are enabled:
    - Repo → Actions → ensure workflows are enabled (not disabled by org/fork policy).
-2. Open a PR against `main` (can be a trivial doc change).
-3. On the PR “Checks” tab:
-   - Identify the exact backend check name shown by GitHub.
-   - Typical format for this repo: `Backend CI / test` (workflow name + job name).
-4. Record the exact check string you will require in branch protection.
+2. Push a trivial commit to `main` (e.g. a doc tweak).
+3. Confirm the workflow runs and passes on that commit.
 
 Verification:
 
-- The PR shows the backend CI check running and passing.
+- GitHub Actions shows the backend CI workflow completing successfully on `main`.
 
-Frontend note:
+### Step 2 — Solo-fast deploy gate (operator; recommended)
 
-- In the frontend repo, the typical check name format is:
-  - `Frontend CI / lint-and-test`
+Objective: prevent broken deploys by only deploying when `main` is green.
 
-### Step 2 — Enforce PR-only merges into `main` (operator; GitHub settings)
+Workflow (recommended):
 
-Objective: prevent broken deploys by requiring CI to pass before merge.
-
-GitHub → Repo → Settings → Branches → Branch protection rules → Add/edit rule for `main`:
-
-1. Enable **Require a pull request before merging**.
-2. Enable **Require status checks to pass before merging**.
-3. Select the required check(s) captured in Step 1 (e.g. `Backend CI / test`).
-4. Recommended (low friction, high value):
-   - Enable **Require branches to be up to date before merging**.
-   - Disable force pushes.
-5. Best practice hardening (recommended):
-   - Enable **Include administrators**.
-   - Enable **Require review from Code Owners** (requires `.github/CODEOWNERS` in the repo).
+1. Push to `main`.
+2. Wait for GitHub Actions to go green on that commit.
+3. Deploy on the VPS:
+   - Run `dodeploy`
+   - Run `./scripts/check_baseline_drift.py --mode live`
+   - Run `./scripts/verify_public_surface.py`
 
 Verification:
 
-- Create a PR that fails tests: merge should be blocked.
-- Create a PR that passes CI: merge should be allowed.
+- The VPS deploy completes and both verification scripts pass.
 
-Emergency bypass protocol (recommended):
+TODO (tighten later):
 
-- Only bypass protections for a production incident.
-- Immediately follow up with a PR containing the same change (or a cherry-pick)
-  so the “real” history shows CI passing on the fix.
+- When there are multiple committers or when you want stricter enforcement, switch to PR-only merges
+  and require the backend/frontend checks in branch protection.
 
 ### Step 3 — External uptime monitoring (operator; UptimeRobot settings)
 
