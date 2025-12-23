@@ -177,6 +177,10 @@ Implementation helpers (repo):
 
 **Current state:** frontend already calls the backend directly and has offline fallbacks.
 
+Implementation helpers (repo):
+
+- Phase 5–7 verifier (public UX + replay + usage): `scripts/verify_phase5_7.py`
+
 1. Verify core public routes against the live backend:
    - `/archive` search + pagination
    - `/archive/browse-by-source`
@@ -186,7 +190,7 @@ Implementation helpers (repo):
    - clear fallback notices
    - demo dataset is used
 
-**Exit criteria:** the public site is usable and degradations are clear and safe.
+**Exit criteria:** `scripts/verify_phase5_7.py` passes and degradations are clear and safe.
 
 ## Phase 6 — Replay service (full-fidelity browsing) + snapshot viewer fidelity
 
