@@ -414,13 +414,10 @@ Workflows live at:
 Each should:
 
 - Backend:
-  - Install deps via `pip install -e ".[dev]"`.
-  - Run `pytest -q`.
-  - Optionally run security tooling (e.g. `bandit`).
+  - Run `make check`.
 - Frontend:
   - Install deps via `npm ci`.
-  - Run `npm run lint`.
-  - Run `npm test`.
+  - Run `npm run check`.
   - Optionally run `npm audit --audit-level=high`.
 
 Checklist:

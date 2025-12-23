@@ -14,10 +14,11 @@ terminal and Python tooling.
 ### 0.1 Create a virtualenv and install the backend
 
 ```bash
-python -m venv .venv
-source .venv/bin/activate
-
-pip install -e ".[dev]"
+make venv
+# or (manual):
+# python -m venv .venv
+# source .venv/bin/activate
+# pip install -e ".[dev]"
 ```
 
 This provides:
@@ -57,7 +58,9 @@ Goal: prove the Python package and DB wiring work in isolation.
 ### 1.1 Run the test suite
 
 ```bash
-pytest -q
+make check
+# or (tests only):
+# pytest -q
 ```
 
 All tests should pass. (At time of writing, a 422 around

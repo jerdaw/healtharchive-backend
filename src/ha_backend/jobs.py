@@ -37,7 +37,7 @@ class RuntimeArchiveJob:
         Construct a filesystem-friendly directory name that includes
         a UTC timestamp and the job name.
 
-        Example: 20251209T204530Z__restoredcdc
+        Example: 20251209T204530Z__hc-2025-12-09
         """
         ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
         safe_name = self.name.strip().replace(" ", "_")

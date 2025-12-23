@@ -18,6 +18,7 @@ Keep documentation accurate, minimal, and easy to maintain across repos.
 -   Prefer one canonical source. Use pointers elsewhere instead of copying text.
 -   Keep docs close to the code they describe; if cross-repo, link to the canonical doc.
 -   Update the relevant docs index (`docs/README.md` or `docs/operations/README.md`).
+-   Documentation should be English-only; do not duplicate it in other languages.
 -   Avoid "phase" labels outside `docs/roadmaps` and explicit implementation plans; use "step" or "milestone".
 -   Keep public copy public-safe (no secrets, private emails, or internal IPs).
 -   If you sync your workspace via Syncthing, treat `.stignore` as “sync ignore” (like `.gitignore`) and ensure it excludes build artifacts and machine-local dev artifacts (e.g., `.venv/`, `node_modules/`, `.dev-archive-root/`). Secrets may sync via Syncthing, but must remain git-ignored.

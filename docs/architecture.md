@@ -1268,11 +1268,11 @@ All commands are available via the `ha-backend` entrypoint.
 ## 12. Testing & development
 
 - Tests are written with `pytest` and live under `tests/`.
-- To run tests:
+- To run checks:
 
   ```bash
-  pip install -e ".[dev]"
-  pytest -q
+  make venv
+  make check
   ```
 
 - Many tests configure a temporary SQLite DB by:

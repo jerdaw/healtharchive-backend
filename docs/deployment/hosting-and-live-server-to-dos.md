@@ -561,11 +561,10 @@ For each repo (`healtharchive-backend` and `healtharchive-frontend`):
    triggered for branch `main` and for pull requests:
 
    - Backend CI should:
-     - Install deps via `pip install -e ".[dev]"`.
-     - Run `pytest -q`.
+     - Run `make check`.
    - Frontend CI should:
      - Install deps via `npm ci`.
-     - Run `npm run lint` and `npm test`.
+     - Run `npm run check`.
 
 ### 6.2. Configure branch protection (optional but recommended)
 
