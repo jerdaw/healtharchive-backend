@@ -1,4 +1,4 @@
-.PHONY: venv format format-check lint typecheck test security audit check
+.PHONY: venv format format-check lint precommit typecheck test security audit check
 
 VENV ?= .venv
 VENV_BIN := $(VENV)/bin
@@ -9,6 +9,7 @@ MYPY := $(if $(wildcard $(VENV_BIN)/mypy),$(VENV_BIN)/mypy,mypy)
 PYTEST := $(if $(wildcard $(VENV_BIN)/pytest),$(VENV_BIN)/pytest,pytest)
 BANDIT := $(if $(wildcard $(VENV_BIN)/bandit),$(VENV_BIN)/bandit,bandit)
 PIP_AUDIT := $(if $(wildcard $(VENV_BIN)/pip-audit),$(VENV_BIN)/pip-audit,pip-audit)
+PRE_COMMIT := $(if $(wildcard $(VENV_BIN)/pre-commit),$(VENV_BIN)/pre-commit,pre-commit)
 
 venv:
 	$(PYTHON) -m venv $(VENV)
@@ -23,6 +24,9 @@ format-check:
 lint:
 	$(RUFF) check .
 
+precommit:
+	$(PRE_COMMIT) run --all-files
+
 typecheck:
 	$(MYPY) src tests
 
@@ -35,4 +39,4 @@ security:
 audit:
 	$(PIP_AUDIT) || true
 
-check: format-check lint typecheck test security audit
+check: format-check lint precommit typecheck test security audit

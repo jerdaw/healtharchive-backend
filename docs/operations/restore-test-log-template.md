@@ -14,4 +14,3 @@ Use this template to record quarterly restore tests. Keep it public-safe: no sec
 - **Result:** Pass / Fail
 - **Notes / anomalies:**
 - **Follow-up actions:**
-
