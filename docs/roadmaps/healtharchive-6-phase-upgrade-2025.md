@@ -423,7 +423,7 @@ Deliverables:
 - Frontend uses a same-origin proxy route (`/api/report`) so reporting works even when the backend CORS policy remains strict.
 - Footer and snapshot/browse views link to the report flow.
 
---- 
+---
 
 ## Phase 2 — Make Impact Measurable + Visible (build on what you already have)
 
@@ -701,13 +701,13 @@ In other words: **institutionalization + proof of use**, not just implementation
 
 Mission (2–3 sentences):
 
-> HealthArchive.ca preserves time-stamped snapshots of selected Canadian public health web pages so changes remain auditable and citable.  
+> HealthArchive.ca preserves time-stamped snapshots of selected Canadian public health web pages so changes remain auditable and citable.
 > It is an independent, non-governmental archival project — not medical advice and not a substitute for current official guidance.
 
 What this is / isn’t (workflow-safe):
 
-> **This is:** an archival record of what public health websites displayed at a specific time, with capture dates and citations.  
-> **This is not:** current guidance, medical advice, or an official government website.  
+> **This is:** an archival record of what public health websites displayed at a specific time, with capture dates and citations.
+> **This is not:** current guidance, medical advice, or an official government website.
 > **For current recommendations:** always consult the official source website.
 
 Browse-mode warning (short, unavoidable):
@@ -1251,7 +1251,7 @@ Acceptance criteria:
 - Updated `/privacy` to disclose aggregate usage counts.
 - Added a baseline impact report and changelog entry for Phase 2.
 
---- 
+---
 
 ## Phase 3 — Change Tracking + Compare + Digest (expanded)
 
@@ -1519,7 +1519,7 @@ Performance gates:
 - Updated governance/methods/researcher copy and changelog to reflect change tracking.
 - Added systemd timer templates for scheduled change tracking runs (see `docs/deployment/systemd/README.md`).
 
---- 
+---
 
 ## Phase 4 — Distribution + External Validation (expanded)
 
@@ -1790,7 +1790,7 @@ HealthArchive’s strongest natural audience is research/journalism. Making it �
 
 Phase 5 has two parallel goals:
 
-1) make HealthArchive easier to cite, reuse, and defend in research/journalism, and  
+1) make HealthArchive easier to cite, reuse, and defend in research/journalism, and
 2) create “proof artifacts” that demonstrate sustained, measurable public-interest value.
 
 #### Sub-phase 5A — Citation guidance (stabilize + make it unambiguous)

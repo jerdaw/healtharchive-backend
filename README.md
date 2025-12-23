@@ -151,21 +151,21 @@ uvicorn ha_backend.api:app --reload
 
 Key public endpoints (all prefixed with `/api`):
 
-- `GET /api/health`  
+- `GET /api/health`
   Basic health check (`status`, DB connectivity, job and snapshot counts).
 
-- `GET /api/stats`  
+- `GET /api/stats`
   Lightweight public archive stats for the frontend (snapshot totals, unique page
   count, source count, latest capture date).
 
-- `GET /api/sources`  
+- `GET /api/sources`
   Per-source summaries derived from indexed snapshots.
 
   When `HEALTHARCHIVE_REPLAY_BASE_URL` is set, the response also includes:
   - `entryRecordId` – a “best effort” entry-point snapshot ID for browsing a source
   - `entryBrowseUrl` – a timestamp-locked replay URL for that entry point
 
-- `GET /api/search`  
+- `GET /api/search`
   Full-text style search over snapshots (with filters for `source`, pagination,
   etc.).
 
@@ -177,40 +177,40 @@ Key public endpoints (all prefixed with `/api`):
   - Default ranking is controlled by `HA_SEARCH_RANKING_VERSION` (`v1` or `v2`).
   - Per-request override: add `ranking=v1|v2` to `/api/search`.
 
-- `GET /api/snapshot/{id}`  
+- `GET /api/snapshot/{id}`
   Snapshot metadata for a single record.
 
   When `HEALTHARCHIVE_REPLAY_BASE_URL` is set, this includes a `browseUrl`
   suitable for embedding a replay engine (pywb) for full-fidelity browsing.
 
-- `GET /api/usage`  
+- `GET /api/usage`
   Aggregated usage metrics (daily counts) for public reporting.
 
-- `GET /api/changes`  
+- `GET /api/changes`
   Precomputed change events feed (filters by source, edition/job, date range).
 
-- `GET /api/changes/compare`  
+- `GET /api/changes/compare`
   Precomputed diff between two adjacent captures (A → B).
 
-- `GET /api/changes/rss`  
+- `GET /api/changes/rss`
   RSS feed for the latest edition-aware change events.
 
-- `GET /api/exports`  
+- `GET /api/exports`
   Export manifest describing available research exports and limits.
 
-- `GET /api/exports/snapshots`  
+- `GET /api/exports/snapshots`
   Snapshot metadata export (JSONL/CSV, metadata-only).
 
-- `GET /api/exports/changes`  
+- `GET /api/exports/changes`
   Change event export (JSONL/CSV, metadata-only).
 
-- `POST /api/reports`  
+- `POST /api/reports`
   Public issue intake endpoint for broken snapshots, metadata errors, missing coverage, or takedown requests.
 
-- `GET /api/snapshots/raw/{id}`  
+- `GET /api/snapshots/raw/{id}`
   Returns the archived HTML document for embedding in the frontend.
 
-- `GET /api/snapshots/{id}/timeline`  
+- `GET /api/snapshots/{id}/timeline`
   Timeline of captures for the same normalized URL group.
 
 Admin + observability endpoints (protected by a simple admin token):
@@ -435,28 +435,28 @@ This:
 The backend reads configuration from environment variables with sensible
 defaults:
 
-- `HEALTHARCHIVE_DATABASE_URL`  
+- `HEALTHARCHIVE_DATABASE_URL`
   SQLAlchemy URL for the DB. Defaults to `sqlite:///healtharchive.db` in the
   repo root.
 
-- `HEALTHARCHIVE_ARCHIVE_ROOT`  
+- `HEALTHARCHIVE_ARCHIVE_ROOT`
   Base directory for job output dirs (passed as `--output-dir` to `archive_tool`).
   Defaults to `/mnt/nasd/nobak/healtharchive/jobs`.
 
-- `HEALTHARCHIVE_TOOL_CMD`  
+- `HEALTHARCHIVE_TOOL_CMD`
   Command used to invoke the archiver. Defaults to `archive-tool`.
 
-- `HEALTHARCHIVE_ENV`  
+- `HEALTHARCHIVE_ENV`
   High-level environment hint used by admin auth. Recognised values:
   - `"development"` (default when unset): admin endpoints are open when
     `HEALTHARCHIVE_ADMIN_TOKEN` is unset (dev convenience).
   - `"staging"` or `"production"`: admin endpoints fail closed with HTTP 500
     if `HEALTHARCHIVE_ADMIN_TOKEN` is not configured.
 
-- `HEALTHARCHIVE_ADMIN_TOKEN`  
+- `HEALTHARCHIVE_ADMIN_TOKEN`
   Optional admin token. If set, `/api/admin/*` and `/metrics` require either:
   - `Authorization: Bearer <token>` or
-  - `X-Admin-Token: <token>`  
+  - `X-Admin-Token: <token>`
   If unset and `HEALTHARCHIVE_ENV` is `"development"` (or unset), admin
   endpoints are open (intended only for local development). In staging and
   production you should **always** set a long, random token and store it as a
@@ -464,10 +464,10 @@ defaults:
   `HEALTHARCHIVE_ENV` is `"staging"` or `"production"` and this token is
   missing, admin and metrics endpoints return HTTP 500.
 
-- `HEALTHARCHIVE_LOG_LEVEL`  
+- `HEALTHARCHIVE_LOG_LEVEL`
   Global log level (`DEBUG`, `INFO`, etc.). Defaults to `INFO`.
 
-- `HEALTHARCHIVE_CORS_ORIGINS`  
+- `HEALTHARCHIVE_CORS_ORIGINS`
   Comma-separated list of allowed Origins for CORS on the public API routes.
   If unset, a built-in default is used:
 
