@@ -53,6 +53,22 @@ if [[ -z "${OUT_FILE}" ]]; then
   OUT_FILE="/tmp/healtharchive-baseline-inventory-${timestamp}.txt"
 fi
 
+out_dir="$(dirname "${OUT_FILE}")"
+if [[ ! -d "${out_dir}" ]]; then
+  cat >&2 <<EOF
+ERROR: Output directory does not exist: ${out_dir}
+
+Create it and retry. For production VPS setups, prefer:
+
+  sudo mkdir -p ${out_dir}
+  sudo chown root:healtharchive ${out_dir}
+  sudo chmod 2770 ${out_dir}
+
+See also: docs/deployment/production-single-vps.md (backend repo).
+EOF
+  exit 1
+fi
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 

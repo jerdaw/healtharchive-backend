@@ -55,12 +55,14 @@ Implementation helpers (repo):
 
      ```bash
      cd /opt/healtharchive-backend
-     ./scripts/capture-baseline-inventory.sh --env-file /etc/healtharchive/backend.env
+     ./scripts/capture-baseline-inventory.sh --env-file /etc/healtharchive/backend.env --out /srv/healtharchive/ops/baseline/healtharchive-baseline-$(date -u +%F).txt
      ```
 
      Notes:
      - The report is written to `/tmp/healtharchive-baseline-inventory-<ts>.txt` by default.
-     - Secrets are redacted; the script does not source env files.
+      - Secrets are redacted; the script does not source env files.
+     - If `/srv/healtharchive/ops/baseline/` does not exist, create it using the production runbook:
+       `docs/deployment/production-single-vps.md`.
 5. Write a short baseline note (private is fine) that you can diff later.
 
 **Exit criteria:** a single authoritative note exists with current env + URLs + supported environments.

@@ -75,10 +75,31 @@ Directories:
 
 ```bash
 sudo groupadd --system healtharchive 2>/dev/null || true
-sudo mkdir -p /srv/healtharchive/jobs /srv/healtharchive/backups
+sudo mkdir -p /srv/healtharchive/jobs /srv/healtharchive/backups /srv/healtharchive/ops
 sudo chown -R haadmin:haadmin /srv/healtharchive/jobs
 sudo chown root:healtharchive /srv/healtharchive/backups
 sudo chmod 2770 /srv/healtharchive/backups
+sudo chown root:healtharchive /srv/healtharchive/ops
+sudo chmod 2770 /srv/healtharchive/ops
+```
+
+Ops directories (public-safe logs + artifacts):
+
+- `root:healtharchive` ownership + `2770` perms is intentional:
+  - `root` owns the directory tree
+  - operators (e.g., `haadmin`) write via the `healtharchive` group
+  - the setgid bit keeps group ownership consistent on new files/dirs
+
+Create the standard subdirectories:
+
+```bash
+sudo mkdir -p \
+  /srv/healtharchive/ops/baseline \
+  /srv/healtharchive/ops/restore-tests \
+  /srv/healtharchive/ops/adoption \
+  /srv/healtharchive/ops/search-eval
+sudo chown -R root:healtharchive /srv/healtharchive/ops
+sudo chmod 2770 /srv/healtharchive/ops /srv/healtharchive/ops/*
 ```
 
 Postgres:
