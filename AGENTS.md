@@ -36,15 +36,13 @@ From the repo root (Python project):
 
 - Create venv (if not already done) – adjust to my actual workflow:
   ```bash
-  python -m venv .venv
-  source .venv/bin/activate  # or equivalent on Windows
-  pip install -e ".[dev]"
+  make venv
 ````
 
-* Run tests:
+* Run checks (what CI runs):
 
   ```bash
-  pytest -q
+  make check
   ```
 
 For how to:
@@ -57,7 +55,7 @@ For how to:
 
 When you add/modify functionality, you should:
 
-* Keep tests passing (`pytest -q`).
+* Keep checks passing (`make check`).
 * Prefer adding/adjusting tests close to the code you touch (e.g., API route tests, indexing pipeline tests, worker tests).
 
 ---
