@@ -45,6 +45,15 @@ In `local` mode:
 - HSTS is validated by parsing `/etc/caddy/Caddyfile` for the API site block.
 - Admin endpoint checks are skipped (warn-only).
 
+## CORS validation
+
+The policy enforces a **strict** production allowlist (no extra origins) via
+`HEALTHARCHIVE_CORS_ORIGINS`.
+
+- `--mode local` validates the env file value (CSV set comparison).
+- `--mode live` additionally probes the API with an `Origin:` header and checks
+  real `Access-Control-Allow-Origin` behavior.
+
 ## When to update policy
 
 Update `production-baseline-policy.toml` only when you intentionally change production invariants:
@@ -55,4 +64,3 @@ Update `production-baseline-policy.toml` only when you intentionally change prod
 - systemd service names or enablement expectations
 
 Avoid adding “things that change often” to policy (package versions, job counts, etc.).
-

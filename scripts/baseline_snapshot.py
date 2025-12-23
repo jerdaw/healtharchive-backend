@@ -2,10 +2,10 @@
 from __future__ import annotations
 
 import argparse
+import grp
 import json
 import os
 import pwd
-import grp
 import re
 import socket
 import stat
@@ -55,7 +55,9 @@ def _parse_env_file(path: Path) -> dict[str, str]:
         key, value = line.split("=", 1)
         key = key.strip()
         value = value.strip()
-        if (value.startswith('"') and value.endswith('"')) or (value.startswith("'") and value.endswith("'")):
+        if (value.startswith('"') and value.endswith('"')) or (
+            value.startswith("'") and value.endswith("'")
+        ):
             value = value[1:-1]
         if key:
             out[key] = value
@@ -187,7 +189,9 @@ def _check_hsts_in_caddyfile(caddyfile: Path, api_domain: str) -> tuple[bool, st
     return found, found_value
 
 
-def _http_get_headers(url: str, headers: dict[str, str] | None = None, timeout_s: int = 10) -> dict[str, str]:
+def _http_get_headers(
+    url: str, headers: dict[str, str] | None = None, timeout_s: int = 10
+) -> dict[str, str]:
     req = Request(url, method="GET")
     for k, v in (headers or {}).items():
         req.add_header(k, v)
@@ -206,7 +210,9 @@ def _check_hsts_live(api_base: str, timeout_s: int = 10) -> tuple[bool, str | No
     return True, val
 
 
-def _check_admin_auth_live(api_base: str, admin_token: str | None, timeout_s: int = 10) -> dict[str, Any]:
+def _check_admin_auth_live(
+    api_base: str, admin_token: str | None, timeout_s: int = 10
+) -> dict[str, Any]:
     """
     Validate admin/metrics endpoints are protected and (if token is available)
     also validate that access succeeds with the token.
@@ -241,12 +247,48 @@ def _check_admin_auth_live(api_base: str, admin_token: str | None, timeout_s: in
     return results
 
 
+def _check_cors_live(
+    *,
+    api_base: str,
+    probe_path: str,
+    allowed_origins: list[str],
+    disallowed_origins: list[str],
+    timeout_s: int = 10,
+) -> dict[str, Any]:
+    def probe(origin: str) -> dict[str, Any]:
+        url = f"{api_base}{probe_path}"
+        try:
+            headers = _http_get_headers(url, headers={"Origin": origin}, timeout_s=timeout_s)
+        except URLError as exc:
+            code = getattr(exc, "code", None)
+            return {
+                "origin": origin,
+                "status": int(code) if isinstance(code, int) else None,
+                "allow_origin": None,
+                "vary": None,
+            }
+        return {
+            "origin": origin,
+            "status": 200,
+            "allow_origin": headers.get("Access-Control-Allow-Origin"),
+            "vary": headers.get("Vary"),
+        }
+
+    return {
+        "probe_path": probe_path,
+        "allowed": [probe(o) for o in allowed_origins],
+        "disallowed": [probe(o) for o in disallowed_origins],
+    }
+
+
 def collect_observed(*, policy: dict[str, Any], mode: str = "local") -> dict[str, Any]:
     api_base = policy.get("urls", {}).get("api_base")
     if not isinstance(api_base, str) or not api_base:
         raise ValueError("Policy missing urls.api_base")
 
-    backend_env_file = Path(policy.get("files", {}).get("backend_env_file", "/etc/healtharchive/backend.env"))
+    backend_env_file = Path(
+        policy.get("files", {}).get("backend_env_file", "/etc/healtharchive/backend.env")
+    )
     caddyfile = Path(policy.get("files", {}).get("caddyfile", "/etc/caddy/Caddyfile"))
     api_domain = api_base.replace("https://", "").replace("http://", "").split("/", 1)[0]
 
@@ -288,9 +330,39 @@ def collect_observed(*, policy: dict[str, Any], mode: str = "local") -> dict[str
     hsts_seen = None
     hsts_seen_val = None
     admin_http: dict[str, Any] = {}
+    cors_http: dict[str, Any] = {}
     if mode == "live":
         hsts_seen, hsts_seen_val = _check_hsts_live(api_base)
-        admin_http = _check_admin_auth_live(api_base, admin_token if env["HEALTHARCHIVE_ADMIN_TOKEN_present"] else None)
+        admin_http = _check_admin_auth_live(
+            api_base, admin_token if env["HEALTHARCHIVE_ADMIN_TOKEN_present"] else None
+        )
+        cors_cfg = policy.get("cors", {}) if isinstance(policy.get("cors", {}), dict) else {}
+        probe_path = cors_cfg.get("probe_path", "/api/health")
+        disallowed_origins = cors_cfg.get("disallowed_origins", ["https://example.com"])
+        exact_csv_env = (
+            policy.get("backend_env_csv_set_equals", {})
+            if isinstance(policy.get("backend_env_csv_set_equals", {}), dict)
+            else {}
+        )
+        contains_env = (
+            policy.get("backend_env_contains", {})
+            if isinstance(policy.get("backend_env_contains", {}), dict)
+            else {}
+        )
+        allowed_origins = exact_csv_env.get(
+            "HEALTHARCHIVE_CORS_ORIGINS", contains_env.get("HEALTHARCHIVE_CORS_ORIGINS", [])
+        )
+        if (
+            isinstance(probe_path, str)
+            and isinstance(allowed_origins, list)
+            and isinstance(disallowed_origins, list)
+        ):
+            cors_http = _check_cors_live(
+                api_base=api_base,
+                probe_path=probe_path,
+                allowed_origins=[str(x) for x in allowed_origins],
+                disallowed_origins=[str(x) for x in disallowed_origins],
+            )
 
     observed: dict[str, Any] = {
         "timestamp_utc": _now_utc_iso(),
@@ -326,6 +398,7 @@ def collect_observed(*, policy: dict[str, Any], mode: str = "local") -> dict[str
         "http": {
             "api_base": api_base,
             "admin_checks": admin_http,
+            "cors_checks": cors_http,
         },
     }
 
@@ -372,8 +445,12 @@ def _write_snapshot(observed: dict[str, Any], out_dir: Path) -> Path:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Generate an observed production baseline snapshot.")
-    parser.add_argument("--policy", type=Path, default=_default_policy_path(), help="Path to policy TOML.")
+    parser = argparse.ArgumentParser(
+        description="Generate an observed production baseline snapshot."
+    )
+    parser.add_argument(
+        "--policy", type=Path, default=_default_policy_path(), help="Path to policy TOML."
+    )
     parser.add_argument(
         "--mode",
         choices=["local", "live"],
@@ -404,4 +481,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

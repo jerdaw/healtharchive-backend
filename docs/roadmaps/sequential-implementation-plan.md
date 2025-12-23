@@ -112,6 +112,12 @@ set -a; source /etc/healtharchive/backend.env; set +a
 
 **Current state:** workflow files exist; enforcement is mostly GitHub settings.
 
+Implementation helpers (repo):
+
+- Backend CI workflow: `healtharchive-backend/.github/workflows/backend-ci.yml`
+- Frontend CI workflow: `healtharchive-frontend/.github/workflows/frontend-ci.yml`
+- GitHub branch protection walkthrough: `docs/operations/monitoring-and-ci-checklist.md`
+
 1. Ensure Actions workflows are enabled for both repos:
    - `healtharchive-backend/.github/workflows/backend-ci.yml`
    - `healtharchive-frontend/.github/workflows/frontend-ci.yml`
@@ -128,6 +134,11 @@ set -a; source /etc/healtharchive/backend.env; set +a
 
 **Current state:** guidance + helper scripts exist; requires operator setup.
 
+Implementation helpers (repo):
+
+- Monitor setup walkthrough: `docs/operations/monitoring-and-ci-checklist.md`
+- Pre-flight checker: `scripts/smoke-external-monitors.sh`
+
 1. Configure external uptime monitors:
    - `https://api.healtharchive.ca/api/health`
    - `https://www.healtharchive.ca/archive` (integration check)
@@ -142,10 +153,15 @@ set -a; source /etc/healtharchive/backend.env; set +a
 
 **Current state:** backend CORS is strict-by-default; frontend can fall back to demo mode.
 
+Implementation helpers (repo):
+
+- Canonical wiring doc: `docs/deployment/environments-and-configuration.md`
+- Production drift + wiring validation (includes CORS header checks): `scripts/check_baseline_drift.py --mode live`
+
 1. Set canonical API base on Vercel:
    - `NEXT_PUBLIC_API_BASE_URL=https://api.healtharchive.ca`
 2. Decide branch-preview posture:
-   - Option A (recommended): strict CORS allowlist; branch preview URLs fall back to demo.
+    - Option A (recommended): strict CORS allowlist; branch preview URLs fall back to demo.
    - Option B: allow additional preview origins (higher risk; more surface).
 3. Implement the chosen posture:
    - set `HEALTHARCHIVE_CORS_ORIGINS` explicitly in production env.

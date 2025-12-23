@@ -33,12 +33,18 @@ def _parse_max_age_seconds(hsts_value: str | None) -> int | None:
         return None
 
 
-def _expect_equal(findings: list[Finding], *, level: str, key: str, expected: str, actual: Any) -> None:
+def _expect_equal(
+    findings: list[Finding], *, level: str, key: str, expected: str, actual: Any
+) -> None:
     if actual != expected:
-        findings.append(Finding(level=level, key=key, message=f"expected {expected!r} got {actual!r}"))
+        findings.append(
+            Finding(level=level, key=key, message=f"expected {expected!r} got {actual!r}")
+        )
 
 
-def _expect_true(findings: list[Finding], *, level: str, key: str, actual: Any, message: str) -> None:
+def _expect_true(
+    findings: list[Finding], *, level: str, key: str, actual: Any, message: str
+) -> None:
     if actual is not True:
         findings.append(Finding(level=level, key=key, message=message))
 
@@ -57,7 +63,48 @@ def _expect_contains_all(
     actual_items = {item.strip() for item in actual_value.split(",") if item.strip()}
     missing = [item for item in expected_items if item not in actual_items]
     if missing:
-        findings.append(Finding(level=level, key=key, message=f"missing required origins: {missing!r}"))
+        findings.append(
+            Finding(level=level, key=key, message=f"missing required origins: {missing!r}")
+        )
+
+
+def _parse_csv_set(value: str | None) -> set[str] | None:
+    if value is None:
+        return None
+    return {item.strip() for item in value.split(",") if item.strip()}
+
+
+def _expect_csv_set_equal(
+    findings: list[Finding],
+    *,
+    level: str,
+    key: str,
+    expected_items: Iterable[str],
+    actual_value: str | None,
+) -> None:
+    actual_items = _parse_csv_set(actual_value)
+    if actual_items is None:
+        findings.append(Finding(level=level, key=key, message="value missing"))
+        return
+
+    expected_set = {str(x) for x in expected_items if str(x).strip()}
+    if "*" in actual_items:
+        findings.append(
+            Finding(
+                level=level, key=key, message="wildcard origin '*' is not allowed in production"
+            )
+        )
+        return
+
+    missing = sorted(expected_set - actual_items)
+    extra = sorted(actual_items - expected_set)
+    if missing or extra:
+        parts: list[str] = []
+        if missing:
+            parts.append(f"missing={missing!r}")
+        if extra:
+            parts.append(f"extra={extra!r}")
+        findings.append(Finding(level=level, key=key, message="; ".join(parts)))
 
 
 def _mode_from_policy_mode(policy_mode: str | None) -> str | None:
@@ -81,7 +128,9 @@ def _expect_path(
     required = bool(policy_entry.get("required", False))
     if observed_entry is None:
         if required:
-            findings.append(Finding(level=level, key=key_prefix, message="path missing from snapshot"))
+            findings.append(
+                Finding(level=level, key=key_prefix, message="path missing from snapshot")
+            )
         return
 
     exists = bool(observed_entry.get("exists"))
@@ -98,7 +147,11 @@ def _expect_path(
             actual = observed_entry.get(k)
             if actual != expected:
                 findings.append(
-                    Finding(level=level, key=f"{key_prefix}:{k}", message=f"expected {expected!r} got {actual!r}")
+                    Finding(
+                        level=level,
+                        key=f"{key_prefix}:{k}",
+                        message=f"expected {expected!r} got {actual!r}",
+                    )
                 )
 
     expected_mode = _mode_from_policy_mode(policy_entry.get("mode"))
@@ -128,10 +181,14 @@ def _expect_path(
             pass
 
     if policy_entry.get("must_be_writable") is True and observed_entry.get("writable") is not True:
-        findings.append(Finding(level=level, key=f"{key_prefix}:writable", message="expected writable=true"))
+        findings.append(
+            Finding(level=level, key=f"{key_prefix}:writable", message="expected writable=true")
+        )
 
 
-def evaluate(policy: dict[str, Any], observed: dict[str, Any]) -> tuple[list[Finding], list[Finding]]:
+def evaluate(
+    policy: dict[str, Any], observed: dict[str, Any]
+) -> tuple[list[Finding], list[Finding]]:
     required: list[Finding] = []
     warned: list[Finding] = []
 
@@ -169,16 +226,33 @@ def evaluate(policy: dict[str, Any], observed: dict[str, Any]) -> tuple[list[Fin
             _expect_equal(required, level="FAIL", key=f"env:{k}", expected=v, actual=env.get(k))
 
     # Required CORS origins
-    contains_env = policy.get("backend_env_contains", {})
-    cors_required = contains_env.get("HEALTHARCHIVE_CORS_ORIGINS") if isinstance(contains_env, dict) else None
-    if isinstance(cors_required, list):
-        _expect_contains_all(
+    exact_csv_env = policy.get("backend_env_csv_set_equals", {})
+    exact_required = (
+        exact_csv_env.get("HEALTHARCHIVE_CORS_ORIGINS") if isinstance(exact_csv_env, dict) else None
+    )
+    if isinstance(exact_required, list):
+        _expect_csv_set_equal(
             required,
             level="FAIL",
             key="env:HEALTHARCHIVE_CORS_ORIGINS",
-            expected_items=[str(x) for x in cors_required],
+            expected_items=[str(x) for x in exact_required],
             actual_value=env.get("HEALTHARCHIVE_CORS_ORIGINS"),
         )
+    else:
+        contains_env = policy.get("backend_env_contains", {})
+        cors_required = (
+            contains_env.get("HEALTHARCHIVE_CORS_ORIGINS")
+            if isinstance(contains_env, dict)
+            else None
+        )
+        if isinstance(cors_required, list):
+            _expect_contains_all(
+                required,
+                level="FAIL",
+                key="env:HEALTHARCHIVE_CORS_ORIGINS",
+                expected_items=[str(x) for x in cors_required],
+                actual_value=env.get("HEALTHARCHIVE_CORS_ORIGINS"),
+            )
 
     # Admin token configured + endpoints protected (live checks only)
     security = policy.get("security", {})
@@ -220,6 +294,50 @@ def evaluate(policy: dict[str, Any], observed: dict[str, Any]) -> tuple[list[Fin
     else:
         warn("http:admin_checks", "skipped (mode=local)")
 
+    # Live CORS checks (optional but recommended)
+    if observed.get("inputs", {}).get("mode") == "live":
+        cors_checks = observed.get("http", {}).get("cors_checks", {})
+        if isinstance(cors_checks, dict):
+            allowed = cors_checks.get("allowed", [])
+            disallowed = cors_checks.get("disallowed", [])
+            if isinstance(allowed, list):
+                for row in allowed:
+                    if not isinstance(row, dict):
+                        continue
+                    origin = row.get("origin")
+                    allow_origin = row.get("allow_origin")
+                    status = row.get("status")
+                    if status != 200:
+                        fail(f"cors:allowed:{origin}", f"expected 200 got {status!r}")
+                        continue
+                    if allow_origin != origin:
+                        fail(
+                            f"cors:allowed:{origin}",
+                            f"expected Access-Control-Allow-Origin={origin!r} got {allow_origin!r}",
+                        )
+            if isinstance(disallowed, list):
+                for row in disallowed:
+                    if not isinstance(row, dict):
+                        continue
+                    origin = row.get("origin")
+                    allow_origin = row.get("allow_origin")
+                    status = row.get("status")
+                    if status != 200:
+                        warn(
+                            f"cors:disallowed:{origin}",
+                            f"expected 200 got {status!r} (check reachability)",
+                        )
+                        continue
+                    if allow_origin:
+                        fail(
+                            f"cors:disallowed:{origin}",
+                            f"expected no Access-Control-Allow-Origin, got {allow_origin!r}",
+                        )
+        else:
+            warn("cors_checks", "missing cors_checks in snapshot")
+    else:
+        warn("cors_checks", "skipped (mode=local)")
+
     # HSTS: local requires it be configured in Caddy; live additionally requires it be observed.
     hsts_policy = policy.get("security", {})
     if isinstance(hsts_policy, dict) and hsts_policy.get("hsts_required") is True:
@@ -228,7 +346,10 @@ def evaluate(policy: dict[str, Any], observed: dict[str, Any]) -> tuple[list[Fin
             fail("hsts", "missing hsts snapshot")
         else:
             if hsts.get("configured_in_caddy") is not True:
-                fail("hsts:configured_in_caddy", "HSTS not configured in Caddyfile for API site block")
+                fail(
+                    "hsts:configured_in_caddy",
+                    "HSTS not configured in Caddyfile for API site block",
+                )
 
             min_age = hsts_policy.get("hsts_header_min_max_age_seconds")
             if isinstance(min_age, int):
@@ -260,7 +381,13 @@ def evaluate(policy: dict[str, Any], observed: dict[str, Any]) -> tuple[list[Fin
             path = entry.get("path")
             if not isinstance(path, str) or not path:
                 continue
-            _expect_path(required, level="FAIL", path=path, policy_entry=entry, observed_entry=fs_obs_paths.get(path))
+            _expect_path(
+                required,
+                level="FAIL",
+                path=path,
+                policy_entry=entry,
+                observed_entry=fs_obs_paths.get(path),
+            )
 
     # systemd units
     units_policy = policy.get("systemd", {}).get("units", [])
@@ -292,21 +419,29 @@ def evaluate(policy: dict[str, Any], observed: dict[str, Any]) -> tuple[list[Fin
     return required, warned
 
 
-def _write_outputs(out_dir: Path, *, observed: dict[str, Any], report_text: str) -> tuple[Path, Path]:
+def _write_outputs(
+    out_dir: Path, *, observed: dict[str, Any], report_text: str
+) -> tuple[Path, Path]:
     out_dir.mkdir(parents=True, exist_ok=True)
     ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     observed_path = out_dir / f"observed-{ts}.json"
-    observed_path.write_text(json.dumps(observed, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    observed_path.write_text(
+        json.dumps(observed, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
     report_path = out_dir / f"drift-report-{ts}.txt"
     report_path.write_text(report_text, encoding="utf-8")
 
-    (out_dir / "observed-latest.json").write_text(observed_path.read_text(encoding="utf-8"), encoding="utf-8")
+    (out_dir / "observed-latest.json").write_text(
+        observed_path.read_text(encoding="utf-8"), encoding="utf-8"
+    )
     (out_dir / "drift-report-latest.txt").write_text(report_text, encoding="utf-8")
 
     return observed_path, report_path
 
 
-def _format_report(required: list[Finding], warned: list[Finding], *, policy_path: Path, mode: str) -> str:
+def _format_report(
+    required: list[Finding], warned: list[Finding], *, policy_path: Path, mode: str
+) -> str:
     lines: list[str] = []
     lines.append("HealthArchive baseline drift report")
     lines.append(f"timestamp_utc={datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')}")
@@ -334,7 +469,9 @@ def _format_report(required: list[Finding], warned: list[Finding], *, policy_pat
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Compare production baseline policy against observed VPS state.")
+    parser = argparse.ArgumentParser(
+        description="Compare production baseline policy against observed VPS state."
+    )
     parser.add_argument("--policy", type=Path, default=baseline_snapshot._default_policy_path())
     parser.add_argument(
         "--mode",
@@ -353,7 +490,9 @@ def main() -> int:
         action="store_true",
         help="Do not write any files; print report only (useful for quick checks).",
     )
-    parser.add_argument("--json", action="store_true", help="Also print observed snapshot JSON to stdout.")
+    parser.add_argument(
+        "--json", action="store_true", help="Also print observed snapshot JSON to stdout."
+    )
     args = parser.parse_args()
 
     policy = baseline_snapshot.load_policy(args.policy)
@@ -375,7 +514,9 @@ def main() -> int:
             )
         if not os.access(args.out_dir, os.W_OK):
             raise SystemExit(f"ERROR: out dir not writable: {args.out_dir}")
-        observed_path, report_path = _write_outputs(args.out_dir, observed=observed, report_text=report)
+        observed_path, report_path = _write_outputs(
+            args.out_dir, observed=observed, report_text=report
+        )
         sys.stderr.write(f"Wrote: {observed_path}\nWrote: {report_path}\n")
 
     return 1 if required else 0

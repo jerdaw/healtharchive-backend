@@ -33,13 +33,21 @@ HEALTHARCHIVE_ENV = "production"
 HEALTHARCHIVE_ARCHIVE_ROOT = "/srv/healtharchive/jobs"
 HEALTHARCHIVE_PUBLIC_SITE_URL = "https://healtharchive.ca"
 
-[backend_env_contains]
-# CORS allowlist is intentionally strict in this project. Keep it narrow.
+[backend_env_csv_set_equals]
+# CORS allowlist is intentionally strict in this project. Keep it narrow and
+# keep it exact (no extra origins in prod).
 HEALTHARCHIVE_CORS_ORIGINS = [
   "https://healtharchive.ca",
   "https://www.healtharchive.ca",
   "https://healtharchive.vercel.app",
 ]
+
+[cors]
+# When running drift checks in --mode live, validate that the API actually
+# returns the expected CORS headers for allowed origins (and does not for a
+# known-disallowed origin).
+probe_path = "/api/health"
+disallowed_origins = ["https://example.com"]
 
 [security]
 # Admin endpoints must not be public in production.
