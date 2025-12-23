@@ -26,12 +26,6 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: pre-commit
-        if: github.event_name == 'pull_request'
-        uses: pre-commit/action@v3.0.1
-        with:
-          extra_args: --from-ref ${{ github.event.pull_request.base.sha }} --to-ref ${{ github.sha }}
-
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip

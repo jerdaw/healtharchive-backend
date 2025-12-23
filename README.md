@@ -513,8 +513,7 @@ run on pushes to `main` and on pull requests. It:
 
 - Checks out the repository.
 - Sets up Python 3.11.
-- Runs pre-commit checks on PR diffs (whitespace/EOF, YAML/TOML validation, detecting private keys).
-- Runs `make check` (format check, lint, typecheck, tests, bandit, and a non-blocking `pip-audit`).
+- Runs `make check` (format check, lint, **pre-commit**, typecheck, tests, bandit, and a non-blocking `pip-audit`).
 
 The CI job uses a temporary SQLite database via:
 
