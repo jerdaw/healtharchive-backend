@@ -66,6 +66,11 @@ Verification:
 
 - The PR shows the backend CI check running and passing.
 
+Frontend note:
+
+- In the frontend repo, the typical check name format is:
+  - `Frontend CI / lint-and-test`
+
 ### Step 2 — Enforce PR-only merges into `main` (operator; GitHub settings)
 
 Objective: prevent broken deploys by requiring CI to pass before merge.

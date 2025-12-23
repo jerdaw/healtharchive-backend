@@ -21,9 +21,15 @@ Notes:
 
 **Current state:** configuration-driven; code supports most features but production state can drift.
 
+Best-practice approach: treat baseline as **policy (in git)** + **observed snapshots (generated on VPS)** + **drift checks**.
+
 Implementation helpers (repo):
 
-- Baseline capture script (safe, secret-redacting): `scripts/capture-baseline-inventory.sh`
+- Desired-state policy (in git): `docs/operations/production-baseline-policy.toml`
+- Drift check + snapshot writer (VPS): `scripts/check_baseline_drift.py`
+- Snapshot generator (optional): `scripts/baseline_snapshot.py`
+- Background timer (optional): `docs/deployment/systemd/healtharchive-baseline-drift-check.*`
+- Ops doc: `docs/operations/baseline-drift.md`
 
 1. Record the current values (or “unset”) for:
    - Backend: `HEALTHARCHIVE_ENV`, `HEALTHARCHIVE_DATABASE_URL`, `HEALTHARCHIVE_ARCHIVE_ROOT`,
@@ -43,27 +49,22 @@ Implementation helpers (repo):
    - `https://replay.healtharchive.ca` (if replay is enabled)
 3. Confirm what environments you actively support:
    - “single production backend” vs “staging backend exists”.
-4. Capture a baseline report from the relevant machine(s):
-   - On a laptop / dev machine (repo checkout):
+4. On the production VPS, generate an observed snapshot and drift report:
 
-     ```bash
-     cd healtharchive-backend
-     ./scripts/capture-baseline-inventory.sh
-     ```
+   ```bash
+   cd /opt/healtharchive-backend
+   ./scripts/check_baseline_drift.py --mode live
+   ```
 
-   - On the production VPS (repo checkout):
+   This writes:
 
-     ```bash
-     cd /opt/healtharchive-backend
-     ./scripts/capture-baseline-inventory.sh --env-file /etc/healtharchive/backend.env
-     ```
+   - `/srv/healtharchive/ops/baseline/observed-<timestamp>.json`
+   - `/srv/healtharchive/ops/baseline/drift-report-<timestamp>.txt`
+   - and updates `observed-latest.json` + `drift-report-latest.txt`.
 
-     Notes:
-     - The report is written to `/tmp/healtharchive-baseline-inventory-<ts>.txt` by default.
-     - Secrets are redacted; the script does not source env files.
-5. Write a short baseline note (private is fine) that you can diff later.
+5. If drift is detected, fix production or update policy **only if the change is intentional**.
 
-**Exit criteria:** a single authoritative note exists with current env + URLs + supported environments.
+**Exit criteria:** `./scripts/check_baseline_drift.py --mode live` reports PASS and artifacts exist under `/srv/healtharchive/ops/baseline/`.
 
 ## Phase 1 — Security and access control (must be correct before scaling usage)
 
@@ -111,6 +112,12 @@ set -a; source /etc/healtharchive/backend.env; set +a
 
 **Current state:** workflow files exist; enforcement is mostly GitHub settings.
 
+Implementation helpers (repo):
+
+- Backend CI workflow: `healtharchive-backend/.github/workflows/backend-ci.yml`
+- Frontend CI workflow: `healtharchive-frontend/.github/workflows/frontend-ci.yml`
+- GitHub branch protection walkthrough: `docs/operations/monitoring-and-ci-checklist.md`
+
 1. Ensure Actions workflows are enabled for both repos:
    - `healtharchive-backend/.github/workflows/backend-ci.yml`
    - `healtharchive-frontend/.github/workflows/frontend-ci.yml`
@@ -127,6 +134,11 @@ set -a; source /etc/healtharchive/backend.env; set +a
 
 **Current state:** guidance + helper scripts exist; requires operator setup.
 
+Implementation helpers (repo):
+
+- Monitor setup walkthrough: `docs/operations/monitoring-and-ci-checklist.md`
+- Pre-flight checker: `scripts/smoke-external-monitors.sh`
+
 1. Configure external uptime monitors:
    - `https://api.healtharchive.ca/api/health`
    - `https://www.healtharchive.ca/archive` (integration check)
@@ -141,10 +153,15 @@ set -a; source /etc/healtharchive/backend.env; set +a
 
 **Current state:** backend CORS is strict-by-default; frontend can fall back to demo mode.
 
+Implementation helpers (repo):
+
+- Canonical wiring doc: `docs/deployment/environments-and-configuration.md`
+- Production drift + wiring validation (includes CORS header checks): `scripts/check_baseline_drift.py --mode live`
+
 1. Set canonical API base on Vercel:
    - `NEXT_PUBLIC_API_BASE_URL=https://api.healtharchive.ca`
 2. Decide branch-preview posture:
-   - Option A (recommended): strict CORS allowlist; branch preview URLs fall back to demo.
+    - Option A (recommended): strict CORS allowlist; branch preview URLs fall back to demo.
    - Option B: allow additional preview origins (higher risk; more surface).
 3. Implement the chosen posture:
    - set `HEALTHARCHIVE_CORS_ORIGINS` explicitly in production env.
