@@ -23,7 +23,7 @@ This folder contains the canonical documentation for the **HealthArchive backend
    - `deployment/staging-rollout-checklist.md` (optional future staging)
 5. Operations (how to keep it healthy)
    - `operations/README.md` (index of ops docs)
-6. Roadmaps (historical)
+6. Roadmaps and implementation plans
    - `roadmaps/README.md`
 
 ## Notes
