@@ -28,7 +28,7 @@ Status: **historical reference**. If anything in this document conflicts with op
 
 3) **Work in small increments.** Each deliverable should be implementable as a small PR:
    - Don’t mix governance copywork with major backend refactors in one change.
-   - Keep tests passing (backend `pytest -q`, frontend `npm run lint` + `npm test`).
+   - Keep checks passing (backend `make check`, frontend `npm run check`).
 
 4) **Non-negotiable safety posture (do not weaken).**
    - HealthArchive is an archive + provenance tool, **not** a guidance provider.

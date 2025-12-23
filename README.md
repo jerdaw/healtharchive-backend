@@ -73,11 +73,7 @@ under `src/archive_tool/docs/documentation.md`.
 From the repo root:
 
 ```bash
-python -m venv .venv
-source .venv/bin/activate
-
-# Install runtime + dev dependencies and entrypoints:
-pip install -e ".[dev]"
+make venv
 ```
 
 This provides:
@@ -517,22 +513,8 @@ run on pushes to `main` and on pull requests. It:
 
 - Checks out the repository.
 - Sets up Python 3.11.
-- Installs dependencies with:
-
-  ```bash
-  pip install -e ".[dev]"
-  ```
-
-- Runs the test suite:
-
-  ```bash
-  pytest -q
-  ```
-  - Runs a lightweight security scan over the backend package using Bandit:
-
-  ```bash
-  bandit -r src/ha_backend -q
-  ```
+- Runs pre-commit checks on PR diffs (whitespace/EOF, YAML/TOML validation, detecting private keys).
+- Runs `make check` (format check, lint, typecheck, tests, bandit, and a non-blocking `pip-audit`).
 
 The CI job uses a temporary SQLite database via:
 
