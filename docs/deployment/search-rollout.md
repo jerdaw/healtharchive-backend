@@ -65,4 +65,3 @@ If something looks off in production:
 2) `sudo systemctl restart healtharchive-api`
 
 This reverts default behavior immediately without touching data/migrations. You can still test v2 per-request with `&ranking=v2` while investigating.
-

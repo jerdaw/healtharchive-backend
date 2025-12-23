@@ -29,6 +29,7 @@ dev = [
   "pytest",
   "bandit",
   "pip-audit",
+  "pre-commit",
 ]
 
 [build-system]

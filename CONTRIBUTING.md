@@ -9,6 +9,6 @@
 
 This repo includes a `.pre-commit-config.yaml` with fast, mechanical checks (whitespace/EOF, YAML/TOML validation, detecting private keys).
 
-- Install (recommended): `python -m pip install --user pre-commit`
-- Enable: `pre-commit install`
-- Run on demand: `pre-commit run --all-files`
+- Included in `make check` (recommended for catching CI failures locally).
+- Enable “run on commit” (recommended):
+  - `pre-commit install`
