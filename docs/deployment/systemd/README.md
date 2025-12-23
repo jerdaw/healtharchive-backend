@@ -9,6 +9,7 @@ They implement:
 - Worker priority lowering during campaign (always-on, low-risk)
 - Replay reconciliation timer (pywb indexing; capped)
 - Change tracking timer (edition-aware diffs; capped)
+- Baseline drift check timer (policy vs observed; detects config drift)
 - Optional "timer ran" pings (Healthchecks-style)
 - Annual search verification capture (optional, safe)
 
@@ -58,6 +59,11 @@ Assumptions (adjust paths/user if your VPS differs):
   - Runs `scripts/annual-search-verify.sh` daily, but captures **once per year** (idempotent).
 - `healtharchive-annual-search-verify.timer`
   - Daily timer for `healtharchive-annual-search-verify.service`.
+- `healtharchive-baseline-drift-check.service`
+  - Runs `scripts/check_baseline_drift.py` (policy vs observed; writes artifacts under `/srv/healtharchive/ops/baseline/`).
+  - Gated by `ConditionPathExists=/etc/healtharchive/baseline-drift-enabled`.
+- `healtharchive-baseline-drift-check.timer`
+  - Weekly timer for `healtharchive-baseline-drift-check.service`.
 
 ---
 
@@ -76,6 +82,8 @@ matches your operational readiness.
   - Enable only if replay is enabled and stable.
 - **Annual search verification** (`healtharchive-annual-search-verify.timer`)
   - Optional; safe to enable if you want a yearly search QA artifact.
+- **Baseline drift check** (`healtharchive-baseline-drift-check.timer`)
+  - Recommended; low-risk and catches “silent” ops drift.
 
 If a timer is enabled, also ensure its sentinel file exists under
 `/etc/healtharchive/` (see the enablement sections below).
@@ -130,6 +138,14 @@ sudo install -m 0644 -o root -g root \
 sudo install -m 0644 -o root -g root \
   /opt/healtharchive-backend/docs/deployment/systemd/healtharchive-annual-search-verify.timer \
   /etc/systemd/system/healtharchive-annual-search-verify.timer
+
+sudo install -m 0644 -o root -g root \
+  /opt/healtharchive-backend/docs/deployment/systemd/healtharchive-baseline-drift-check.service \
+  /etc/systemd/system/healtharchive-baseline-drift-check.service
+
+sudo install -m 0644 -o root -g root \
+  /opt/healtharchive-backend/docs/deployment/systemd/healtharchive-baseline-drift-check.timer \
+  /etc/systemd/system/healtharchive-baseline-drift-check.timer
 ```
 
 Install the worker priority drop-in:
@@ -319,6 +335,35 @@ Artifacts default to:
 
 To force a re-run for the current year, delete that directory and run the
 service once.
+
+---
+
+## Enable baseline drift checks (recommended)
+
+Baseline drift checks validate that production still matches the project’s
+expected invariants (security posture, perms, unit enablement).
+
+Create the sentinel file:
+
+```bash
+sudo install -m 0644 -o root -g root /dev/null /etc/healtharchive/baseline-drift-enabled
+```
+
+Enable the timer:
+
+```bash
+sudo systemctl enable --now healtharchive-baseline-drift-check.timer
+systemctl list-timers | rg healtharchive-baseline-drift-check || systemctl list-timers | grep healtharchive-baseline-drift-check
+```
+
+Artifacts are written under:
+
+- `/srv/healtharchive/ops/baseline/`
+
+If the drift check fails, inspect:
+
+- `/srv/healtharchive/ops/baseline/drift-report-latest.txt`
+- `journalctl -u healtharchive-baseline-drift-check.service --no-pager -l`
 
 ---
 

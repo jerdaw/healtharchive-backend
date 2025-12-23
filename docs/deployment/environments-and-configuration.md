@@ -17,6 +17,7 @@ For deeper operational details, see:
 - `production-single-vps.md` (current production runbook)
 - `hosting-and-live-server-to-dos.md` (high-level deployment checklist)
 - `../operations/monitoring-and-ci-checklist.md` (uptime/monitoring guidance)
+- `../operations/baseline-drift.md` (production drift checks: policy vs observed)
 - Frontend docs: `healtharchive-frontend/docs/implementation-guide.md`
 - Frontend verification: `healtharchive-frontend/docs/deployment/verification.md`
 
@@ -37,6 +38,22 @@ Expected limitation (by design):
 
 - Branch preview URLs like `https://healtharchive-git-...vercel.app` may fall
   back to demo mode until we explicitly allow those origins (CORS).
+
+## 1.1 Validate production wiring (recommended)
+
+On the production VPS, run the baseline drift check in live mode:
+
+```bash
+cd /opt/healtharchive-backend
+./scripts/check_baseline_drift.py --mode live
+```
+
+This validates:
+
+- env vars are set as expected (including CORS allowlist),
+- HSTS is configured and observed,
+- admin endpoints are protected,
+- CORS headers are actually returned for the allowed origins.
 
 ### Matrix
 
