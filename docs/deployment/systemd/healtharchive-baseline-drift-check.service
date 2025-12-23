@@ -12,4 +12,3 @@ WorkingDirectory=/opt/healtharchive-backend
 
 # Writes artifacts under /srv/healtharchive/ops/baseline and exits non-zero on required drift.
 ExecStart=/usr/bin/python3 /opt/healtharchive-backend/scripts/check_baseline_drift.py --mode local
-

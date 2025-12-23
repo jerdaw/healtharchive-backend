@@ -5,8 +5,8 @@ Goal: avoid “configuration drift” where production stops matching what the p
 
 This is implemented as:
 
-1) **Desired state (in git)**: `production-baseline-policy.toml`  
-2) **Observed state (generated on the VPS)**: JSON snapshots written to `/srv/healtharchive/ops/baseline/`  
+1) **Desired state (in git)**: `production-baseline-policy.toml`
+2) **Observed state (generated on the VPS)**: JSON snapshots written to `/srv/healtharchive/ops/baseline/`
 3) **Drift check**: compares observed vs policy and fails on required mismatches
 
 ## Files
