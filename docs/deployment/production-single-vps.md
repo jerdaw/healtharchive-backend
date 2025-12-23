@@ -75,10 +75,31 @@ Directories:
 
 ```bash
 sudo groupadd --system healtharchive 2>/dev/null || true
-sudo mkdir -p /srv/healtharchive/jobs /srv/healtharchive/backups
+sudo mkdir -p /srv/healtharchive/jobs /srv/healtharchive/backups /srv/healtharchive/ops
 sudo chown -R haadmin:haadmin /srv/healtharchive/jobs
 sudo chown root:healtharchive /srv/healtharchive/backups
 sudo chmod 2770 /srv/healtharchive/backups
+sudo chown root:healtharchive /srv/healtharchive/ops
+sudo chmod 2770 /srv/healtharchive/ops
+```
+
+Ops directories (public-safe logs + artifacts):
+
+- `root:healtharchive` ownership + `2770` perms is intentional:
+  - `root` owns the directory tree
+  - operators (e.g., `haadmin`) write via the `healtharchive` group
+  - the setgid bit keeps group ownership consistent on new files/dirs
+
+Create the standard subdirectories:
+
+```bash
+sudo mkdir -p \
+  /srv/healtharchive/ops/baseline \
+  /srv/healtharchive/ops/restore-tests \
+  /srv/healtharchive/ops/adoption \
+  /srv/healtharchive/ops/search-eval
+sudo chown -R root:healtharchive /srv/healtharchive/ops
+sudo chmod 2770 /srv/healtharchive/ops /srv/healtharchive/ops/*
 ```
 
 Postgres:
@@ -196,6 +217,16 @@ cd /opt/healtharchive-backend
 ./scripts/vps-deploy.sh --apply --ref <GIT_SHA>
 ```
 
+Notes:
+
+- The deploy script runs a **baseline drift check** by default to catch
+  misconfiguration (HSTS, admin auth posture, perms, systemd enablement).
+  - Artifacts are written to: `/srv/healtharchive/ops/baseline/`
+  - You can skip in emergencies: `./scripts/vps-deploy.sh --apply --skip-baseline-drift`
+  - To require live HTTPS checks (DNS/TLS): `./scripts/vps-deploy.sh --apply --baseline-mode live`
+- The baseline policy (desired state) is versioned in git at:
+  `docs/operations/production-baseline-policy.toml`
+
 ---
 
 ## 5) HTTPS + DNS (Caddy)
@@ -206,6 +237,7 @@ cd /opt/healtharchive-backend
 
 ```caddyfile
 api.healtharchive.ca {
+  header Strict-Transport-Security "max-age=31536000"
   reverse_proxy 127.0.0.1:8001
 }
 ```

@@ -27,3 +27,4 @@
 - Search relevance evaluation (process + commands): `search-quality.md`
 - Golden queries + expected results (living checklist): `search-golden-queries.md`
 - Replay + preview automation plan (design + guardrails; includes `replay-reconcile`): `replay-and-preview-automation-plan.md`
+- Production baseline drift checks (policy + snapshot + compare): `baseline-drift.md`

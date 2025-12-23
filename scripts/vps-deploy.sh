@@ -10,6 +10,7 @@ Safe-by-default: this script is DRY-RUN unless you pass --apply.
 Usage:
   ./scripts/vps-deploy.sh [--apply] [--ref REF] [--repo-dir DIR] [--env-file FILE] [--health-url URL]
                          [--skip-deps] [--skip-migrations] [--skip-restart] [--restart-replay]
+                         [--skip-baseline-drift] [--baseline-mode MODE]
                          [--allow-dirty] [--no-pull] [--lock-file FILE]
 
 Examples (on the VPS):
@@ -44,6 +45,8 @@ SKIP_DEPS="false"
 SKIP_MIGRATIONS="false"
 SKIP_RESTART="false"
 RESTART_REPLAY="false"
+SKIP_BASELINE_DRIFT="false"
+BASELINE_MODE="local"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -94,6 +97,14 @@ while [[ $# -gt 0 ]]; do
     --restart-replay)
       RESTART_REPLAY="true"
       shift 1
+      ;;
+    --skip-baseline-drift)
+      SKIP_BASELINE_DRIFT="true"
+      shift 1
+      ;;
+    --baseline-mode)
+      BASELINE_MODE="$2"
+      shift 2
       ;;
     -h|--help)
       usage
@@ -199,6 +210,7 @@ echo "Repo:        ${REPO_DIR}"
 echo "Env file:    ${ENV_FILE}"
 echo "Health URL:  ${HEALTH_URL}"
 echo "Lock file:   ${LOCK_FILE}"
+echo "Baseline:    $([[ "${SKIP_BASELINE_DRIFT}" == "true" ]] && echo SKIPPED || echo "ENABLED (mode=${BASELINE_MODE})")"
 if [[ -n "${REF}" ]]; then
   echo "Ref:         ${REF}"
 fi
@@ -257,6 +269,24 @@ fi
 
 wait_for_health "${HEALTH_URL}" 30 1
 run bash -lc "curl -fsS \"${HEALTH_URL}\" | head -c 2000; echo"
+
+if [[ "${SKIP_BASELINE_DRIFT}" != "true" ]]; then
+  case "${BASELINE_MODE}" in
+    local|live)
+      ;;
+    *)
+      echo "ERROR: --baseline-mode must be 'local' or 'live' (got: ${BASELINE_MODE})" >&2
+      exit 2
+      ;;
+  esac
+
+  # Capture and enforce production baseline invariants (security posture, perms,
+  # systemd enablement, etc.). This is intentionally a post-deploy gate so we
+  # catch drift before calling the deploy "done".
+  run "${VENV_BIN}/python3" ./scripts/check_baseline_drift.py --mode "${BASELINE_MODE}"
+else
+  echo "Skipping baseline drift check (--skip-baseline-drift)."
+fi
 
 echo ""
 echo "Deploy complete."
