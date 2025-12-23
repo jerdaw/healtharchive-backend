@@ -33,8 +33,9 @@ HEALTHARCHIVE_ENV = "production"
 HEALTHARCHIVE_ARCHIVE_ROOT = "/srv/healtharchive/jobs"
 HEALTHARCHIVE_PUBLIC_SITE_URL = "https://healtharchive.ca"
 
+[backend_env_contains]
 # CORS allowlist is intentionally strict in this project. Keep it narrow.
-HEALTHARCHIVE_CORS_ORIGINS_contains = [
+HEALTHARCHIVE_CORS_ORIGINS = [
   "https://healtharchive.ca",
   "https://www.healtharchive.ca",
   "https://healtharchive.vercel.app",
@@ -122,4 +123,3 @@ must_be_enabled = true
 name = "healtharchive-worker.service"
 required = true
 must_be_enabled = true
-

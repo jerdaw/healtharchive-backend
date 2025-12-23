@@ -163,10 +163,14 @@ def evaluate(policy: dict[str, Any], observed: dict[str, Any]) -> tuple[list[Fin
     required_env = policy.get("backend_env_required", {})
     if isinstance(required_env, dict):
         for k, v in required_env.items():
+            if not isinstance(v, str):
+                fail(f"policy:backend_env_required:{k}", "expected a string value in policy")
+                continue
             _expect_equal(required, level="FAIL", key=f"env:{k}", expected=v, actual=env.get(k))
 
     # Required CORS origins
-    cors_required = policy.get("backend_env_required", {}).get("HEALTHARCHIVE_CORS_ORIGINS_contains")
+    contains_env = policy.get("backend_env_contains", {})
+    cors_required = contains_env.get("HEALTHARCHIVE_CORS_ORIGINS") if isinstance(contains_env, dict) else None
     if isinstance(cors_required, list):
         _expect_contains_all(
             required,
