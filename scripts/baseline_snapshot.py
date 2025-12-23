@@ -320,6 +320,7 @@ def collect_observed(*, policy: dict[str, Any], mode: str = "local") -> dict[str
         "HEALTHARCHIVE_REPLAY_BASE_URL",
         "HEALTHARCHIVE_REPLAY_PREVIEW_DIR",
         "HEALTHARCHIVE_USAGE_METRICS_ENABLED",
+        "HEALTHARCHIVE_USAGE_METRICS_WINDOW_DAYS",
         "HEALTHARCHIVE_CHANGE_TRACKING_ENABLED",
         "HEALTHARCHIVE_EXPORTS_ENABLED",
     ):
