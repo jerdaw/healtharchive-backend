@@ -41,8 +41,8 @@ settings drift”.
 3. Decide the `main` branch policy:
    - **PR-only merges** into `main` (recommended).
    - Whether admins should be subject to protection:
-     - Solo-dev: **do not** “Include administrators” (lets you bypass in emergencies).
-     - Team repo: enable “Include administrators”.
+     - Recommended best practice: enable **Include administrators** (prevents accidental bypass).
+     - If you intentionally want a “break glass” bypass, document it explicitly and keep it rare.
 
 Verification:
 
@@ -83,8 +83,9 @@ GitHub → Repo → Settings → Branches → Branch protection rules → Add/ed
 4. Recommended (low friction, high value):
    - Enable **Require branches to be up to date before merging**.
    - Disable force pushes.
-5. Solo-dev posture (per current project reality):
-   - Leave **Include administrators** OFF.
+5. Best practice hardening (recommended):
+   - Enable **Include administrators**.
+   - Enable **Require review from Code Owners** (requires `.github/CODEOWNERS` in the repo).
 
 Verification:
 
@@ -444,9 +445,8 @@ In each repo:
    - Select:
      - The backend CI workflow for the backend repo.
      - The frontend CI workflow for the frontend repo.
-   - Optionally:
-     - Enable **Include administrators** (recommended for team repos; solo-dev
-       can leave this off for emergency bypasses).
+   - Enable **Include administrators** (recommended best practice).
+   - Enable **Require review from Code Owners** (recommended; requires `.github/CODEOWNERS`).
 
 This ensures:
 
