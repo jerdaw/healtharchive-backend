@@ -11,7 +11,7 @@
 # The drift checker validates this policy against the real VPS configuration
 # (without printing or persisting secrets).
 
-version = 1
+version = 2
 
 # The operator account expected to run deploy scripts and ops checks.
 operator_user = "haadmin"
@@ -32,6 +32,10 @@ caddyfile = "/etc/caddy/Caddyfile"
 HEALTHARCHIVE_ENV = "production"
 HEALTHARCHIVE_ARCHIVE_ROOT = "/srv/healtharchive/jobs"
 HEALTHARCHIVE_PUBLIC_SITE_URL = "https://healtharchive.ca"
+HEALTHARCHIVE_REPLAY_BASE_URL = "https://replay.healtharchive.ca"
+HEALTHARCHIVE_REPLAY_PREVIEW_DIR = "/srv/healtharchive/replay/previews"
+HEALTHARCHIVE_USAGE_METRICS_ENABLED = "1"
+HEALTHARCHIVE_USAGE_METRICS_WINDOW_DAYS = "30"
 
 [backend_env_csv_set_equals]
 # CORS allowlist is intentionally strict in this project. Keep it narrow and

@@ -54,6 +54,13 @@ The policy enforces a **strict** production allowlist (no extra origins) via
 - `--mode live` additionally probes the API with an `Origin:` header and checks
   real `Access-Control-Allow-Origin` behavior.
 
+## Replay + usage invariants
+
+The policy can also pin “public UX” toggles that affect what users see:
+
+- `HEALTHARCHIVE_REPLAY_BASE_URL` and `HEALTHARCHIVE_REPLAY_PREVIEW_DIR` (replay browse URLs + previews)
+- `HEALTHARCHIVE_USAGE_METRICS_ENABLED` and `HEALTHARCHIVE_USAGE_METRICS_WINDOW_DAYS` (public `/status` + `/impact`)
+
 ## When to update policy
 
 Update `production-baseline-policy.toml` only when you intentionally change production invariants:
