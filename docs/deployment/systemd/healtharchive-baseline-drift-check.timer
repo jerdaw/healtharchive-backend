@@ -1,0 +1,11 @@
+[Unit]
+Description=Run HealthArchive baseline drift check weekly
+
+[Timer]
+OnCalendar=Sun *-*-* 03:30:00 UTC
+RandomizedDelaySec=2h
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+

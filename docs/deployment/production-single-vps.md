@@ -217,6 +217,16 @@ cd /opt/healtharchive-backend
 ./scripts/vps-deploy.sh --apply --ref <GIT_SHA>
 ```
 
+Notes:
+
+- The deploy script runs a **baseline drift check** by default to catch
+  misconfiguration (HSTS, admin auth posture, perms, systemd enablement).
+  - Artifacts are written to: `/srv/healtharchive/ops/baseline/`
+  - You can skip in emergencies: `./scripts/vps-deploy.sh --apply --skip-baseline-drift`
+  - To require live HTTPS checks (DNS/TLS): `./scripts/vps-deploy.sh --apply --baseline-mode live`
+- The baseline policy (desired state) is versioned in git at:
+  `docs/operations/production-baseline-policy.toml`
+
 ---
 
 ## 5) HTTPS + DNS (Caddy)
@@ -227,6 +237,7 @@ cd /opt/healtharchive-backend
 
 ```caddyfile
 api.healtharchive.ca {
+  header Strict-Transport-Security "max-age=31536000"
   reverse_proxy 127.0.0.1:8001
 }
 ```

@@ -21,9 +21,15 @@ Notes:
 
 **Current state:** configuration-driven; code supports most features but production state can drift.
 
+Best-practice approach: treat baseline as **policy (in git)** + **observed snapshots (generated on VPS)** + **drift checks**.
+
 Implementation helpers (repo):
 
-- Baseline capture script (safe, secret-redacting): `scripts/capture-baseline-inventory.sh`
+- Desired-state policy (in git): `docs/operations/production-baseline-policy.toml`
+- Drift check + snapshot writer (VPS): `scripts/check_baseline_drift.py`
+- Snapshot generator (optional): `scripts/baseline_snapshot.py`
+- Background timer (optional): `docs/deployment/systemd/healtharchive-baseline-drift-check.*`
+- Ops doc: `docs/operations/baseline-drift.md`
 
 1. Record the current values (or “unset”) for:
    - Backend: `HEALTHARCHIVE_ENV`, `HEALTHARCHIVE_DATABASE_URL`, `HEALTHARCHIVE_ARCHIVE_ROOT`,
@@ -43,29 +49,22 @@ Implementation helpers (repo):
    - `https://replay.healtharchive.ca` (if replay is enabled)
 3. Confirm what environments you actively support:
    - “single production backend” vs “staging backend exists”.
-4. Capture a baseline report from the relevant machine(s):
-   - On a laptop / dev machine (repo checkout):
+4. On the production VPS, generate an observed snapshot and drift report:
 
-     ```bash
-     cd healtharchive-backend
-     ./scripts/capture-baseline-inventory.sh
-     ```
+   ```bash
+   cd /opt/healtharchive-backend
+   ./scripts/check_baseline_drift.py --mode live
+   ```
 
-   - On the production VPS (repo checkout):
+   This writes:
 
-     ```bash
-     cd /opt/healtharchive-backend
-     ./scripts/capture-baseline-inventory.sh --env-file /etc/healtharchive/backend.env --out /srv/healtharchive/ops/baseline/healtharchive-baseline-$(date -u +%F).txt
-     ```
+   - `/srv/healtharchive/ops/baseline/observed-<timestamp>.json`
+   - `/srv/healtharchive/ops/baseline/drift-report-<timestamp>.txt`
+   - and updates `observed-latest.json` + `drift-report-latest.txt`.
 
-     Notes:
-     - The report is written to `/tmp/healtharchive-baseline-inventory-<ts>.txt` by default.
-      - Secrets are redacted; the script does not source env files.
-     - If `/srv/healtharchive/ops/baseline/` does not exist, create it using the production runbook:
-       `docs/deployment/production-single-vps.md`.
-5. Write a short baseline note (private is fine) that you can diff later.
+5. If drift is detected, fix production or update policy **only if the change is intentional**.
 
-**Exit criteria:** a single authoritative note exists with current env + URLs + supported environments.
+**Exit criteria:** `./scripts/check_baseline_drift.py --mode live` reports PASS and artifacts exist under `/srv/healtharchive/ops/baseline/`.
 
 ## Phase 1 — Security and access control (must be correct before scaling usage)
 
