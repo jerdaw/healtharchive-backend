@@ -30,7 +30,7 @@ def _http_request(
     read_limit_bytes: int = 64 * 1024,
 ) -> HttpResponse:
     data = None
-    hdrs = {"User-Agent": "healtharchive-verify-phase5-7/1.0"}
+    hdrs = {"User-Agent": "healtharchive-verify-public-surface/1.0"}
     if headers:
         hdrs.update(headers)
 
@@ -76,7 +76,7 @@ def _ok(msg: str) -> None:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        description="Verify HealthArchive phases 5-7 (public UX + replay + usage)."
+        description="Verify HealthArchive public surface (frontend + public API + replay + usage metrics)."
     )
     parser.add_argument(
         "--api-base", default="https://api.healtharchive.ca", help="Backend API base URL."
@@ -117,7 +117,7 @@ def main(argv: list[str] | None = None) -> int:
 
     failures = 0
 
-    print("HealthArchive phase 5-7 verification")
+    print("HealthArchive public surface verification")
     print("-----------------------------------")
     print(f"API base:      {api_base}")
     print(f"Frontend base: {frontend_base}")

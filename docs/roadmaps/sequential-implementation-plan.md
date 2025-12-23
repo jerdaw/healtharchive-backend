@@ -179,7 +179,7 @@ Implementation helpers (repo):
 
 Implementation helpers (repo):
 
-- Phase 5–7 verifier (public UX + replay + usage): `scripts/verify_phase5_7.py`
+- Public-surface verifier (frontend + public API + replay + usage): `scripts/verify_public_surface.py`
 
 1. Verify core public routes against the live backend:
    - `/archive` search + pagination
@@ -190,7 +190,7 @@ Implementation helpers (repo):
    - clear fallback notices
    - demo dataset is used
 
-**Exit criteria:** `scripts/verify_phase5_7.py` passes and degradations are clear and safe.
+**Exit criteria:** `scripts/verify_public_surface.py` passes and degradations are clear and safe.
 
 ## Phase 6 — Replay service (full-fidelity browsing) + snapshot viewer fidelity
 
