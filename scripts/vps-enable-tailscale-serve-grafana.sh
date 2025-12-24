@@ -66,6 +66,15 @@ run() {
   "$@"
 }
 
+is_url_up() {
+  local url="$1"
+  local health_url="${url%/}/api/health"
+  if ! command -v curl >/dev/null 2>&1; then
+    return 0
+  fi
+  curl -fsS --max-time 2 "${health_url}" >/dev/null 2>&1
+}
+
 if [[ "${APPLY}" == "true" && "${EUID}" -ne 0 ]]; then
   echo "ERROR: --apply requires root (use sudo)." >&2
   exit 1
@@ -99,12 +108,38 @@ fi
 if [[ "${APPLY}" != "true" ]]; then
   echo "+ (try: tailscale serve --bg ${GRAFANA_URL}; fallback to legacy syntax if unsupported)"
 else
-  set +e
-  tailscale serve --bg "${GRAFANA_URL}" >/dev/null 2>&1
-  rc=$?
-  set -e
+  if ! is_url_up "${GRAFANA_URL}"; then
+    echo "ERROR: Grafana does not appear reachable at ${GRAFANA_URL} (try ${GRAFANA_URL%/}/api/health)." >&2
+    echo "Start/fix Grafana first, then re-run this script." >&2
+    exit 1
+  fi
+
+  out=""
+  rc=0
+  if command -v timeout >/dev/null 2>&1; then
+    out="$(timeout 10s tailscale serve --bg "${GRAFANA_URL}" 2>&1)"
+    rc=$?
+  else
+    out="$(tailscale serve --bg "${GRAFANA_URL}" 2>&1)"
+    rc=$?
+  fi
+
   if [[ "${rc}" -ne 0 ]]; then
-    tailscale serve https / "${GRAFANA_URL}"
+    if [[ "${rc}" -eq 124 ]]; then
+      echo "ERROR: tailscale serve --bg timed out after 10s." >&2
+      echo "Output:" >&2
+      echo "${out}" >&2
+      exit 124
+    fi
+
+    if [[ "${out}" == *"unknown flag: --bg"* || "${out}" == *"flag provided but not defined"* || "${out}" == *"unknown shorthand flag"* ]]; then
+      tailscale serve https / "${GRAFANA_URL}"
+    else
+      echo "ERROR: tailscale serve --bg failed." >&2
+      echo "Output:" >&2
+      echo "${out}" >&2
+      exit "${rc}"
+    fi
   fi
 fi
 
