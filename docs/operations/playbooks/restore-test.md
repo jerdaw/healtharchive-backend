@@ -18,4 +18,3 @@ Canonical reference:
 
 - A dated restore-test log exists under `/srv/healtharchive/ops/restore-tests/`.
 - Core API checks against the restored DB succeed (health, stats, sources).
-

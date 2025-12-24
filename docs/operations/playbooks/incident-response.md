@@ -28,4 +28,3 @@ Canonical references:
 
 - The public surface verification passes again.
 - The underlying cause is identified (config drift, failed migration, disk, external dependency, etc.).
-

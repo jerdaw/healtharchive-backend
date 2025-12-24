@@ -27,4 +27,3 @@ Replay depends on WARCs staying on disk. Do not delete WARCs for jobs you expect
 
 - `https://replay.healtharchive.ca/` responds successfully.
 - `./scripts/verify_public_surface.py` reports a working replay `browseUrl` where expected.
-
