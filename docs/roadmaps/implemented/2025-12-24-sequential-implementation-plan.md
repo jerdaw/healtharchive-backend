@@ -135,10 +135,11 @@ Implementation helpers (repo):
    - if you use a local alias like `dodeploy`, ensure you still run:
      - `./scripts/check_baseline_drift.py --mode live`
      - `./scripts/verify_public_surface.py`
-4. TODO (tighten later when there are multiple committers):
+4. Future (tighten later when there are multiple committers):
    - require PR
    - require status checks
    - include administrators + require code owner review
+   - track in `../future-roadmap.md`
 
 **Exit criteria:** deploys only happen from a green `main`, and post-deploy verification is routine.
 

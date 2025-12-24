@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import List
@@ -57,12 +58,12 @@ DEFAULT_USAGE_METRICS_WINDOW_DAYS = 30
 
 # === Change tracking ===
 
-# Precomputed change events and diff artifacts (Phase 3).
+# Precomputed change events and diff artifacts (change tracking pipeline).
 DEFAULT_CHANGE_TRACKING_ENABLED = True
 
 # === Research exports ===
 
-# Public, metadata-only exports for research (Phase 5).
+# Public, metadata-only exports for research.
 DEFAULT_EXPORTS_ENABLED = True
 DEFAULT_EXPORTS_DEFAULT_LIMIT = 1000
 DEFAULT_EXPORTS_MAX_LIMIT = 10000
@@ -85,7 +86,14 @@ class ArchiveToolConfig:
         Ensure the archive root directory exists and is writable.
         """
         self.archive_root.mkdir(parents=True, exist_ok=True)
-        # Optionally: add a simple writability check here later.
+        try:
+            with tempfile.NamedTemporaryFile(
+                dir=self.archive_root, prefix=".ha_write_test_", delete=True
+            ) as file:
+                file.write(b"ok")
+                file.flush()
+        except OSError as exc:
+            raise RuntimeError(f"Archive root is not writable: {self.archive_root}") from exc
 
 
 # Simple global accessor for now; later we can make this more flexible.

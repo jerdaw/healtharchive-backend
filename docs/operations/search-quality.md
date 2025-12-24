@@ -175,9 +175,11 @@ data intact.
 - Default: duplicates are hidden.
 - To include them: `GET /api/search?...&view=snapshots&includeDuplicates=true`
 
-TODO (storage-only, must preserve trustworthiness): if we can *prove* the HTML
+Future (storage-only, must preserve trustworthiness): if we can *prove* the HTML
 payload is identical (and preserve provenance), consider pruning same-day
-duplicates from storage to save disk space.
+duplicates from storage to save disk space. Track this work in:
+
+- `../roadmaps/future-roadmap.md`
 
 ### 5.3 Backfill outlinks + authority signals
 
