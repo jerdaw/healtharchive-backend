@@ -187,12 +187,19 @@ Systemd services:
 
 Optional systemd automation (recommended):
 
+- Install/update systemd unit templates from this repo:
+  - `./scripts/vps-install-systemd-units.sh --apply`
+  - Templates + enablement steps: `deployment/systemd/README.md`
+- Baseline drift check timer (weekly; low-risk, recommended):
+  - Templates + enablement steps: `deployment/systemd/README.md`
 - Annual scheduling timer (Jan 01 UTC) + worker priority drop-in:
   - Templates + install steps: `deployment/systemd/README.md`
 - Replay reconciliation timer (pywb indexing; capped, optional):
   - Templates + install steps: `deployment/systemd/README.md`
 - Change tracking timer (edition-aware diffs; capped):
   - Templates + install steps: `deployment/systemd/README.md`
+- Annual search verification capture (optional; safe):
+  - Templates + enablement steps: `deployment/systemd/README.md`
 
 Enable + start:
 

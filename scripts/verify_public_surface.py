@@ -103,10 +103,22 @@ def main(argv: list[str] | None = None) -> int:
         help="Do not fail if /api/exports reports enabled=false.",
     )
     parser.add_argument(
+        "--allow-change-tracking-disabled",
+        action="store_true",
+        default=False,
+        help="Do not fail if /api/changes reports enabled=false.",
+    )
+    parser.add_argument(
         "--skip-exports",
         action="store_true",
         default=False,
         help="Skip export endpoint checks (Phase 8).",
+    )
+    parser.add_argument(
+        "--skip-changes",
+        action="store_true",
+        default=False,
+        help="Skip change tracking checks (Phase 12).",
     )
     parser.add_argument(
         "--require-source",
@@ -308,12 +320,52 @@ def main(argv: list[str] | None = None) -> int:
             _fail("api usage enabled=false (expected enabled=true for Phase 7)")
             failures += 1
 
+    if not args.skip_changes:
+        changes_url = f"{api_base}/api/changes?pageSize=1"
+        changes, changes_json = _http_json(changes_url, timeout_s=timeout_s)
+        if changes.status != 200 or not isinstance(changes_json, dict):
+            _fail(f"api changes status={changes.status} url={changes_url}")
+            failures += 1
+        else:
+            enabled = changes_json.get("enabled")
+            if enabled is True:
+                _ok("api changes enabled=true")
+
+                rss = _http_request(
+                    f"{api_base}/api/changes/rss",
+                    timeout_s=timeout_s,
+                    method="GET",
+                    read_limit_bytes=64 * 1024,
+                    headers={"Accept": "application/rss+xml, application/xml;q=0.9, */*;q=0.1"},
+                )
+                content_type = (
+                    rss.headers.get("Content-Type") or rss.headers.get("content-type") or ""
+                ).lower()
+                if rss.status != 200 or ("xml" not in content_type and "rss" not in content_type):
+                    _fail(
+                        f"api changes rss status={rss.status} content-type={content_type!r} url={api_base}/api/changes/rss"
+                    )
+                    failures += 1
+                else:
+                    _ok("api changes rss status=200")
+            elif args.allow_change_tracking_disabled:
+                _ok("api changes enabled=false (allowed)")
+            else:
+                _fail("api changes enabled=false (expected enabled=true for Phase 12)")
+                failures += 1
+
     if not args.skip_frontend:
         pages: list[tuple[str, str]] = [
             ("archive", f"{frontend_base}/archive"),
             ("browse-by-source", f"{frontend_base}/archive/browse-by-source"),
+            ("changes", f"{frontend_base}/changes"),
+            ("digest", f"{frontend_base}/digest"),
             ("exports", f"{frontend_base}/exports"),
             ("researchers", f"{frontend_base}/researchers"),
+            ("brief", f"{frontend_base}/brief"),
+            ("cite", f"{frontend_base}/cite"),
+            ("methods", f"{frontend_base}/methods"),
+            ("governance", f"{frontend_base}/governance"),
             ("status", f"{frontend_base}/status"),
             ("impact", f"{frontend_base}/impact"),
         ]
