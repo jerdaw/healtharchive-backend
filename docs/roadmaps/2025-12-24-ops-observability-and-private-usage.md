@@ -203,23 +203,27 @@ Rollback:
 
 **Goal:** provide a minimal set of signals that catch real outages: disk, CPU, memory, DB health.
 
+Status: implemented in this repo (installer script + playbook); requires running on the VPS.
+
 Deliverables:
 
 - Node exporter running as a service (private bind).
 - Postgres exporter running as a service (private bind), using a least-privilege role.
+  - Role: `postgres_exporter` with `pg_monitor`.
+  - Credentials: `/etc/healtharchive/observability/postgres_exporter.env` (root-owned).
 
 Steps:
 
-1. Choose install method (recommended): Ubuntu packages + systemd.
-   - Node exporter: `prometheus-node-exporter`.
-   - Postgres exporter: `prometheus-postgres-exporter` (or equivalent).
-2. Configure exporters to bind only to loopback or tailnet.
-3. Postgres:
-   - Create a dedicated exporter user with minimal rights.
-   - Configure exporter DSN via env file readable only by root/service.
+1. Add the VPS installer script:
+   - `scripts/vps-install-observability-exporters.sh`
+2. Add the playbook:
+   - `docs/operations/playbooks/observability-exporters.md`
+3. Run on the VPS:
+   - dry-run: `./scripts/vps-install-observability-exporters.sh`
+   - apply: `sudo ./scripts/vps-install-observability-exporters.sh --apply`
 4. Validate endpoints locally:
-   - `curl http://127.0.0.1:<node_exporter_port>/metrics`
-   - `curl http://127.0.0.1:<postgres_exporter_port>/metrics`
+   - `curl http://127.0.0.1:9100/metrics | head`
+   - `curl http://127.0.0.1:9187/metrics | head`
 
 Acceptance criteria:
 
