@@ -9,6 +9,7 @@ Type=oneshot
 User=haadmin
 Group=healtharchive
 WorkingDirectory=/opt/healtharchive-backend
+EnvironmentFile=-/etc/healtharchive/healthchecks.env
 
 # Writes artifacts under /srv/healtharchive/ops/baseline and exits non-zero on required drift.
-ExecStart=/usr/bin/python3 /opt/healtharchive-backend/scripts/check_baseline_drift.py --mode local
+ExecStart=/opt/healtharchive-backend/scripts/systemd-healthchecks-wrapper.sh --ping-var HEALTHARCHIVE_HC_PING_BASELINE_DRIFT -- /usr/bin/python3 /opt/healtharchive-backend/scripts/check_baseline_drift.py --mode local

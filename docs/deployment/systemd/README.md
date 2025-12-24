@@ -92,6 +92,15 @@ If a timer is enabled, also ensure its sentinel file exists under
 
 ## Install / update on the VPS
 
+Preferred (one command; installs templates + worker priority drop-in):
+
+```bash
+cd /opt/healtharchive-backend
+sudo ./scripts/vps-install-systemd-units.sh --apply --restart-worker
+```
+
+Manual install (equivalent):
+
 Copy unit files:
 
 ```bash
@@ -193,6 +202,7 @@ Edit `/etc/healtharchive/healthchecks.env` and set (examples):
 HEALTHARCHIVE_HC_PING_REPLAY_RECONCILE=https://hc-ping.com/<uuid>
 HEALTHARCHIVE_HC_PING_SCHEDULE_ANNUAL=https://hc-ping.com/<uuid>
 HEALTHARCHIVE_HC_PING_CHANGE_TRACKING=https://hc-ping.com/<uuid>
+HEALTHARCHIVE_HC_PING_BASELINE_DRIFT=https://hc-ping.com/<uuid>
 ```
 
 Notes:

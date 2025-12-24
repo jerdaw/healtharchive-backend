@@ -306,34 +306,139 @@ Implementation helpers (repo):
 
 ## Phase 11 — Automation and sustainability (timers, reconcile loops, retention)
 
-**Current state:** automation candidates are documented; CLI support exists for replay indexing/reconcile.
+**Current state:** systemd templates and ops docs exist; enabling automation is an operator action on the VPS.
 
-1. Decide which timers to enable now vs later (keep it boring):
-   - annual scheduling
-   - change tracking pipeline
-   - replay reconcile
-   - reference: `docs/deployment/systemd/README.md`
-2. If you enable replay reconcile:
-   - use `ha-backend replay-reconcile` with conservative caps
-   - add timer-ran monitoring if you want silent-failure alerts
-3. Operationalize the ops cadence:
-   - quarterly restore tests
-   - quarterly dataset checksum verification
-   - quarterly adoption signals entry
-   - reference: `docs/operations/healtharchive-ops-roadmap.md`
-4. Define retention/cleanup rules after replay stance is stable:
-   - avoid deleting WARCs required for replay
-   - use the cleanup tooling intentionally
+Implementation helpers (repo):
 
-**Exit criteria:** the system runs on repeatable routines (not memory), and automation failures become visible quickly.
+- Systemd templates + enablement steps: `docs/deployment/systemd/README.md`
+- Install/update systemd templates (VPS): `scripts/vps-install-systemd-units.sh`
+- Bootstrap `/srv/healtharchive/ops/*` dirs (VPS): `scripts/vps-bootstrap-ops-dirs.sh`
+- Automation verifier (VPS): `scripts/verify_ops_automation.sh`
+- Ops cadence docs/templates:
+  - restore tests: `docs/operations/restore-test-procedure.md`, `docs/operations/restore-test-log-template.md`
+  - dataset releases: `docs/operations/dataset-release-runbook.md`
+  - adoption signals: `docs/operations/adoption-signals-log-template.md`
+  - monitoring/timer pings: `docs/operations/monitoring-and-ci-checklist.md`
+- Retention constraints (replay safety): `docs/operations/growth-constraints.md`
+
+### 11.1 Bootstrap ops directories (one-time; VPS)
+
+If not already created, bootstrap the ops artifact directories so timers and scripts can write artifacts:
+
+```bash
+cd /opt/healtharchive-backend
+sudo ./scripts/vps-bootstrap-ops-dirs.sh
+```
+
+### 11.2 Install/update systemd templates (VPS)
+
+```bash
+cd /opt/healtharchive-backend
+sudo ./scripts/vps-install-systemd-units.sh --apply --restart-worker
+```
+
+### 11.3 Enable baseline drift timer (recommended; VPS)
+
+Baseline drift checks are low-risk and provide early warning on misconfig (env, perms, unit enablement).
+
+```bash
+sudo install -m 0644 -o root -g root /dev/null /etc/healtharchive/baseline-drift-enabled
+sudo systemctl enable --now healtharchive-baseline-drift-check.timer
+```
+
+### 11.4 Decide optional automation timers (VPS)
+
+Keep it boring: enable only what you’re ready to operate. Validate dry-run services before enabling timers:
+
+- **Annual scheduling (Jan 01 UTC)**
+  - Validate: `sudo systemctl start healtharchive-schedule-annual-dry-run.service`
+  - Enable: create `/etc/healtharchive/automation-enabled`, then `enable --now healtharchive-schedule-annual.timer`
+- **Replay reconcile (daily; optional)**
+  - Validate: `sudo systemctl start healtharchive-replay-reconcile-dry-run.service`
+  - Enable: create `/etc/healtharchive/replay-automation-enabled`, then `enable --now healtharchive-replay-reconcile.timer`
+- **Change tracking (daily; optional)**
+  - Validate: `sudo systemctl start healtharchive-change-tracking-dry-run.service`
+  - Enable: create `/etc/healtharchive/change-tracking-enabled`, then `enable --now healtharchive-change-tracking.timer`
+- **Annual search verification capture (daily timer; captures once per year; optional)**
+  - Enable: `sudo systemctl enable --now healtharchive-annual-search-verify.timer`
+
+Full enablement and rollback commands live in: `docs/deployment/systemd/README.md`
+
+### 11.5 Optional: timer-ran monitoring (Healthchecks-style; VPS)
+
+If you want “silent failure” alerts (timer disabled, unit failing, disk-full refusal, etc.), follow:
+
+- `docs/operations/monitoring-and-ci-checklist.md` (Step 4)
+
+This uses a root-owned `/etc/healtharchive/healthchecks.env` plus
+`scripts/systemd-healthchecks-wrapper.sh` so ping URLs are not committed.
+
+### 11.6 Operationalize the quarterly ops cadence (VPS + GitHub Releases)
+
+- **Quarterly restore test:** follow `docs/operations/restore-test-procedure.md` and write a public-safe log entry under `/srv/healtharchive/ops/restore-tests/`.
+- **Quarterly dataset checksum verification:** verify release assets with `sha256sum -c SHA256SUMS` (see `docs/operations/dataset-release-runbook.md`).
+- **Quarterly adoption signals entry:** write a public-safe entry under `/srv/healtharchive/ops/adoption/` using `docs/operations/adoption-signals-log-template.md`.
+
+### 11.7 Retention / cleanup posture (VPS)
+
+- If replay is enabled, treat WARC retention as critical state: do not delete WARCs needed for replay.
+- Use only “safe cleanup” modes until you have a cold storage replay plan:
+  - reference: `docs/operations/growth-constraints.md`
+
+### 11.8 Verify Phase 11 (VPS)
+
+```bash
+cd /opt/healtharchive-backend
+./scripts/verify_ops_automation.sh
+./scripts/check_baseline_drift.py --mode live
+```
+
+**Exit criteria:** baseline drift timer is enabled, ops artifact dirs exist, worker priority override is installed, and any optional timers are either enabled or explicitly deferred (with monitoring decisions recorded).
 
 ## Phase 12 — External validation and outreach (only after the service is credible)
 
-**Current state:** templates exist; this work is mostly IRL.
+**Current state:** public-facing “credibility” pages exist; the remaining work is mostly IRL, but templates and checklists exist in-repo.
 
-1. Secure one distribution partner (with permission to name them).
-2. Secure one verifier (with permission).
-3. Maintain the mentions/citations log (public-safe).
-4. Reflect partner highlights in a public impact report when appropriate.
+Implementation helpers (repo):
 
-**Exit criteria:** at least one partner + one verifier are secured and the public-facing story is backed by evidence.
+- Partner kit (internal ops guide): `docs/operations/partner-kit.md`
+- Outreach email templates: `docs/operations/outreach-templates.md`
+- Verifier packet outline: `docs/operations/verification-packet.md`
+- Mentions log template: `docs/operations/mentions-log-template.md`
+- Citation handout pointer: `docs/operations/citation-handout.md`
+- Public pages to keep healthy (frontend):
+  - `/changes`, `/digest`
+  - `/brief`, `/cite`
+  - `/methods`, `/governance`
+- Public surface verifier (production): `scripts/verify_public_surface.py` (includes `/api/changes/rss` + partner pages)
+
+### 12.1 Confirm public credibility surfaces are live (production)
+
+```bash
+cd /opt/healtharchive-backend
+./scripts/verify_public_surface.py
+```
+
+### 12.2 Start (and maintain) a public-safe mentions log
+
+- Use `docs/operations/mentions-log-template.md`.
+- Store it somewhere you will actually update:
+  - recommended (VPS): `/srv/healtharchive/ops/adoption/` (public-safe only), or
+  - a separate private notes location (never commit private contact details to git).
+
+### 12.3 Secure 1 distribution partner (IRL)
+
+- Use `docs/operations/outreach-templates.md` and `docs/operations/partner-kit.md`.
+- Get explicit permission before naming them publicly.
+
+### 12.4 Secure 1 verifier (IRL)
+
+- Use `docs/operations/verification-packet.md`.
+- Get explicit permission before naming them publicly.
+
+### 12.5 Reflect highlights in public impact reporting (when appropriate)
+
+- Add partner highlights and citations only when permissions are clear.
+- Keep the story evidence-backed and non-committal (“archive”, “snapshots”, “change tracking”; not “official guidance”).
+
+**Exit criteria:** at least one partner + one verifier are secured (with permission to name), the mentions log discipline exists, and public-facing claims are backed by links/evidence.

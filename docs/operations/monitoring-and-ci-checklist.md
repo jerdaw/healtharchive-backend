@@ -140,9 +140,15 @@ disabled, unit failing, disk low refusal, etc.).
 
 Recommended checks to monitor:
 
+- Baseline drift check (weekly):
+  - `healtharchive-baseline-drift-check.timer`
+  - Ping variable: `HEALTHARCHIVE_HC_PING_BASELINE_DRIFT`
 - Replay reconcile (daily):
   - `healtharchive-replay-reconcile.timer`
   - Ping variable: `HEALTHARCHIVE_HC_PING_REPLAY_RECONCILE`
+- Change tracking (daily):
+  - `healtharchive-change-tracking.timer`
+  - Ping variable: `HEALTHARCHIVE_HC_PING_CHANGE_TRACKING`
 - Annual scheduler (yearly):
   - `healtharchive-schedule-annual.timer`
   - Ping variable: `HEALTHARCHIVE_HC_PING_SCHEDULE_ANNUAL`

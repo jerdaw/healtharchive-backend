@@ -45,6 +45,14 @@ In `local` mode:
 - HSTS is validated by parsing `/etc/caddy/Caddyfile` for the API site block.
 - Admin endpoint checks are skipped (warn-only).
 
+## Optional: weekly drift timer (systemd)
+
+If you want drift checks to run automatically (not just during deploys), this repo includes a weekly systemd timer:
+
+- Templates: `docs/deployment/systemd/healtharchive-baseline-drift-check.*`
+- Installer helper (VPS): `scripts/vps-install-systemd-units.sh --apply`
+- Enablement steps: `docs/deployment/systemd/README.md`
+
 ## CORS validation
 
 The policy enforces a **strict** production allowlist (no extra origins) via
