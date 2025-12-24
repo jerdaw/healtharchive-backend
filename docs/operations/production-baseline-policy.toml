@@ -78,6 +78,20 @@ mode = "0640"
 required = true
 
 [[filesystem.paths]]
+path = "/etc/healtharchive/baseline-drift-enabled"
+owner = "root"
+group = "root"
+mode = "0644"
+required = true
+
+[[filesystem.paths]]
+path = "/etc/systemd/system/healtharchive-worker.service.d/override.conf"
+owner = "root"
+group = "root"
+mode = "0644"
+required = true
+
+[[filesystem.paths]]
 path = "/srv/healtharchive/backups"
 owner = "root"
 group = "healtharchive"
@@ -134,5 +148,10 @@ must_be_enabled = true
 
 [[systemd.units]]
 name = "healtharchive-worker.service"
+required = true
+must_be_enabled = true
+
+[[systemd.units]]
+name = "healtharchive-baseline-drift-check.timer"
 required = true
 must_be_enabled = true

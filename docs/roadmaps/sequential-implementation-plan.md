@@ -361,6 +361,8 @@ Keep it boring: enable only what you’re ready to operate. Validate dry-run ser
   - Enable: create `/etc/healtharchive/change-tracking-enabled`, then `enable --now healtharchive-change-tracking.timer`
 - **Annual search verification capture (daily timer; captures once per year; optional)**
   - Enable: `sudo systemctl enable --now healtharchive-annual-search-verify.timer`
+- **Public surface verification (daily; optional, recommended)**
+  - Enable: create `/etc/healtharchive/public-verify-enabled`, then `enable --now healtharchive-public-surface-verify.timer`
 
 Full enablement and rollback commands live in: `docs/deployment/systemd/README.md`
 

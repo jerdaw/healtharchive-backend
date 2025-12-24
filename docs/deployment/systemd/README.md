@@ -10,6 +10,7 @@ They implement:
 - Replay reconciliation timer (pywb indexing; capped)
 - Change tracking timer (edition-aware diffs; capped)
 - Baseline drift check timer (policy vs observed; detects config drift)
+- Public surface verification timer (public API + frontend; deeper than uptime checks)
 - Optional "timer ran" pings (Healthchecks-style)
 - Annual search verification capture (optional, safe)
 
@@ -64,6 +65,12 @@ Assumptions (adjust paths/user if your VPS differs):
   - Gated by `ConditionPathExists=/etc/healtharchive/baseline-drift-enabled`.
 - `healtharchive-baseline-drift-check.timer`
   - Weekly timer for `healtharchive-baseline-drift-check.service`.
+- `healtharchive-public-surface-verify.service`
+  - Runs `scripts/verify_public_surface.py` (public API + frontend; includes changes/RSS and partner pages).
+  - Gated by `ConditionPathExists=/etc/healtharchive/public-verify-enabled`.
+  - Intended as a deeper “synthetic check” than external uptime monitors.
+- `healtharchive-public-surface-verify.timer`
+  - Daily timer for `healtharchive-public-surface-verify.service`.
 
 ---
 
@@ -155,6 +162,14 @@ sudo install -m 0644 -o root -g root \
 sudo install -m 0644 -o root -g root \
   /opt/healtharchive-backend/docs/deployment/systemd/healtharchive-baseline-drift-check.timer \
   /etc/systemd/system/healtharchive-baseline-drift-check.timer
+
+sudo install -m 0644 -o root -g root \
+  /opt/healtharchive-backend/docs/deployment/systemd/healtharchive-public-surface-verify.service \
+  /etc/systemd/system/healtharchive-public-surface-verify.service
+
+sudo install -m 0644 -o root -g root \
+  /opt/healtharchive-backend/docs/deployment/systemd/healtharchive-public-surface-verify.timer \
+  /etc/systemd/system/healtharchive-public-surface-verify.timer
 ```
 
 Install the worker priority drop-in:
@@ -203,6 +218,7 @@ HEALTHARCHIVE_HC_PING_REPLAY_RECONCILE=https://hc-ping.com/<uuid>
 HEALTHARCHIVE_HC_PING_SCHEDULE_ANNUAL=https://hc-ping.com/<uuid>
 HEALTHARCHIVE_HC_PING_CHANGE_TRACKING=https://hc-ping.com/<uuid>
 HEALTHARCHIVE_HC_PING_BASELINE_DRIFT=https://hc-ping.com/<uuid>
+HEALTHARCHIVE_HC_PING_PUBLIC_VERIFY=https://hc-ping.com/<uuid>
 ```
 
 Notes:
@@ -373,7 +389,32 @@ Artifacts are written under:
 If the drift check fails, inspect:
 
 - `/srv/healtharchive/ops/baseline/drift-report-latest.txt`
-- `journalctl -u healtharchive-baseline-drift-check.service --no-pager -l`
+  - `journalctl -u healtharchive-baseline-drift-check.service --no-pager -l`
+
+---
+
+## Enable public surface verification (optional, recommended)
+
+This is a deeper synthetic check than external uptime monitors. It validates:
+
+- public API health, sources, search, snapshot detail and raw HTML
+- replay browse URL (unless skipped)
+- exports manifest and export endpoint HEADs
+- changes feed + RSS
+- key frontend pages, including `/brief`, `/cite`, `/methods`, and `/governance`
+
+Create the sentinel file:
+
+```bash
+sudo install -m 0644 -o root -g root /dev/null /etc/healtharchive/public-verify-enabled
+```
+
+Enable the timer:
+
+```bash
+sudo systemctl enable --now healtharchive-public-surface-verify.timer
+systemctl list-timers | rg healtharchive-public-surface-verify || systemctl list-timers | grep healtharchive-public-surface-verify
+```
 
 ---
 

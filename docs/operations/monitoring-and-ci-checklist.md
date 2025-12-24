@@ -143,6 +143,9 @@ Recommended checks to monitor:
 - Baseline drift check (weekly):
   - `healtharchive-baseline-drift-check.timer`
   - Ping variable: `HEALTHARCHIVE_HC_PING_BASELINE_DRIFT`
+- Public surface verification (daily):
+  - `healtharchive-public-surface-verify.timer`
+  - Ping variable: `HEALTHARCHIVE_HC_PING_PUBLIC_VERIFY`
 - Replay reconcile (daily):
   - `healtharchive-replay-reconcile.timer`
   - Ping variable: `HEALTHARCHIVE_HC_PING_REPLAY_RECONCILE`
