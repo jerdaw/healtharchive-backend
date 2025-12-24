@@ -1,4 +1,4 @@
-# HealthArchive Ops Roadmap + TODO (internal)
+# HealthArchive ops roadmap (internal)
 
 This file tracks the current ops roadmap/todo items only. Keep it short and current.
 
@@ -20,6 +20,6 @@ Keep the two synced copies of this file aligned:
 
 ## IRL / external validation (pending)
 
-- Secure **1 distribution partner** willing to link to `/digest` or `/changes` (with permission to name them).
-- Secure **1 verifier** willing to confirm your role and project utility (email confirmation is sufficient).
-- Maintain the **mentions/citations log** discipline (public-safe; no private contact details).
+Track external validation/outreach work (partner, verifier, mentions/citations log) in:
+
+- `../roadmaps/future-roadmap.md`

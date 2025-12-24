@@ -42,8 +42,8 @@ settings drift”.
    - **Solo-fast (recommended for this project right now): direct pushes to `main`**.
      - CI still runs on every push to `main`.
      - Deploys are gated by “green main” + VPS verification steps (below).
-   - **TODO (tighten later when there are multiple committers): PR-only merges** into `main`
-     with required status checks + code owners.
+   - Future (when there are multiple committers): PR-only merges into `main` with required
+     status checks + code owners (track in `../roadmaps/future-roadmap.md`).
 
 Verification:
 
@@ -89,10 +89,10 @@ Verification:
 
 - The VPS deploy completes and both verification scripts pass.
 
-TODO (tighten later):
+Future (tighten later):
 
 - When there are multiple committers or when you want stricter enforcement, switch to PR-only merges
-  and require the backend/frontend checks in branch protection.
+  and require the backend/frontend checks in branch protection (track in `../roadmaps/future-roadmap.md`).
 
 ### Step 3 — External uptime monitoring (operator; UptimeRobot settings)
 

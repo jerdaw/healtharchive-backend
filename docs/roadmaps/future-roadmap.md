@@ -36,6 +36,8 @@ Keep this list short; prefer linking to the canonical doc that explains the item
 
 - Tighten GitHub merge discipline when there are multiple committers (PR-only + required checks).
   - See: `../operations/monitoring-and-ci-checklist.md`
+- Storage optimization (only if provenance is preserved): consider pruning same-day duplicates if identical HTML can be proven safely.
+  - See: `../operations/search-quality.md`
 - Consider whether a separate staging backend is worth it (optional; increases ops surface).
   - See: `../deployment/environments-and-configuration.md`
 - Storage/retention upgrades (only with a designed replay retention policy).
