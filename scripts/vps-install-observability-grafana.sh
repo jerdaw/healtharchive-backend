@@ -280,7 +280,21 @@ write_dropin "${GRAFANA_UNIT}" "${dropin_body}"
 run systemctl daemon-reload
 if [[ "${ENABLE_SERVICE}" == "true" ]]; then
   run systemctl enable "${GRAFANA_UNIT}"
-  run systemctl restart "${GRAFANA_UNIT}"
+  if [[ "${APPLY}" != "true" ]]; then
+    echo "+ systemctl restart ${GRAFANA_UNIT}"
+  else
+    set +e
+    systemctl restart "${GRAFANA_UNIT}"
+    rc=$?
+    set -e
+    if [[ "${rc}" -ne 0 ]]; then
+      echo "ERROR: ${GRAFANA_UNIT} failed to start." >&2
+      echo "Run these on the VPS for details:" >&2
+      echo "  sudo systemctl status ${GRAFANA_UNIT} --no-pager -l" >&2
+      echo "  sudo journalctl -xeu ${GRAFANA_UNIT} --no-pager | tail -n 200" >&2
+      exit "${rc}"
+    fi
+  fi
 fi
 
 if [[ "${APPLY}" == "true" ]]; then
