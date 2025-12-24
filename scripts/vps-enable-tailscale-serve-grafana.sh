@@ -147,6 +147,20 @@ else
 
   if [[ "${rc}" -ne 0 ]]; then
     if [[ "${rc}" -eq 124 ]]; then
+      if [[ "${out}" == *"Serve is not enabled on your tailnet."* ]]; then
+        echo "ERROR: Tailscale Serve is disabled for this tailnet." >&2
+        echo "${out}" >&2
+        echo >&2
+        echo "Enable it in the Tailscale admin console (the URL above), then re-run:" >&2
+        echo "  sudo tailscale serve --bg ${GRAFANA_URL}" >&2
+        echo "  sudo tailscale serve status" >&2
+        echo >&2
+        echo "Fallback (no Serve needed): use SSH port-forwarding over Tailscale:" >&2
+        echo "  ssh -L 3000:127.0.0.1:3000 haadmin@<tailscale-host>" >&2
+        echo "  # then open: http://127.0.0.1:3000" >&2
+        exit 1
+      fi
+
       echo "ERROR: tailscale serve --bg timed out after 10s." >&2
       echo "Output:" >&2
       echo "${out}" >&2
