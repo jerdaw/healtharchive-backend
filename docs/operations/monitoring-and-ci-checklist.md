@@ -69,12 +69,21 @@ Objective: prevent broken deploys by only deploying when `main` is green.
 
 Workflow (recommended):
 
+0. Local guardrails (recommended while branch protections are relaxed):
+   - Run checks before you push:
+     - From the mono-repo root: `make check`
+     - Or per-repo: `healtharchive-backend: make check`, `healtharchive-frontend: npm run check`
+   - Optional but recommended: install pre-push hooks so you can't forget:
+     - Backend: `healtharchive-backend/scripts/install-pre-push-hook.sh`
+     - Frontend: `healtharchive-frontend/scripts/install-pre-push-hook.sh`
 1. Push to `main`.
 2. Wait for GitHub Actions to go green on that commit.
 3. Deploy on the VPS:
-   - Run `dodeploy`
-   - Run `./scripts/check_baseline_drift.py --mode live`
-   - Run `./scripts/verify_public_surface.py`
+   - Recommended (one command): `./scripts/vps-deploy.sh --apply --baseline-mode live`
+     - Includes baseline drift + public-surface verify by default.
+   - If you use a local alias like `dodeploy`, ensure you still run:
+     - `./scripts/check_baseline_drift.py --mode live`
+     - `./scripts/verify_public_surface.py`
 
 Verification:
 

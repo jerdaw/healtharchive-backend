@@ -11,6 +11,8 @@ Usage:
   ./scripts/vps-deploy.sh [--apply] [--ref REF] [--repo-dir DIR] [--env-file FILE] [--health-url URL]
                          [--skip-deps] [--skip-migrations] [--skip-restart] [--restart-replay]
                          [--skip-baseline-drift] [--baseline-mode MODE]
+                         [--skip-public-surface-verify]
+                         [--public-api-base URL] [--public-frontend-base URL] [--public-timeout-seconds SECONDS]
                          [--allow-dirty] [--no-pull] [--lock-file FILE]
 
 Examples (on the VPS):
@@ -47,6 +49,10 @@ SKIP_RESTART="false"
 RESTART_REPLAY="false"
 SKIP_BASELINE_DRIFT="false"
 BASELINE_MODE="local"
+SKIP_PUBLIC_SURFACE_VERIFY="false"
+PUBLIC_API_BASE="https://api.healtharchive.ca"
+PUBLIC_FRONTEND_BASE="https://www.healtharchive.ca"
+PUBLIC_TIMEOUT_SECONDS="20"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -104,6 +110,22 @@ while [[ $# -gt 0 ]]; do
       ;;
     --baseline-mode)
       BASELINE_MODE="$2"
+      shift 2
+      ;;
+    --skip-public-surface-verify)
+      SKIP_PUBLIC_SURFACE_VERIFY="true"
+      shift 1
+      ;;
+    --public-api-base)
+      PUBLIC_API_BASE="$2"
+      shift 2
+      ;;
+    --public-frontend-base)
+      PUBLIC_FRONTEND_BASE="$2"
+      shift 2
+      ;;
+    --public-timeout-seconds)
+      PUBLIC_TIMEOUT_SECONDS="$2"
       shift 2
       ;;
     -h|--help)
@@ -168,7 +190,7 @@ wait_for_health() {
 
   local i
   for ((i = 1; i <= attempts; i++)); do
-    if curl -fsS --max-time 2 "${url}" >/dev/null; then
+    if curl -fsS --max-time 2 "${url}" >/dev/null 2>&1; then
       return 0
     fi
     sleep "${delay_seconds}"
@@ -211,6 +233,7 @@ echo "Env file:    ${ENV_FILE}"
 echo "Health URL:  ${HEALTH_URL}"
 echo "Lock file:   ${LOCK_FILE}"
 echo "Baseline:    $([[ "${SKIP_BASELINE_DRIFT}" == "true" ]] && echo SKIPPED || echo "ENABLED (mode=${BASELINE_MODE})")"
+echo "Public verify: $([[ "${SKIP_PUBLIC_SURFACE_VERIFY}" == "true" ]] && echo SKIPPED || echo "ENABLED (api=${PUBLIC_API_BASE}, frontend=${PUBLIC_FRONTEND_BASE})")"
 if [[ -n "${REF}" ]]; then
   echo "Ref:         ${REF}"
 fi
@@ -286,6 +309,15 @@ if [[ "${SKIP_BASELINE_DRIFT}" != "true" ]]; then
   run "${VENV_BIN}/python3" ./scripts/check_baseline_drift.py --mode "${BASELINE_MODE}"
 else
   echo "Skipping baseline drift check (--skip-baseline-drift)."
+fi
+
+if [[ "${SKIP_PUBLIC_SURFACE_VERIFY}" != "true" ]]; then
+  run "${VENV_BIN}/python3" ./scripts/verify_public_surface.py \
+    --api-base "${PUBLIC_API_BASE}" \
+    --frontend-base "${PUBLIC_FRONTEND_BASE}" \
+    --timeout-seconds "${PUBLIC_TIMEOUT_SECONDS}"
+else
+  echo "Skipping public surface verification (--skip-public-surface-verify)."
 fi
 
 echo ""

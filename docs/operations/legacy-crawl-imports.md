@@ -148,6 +148,27 @@ Why:
 - `healtharchive` group can be granted controlled read access.
 - We avoid `777` and other “world writable” mistakes.
 
+### Optional helper: one command to normalize + register + index
+
+This repo includes a helper script that wraps the “VPS-side” steps:
+
+- permissions normalization (Step 4)
+- register-job-dir (Step 5)
+- index-job (Step 6)
+
+It is **dry-run by default**:
+
+```bash
+cd /opt/healtharchive-backend
+./scripts/import-legacy-crawl.sh --import-dir "/srv/healtharchive/jobs/imports/<IMPORT_NAME>" --source <SOURCE_CODE>
+```
+
+To apply (real run):
+
+```bash
+./scripts/import-legacy-crawl.sh --apply --import-dir "/srv/healtharchive/jobs/imports/<IMPORT_NAME>" --source <SOURCE_CODE> --job-name "<JOB_NAME>"
+```
+
 ### Step 5 — Register the directory as an ArchiveJob
 
 Because `/etc/healtharchive/backend.env` is root-owned and not readable by
@@ -217,6 +238,13 @@ In the browser (frontend):
 - `https://www.healtharchive.ca/archive` should show a large snapshot count and real results.
 - Clicking “View snapshot” should open `https://www.healtharchive.ca/snapshot/<id>` and the embedded content should load from:
   - `https://api.healtharchive.ca/api/snapshots/raw/<id>`
+
+Optional single command (VPS; requires CIHR to be imported/indexed if you ask for it):
+
+```bash
+cd /opt/healtharchive-backend
+./scripts/verify_public_surface.py --require-source cihr
+```
 
 ## Known gotcha: capture dates may look wrong (fix requires re-index)
 

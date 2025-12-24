@@ -124,10 +124,17 @@ Implementation helpers (repo):
 2. Solo-fast mode (recommended while you’re the only committer):
    - allow direct pushes to `main`
    - treat “green main” as the deploy gate
+   - add local guardrails so you don’t accidentally push broken `main`:
+     - from the mono-repo root: `make check`
+     - optional but recommended:
+       - `healtharchive-backend/scripts/install-pre-push-hook.sh`
+       - `healtharchive-frontend/scripts/install-pre-push-hook.sh`
 3. Deploy gate (production):
-   - `dodeploy`
-   - `./scripts/check_baseline_drift.py --mode live`
-   - `./scripts/verify_public_surface.py`
+   - recommended (one command): `./scripts/vps-deploy.sh --apply --baseline-mode live`
+     - includes baseline drift + public-surface verify by default
+   - if you use a local alias like `dodeploy`, ensure you still run:
+     - `./scripts/check_baseline_drift.py --mode live`
+     - `./scripts/verify_public_surface.py`
 4. TODO (tighten later when there are multiple committers):
    - require PR
    - require status checks
@@ -235,11 +242,13 @@ Implementation helpers (repo):
 
 ## Phase 8 — Research exports, dataset releases, and the Researchers page TODO
 
-**Current state:** export endpoints and the `/exports` page exist; the Researchers page still contains a TODO.
+**Current state:** export endpoints and the `/exports` + `/researchers` pages exist; verify script covers exports and pages.
 
 1. Confirm exports are enabled and stable:
    - `HEALTHARCHIVE_EXPORTS_ENABLED=1`
    - `/api/exports`, `/api/exports/snapshots`, `/api/exports/changes`
+   - Recommended verifier (production):
+     - `./scripts/verify_public_surface.py` (checks exports manifest + export HEADs)
 2. Confirm the public data dictionary + downloadables are correct:
    - `healtharchive-frontend/public/exports/healtharchive-data-dictionary.md`
    - `healtharchive-frontend/public/exports/healtharchive-data-dictionary.fr.md` (alpha)
@@ -248,7 +257,10 @@ Implementation helpers (repo):
    - where releases live (GitHub Releases)
    - checksum policy (`SHA256SUMS`)
    - validation step (in ops cadence)
-4. Implement the Researchers page workflow (remove TODO):
+   - Implementation helpers (repo):
+     - `docs/operations/dataset-release-runbook.md`
+     - `docs/operations/export-integrity-contract.md`
+4. Implement the Researchers page workflow (remove TODO / avoid “planned” contradictions):
    - state the **current** dataset release cadence (or explicitly mark it “not yet stable”)
    - document the bulk export request workflow (what info to send, constraints, expected response time)
    - keep English canonical and ship French in the same change
@@ -258,29 +270,33 @@ Implementation helpers (repo):
 
 ## Phase 9 — Coverage expansion (CIHR legacy import and new sources)
 
-**Current state:** CIHR import is documented as in-progress.
+**Current state:** CIHR import is documented; helper script exists to normalize/register/index on the VPS.
 
 1. Complete CIHR legacy import:
    - normalize permissions
    - register job dir for CIHR
    - index job
    - reference: `docs/operations/legacy-crawl-imports.md`
+   - Optional helper (VPS): `scripts/import-legacy-crawl.sh`
 2. Verify:
    - CIHR appears in `/api/sources`
    - CIHR is searchable in `/api/search` and visible in the frontend
+   - Single command (production):
+     - `./scripts/verify_public_surface.py --require-source cihr`
 3. Only after CIHR is stable, consider additional source expansion (annual campaign updates).
 
 **Exit criteria:** CIHR is a first-class source in search, browse, and snapshot detail.
 
 ## Phase 10 — Search quality loop + ranking rollout decisions
 
-**Current state:** evaluation docs and scripts exist; ranking v2 rollout is documented.
+**Current state:** evaluation docs + capture/diff scripts exist; ranking v2 rollout is documented (and currently recommended).
 
 1. Establish a repeatable evaluation workflow:
    - golden queries + expectations live in:
      - `docs/operations/search-golden-queries.md`
      - `docs/operations/search-quality.md`
-   - capture/diff scripts under `healtharchive-backend/scripts/`
+   - capture/diff scripts under `healtharchive-backend/scripts/`:
+     - `scripts/search-eval-run.sh` (one-command v1+v2 capture + diff)
 2. Run evaluations periodically and record outcomes (public-safe).
 3. Only after you have signal:
    - decide whether to keep `HA_SEARCH_RANKING_VERSION=v1` or switch to `v2`

@@ -36,6 +36,7 @@ HEALTHARCHIVE_REPLAY_BASE_URL = "https://replay.healtharchive.ca"
 HEALTHARCHIVE_REPLAY_PREVIEW_DIR = "/srv/healtharchive/replay/previews"
 HEALTHARCHIVE_USAGE_METRICS_ENABLED = "1"
 HEALTHARCHIVE_USAGE_METRICS_WINDOW_DAYS = "30"
+HEALTHARCHIVE_EXPORTS_ENABLED = "1"
 
 [backend_env_csv_set_equals]
 # CORS allowlist is intentionally strict in this project. Keep it narrow and

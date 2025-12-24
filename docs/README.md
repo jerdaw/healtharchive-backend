@@ -11,6 +11,7 @@ This folder contains the canonical documentation for the **HealthArchive backend
    - `documentation-guidelines.md`
 3. Local development / live testing (how to run it locally)
    - `development/live-testing.md`
+   - `development/dev-environment-setup.md` (local setup + local vs VPS guidance)
 4. Deployment (how to run it on a server)
    - `deployment/production-single-vps.md` (current production runbook)
    - `deployment/systemd/README.md` (systemd units: annual scheduler timer, worker priority, replay reconcile)
