@@ -97,6 +97,18 @@ For repeatable, multi-query captures, use the helper scripts in `scripts/`:
 python ./scripts/search-eval-diff.py --a /tmp/ha-search-eval/<TS_A> --b /tmp/ha-search-eval/<TS_B> --top 20
 ```
 
+To capture v1 + v2 and generate a diff report in one command:
+
+```bash
+./scripts/search-eval-run.sh --base-url https://api.healtharchive.ca --out-dir /tmp/ha-search-eval
+```
+
+On the production VPS, prefer a persistent output directory:
+
+```bash
+./scripts/search-eval-run.sh --base-url https://api.healtharchive.ca --out-dir /srv/healtharchive/ops/search-eval
+```
+
 ## 4) Minimal pass/fail checklist for releases
 
 For each key query:

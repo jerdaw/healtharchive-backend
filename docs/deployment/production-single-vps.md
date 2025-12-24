@@ -220,12 +220,15 @@ cd /opt/healtharchive-backend
 Notes:
 
 - The deploy script runs a **baseline drift check** by default to catch
-  misconfiguration (HSTS, admin auth posture, perms, systemd enablement).
+  misconfiguration (filesystem perms, systemd enablement, env allowlists, etc.).
   - Artifacts are written to: `/srv/healtharchive/ops/baseline/`
   - You can skip in emergencies: `./scripts/vps-deploy.sh --apply --skip-baseline-drift`
-  - To require live HTTPS checks (DNS/TLS): `./scripts/vps-deploy.sh --apply --baseline-mode live`
+  - To include live HTTPS checks (HSTS, CORS headers, admin/metrics auth): `./scripts/vps-deploy.sh --apply --baseline-mode live`
 - The baseline policy (desired state) is versioned in git at:
   `docs/operations/production-baseline-policy.toml`
+- The deploy script runs a **public-surface smoke verify** by default (public API + frontend + replay + usage):
+  - `./scripts/verify_public_surface.py` (defaults to `https://api.healtharchive.ca` and `https://www.healtharchive.ca`)
+  - You can skip in emergencies: `./scripts/vps-deploy.sh --apply --skip-public-surface-verify`
 
 ---
 

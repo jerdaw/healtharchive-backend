@@ -57,6 +57,10 @@ From any machine (your laptop is fine):
 2) Diff:
    - `python ./scripts/search-eval-diff.py --a /tmp/ha-search-eval/<TS_V1> --b /tmp/ha-search-eval/<TS_V2> --top 20`
 
+Or run capture+diff in one command:
+
+- `./scripts/search-eval-run.sh --base-url https://api.healtharchive.ca --out-dir /tmp/ha-search-eval`
+
 ## 4) Rollback plan (fast)
 
 If something looks off in production:

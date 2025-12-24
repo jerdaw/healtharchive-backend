@@ -97,6 +97,24 @@ def main(argv: list[str] | None = None) -> int:
         help="Do not fail if /api/usage reports enabled=false.",
     )
     parser.add_argument(
+        "--allow-exports-disabled",
+        action="store_true",
+        default=False,
+        help="Do not fail if /api/exports reports enabled=false.",
+    )
+    parser.add_argument(
+        "--skip-exports",
+        action="store_true",
+        default=False,
+        help="Skip export endpoint checks (Phase 8).",
+    )
+    parser.add_argument(
+        "--require-source",
+        action="append",
+        default=[],
+        help="Require that /api/sources includes this sourceCode (repeatable; e.g. --require-source cihr).",
+    )
+    parser.add_argument(
         "--skip-replay",
         action="store_true",
         default=False,
@@ -145,6 +163,59 @@ def main(argv: list[str] | None = None) -> int:
         sources_json = []
     else:
         _ok(f"api sources status=200 count={len(sources_json)}")
+        required_sources = [s.strip().lower() for s in args.require_source if str(s).strip()]
+        if required_sources:
+            present = {
+                str(row.get("sourceCode", "")).strip().lower()
+                for row in sources_json
+                if isinstance(row, dict)
+            }
+            missing = [code for code in required_sources if code not in present]
+            if missing:
+                _fail(f"api sources missing required sourceCode(s): {missing}")
+                failures += 1
+            else:
+                _ok(f"api sources includes required sourceCode(s): {required_sources}")
+
+    if not args.skip_exports:
+        exports_url = f"{api_base}/api/exports"
+        exports, exports_json = _http_json(exports_url, timeout_s=timeout_s)
+        if exports.status != 200 or not isinstance(exports_json, dict):
+            _fail(f"api exports manifest status={exports.status} url={exports_url}")
+            failures += 1
+        else:
+            enabled = exports_json.get("enabled")
+            if enabled is True:
+                _ok("api exports manifest enabled=true")
+
+                snapshots_head = _http_request(
+                    f"{api_base}/api/exports/snapshots?format=jsonl&compressed=false",
+                    timeout_s=timeout_s,
+                    method="HEAD",
+                    read_limit_bytes=0,
+                )
+                if snapshots_head.status != 200:
+                    _fail(f"api exports snapshots HEAD status={snapshots_head.status}")
+                    failures += 1
+                else:
+                    _ok("api exports snapshots HEAD status=200")
+
+                changes_head = _http_request(
+                    f"{api_base}/api/exports/changes?format=jsonl&compressed=false",
+                    timeout_s=timeout_s,
+                    method="HEAD",
+                    read_limit_bytes=0,
+                )
+                if changes_head.status != 200:
+                    _fail(f"api exports changes HEAD status={changes_head.status}")
+                    failures += 1
+                else:
+                    _ok("api exports changes HEAD status=200")
+            elif args.allow_exports_disabled:
+                _ok("api exports manifest enabled=false (allowed)")
+            else:
+                _fail("api exports enabled=false (expected enabled=true for Phase 8)")
+                failures += 1
 
     search_url = f"{api_base}/api/search?pageSize=1"
     search, search_json = _http_json(search_url, timeout_s=timeout_s)
@@ -241,6 +312,8 @@ def main(argv: list[str] | None = None) -> int:
         pages: list[tuple[str, str]] = [
             ("archive", f"{frontend_base}/archive"),
             ("browse-by-source", f"{frontend_base}/archive/browse-by-source"),
+            ("exports", f"{frontend_base}/exports"),
+            ("researchers", f"{frontend_base}/researchers"),
             ("status", f"{frontend_base}/status"),
             ("impact", f"{frontend_base}/impact"),
         ]
