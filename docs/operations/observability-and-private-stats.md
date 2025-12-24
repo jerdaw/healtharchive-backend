@@ -68,6 +68,8 @@ Low-maintenance default:
 - `/etc/healtharchive/observability/prometheus_backend_admin_token`
 - `/etc/healtharchive/observability/grafana_admin_password`
 - `/etc/healtharchive/observability/postgres_grafana_password`
+- `/etc/healtharchive/observability/postgres_exporter.env`
+- `/etc/healtharchive/observability/postgres_exporter_password`
 
 Bootstrap helper (VPS only):
 

@@ -93,6 +93,8 @@ secret_files=(
   prometheus_backend_admin_token
   grafana_admin_password
   postgres_grafana_password
+  postgres_exporter_password
+  postgres_exporter.env
 )
 
 for f in "${secret_files[@]}"; do

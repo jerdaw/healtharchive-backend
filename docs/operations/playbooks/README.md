@@ -18,6 +18,7 @@ Recommended starting points:
 - Automation posture: `automation-maintenance.md`
 - Monitoring + alerting setup: `monitoring-and-alerting.md`
 - Observability scaffolding (dirs + secrets): `observability-bootstrap.md`
+- Exporters install (node + Postgres, loopback-only): `observability-exporters.md`
 - Cadence overview: `../ops-cadence-checklist.md` (what to do weekly/monthly/quarterly)
 
 Other playbooks:
