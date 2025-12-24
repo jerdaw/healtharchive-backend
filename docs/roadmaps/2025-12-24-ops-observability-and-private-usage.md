@@ -239,6 +239,8 @@ Rollback:
 
 **Goal:** collect time-series metrics in a controlled way that cannot fill disk or overload the backend.
 
+Status: implemented in this repo (installer script + playbook); requires running on the VPS.
+
 Deliverables:
 
 - Prometheus running under systemd.
@@ -250,17 +252,17 @@ Deliverables:
 
 Steps:
 
-1. Install Prometheus.
-2. Configure retention:
-   - Start conservative: `15d` or `30d` time retention.
-   - Also set a size-based retention cap if available.
-3. Configure scrape target for backend metrics:
-   - Target: `http://127.0.0.1:8001/metrics`
-   - Add the admin token header (from file) to avoid embedding secrets in `prometheus.yml`.
-   - Use a conservative scrape interval (e.g., 60s–300s) because `/metrics` performs DB queries.
-4. Configure scrape targets for exporters.
-5. Add recording rules for expensive/standard derived series (later dashboards will depend on these).
-6. Validate in Prometheus UI (loopback-only): targets are `UP`.
+1. Add the VPS installer script:
+   - `scripts/vps-install-observability-prometheus.sh`
+2. Add the playbook:
+   - `docs/operations/playbooks/observability-prometheus.md`
+3. Run on the VPS:
+   - dry-run: `./scripts/vps-install-observability-prometheus.sh`
+   - apply: `sudo ./scripts/vps-install-observability-prometheus.sh --apply`
+4. Validate locally:
+   - readiness: `curl -s http://127.0.0.1:9090/-/ready`
+   - targets: `curl -s http://127.0.0.1:9090/api/v1/targets | head`
+   - loopback-only bind: `ss -lntp | grep -E ':9090\\b'`
 
 Acceptance criteria:
 
@@ -277,6 +279,8 @@ Rollback:
 
 **Goal:** create a single operator-only entrypoint for ops health and private usage.
 
+Status: implemented in this repo (installer scripts + playbook); requires running on the VPS.
+
 Deliverables:
 
 - Grafana running.
@@ -287,19 +291,21 @@ Deliverables:
 
 Steps:
 
-1. Install Grafana (OSS).
-2. Configure Grafana security:
-   - Disable anonymous access.
-   - Disable self-signup.
-   - Create a single operator admin account (or minimal operators).
-3. Bind Grafana to loopback only.
-4. Publish Grafana via Tailscale:
-   - `tailscale serve` to expose `http://127.0.0.1:<grafana_port>` as tailnet-only HTTPS.
-5. Configure data sources:
-   - Prometheus at `http://127.0.0.1:<prom_port>`.
-   - Postgres at `127.0.0.1:5432`, using `grafana_readonly` DB role.
-6. Decide dashboard lifecycle:
-   - Recommended: provision dashboards from files (keeps drift low).
+1. Add the VPS installer scripts:
+   - `scripts/vps-install-observability-grafana.sh`
+   - `scripts/vps-enable-tailscale-serve-grafana.sh`
+2. Add the playbook:
+   - `docs/operations/playbooks/observability-grafana.md`
+3. Run on the VPS:
+   - Grafana install/hardening:
+     - dry-run: `./scripts/vps-install-observability-grafana.sh`
+     - apply: `sudo ./scripts/vps-install-observability-grafana.sh --apply`
+   - Tailnet-only HTTPS:
+     - dry-run: `./scripts/vps-enable-tailscale-serve-grafana.sh`
+     - apply: `sudo ./scripts/vps-enable-tailscale-serve-grafana.sh --apply`
+4. Configure data sources in the Grafana UI:
+   - Prometheus: `http://127.0.0.1:9090`
+   - Postgres: `127.0.0.1:5432`, DB `healtharchive`, user `grafana_readonly`
 
 Acceptance criteria:
 

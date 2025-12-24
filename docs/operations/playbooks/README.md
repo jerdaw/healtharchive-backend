@@ -19,6 +19,8 @@ Recommended starting points:
 - Monitoring + alerting setup: `monitoring-and-alerting.md`
 - Observability scaffolding (dirs + secrets): `observability-bootstrap.md`
 - Exporters install (node + Postgres, loopback-only): `observability-exporters.md`
+- Prometheus install (scrape config + retention, loopback-only): `observability-prometheus.md`
+- Grafana install (loopback-only) + tailnet access: `observability-grafana.md`
 - Cadence overview: `../ops-cadence-checklist.md` (what to do weekly/monthly/quarterly)
 
 Other playbooks:

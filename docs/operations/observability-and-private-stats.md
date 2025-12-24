@@ -74,6 +74,10 @@ Low-maintenance default:
 Bootstrap helper (VPS only):
 
 - `scripts/vps-bootstrap-observability-scaffold.sh`
+- `scripts/vps-install-observability-exporters.sh`
+- `scripts/vps-install-observability-prometheus.sh`
+- `scripts/vps-install-observability-grafana.sh`
+- `scripts/vps-enable-tailscale-serve-grafana.sh`
 
 ---
 
