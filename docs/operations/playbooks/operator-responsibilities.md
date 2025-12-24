@@ -47,4 +47,3 @@ This file is intentionally brief; it points to canonical docs when you need deta
   - Canonical: `../../deployment/hosting-and-live-server-to-dos.md`
 - Maintain a strict CORS allowlist; treat widening it as a deliberate security decision.
   - Canonical: `../../deployment/environments-and-configuration.md`
-

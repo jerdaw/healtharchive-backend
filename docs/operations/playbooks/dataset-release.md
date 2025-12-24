@@ -16,4 +16,3 @@ Canonical reference:
 ## What “done” means
 
 - `sha256sum -c SHA256SUMS` completes without errors for the latest release.
-

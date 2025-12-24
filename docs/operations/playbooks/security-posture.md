@@ -34,4 +34,3 @@ Canonical references:
 - Admin endpoints are not publicly accessible.
 - HSTS is present on `https://api.healtharchive.ca/api/health`.
 - CORS behavior matches the allowlist policy.
-

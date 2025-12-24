@@ -21,4 +21,3 @@ Rules:
 ## What “done” means
 
 - A dated adoption signals entry exists under `/srv/healtharchive/ops/adoption/`.
-

@@ -32,4 +32,3 @@ If you want alerts when systemd timers stop running:
 
 - External monitors are green and alert routing is confirmed.
 - If enabled, Healthchecks pings are configured without committing URLs to git.
-

@@ -25,4 +25,3 @@ Canonical references:
 
 - Annual scope is current in `../annual-campaign.md`.
 - If automation is enabled, the scheduler and follow-up tasks run as intended and are verifiable in logs/artifacts.
-
