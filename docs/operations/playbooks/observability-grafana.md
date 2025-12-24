@@ -61,6 +61,13 @@ Then run:
 
 Copy the HTTPS URL and open it from an operator machine that is on the tailnet.
 
+Troubleshooting:
+
+- If you see: `Serve is not enabled on your tailnet`, enable it in the Tailscale admin console (the error message includes a link), then re-run the script.
+- If you don’t want to enable Serve yet, use an SSH port-forward over Tailscale instead:
+  - `ssh -L 3000:127.0.0.1:3000 haadmin@<tailscale-host>`
+  - Then open `http://127.0.0.1:3000`
+
 ## Configure data sources (Grafana UI)
 
 This plan keeps secrets out of git and does **not** provision data sources yet.
