@@ -87,7 +87,11 @@ install -d -m 2770 -o root -g "${OPS_GROUP}" "${obs_dir}/notes"
 
 # /etc layout
 install -d -m 0750 -o root -g "${OPS_GROUP}" "${ETC_DIR}"
-install -d -m 0700 -o root -g root "${ETC_DIR%/}/observability"
+install -d -m 0750 -o root -g "${OPS_GROUP}" "${ETC_DIR%/}/observability"
+
+# Enforce directory perms even if it already existed (install -d does not update mode/owner).
+chown "root:${OPS_GROUP}" "${ETC_DIR%/}/observability"
+chmod 0750 "${ETC_DIR%/}/observability"
 
 secret_files=(
   prometheus_backend_admin_token
