@@ -44,3 +44,5 @@ tmp-test.warc.gz
 tmp-*.warc.gz
 .pytest_cache/
 .coverage
+.mypy_cache/
+.ruff_cache/

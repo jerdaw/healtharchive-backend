@@ -11,7 +11,7 @@
 # The drift checker validates this policy against the real VPS configuration
 # (without printing or persisting secrets).
 
-version = 2
+version = 3
 
 # The operator account expected to run deploy scripts and ops checks.
 operator_user = "haadmin"

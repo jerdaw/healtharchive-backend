@@ -16,6 +16,7 @@ Canonical docs to consult first:
 
 - `docs/README.md` – docs index.
 - `docs/architecture.md` – architecture & implementation details.
+- `docs/documentation-guidelines.md` – documentation policy and canonical sources.
 - `docs/development/live-testing.md` – step-by-step local testing flows.
 - `docs/deployment/environments-and-configuration.md` – cross-repo env vars and host matrix.
 - `src/archive_tool/docs/documentation.md` – internals of the `archive_tool` crawler CLI.
@@ -24,7 +25,9 @@ Canonical docs to consult first:
 - `docs/deployment/production-rollout-checklist.md` – production rollout steps.
 - `docs/operations/monitoring-and-ci-checklist.md` – monitoring, uptime, and CI guidance.
 - `docs/deployment/production-single-vps.md` – current production runbook (Hetzner + Tailscale-only SSH, nightly backups, NAS pull).
-- `docs/roadmaps/healtharchive-6-phase-upgrade-2025.md` – historical 6-phase upgrade roadmap; current ops todo lives in `docs/operations/healtharchive-ops-roadmap.md`.
+- `docs/roadmaps/future-roadmap.md` – backlog of not-yet-implemented work.
+- `docs/roadmaps/implemented/` – historical implementation plans (executed).
+- Frontend bilingual/dev architecture: `../healtharchive-frontend/docs/development/bilingual-dev-guide.md`
 
 When you’re doing anything beyond tiny local changes, **open those docs and sync your mental model first**.
 

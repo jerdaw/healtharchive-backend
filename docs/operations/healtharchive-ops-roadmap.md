@@ -16,7 +16,7 @@ Keep the two synced copies of this file aligned:
 - **Quarterly:** run a restore test and record a public-safe log entry in `/srv/healtharchive/ops/restore-tests/`.
 - **Quarterly:** add an adoption signals entry in `/srv/healtharchive/ops/adoption/` (links + aggregates only).
 - **Quarterly:** confirm dataset release exists and passes checksum verification (`sha256sum -c SHA256SUMS`).
-- **Quarterly:** confirm core timers are still enabled and succeeding (`systemctl list-timers`, `journalctl -u <service>`).
+- **Quarterly:** confirm core timers are enabled and succeeding (recommended: on the VPS run `cd /opt/healtharchive-backend && ./scripts/verify_ops_automation.sh`; then spot-check `journalctl -u <service>`).
 
 ## IRL / external validation (pending)
 
