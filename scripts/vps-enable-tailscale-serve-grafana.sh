@@ -92,9 +92,27 @@ if [[ "${APPLY}" == "true" && "${FORCE}" != "true" ]]; then
   fi
 fi
 
-run tailscale serve https / "${GRAFANA_URL}"
+serve_help="$(tailscale serve --help 2>/dev/null || true)"
+serve_mode="legacy"
+if [[ "${serve_help}" == *"--bg"* ]]; then
+  serve_mode="bg"
+fi
 
-echo "OK: tailscale serve configured for Grafana."
+if [[ "${FORCE}" == "true" ]]; then
+  run tailscale serve reset
+fi
+
+if [[ "${serve_mode}" == "bg" ]]; then
+  run tailscale serve --bg "${GRAFANA_URL}"
+else
+  run tailscale serve https / "${GRAFANA_URL}"
+fi
+
+if [[ "${APPLY}" == "true" ]]; then
+  echo "OK: tailscale serve configured for Grafana."
+else
+  echo "DRY-RUN: no changes applied."
+fi
 echo
 echo "Serve status:"
 if [[ "${APPLY}" == "true" ]]; then
