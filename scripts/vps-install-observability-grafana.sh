@@ -11,7 +11,7 @@ Safe-by-default: dry-run unless you pass --apply.
 
 What this does (when run with --apply):
 
-- Installs Grafana (Ubuntu package: grafana)
+- Installs Grafana (package: grafana; auto-adds Grafana Labs apt repo if needed)
 - Forces Grafana to bind loopback only (127.0.0.1:3000) via systemd env overrides
 - Disables anonymous access and self-signup
 - Resets the Grafana admin password from:
@@ -176,7 +176,38 @@ if [[ "${SKIP_DB_ROLE}" != "true" && ! -f "${pg_pw_file}" ]]; then
 fi
 
 if [[ "${SKIP_APT}" != "true" ]]; then
+  ensure_grafana_apt_repo() {
+    local keyring_dir="/etc/apt/keyrings"
+    local keyring_path="${keyring_dir}/grafana.gpg"
+    local list_path="/etc/apt/sources.list.d/grafana.list"
+    local repo_line="deb [signed-by=${keyring_path}] https://apt.grafana.com stable main"
+
+    run install -d -m 0755 -o root -g root "${keyring_dir}"
+    if [[ "${APPLY}" != "true" ]]; then
+      echo "+ curl -fsSL https://apt.grafana.com/gpg.key | gpg --dearmor >${keyring_path}"
+      echo "+ chmod 0644 ${keyring_path}"
+      echo "+ cat > ${list_path} <<'EOF'"
+      echo "${repo_line}"
+      echo "+ EOF"
+      return 0
+    fi
+
+    curl -fsSL https://apt.grafana.com/gpg.key | gpg --dearmor >"${keyring_path}"
+    chmod 0644 "${keyring_path}"
+    cat >"${list_path}" <<EOF
+${repo_line}
+EOF
+  }
+
   run apt-get update
+  if [[ "${APPLY}" == "true" ]]; then
+    if ! apt-cache show grafana >/dev/null 2>&1; then
+      echo "INFO: grafana package not found in apt sources; adding Grafana Labs repository."
+      apt-get install -y ca-certificates curl gnupg
+      ensure_grafana_apt_repo
+      apt-get update
+    fi
+  fi
   run apt-get install -y grafana
 fi
 
@@ -336,7 +367,11 @@ SQL
   fi
 fi
 
-echo "OK: Grafana installed and bound to ${GRAFANA_LISTEN}:${GRAFANA_PORT}."
+if [[ "${APPLY}" == "true" ]]; then
+  echo "OK: Grafana installed and bound to ${GRAFANA_LISTEN}:${GRAFANA_PORT}."
+else
+  echo "DRY-RUN: no changes applied."
+fi
 echo
 echo "Next (Phase 5): expose Grafana via tailnet-only HTTPS:"
 echo "  sudo ./scripts/vps-enable-tailscale-serve-grafana.sh --apply"

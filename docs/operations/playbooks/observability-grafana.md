@@ -32,6 +32,8 @@ Apply:
 
 - `sudo ./scripts/vps-install-observability-grafana.sh --apply`
 
+Note: on Ubuntu, the `grafana` package is not always available in the default apt sources; the installer script will add the Grafana Labs apt repo automatically when needed.
+
 This will:
 
 - bind Grafana to `127.0.0.1:3000` (not public)
@@ -48,6 +50,8 @@ Dry-run:
 Apply:
 
 - `sudo ./scripts/vps-enable-tailscale-serve-grafana.sh --apply`
+
+Note: Tailscale has changed the `tailscale serve` CLI over time; the script detects the installed version and uses the compatible command form.
 
 Then run:
 
@@ -75,7 +79,7 @@ Configure them once in the UI:
 ## Verify
 
 - Grafana is not publicly reachable (it binds to loopback):
-  - `ss -lntp | grep -E ':3000\\b'`
+  - `ss -lntp | grep -E ':3000\b'`
   - Expect `127.0.0.1:3000`
 - Grafana is reachable via tailnet HTTPS:
   - open the `tailscale serve status` URL from a tailnet-connected machine

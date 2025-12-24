@@ -356,11 +356,16 @@ if [[ "${ENABLE_SERVICE}" == "true" ]]; then
   run systemctl restart "${PROM_UNIT}"
 fi
 
-echo "OK: Prometheus configured."
+if [[ "${APPLY}" == "true" ]]; then
+  echo "OK: Prometheus configured."
+else
+  echo "DRY-RUN: no changes applied."
+fi
 echo
 echo "Verify locally on the VPS:"
 echo "  curl -s http://${PROM_LISTEN}/-/ready"
 echo "  curl -s http://${PROM_LISTEN}/api/v1/targets | head"
 echo
 echo "Confirm it is loopback-only:"
-echo "  ss -lntp | grep -E ':9090\\b'"
+prom_port="${PROM_LISTEN##*:}"
+echo "  ss -lntp | grep -E ':${prom_port}\\b'"

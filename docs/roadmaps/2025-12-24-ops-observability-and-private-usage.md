@@ -262,7 +262,7 @@ Steps:
 4. Validate locally:
    - readiness: `curl -s http://127.0.0.1:9090/-/ready`
    - targets: `curl -s http://127.0.0.1:9090/api/v1/targets | head`
-   - loopback-only bind: `ss -lntp | grep -E ':9090\\b'`
+   - loopback-only bind: `ss -lntp | grep -E ':9090\b'`
 
 Acceptance criteria:
 
@@ -300,9 +300,11 @@ Steps:
    - Grafana install/hardening:
      - dry-run: `./scripts/vps-install-observability-grafana.sh`
      - apply: `sudo ./scripts/vps-install-observability-grafana.sh --apply`
+     - note: if `grafana` is not in the default apt sources (common on Ubuntu), the script will add the Grafana Labs apt repo automatically.
    - Tailnet-only HTTPS:
      - dry-run: `./scripts/vps-enable-tailscale-serve-grafana.sh`
      - apply: `sudo ./scripts/vps-enable-tailscale-serve-grafana.sh --apply`
+     - note: the script supports both legacy and current `tailscale serve` CLI syntax.
 4. Configure data sources in the Grafana UI:
    - Prometheus: `http://127.0.0.1:9090`
    - Postgres: `127.0.0.1:5432`, DB `healtharchive`, user `grafana_readonly`

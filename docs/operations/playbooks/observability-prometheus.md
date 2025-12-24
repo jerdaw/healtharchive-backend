@@ -47,7 +47,7 @@ This will:
 
 2. Confirm it is loopback-only:
 
-   - `ss -lntp | grep -E ':9090\\b'`
+   - `ss -lntp | grep -E ':9090\b'`
 
    Expect `127.0.0.1:9090`.
 
