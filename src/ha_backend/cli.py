@@ -2281,7 +2281,7 @@ def cmd_replay_generate_previews(args: argparse.Namespace) -> None:
         requested_sources = [code.strip().lower() for code in args.source if code.strip()]
 
     with get_session() as session:
-        sources = list_sources(db=session)
+        sources = list_sources(lang=None, db=session)
 
     if requested_sources:
         wanted = set(requested_sources)
@@ -2922,7 +2922,7 @@ def cmd_replay_reconcile(args: argparse.Namespace) -> None:
 
             preview_dir = preview_dir.expanduser().resolve()
 
-            source_summaries = list_sources(db=session)
+            source_summaries = list_sources(lang=None, db=session)
             wanted_sources = (
                 [s for s in source_summaries if s.sourceCode in source_allowlist]
                 if source_allowlist

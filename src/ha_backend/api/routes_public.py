@@ -489,7 +489,11 @@ _REPLAY_PREVIEW_FORMATS: tuple[tuple[str, str], ...] = (
 
 
 def _find_replay_preview_file(
-    preview_dir: Path, source_code: str, job_id: int
+    preview_dir: Path,
+    source_code: str,
+    job_id: int,
+    *,
+    lang: Optional[str] = None,
 ) -> Optional[tuple[Path, str]]:
     """
     Return the first matching preview file path + media type.
@@ -498,6 +502,13 @@ def _find_replay_preview_file(
     encodings without changing the public API contract.
     """
     base = f"source-{source_code}-job-{job_id}"
+    normalized_lang = (lang or "").strip().lower()
+    if normalized_lang in ("en", "fr"):
+        localized_base = f"{base}-{normalized_lang}"
+        for ext, media_type in _REPLAY_PREVIEW_FORMATS:
+            candidate = preview_dir / f"{localized_base}{ext}"
+            if candidate.exists():
+                return candidate, media_type
     for ext, media_type in _REPLAY_PREVIEW_FORMATS:
         candidate = preview_dir / f"{base}{ext}"
         if candidate.exists():
@@ -2747,10 +2758,40 @@ def get_archive_stats(response: Response, db: Session = Depends(get_db)) -> Arch
 
 
 @router.get("/sources", response_model=List[SourceSummarySchema])
-def list_sources(db: Session = Depends(get_db)) -> List[SourceSummarySchema]:
+def list_sources(
+    lang: Optional[str] = Query(default=None, pattern=r"^(en|fr)$"),
+    db: Session = Depends(get_db),
+) -> List[SourceSummarySchema]:
     """
     Return per-source summary statistics derived from Snapshot data.
     """
+    normalized_lang = (lang or "").strip().lower()
+    if normalized_lang not in ("en", "fr"):
+        normalized_lang = ""
+
+    source_name_overrides: dict[str, dict[str, str]] = {
+        "hc": {"fr": "Santé Canada"},
+        "phac": {"fr": "Agence de la santé publique du Canada"},
+        "cihr": {"fr": "Instituts de recherche en santé du Canada"},
+    }
+
+    # Prefer bilingual "home" pages as entry points when the caller requests a
+    # specific language. This affects the entryBrowseUrl + entryPreviewUrl used
+    # by the frontend browse cards.
+    source_entry_base_urls: dict[str, dict[str, str]] = {
+        "hc": {
+            "en": "https://www.canada.ca/en/health-canada.html",
+            "fr": "https://www.canada.ca/fr/sante-canada.html",
+        },
+        "phac": {
+            "en": "https://www.canada.ca/en/public-health.html",
+            "fr": "https://www.canada.ca/fr/sante-publique.html",
+        },
+        "cihr": {
+            "en": "https://cihr-irsc.gc.ca/e/193.html",
+            "fr": "https://cihr-irsc.gc.ca/f/193.html",
+        },
+    }
     snapshot_agg = (
         db.query(
             Snapshot.source_id.label("source_id"),
@@ -2778,6 +2819,16 @@ def list_sources(db: Session = Depends(get_db)) -> List[SourceSummarySchema]:
     summaries: List[SourceSummarySchema] = []
 
     for source, record_count, first_capture, last_capture in rows:
+        localized_name = source.name
+        if normalized_lang and source.code in source_name_overrides:
+            localized_name = source_name_overrides[source.code].get(normalized_lang, source.name)
+
+        localized_base_url = source.base_url
+        if normalized_lang and source.code in source_entry_base_urls:
+            localized_base_url = source_entry_base_urls[source.code].get(
+                normalized_lang, source.base_url
+            )
+
         # Latest record id for this source
         latest_snapshot = (
             db.query(Snapshot.id)
@@ -2792,7 +2843,7 @@ def list_sources(db: Session = Depends(get_db)) -> List[SourceSummarySchema]:
         entry_browse_url: Optional[str] = None
         entry_preview_url: Optional[str] = None
 
-        entry_groups = _candidate_entry_groups(source.base_url)
+        entry_groups = _candidate_entry_groups(localized_base_url)
         if entry_groups:
             entry_status_quality = case(
                 (Snapshot.status_code.is_(None), 0),
@@ -2833,8 +2884,8 @@ def list_sources(db: Session = Depends(get_db)) -> List[SourceSummarySchema]:
         # If the exact baseUrl wasn't captured, fall back to a "reasonable"
         # entry point on the same host (avoid third-party pages being treated as
         # the source homepage).
-        if entry_record_id is None and source.base_url:
-            host_variants = _candidate_entry_hosts(source.base_url)
+        if entry_record_id is None and localized_base_url:
+            host_variants = _candidate_entry_hosts(localized_base_url)
             host_filters: list[Any] = []
             for host in host_variants:
                 for scheme in ("https", "http"):
@@ -2880,14 +2931,18 @@ def list_sources(db: Session = Depends(get_db)) -> List[SourceSummarySchema]:
 
         preview_dir = get_replay_preview_dir()
         if preview_dir is not None and entry_job_id:
-            if _find_replay_preview_file(preview_dir, source.code, entry_job_id):
+            if _find_replay_preview_file(
+                preview_dir, source.code, entry_job_id, lang=normalized_lang
+            ):
                 entry_preview_url = f"/api/sources/{source.code}/preview?jobId={entry_job_id}"
+                if normalized_lang:
+                    entry_preview_url = f"{entry_preview_url}&lang={normalized_lang}"
 
         summaries.append(
             SourceSummarySchema(
                 sourceCode=source.code,
-                sourceName=source.name,
-                baseUrl=source.base_url,
+                sourceName=localized_name,
+                baseUrl=localized_base_url,
                 description=source.description,
                 recordCount=record_count or 0,
                 firstCapture=(
@@ -3066,6 +3121,7 @@ def list_source_editions(
 def get_source_preview(
     source_code: str,
     jobId: int = Query(..., ge=1),
+    lang: Optional[str] = Query(default=None, pattern=r"^(en|fr)$"),
     db: Session = Depends(get_db),
 ) -> Response:
     """
@@ -3087,7 +3143,7 @@ def get_source_preview(
     if not source:
         raise HTTPException(status_code=404, detail="Source not found")
 
-    resolved = _find_replay_preview_file(preview_dir, normalized_code, jobId)
+    resolved = _find_replay_preview_file(preview_dir, normalized_code, jobId, lang=lang)
     if resolved is None:
         raise HTTPException(status_code=404, detail="Preview not found")
 
