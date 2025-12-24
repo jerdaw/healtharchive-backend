@@ -34,6 +34,9 @@ Supporting materials:
 
 Keep this list short; prefer linking to the canonical doc that explains the item.
 
+- Private ops observability + internal usage dashboards (Prometheus/Grafana; avoid bespoke admin UI unless needed).
+  - See: `2025-12-24-ops-observability-and-private-usage.md`
+
 - Tighten GitHub merge discipline when there are multiple committers (PR-only + required checks).
   - See: `../operations/monitoring-and-ci-checklist.md`
 - Storage optimization (only if provenance is preserved): consider pruning same-day duplicates if identical HTML can be proven safely.
