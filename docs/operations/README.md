@@ -1,5 +1,7 @@
 # Operations docs
 
+
+- Ops playbooks (task-oriented checklists): `playbooks/README.md`
 - Annual capture campaign (scope + seeds): `annual-campaign.md`
 - Automation implementation plan (phased, production-only): `automation-implementation-plan.md`
 - Monitoring + uptime + CI checklist: `monitoring-and-ci-checklist.md`

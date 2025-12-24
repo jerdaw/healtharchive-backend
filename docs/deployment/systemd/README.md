@@ -106,6 +106,14 @@ cd /opt/healtharchive-backend
 sudo ./scripts/vps-install-systemd-units.sh --apply --restart-worker
 ```
 
+Before enabling timers that write artifacts under `/srv/healtharchive/ops/`, ensure
+the ops directories exist with the expected permissions:
+
+```bash
+cd /opt/healtharchive-backend
+sudo ./scripts/vps-bootstrap-ops-dirs.sh
+```
+
 Manual install (equivalent):
 
 Copy unit files:

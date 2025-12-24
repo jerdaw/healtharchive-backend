@@ -4,6 +4,20 @@ Purpose: make routine operations repeatable and low-friction so the project can 
 
 This checklist is intentionally short. If a task feels too heavy to do regularly, it should be moved to a longer cadence or automated safely.
 
+
+## Every deploy (always)
+
+- **Treat green `main` as the deploy gate** (run local checks, push, wait for CI).
+- **Deploy using the VPS helper** (safe deploy + verification):
+  - `cd /opt/healtharchive-backend && ./scripts/vps-deploy.sh --apply --baseline-mode live`
+- If the deploy script fails, **don’t retry blindly**:
+  - read the drift report / verifier output
+  - fix the underlying mismatch (policy vs reality)
+
+Related docs:
+
+- Deploy runbook: `../deployment/production-single-vps.md`
+- Verification/monitoring: `monitoring-and-ci-checklist.md`
 ## Weekly (10–15 minutes)
 
 - **Service health**
@@ -17,6 +31,16 @@ This checklist is intentionally short. If a task feels too heavy to do regularly
   - `sudo journalctl -u healtharchive-worker -n 200 --no-pager`
 - **Change tracking timer** (if enabled)
   - `systemctl list-timers | rg healtharchive-change-tracking || systemctl list-timers | grep healtharchive-change-tracking`
+
+## Ongoing automation maintenance
+
+- Keep systemd unit templates installed/updated on the VPS after repo updates:
+  - `cd /opt/healtharchive-backend && sudo ./scripts/vps-install-systemd-units.sh --apply --restart-worker`
+- Treat sentinel files under `/etc/healtharchive/` as the explicit on/off controls for automation.
+- If you enable Healthchecks pings, keep ping URLs only in the root-owned VPS env file:
+  - `/etc/healtharchive/healthchecks.env` (never commit ping URLs)
+
+See: `../deployment/systemd/README.md`
 
 ## Monthly (30–60 minutes)
 
@@ -34,6 +58,14 @@ This checklist is intentionally short. If a task feels too heavy to do regularly
 
 - **Restore test**
   - Follow `restore-test-procedure.md` and record results using `restore-test-log-template.md`.
+- **Dataset release integrity**
+  - Confirm a dataset release exists for the expected quarter/date.
+  - Verify checksums: `sha256sum -c SHA256SUMS` (see `dataset-release-runbook.md`).
+- **Adoption signals entry** (public-safe)
+  - Add a dated entry under `/srv/healtharchive/ops/adoption/` (links + aggregates only).
+- **Automation posture check**
+  - On the VPS run: `cd /opt/healtharchive-backend && ./scripts/verify_ops_automation.sh`
+  - Spot-check logs: `journalctl -u <service> -n 200`
 - **Growth constraints review**
   - Revisit `growth-constraints.md` (storage, source caps, performance budgets).
   - Adjust only if you can still support the new limits.

@@ -1,4 +1,4 @@
-# HealthArchive 6-Phase Upgrade Roadmap (2025)
+# HealthArchive 6-Phase Upgrade Roadmap (2025; archived 2025-12-24)
 
 This is the **historical roadmap** for the 6-phase upgrade program (Phases 0–6).
 

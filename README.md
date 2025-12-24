@@ -19,6 +19,15 @@ VPS + Tailscale-only SSH + nightly backups), see
 `docs/deployment/production-single-vps.md`.
 This README is intentionally shorter and focused on practical usage.
 
+Production entrypoints (VPS):
+
+- Deploy gate (includes baseline drift + public surface checks):
+  - `./scripts/vps-deploy.sh --apply --baseline-mode live`
+- Baseline drift policy (desired state in git):
+  - `docs/operations/production-baseline-policy.toml`
+- Systemd automation templates (timers + enablement steps):
+  - `docs/deployment/systemd/README.md`
+
 ---
 
 ## Project layout (high level)
