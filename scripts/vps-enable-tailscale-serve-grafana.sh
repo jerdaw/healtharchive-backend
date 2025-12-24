@@ -92,20 +92,20 @@ if [[ "${APPLY}" == "true" && "${FORCE}" != "true" ]]; then
   fi
 fi
 
-serve_help="$(tailscale serve --help 2>/dev/null || true)"
-serve_mode="legacy"
-if [[ "${serve_help}" == *"--bg"* ]]; then
-  serve_mode="bg"
-fi
-
 if [[ "${FORCE}" == "true" ]]; then
   run tailscale serve reset
 fi
 
-if [[ "${serve_mode}" == "bg" ]]; then
-  run tailscale serve --bg "${GRAFANA_URL}"
+if [[ "${APPLY}" != "true" ]]; then
+  echo "+ (try: tailscale serve --bg ${GRAFANA_URL}; fallback to legacy syntax if unsupported)"
 else
-  run tailscale serve https / "${GRAFANA_URL}"
+  set +e
+  tailscale serve --bg "${GRAFANA_URL}" >/dev/null 2>&1
+  rc=$?
+  set -e
+  if [[ "${rc}" -ne 0 ]]; then
+    tailscale serve https / "${GRAFANA_URL}"
+  fi
 fi
 
 if [[ "${APPLY}" == "true" ]]; then
