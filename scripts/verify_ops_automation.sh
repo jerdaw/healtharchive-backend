@@ -176,4 +176,3 @@ if [[ "${failures}" -gt 0 ]]; then
   exit 1
 fi
 echo "All checks passed."
-
