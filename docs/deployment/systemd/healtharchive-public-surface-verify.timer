@@ -1,0 +1,11 @@
+[Unit]
+Description=Run HealthArchive public surface verification daily
+
+[Timer]
+OnCalendar=*-*-* 04:10:00 UTC
+RandomizedDelaySec=30m
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+
