@@ -20,6 +20,7 @@ Options:
   --require-replay-reconcile     Fail if replay reconcile timer isn't enabled
   --require-annual-schedule      Fail if annual schedule timer isn't enabled
   --require-annual-search-verify Fail if annual search verify timer isn't enabled
+  --require-public-verify        Fail if public surface verify timer isn't enabled
   --allow-missing-worker-override Do not fail if worker override isn't present
 
 Notes:
@@ -32,6 +33,7 @@ REQUIRE_CHANGE_TRACKING="false"
 REQUIRE_REPLAY_RECONCILE="false"
 REQUIRE_ANNUAL_SCHEDULE="false"
 REQUIRE_ANNUAL_SEARCH_VERIFY="false"
+REQUIRE_PUBLIC_VERIFY="false"
 ALLOW_MISSING_WORKER_OVERRIDE="false"
 
 while [[ $# -gt 0 ]]; do
@@ -50,6 +52,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --require-annual-search-verify)
       REQUIRE_ANNUAL_SEARCH_VERIFY="true"
+      shift 1
+      ;;
+    --require-public-verify)
+      REQUIRE_PUBLIC_VERIFY="true"
       shift 1
       ;;
     --allow-missing-worker-override)
@@ -136,6 +142,7 @@ check_timer "healtharchive-change-tracking.timer" "/etc/healtharchive/change-tra
 check_timer "healtharchive-replay-reconcile.timer" "/etc/healtharchive/replay-automation-enabled" "${REQUIRE_REPLAY_RECONCILE}"
 check_timer "healtharchive-schedule-annual.timer" "/etc/healtharchive/automation-enabled" "${REQUIRE_ANNUAL_SCHEDULE}"
 check_timer "healtharchive-annual-search-verify.timer" "/etc/healtharchive/automation-enabled" "${REQUIRE_ANNUAL_SEARCH_VERIFY}"
+check_timer "healtharchive-public-surface-verify.timer" "/etc/healtharchive/public-verify-enabled" "${REQUIRE_PUBLIC_VERIFY}"
 
 echo ""
 

@@ -1,0 +1,21 @@
+[Unit]
+Description=HealthArchive public surface verification (public API + frontend)
+Wants=network-online.target
+After=network-online.target
+ConditionPathExists=/etc/healtharchive/public-verify-enabled
+
+[Service]
+Type=oneshot
+User=haadmin
+WorkingDirectory=/opt/healtharchive-backend
+EnvironmentFile=-/etc/healtharchive/healthchecks.env
+
+# Keep impact low on the single VPS.
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=6
+
+TimeoutStartSec=10m
+
+ExecStart=/opt/healtharchive-backend/scripts/systemd-healthchecks-wrapper.sh --ping-var HEALTHARCHIVE_HC_PING_PUBLIC_VERIFY -- /usr/bin/python3 /opt/healtharchive-backend/scripts/verify_public_surface.py --api-base https://api.healtharchive.ca --frontend-base https://www.healtharchive.ca --timeout-seconds 20
+
