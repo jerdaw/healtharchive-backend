@@ -66,6 +66,22 @@ run() {
   "$@"
 }
 
+get_timeout_cmd() {
+  if command -v timeout >/dev/null 2>&1; then
+    echo "timeout"
+    return 0
+  fi
+  if [[ -x "/usr/bin/timeout" ]]; then
+    echo "/usr/bin/timeout"
+    return 0
+  fi
+  if [[ -x "/bin/timeout" ]]; then
+    echo "/bin/timeout"
+    return 0
+  fi
+  echo ""
+}
+
 is_url_up() {
   local url="$1"
   local health_url="${url%/}/api/health"
@@ -114,15 +130,20 @@ else
     exit 1
   fi
 
+  echo "Configuring tailscale serve for Grafana upstream: ${GRAFANA_URL}"
+
   out=""
   rc=0
-  if command -v timeout >/dev/null 2>&1; then
-    out="$(timeout 10s tailscale serve --bg "${GRAFANA_URL}" 2>&1)"
+  timeout_cmd="$(get_timeout_cmd)"
+  set +e
+  if [[ -n "${timeout_cmd}" ]]; then
+    out="$("${timeout_cmd}" 10s tailscale serve --bg "${GRAFANA_URL}" 2>&1)"
     rc=$?
   else
     out="$(tailscale serve --bg "${GRAFANA_URL}" 2>&1)"
     rc=$?
   fi
+  set -e
 
   if [[ "${rc}" -ne 0 ]]; then
     if [[ "${rc}" -eq 124 ]]; then
@@ -140,6 +161,19 @@ else
       echo "${out}" >&2
       exit "${rc}"
     fi
+  fi
+
+  status="$(tailscale serve status 2>/dev/null || true)"
+  if [[ "${status}" == *"No serve config"* ]]; then
+    echo "ERROR: tailscale serve did not create a serve config." >&2
+    if [[ -n "${out}" ]]; then
+      echo "Output from tailscale serve:" >&2
+      echo "${out}" >&2
+    fi
+    echo "Try manually:" >&2
+    echo "  sudo tailscale serve --bg ${GRAFANA_URL}" >&2
+    echo "  sudo tailscale serve status" >&2
+    exit 1
   fi
 fi
 
