@@ -277,6 +277,36 @@ fi
 
 write_dropin "${GRAFANA_UNIT}" "${dropin_body}"
 
+ensure_grafana_state_dirs_writable() {
+  if [[ "${APPLY}" != "true" ]]; then
+    echo "+ (ensure Grafana state dirs are writable by service user)"
+    return 0
+  fi
+
+  svc_user="$(systemctl show -p User --value "${GRAFANA_UNIT}" 2>/dev/null || true)"
+  if [[ -z "${svc_user}" ]]; then
+    svc_user="grafana"
+  fi
+
+  svc_group="$(systemctl show -p Group --value "${GRAFANA_UNIT}" 2>/dev/null || true)"
+  if [[ -z "${svc_group}" ]]; then
+    svc_group="${svc_user}"
+  fi
+
+  if ! id "${svc_user}" >/dev/null 2>&1; then
+    echo "ERROR: Grafana service user not found: ${svc_user}" >&2
+    exit 1
+  fi
+
+  install -d -m 0750 -o "${svc_user}" -g "${svc_group}" /var/lib/grafana
+  install -d -m 0750 -o "${svc_user}" -g "${svc_group}" /var/lib/grafana/plugins
+  install -d -m 0750 -o "${svc_user}" -g "${svc_group}" /var/log/grafana
+
+  chown -R "${svc_user}:${svc_group}" /var/lib/grafana /var/log/grafana
+}
+
+ensure_grafana_state_dirs_writable
+
 run systemctl daemon-reload
 if [[ "${ENABLE_SERVICE}" == "true" ]]; then
   run systemctl enable "${GRAFANA_UNIT}"
