@@ -182,7 +182,12 @@ fi
 find_unit() {
   local unit
   for unit in "$@"; do
-    if systemctl list-unit-files --type=service --no-pager --no-legend 2>/dev/null | awk '{print $1}' | grep -qx "${unit}"; then
+    # Prefer systemctl introspection, but also accept common unit-file paths.
+    if systemctl cat "${unit}" >/dev/null 2>&1; then
+      echo "${unit}"
+      return 0
+    fi
+    if [[ -f "/etc/systemd/system/${unit}" || -f "/usr/lib/systemd/system/${unit}" || -f "/lib/systemd/system/${unit}" ]]; then
       echo "${unit}"
       return 0
     fi
@@ -202,25 +207,36 @@ find_bin() {
 }
 
 NODE_UNIT="$(find_unit prometheus-node-exporter.service node-exporter.service || true)"
-if [[ -z "${NODE_UNIT}" ]]; then
-  echo "ERROR: Could not find node exporter systemd unit (expected prometheus-node-exporter.service)." >&2
-  exit 1
-fi
 NODE_BIN="$(find_bin prometheus-node-exporter node_exporter /usr/bin/prometheus-node-exporter /usr/bin/node_exporter || true)"
-if [[ -z "${NODE_BIN}" ]]; then
-  echo "ERROR: Could not find node exporter binary." >&2
-  exit 1
+if [[ "${APPLY}" != "true" ]]; then
+  # Dry-run should not fail if packages aren't installed yet.
+  NODE_UNIT="${NODE_UNIT:-prometheus-node-exporter.service}"
+  NODE_BIN="${NODE_BIN:-/usr/bin/prometheus-node-exporter}"
+else
+  if [[ -z "${NODE_UNIT}" ]]; then
+    echo "ERROR: Could not find node exporter systemd unit (expected prometheus-node-exporter.service)." >&2
+    exit 1
+  fi
+  if [[ -z "${NODE_BIN}" ]]; then
+    echo "ERROR: Could not find node exporter binary." >&2
+    exit 1
+  fi
 fi
 
 PG_UNIT="$(find_unit prometheus-postgres-exporter.service postgres-exporter.service prometheus-postgresql-exporter.service || true)"
-if [[ -z "${PG_UNIT}" ]]; then
-  echo "ERROR: Could not find postgres exporter systemd unit (expected prometheus-postgres-exporter.service)." >&2
-  exit 1
-fi
 PG_BIN="$(find_bin prometheus-postgres-exporter postgres_exporter /usr/bin/prometheus-postgres-exporter /usr/bin/postgres_exporter || true)"
-if [[ -z "${PG_BIN}" ]]; then
-  echo "ERROR: Could not find postgres exporter binary." >&2
-  exit 1
+if [[ "${APPLY}" != "true" ]]; then
+  PG_UNIT="${PG_UNIT:-prometheus-postgres-exporter.service}"
+  PG_BIN="${PG_BIN:-/usr/bin/prometheus-postgres-exporter}"
+else
+  if [[ -z "${PG_UNIT}" ]]; then
+    echo "ERROR: Could not find postgres exporter systemd unit (expected prometheus-postgres-exporter.service)." >&2
+    exit 1
+  fi
+  if [[ -z "${PG_BIN}" ]]; then
+    echo "ERROR: Could not find postgres exporter binary." >&2
+    exit 1
+  fi
 fi
 
 pg_pw_file="${obs_secrets_dir}/postgres_exporter_password"
@@ -228,6 +244,10 @@ pg_env_file="${obs_secrets_dir}/postgres_exporter.env"
 
 if [[ "${SKIP_DB_ROLE}" != "true" ]]; then
   if [[ "${APPLY}" == "true" ]]; then
+    # Allow services to read only the files they need. Keep other secrets root-only.
+    chown "root:${OPS_GROUP}" "${obs_secrets_dir}"
+    chmod 0750 "${obs_secrets_dir}"
+
     if [[ ! -s "${pg_pw_file}" ]]; then
       if command -v openssl >/dev/null 2>&1; then
         pw="$(openssl rand -hex 24)"
@@ -236,8 +256,8 @@ if [[ "${SKIP_DB_ROLE}" != "true" ]]; then
       fi
       umask 077
       printf '%s' "${pw}" >"${pg_pw_file}"
-      chown root:root "${pg_pw_file}"
-      chmod 0600 "${pg_pw_file}"
+      chown "root:${OPS_GROUP}" "${pg_pw_file}"
+      chmod 0640 "${pg_pw_file}"
     else
       pw="$(cat "${pg_pw_file}")"
     fi
@@ -250,8 +270,16 @@ if [[ "${SKIP_DB_ROLE}" != "true" ]]; then
         "${DB_HOST}" \
         "${DB_PORT}" \
         "${DB_NAME}" >"${pg_env_file}"
-      chown root:root "${pg_env_file}"
-      chmod 0600 "${pg_env_file}"
+      chown "root:${OPS_GROUP}" "${pg_env_file}"
+      chmod 0640 "${pg_env_file}"
+    fi
+
+    # Ensure the postgres exporter service user can read the env file.
+    pg_service_user="$(systemctl show -p User --value "${PG_UNIT}" 2>/dev/null || true)"
+    if [[ -n "${pg_service_user}" && "${pg_service_user}" != "root" ]]; then
+      if id "${pg_service_user}" >/dev/null 2>&1; then
+        usermod -aG "${OPS_GROUP}" "${pg_service_user}"
+      fi
     fi
 
     psql_runner=()
@@ -320,7 +348,8 @@ ExecStart=${PG_BIN} --web.listen-address=${PG_LISTEN}
 run systemctl daemon-reload
 
 if [[ "${ENABLE_SERVICES}" == "true" ]]; then
-  run systemctl enable --now "${NODE_UNIT}" "${PG_UNIT}"
+  run systemctl enable "${NODE_UNIT}" "${PG_UNIT}"
+  run systemctl restart "${NODE_UNIT}" "${PG_UNIT}"
 fi
 
 echo "OK: exporters configured."
