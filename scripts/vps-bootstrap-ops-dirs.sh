@@ -87,4 +87,3 @@ done
 
 echo "OK: bootstrapped ops dirs under: ${ops_dir}"
 stat -c '%U:%G %a %n' "${ops_dir}" "${ops_dir}/"* | sed 's/^/  /'
-
