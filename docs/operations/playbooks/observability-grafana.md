@@ -53,6 +53,8 @@ Apply:
 
 Note: Tailscale has changed the `tailscale serve` CLI over time; the script detects the installed version and uses the compatible command form.
 
+Note: this script also checks that Grafana is reachable on loopback first (via `http://127.0.0.1:3000/api/health`) to avoid hanging on misconfigured systems.
+
 Then run:
 
 - `sudo tailscale serve status`
