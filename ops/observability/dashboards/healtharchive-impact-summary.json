@@ -38,7 +38,7 @@
         {
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT\\n  date_trunc('month', metric_date)::date AS month,\\n  event,\\n  SUM(count)::bigint AS count\\nFROM public.usage_metrics\\nWHERE metric_date >= (current_date - INTERVAL '400 days')\\nGROUP BY 1, 2\\nORDER BY 1 DESC, 3 DESC;",
+          "rawSql": "SELECT date_trunc('month', metric_date)::date AS month, event, SUM(count)::bigint AS count FROM public.usage_metrics WHERE metric_date >= (current_date - INTERVAL '400 days') GROUP BY 1, 2 ORDER BY 1 DESC, 3 DESC;",
           "refId": "A"
         }
       ],
@@ -66,7 +66,7 @@
         {
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT\\n  date_trunc('quarter', metric_date)::date AS quarter,\\n  event,\\n  SUM(count)::bigint AS count\\nFROM public.usage_metrics\\nWHERE metric_date >= (current_date - INTERVAL '800 days')\\n  AND event IN ('search_request', 'snapshot_detail', 'snapshot_raw', 'report_submitted', 'changes_list', 'compare_view', 'timeline_view', 'exports_download_snapshots', 'exports_download_changes')\\nGROUP BY 1, 2\\nORDER BY 1 DESC, 3 DESC;",
+          "rawSql": "SELECT date_trunc('quarter', metric_date)::date AS quarter, event, SUM(count)::bigint AS count FROM public.usage_metrics WHERE metric_date >= (current_date - INTERVAL '800 days') AND event IN ('search_request', 'snapshot_detail', 'snapshot_raw', 'report_submitted', 'changes_list', 'compare_view', 'timeline_view', 'exports_download_snapshots', 'exports_download_changes') GROUP BY 1, 2 ORDER BY 1 DESC, 3 DESC;",
           "refId": "A"
         }
       ],
@@ -99,7 +99,7 @@
         {
           "format": "time_series",
           "rawQuery": true,
-          "rawSql": "SELECT\\n  (metric_date::timestamp AT TIME ZONE 'UTC') AS time,\\n  event AS metric,\\n  count::bigint AS value\\nFROM public.usage_metrics\\nWHERE $__timeFilter(metric_date::timestamp AT TIME ZONE 'UTC')\\n  AND event IN ('search_request', 'snapshot_detail', 'changes_list', 'exports_download_snapshots', 'exports_download_changes')\\nORDER BY metric_date;",
+          "rawSql": "SELECT (metric_date::timestamp AT TIME ZONE 'UTC') AS time, event AS metric, count::bigint AS value FROM public.usage_metrics WHERE $__timeFilter(metric_date::timestamp AT TIME ZONE 'UTC') AND event IN ('search_request', 'snapshot_detail', 'changes_list', 'exports_download_snapshots', 'exports_download_changes') ORDER BY metric_date;",
           "refId": "A"
         }
       ],

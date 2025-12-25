@@ -43,7 +43,7 @@
         {
           "format": "time_series",
           "rawQuery": true,
-          "rawSql": "SELECT\\n  (metric_date::timestamp AT TIME ZONE 'UTC') AS time,\\n  event AS metric,\\n  count::bigint AS value\\nFROM public.usage_metrics\\nWHERE $__timeFilter(metric_date::timestamp AT TIME ZONE 'UTC')\\n  AND event IN ('search_request', 'snapshot_detail', 'snapshot_raw')\\nORDER BY metric_date;",
+          "rawSql": "SELECT (metric_date::timestamp AT TIME ZONE 'UTC') AS time, event AS metric, count::bigint AS value FROM public.usage_metrics WHERE $__timeFilter(metric_date::timestamp AT TIME ZONE 'UTC') AND event IN ('search_request', 'snapshot_detail', 'snapshot_raw') ORDER BY metric_date;",
           "refId": "A"
         }
       ],
@@ -76,7 +76,7 @@
         {
           "format": "time_series",
           "rawQuery": true,
-          "rawSql": "SELECT\\n  (metric_date::timestamp AT TIME ZONE 'UTC') AS time,\\n  event AS metric,\\n  count::bigint AS value\\nFROM public.usage_metrics\\nWHERE $__timeFilter(metric_date::timestamp AT TIME ZONE 'UTC')\\n  AND event IN ('report_submitted', 'changes_list', 'compare_view', 'timeline_view', 'exports_download_snapshots', 'exports_download_changes')\\nORDER BY metric_date;",
+          "rawSql": "SELECT (metric_date::timestamp AT TIME ZONE 'UTC') AS time, event AS metric, count::bigint AS value FROM public.usage_metrics WHERE $__timeFilter(metric_date::timestamp AT TIME ZONE 'UTC') AND event IN ('report_submitted', 'changes_list', 'compare_view', 'timeline_view', 'exports_download_snapshots', 'exports_download_changes') ORDER BY metric_date;",
           "refId": "A"
         }
       ],
@@ -109,7 +109,7 @@
         {
           "format": "time_series",
           "rawQuery": true,
-          "rawSql": "WITH daily AS (\\n  SELECT metric_date, SUM(count)::bigint AS count\\n  FROM public.usage_metrics\\n  WHERE event = 'search_request'\\n  GROUP BY metric_date\\n)\\nSELECT\\n  (metric_date::timestamp AT TIME ZONE 'UTC') AS time,\\n  count,\\n  AVG(count) OVER (ORDER BY metric_date ROWS BETWEEN 6 PRECEDING AND CURRENT ROW) AS avg_7d,\\n  AVG(count) OVER (ORDER BY metric_date ROWS BETWEEN 29 PRECEDING AND CURRENT ROW) AS avg_30d\\nFROM daily\\nWHERE $__timeFilter(metric_date::timestamp AT TIME ZONE 'UTC')\\nORDER BY metric_date;",
+          "rawSql": "WITH daily AS (SELECT metric_date, SUM(count)::bigint AS count FROM public.usage_metrics WHERE event = 'search_request' GROUP BY metric_date) SELECT (metric_date::timestamp AT TIME ZONE 'UTC') AS time, count, AVG(count) OVER (ORDER BY metric_date ROWS BETWEEN 6 PRECEDING AND CURRENT ROW) AS avg_7d, AVG(count) OVER (ORDER BY metric_date ROWS BETWEEN 29 PRECEDING AND CURRENT ROW) AS avg_30d FROM daily WHERE $__timeFilter(metric_date::timestamp AT TIME ZONE 'UTC') ORDER BY metric_date;",
           "refId": "A"
         }
       ],
@@ -137,7 +137,7 @@
         {
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT\\n  event,\\n  SUM(count)::bigint AS count_30d\\nFROM public.usage_metrics\\nWHERE metric_date >= (current_date - INTERVAL '30 days')\\nGROUP BY event\\nORDER BY count_30d DESC;",
+          "rawSql": "SELECT event, SUM(count)::bigint AS count_30d FROM public.usage_metrics WHERE metric_date >= (current_date - INTERVAL '30 days') GROUP BY event ORDER BY count_30d DESC;",
           "refId": "A"
         }
       ],
