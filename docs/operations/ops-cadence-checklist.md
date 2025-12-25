@@ -10,6 +10,8 @@ This checklist is intentionally short. If a task feels too heavy to do regularly
 - **Treat green `main` as the deploy gate** (run local checks, push, wait for CI).
 - **Deploy using the VPS helper** (safe deploy + verification):
   - `cd /opt/healtharchive-backend && ./scripts/vps-deploy.sh --apply --baseline-mode live`
+- **Verify observability is still healthy** (internal; loopback-only):
+  - `cd /opt/healtharchive-backend && ./scripts/vps-verify-observability.sh`
 - If the deploy script fails, **don’t retry blindly**:
   - read the drift report / verifier output
   - fix the underlying mismatch (policy vs reality)
@@ -20,6 +22,8 @@ Related docs:
 - Verification/monitoring: `monitoring-and-ci-checklist.md`
 ## Weekly (10–15 minutes)
 
+- **Observability sanity check**
+  - `cd /opt/healtharchive-backend && ./scripts/vps-verify-observability.sh`
 - **Service health**
   - `curl -sS http://127.0.0.1:8001/api/health; echo`
   - `sudo systemctl status healtharchive-api healtharchive-worker --no-pager -l`
