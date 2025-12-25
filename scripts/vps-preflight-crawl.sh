@@ -348,6 +348,11 @@ step_campaign_storage_forecast() {
   "${VENV_BIN}/python3" ./scripts/campaign_storage_forecast.py --year "${YEAR}" --archive-root "${archive_root}"
 }
 
+step_resource_headroom() {
+  set -u -o pipefail
+  "${VENV_BIN}/python3" ./scripts/vps_resource_headroom.py
+}
+
 step_annual_status_json() {
   set -u -o pipefail
   "${VENV_BIN}/ha-backend" annual-status --year "${YEAR}" --json
@@ -465,44 +470,46 @@ else
   warn "campaign storage forecast skipped (pass --year YYYY)"
 fi
 
-run_step "Services" "03-services.txt" step_services
+run_step "CPU/RAM headroom" "03-resource-headroom.txt" step_resource_headroom
 
-run_step "API health (loopback)" "04-api-health.json" curl -fsS --max-time 5 "${API_BASE}/api/health"
+run_step "Services" "04-services.txt" step_services
 
-run_step "Backups" "05-backups.txt" step_backups
+run_step "API health (loopback)" "05-api-health.json" curl -fsS --max-time 5 "${API_BASE}/api/health"
 
-run_step "archive-tool dry-run (Docker wiring)" "06-archive-tool-dry-run.txt" step_archive_tool_dry_run
+run_step "Backups" "06-backups.txt" step_backups
+
+run_step "archive-tool dry-run (Docker wiring)" "07-archive-tool-dry-run.txt" step_archive_tool_dry_run
 
 if [[ -n "${YEAR}" ]]; then
-  run_step "annual-status (json)" "07-annual-status.json" step_annual_status_json
-  run_step "schedule-annual (dry-run)" "08-schedule-annual.txt" step_schedule_annual_dry_run
+  run_step "annual-status (json)" "08-annual-status.json" step_annual_status_json
+  run_step "schedule-annual (dry-run)" "09-schedule-annual.txt" step_schedule_annual_dry_run
 else
   warn "annual scheduler dry-run skipped (pass --year YYYY)"
 fi
 
-run_step "Ops automation posture" "09-verify-ops-automation.txt" step_ops_automation
+run_step "Ops automation posture" "10-verify-ops-automation.txt" step_ops_automation
 
 if [[ "${SKIP_BASELINE_DRIFT}" != "true" ]]; then
-  run_step "Baseline drift" "10-baseline-drift.txt" step_baseline_drift
+  run_step "Baseline drift" "11-baseline-drift.txt" step_baseline_drift
 else
   warn "baseline drift check skipped (--skip-baseline-drift)"
 fi
 
 if [[ "${SKIP_SECURITY_ADMIN}" != "true" ]]; then
-  run_step "Security + admin auth (public)" "11-verify-security-and-admin.txt" step_security_admin_public
+  run_step "Security + admin auth (public)" "12-verify-security-and-admin.txt" step_security_admin_public
 else
   warn "security/admin check skipped (--skip-security-admin)"
 fi
 
 if [[ "${SKIP_PUBLIC_SURFACE}" != "true" ]]; then
-  run_step "Public surface" "12-verify-public-surface.txt" step_public_surface
+  run_step "Public surface" "13-verify-public-surface.txt" step_public_surface
 else
   warn "public surface verify skipped (--skip-public-surface)"
 fi
 
 if [[ "${SKIP_OBSERVABILITY}" != "true" ]]; then
   if [[ -x "./scripts/vps-verify-observability.sh" ]]; then
-    run_step "Observability" "13-verify-observability.txt" step_observability
+    run_step "Observability" "14-verify-observability.txt" step_observability
   else
     warn "observability verifier not present; skipping (scripts/vps-verify-observability.sh)"
   fi
