@@ -11,7 +11,7 @@ It is intentionally **sequential**: complete each phase before starting the next
 Notes:
 
 - This is not the historical “6-phase upgrade roadmap”. That historical doc lives in
-  `healtharchive-6-phase-upgrade-2025.md`.
+  `2025-12-24-6-phase-upgrade-roadmap-2025.md`.
 - This plan is written against **current implementation reality**. Where code already
   exists, phases focus on configuration + verification rather than new development.
 - Keep `docs/operations/healtharchive-ops-roadmap.md` short; it should reference canonical docs

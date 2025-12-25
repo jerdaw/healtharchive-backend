@@ -17,4 +17,4 @@ None currently.
 
 ## Historical context
 
-- HealthArchive 6-Phase Upgrade Roadmap (2025; archived): `healtharchive-6-phase-upgrade-2025.md`
+- HealthArchive 6-Phase Upgrade Roadmap (2025; archived): `implemented/2025-12-24-6-phase-upgrade-roadmap-2025.md`
