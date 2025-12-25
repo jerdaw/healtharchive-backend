@@ -1,0 +1,122 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": "-- Grafana --",
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "description": "Read-only ops console backed by Postgres. Use the admin proxy for JSON drilldown (/api/admin/**, /metrics).",
+  "editable": false,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "links": [
+    {
+      "asDropdown": false,
+      "icon": "external link",
+      "includeVars": false,
+      "keepTime": false,
+      "tags": [],
+      "targetBlank": true,
+      "title": "Admin proxy playbook",
+      "type": "link",
+      "url": "https://github.com/jerdaw/healtharchive-backend/blob/main/docs/operations/playbooks/admin-proxy.md"
+    },
+    {
+      "asDropdown": false,
+      "icon": "external link",
+      "includeVars": false,
+      "keepTime": false,
+      "tags": [],
+      "targetBlank": true,
+      "title": "Incident response playbook",
+      "type": "link",
+      "url": "https://github.com/jerdaw/healtharchive-backend/blob/main/docs/operations/playbooks/incident-response.md"
+    }
+  ],
+  "panels": [
+    {
+      "datasource": "grafana-postgresql-datasource",
+      "description": "Postgres: recent jobs that are not indexed (likely needing operator attention).",
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 12,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 1,
+      "options": {
+        "showHeader": true
+      },
+      "targets": [
+        {
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT\\n  j.id,\\n  COALESCE(s.code, '') AS source_code,\\n  j.name,\\n  j.status,\\n  j.retry_count,\\n  j.created_at,\\n  j.started_at,\\n  j.finished_at,\\n  j.pages_crawled,\\n  j.pages_failed,\\n  j.warc_file_count,\\n  j.warc_bytes_total\\nFROM archive_jobs j\\nLEFT JOIN sources s ON s.id = j.source_id\\nWHERE j.created_at >= (now() - INTERVAL '14 days')\\n  AND j.status <> 'indexed'\\nORDER BY j.created_at DESC\\nLIMIT 200;",
+          "refId": "A"
+        }
+      ],
+      "title": "Jobs Needing Attention (last 14 days)",
+      "type": "table"
+    },
+    {
+      "datasource": "grafana-postgresql-datasource",
+      "description": "Postgres: redacted issue report metadata only (no email or free text).",
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 12,
+        "w": 24,
+        "x": 0,
+        "y": 12
+      },
+      "id": 2,
+      "options": {
+        "showHeader": true
+      },
+      "targets": [
+        {
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT\\n  id,\\n  category,\\n  status,\\n  created_at,\\n  updated_at,\\n  snapshot_id,\\n  original_url,\\n  page_url\\nFROM grafana_issue_reports_summary\\nWHERE created_at >= (now() - INTERVAL '30 days')\\nORDER BY created_at DESC\\nLIMIT 200;",
+          "refId": "A"
+        }
+      ],
+      "title": "Issue Reports (last 30 days; metadata only)",
+      "type": "table"
+    }
+  ],
+  "refresh": "15m",
+  "schemaVersion": 39,
+  "tags": [
+    "healtharchive",
+    "ops",
+    "admin",
+    "private"
+  ],
+  "templating": {
+    "list": []
+  },
+  "time": {
+    "from": "now-30d",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "utc",
+  "title": "HealthArchive - Ops Console (Read-only)",
+  "uid": "ha-ops-console",
+  "version": 1
+}
+

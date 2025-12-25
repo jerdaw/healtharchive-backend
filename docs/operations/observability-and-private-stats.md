@@ -86,6 +86,7 @@ Bootstrap helper (VPS only):
 - `scripts/vps-install-observability-dashboards.sh`
 - `scripts/vps-install-observability-alerting.sh`
 - `scripts/vps-install-observability-pushover-relay.sh` (optional; Alertmanager -> Pushover)
+- `scripts/vps-install-ops-admin-proxy.sh` (optional; browser-friendly /api/admin/** + /metrics via SSH tunnel)
 
 ---
 
