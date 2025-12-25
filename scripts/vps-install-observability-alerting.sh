@@ -248,11 +248,24 @@ if [[ -z "${AM_BIN}" ]]; then
   exit 1
 fi
 
+am_user="$(systemctl show -p User --value "${AM_UNIT}" 2>/dev/null || true)"
+am_group="$(systemctl show -p Group --value "${AM_UNIT}" 2>/dev/null || true)"
+if [[ -z "${am_user}" ]]; then
+  am_user="prometheus"
+fi
+if [[ -z "${am_group}" ]]; then
+  am_group="${am_user}"
+fi
+
+am_storage_dir="/var/lib/prometheus/alertmanager"
+run install -d -m 0750 -o "${am_user}" -g "${am_group}" "${am_storage_dir}"
+
 am_args=(
   "--config.file=${am_cfg}"
-  "--storage.path=/var/lib/alertmanager"
+  "--storage.path=${am_storage_dir}"
   "--web.listen-address=127.0.0.1:9093"
   "--cluster.listen-address=127.0.0.1:9094"
+  "--cluster.advertise-address=127.0.0.1:9094"
 )
 
 dropin_dir="/etc/systemd/system/${AM_UNIT}.d"
