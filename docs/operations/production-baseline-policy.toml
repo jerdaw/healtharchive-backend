@@ -11,7 +11,7 @@
 # The drift checker validates this policy against the real VPS configuration
 # (without printing or persisting secrets).
 
-version = 3
+version = 4
 
 # The operator account expected to run deploy scripts and ops checks.
 operator_user = "haadmin"
@@ -71,6 +71,13 @@ mode = "0750"
 required = true
 
 [[filesystem.paths]]
+path = "/etc/healtharchive/observability"
+owner = "root"
+group = "healtharchive"
+mode = "0750"
+required = true
+
+[[filesystem.paths]]
 path = "/etc/healtharchive/backend.env"
 owner = "root"
 group = "healtharchive"
@@ -79,6 +86,90 @@ required = true
 
 [[filesystem.paths]]
 path = "/etc/healtharchive/baseline-drift-enabled"
+owner = "root"
+group = "root"
+mode = "0644"
+required = true
+
+[[filesystem.paths]]
+path = "/etc/healtharchive/observability/prometheus_backend_admin_token"
+owner = "root"
+group = "healtharchive"
+mode = "0640"
+required = true
+
+[[filesystem.paths]]
+path = "/etc/healtharchive/observability/postgres_exporter_password"
+owner = "root"
+group = "healtharchive"
+mode = "0640"
+required = true
+
+[[filesystem.paths]]
+path = "/etc/healtharchive/observability/postgres_exporter.env"
+owner = "root"
+group = "healtharchive"
+mode = "0640"
+required = true
+
+[[filesystem.paths]]
+path = "/etc/healtharchive/observability/alertmanager_webhook_url"
+owner = "root"
+group = "healtharchive"
+mode = "0640"
+required = true
+
+[[filesystem.paths]]
+path = "/etc/healtharchive/observability/pushover_app_token"
+owner = "root"
+group = "healtharchive"
+mode = "0640"
+required = true
+
+[[filesystem.paths]]
+path = "/etc/healtharchive/observability/pushover_user_key"
+owner = "root"
+group = "healtharchive"
+mode = "0640"
+required = true
+
+[[filesystem.paths]]
+path = "/etc/healtharchive/observability/grafana_admin_password"
+owner = "root"
+group = "root"
+mode = "0600"
+required = true
+
+[[filesystem.paths]]
+path = "/etc/healtharchive/observability/postgres_grafana_password"
+owner = "root"
+group = "root"
+mode = "0600"
+required = true
+
+[[filesystem.paths]]
+path = "/etc/prometheus/prometheus.yml"
+owner = "root"
+group = "root"
+mode = "0644"
+required = true
+
+[[filesystem.paths]]
+path = "/etc/prometheus/rules/healtharchive-alerts.yml"
+owner = "root"
+group = "root"
+mode = "0644"
+required = true
+
+[[filesystem.paths]]
+path = "/etc/prometheus/alertmanager.yml"
+owner = "root"
+group = "root"
+mode = "0644"
+required = true
+
+[[filesystem.paths]]
+path = "/etc/grafana/provisioning/dashboards/healtharchive.yaml"
 owner = "root"
 group = "root"
 mode = "0644"
@@ -103,6 +194,41 @@ path = "/srv/healtharchive/ops"
 owner = "root"
 group = "healtharchive"
 mode = "2770"
+required = true
+
+[[filesystem.paths]]
+path = "/srv/healtharchive/ops/observability"
+owner = "root"
+group = "healtharchive"
+mode = "2770"
+required = true
+
+[[filesystem.paths]]
+path = "/srv/healtharchive/ops/observability/dashboards"
+owner = "root"
+group = "healtharchive"
+mode = "2770"
+required = true
+
+[[filesystem.paths]]
+path = "/srv/healtharchive/ops/observability/dashboards/healtharchive"
+owner = "root"
+group = "healtharchive"
+mode = "2770"
+required = true
+
+[[filesystem.paths]]
+path = "/srv/healtharchive/ops/observability/alerting"
+owner = "root"
+group = "healtharchive"
+mode = "2770"
+required = true
+
+[[filesystem.paths]]
+path = "/srv/healtharchive/ops/observability/alerting/healtharchive-alerts.yml"
+owner = "root"
+group = "healtharchive"
+mode = "0664"
 required = true
 
 [[filesystem.paths]]
@@ -152,6 +278,50 @@ required = true
 must_be_enabled = true
 
 [[systemd.units]]
+name = "prometheus.service"
+required = true
+must_be_enabled = true
+
+[[systemd.units]]
+name = "prometheus-node-exporter.service"
+required = true
+must_be_enabled = true
+
+[[systemd.units]]
+name = "prometheus-postgres-exporter.service"
+required = true
+must_be_enabled = true
+
+[[systemd.units]]
+name = "grafana-server.service"
+required = true
+must_be_enabled = true
+
+[[systemd.units]]
+name = "prometheus-alertmanager.service"
+required = true
+must_be_enabled = true
+
+[[systemd.units]]
+name = "healtharchive-pushover-relay.service"
+required = true
+must_be_enabled = true
+
+[[systemd.units]]
+name = "healtharchive-admin-proxy.service"
+required = true
+must_be_enabled = true
+
+[[systemd.units]]
 name = "healtharchive-baseline-drift-check.timer"
 required = true
 must_be_enabled = true
+
+[network]
+# These ports should never be reachable directly from the public internet.
+# Enforce by binding to loopback only (and accessing via tailnet-only SSH).
+loopback_only_tcp_ports = [3000, 5432, 8001, 8002, 9090, 9093, 9094, 9100, 9187, 9911]
+
+# A minimal allowlist of ports that may listen on non-loopback interfaces.
+# Note: SSH may listen on all interfaces but is firewalled to tailnet-only in the runbook.
+allowed_non_loopback_tcp_ports = [22, 80, 443]

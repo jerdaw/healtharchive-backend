@@ -116,6 +116,17 @@ def _mode_from_policy_mode(policy_mode: str | None) -> str | None:
     return mode_str
 
 
+def _is_loopback_addr(addr: str) -> bool:
+    addr = (addr or "").strip()
+    if not addr:
+        return False
+    if addr.startswith("127."):
+        return True
+    if addr in {"::1", "0:0:0:0:0:0:0:1"}:
+        return True
+    return False
+
+
 def _expect_path(
     findings: list[Finding],
     *,
@@ -415,6 +426,58 @@ def evaluate(
                 active = str(status.get("active") or "")
                 if active != "active":
                     warn(f"systemd:{name}:active", f"not active ({active!r})")
+
+    # Network: ensure sensitive services are loopback-only and detect unexpected public listeners.
+    net_policy = policy.get("network", {})
+    net_obs = observed.get("network", {})
+    if isinstance(net_policy, dict) and isinstance(net_obs, dict):
+        tcp_err = net_obs.get("tcp_listeners_error")
+        if tcp_err:
+            warn("network:tcp_listeners", f"could not collect tcp listeners: {tcp_err!r}")
+
+        listeners = net_obs.get("tcp_listeners", [])
+        port_to_addrs: dict[int, set[str]] = {}
+        if isinstance(listeners, list):
+            for row in listeners:
+                if not isinstance(row, dict):
+                    continue
+                port = row.get("port")
+                addr = row.get("address")
+                if not isinstance(port, int) or not isinstance(addr, str):
+                    continue
+                port_to_addrs.setdefault(port, set()).add(addr)
+
+        loopback_only_ports = net_policy.get("loopback_only_tcp_ports")
+        if isinstance(loopback_only_ports, list):
+            for port in loopback_only_ports:
+                if not isinstance(port, int):
+                    continue
+                addrs = port_to_addrs.get(port)
+                if not addrs:
+                    warn(
+                        f"network:tcp:{port}", "port not listening (service down or not installed)"
+                    )
+                    continue
+                non_loopback = sorted(a for a in addrs if not _is_loopback_addr(a))
+                if non_loopback:
+                    fail(
+                        f"network:tcp:{port}:bind",
+                        f"expected loopback-only; found non-loopback listeners: {non_loopback!r}",
+                    )
+
+        allowed_non_loopback = net_policy.get("allowed_non_loopback_tcp_ports")
+        if isinstance(allowed_non_loopback, list):
+            allowed_set = {p for p in allowed_non_loopback if isinstance(p, int)}
+            non_loopback_ports: set[int] = set()
+            for port, addrs in port_to_addrs.items():
+                if any(not _is_loopback_addr(a) for a in addrs):
+                    non_loopback_ports.add(port)
+            unexpected = sorted(p for p in non_loopback_ports if p not in allowed_set)
+            if unexpected:
+                fail(
+                    "network:tcp:unexpected_non_loopback_ports",
+                    f"unexpected non-loopback TCP listeners on ports: {unexpected!r}",
+                )
 
     return required, warned
 
