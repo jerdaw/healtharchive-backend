@@ -33,6 +33,10 @@ This writes a timestamped report under:
 
 - **Campaign storage forecast fails** (even if you’re below 80% *today*): the annual campaign is projected to exceed disk headroom or the 80% review threshold. Follow the report output to free space or expand disk *before* Jan 01 UTC.
 - **CPU/RAM headroom fails**: the VPS is already under sustained load / memory pressure (or swap usage). Stop other heavy work (indexing, other crawls), then re-run preflight; if it persists, reduce crawl concurrency or upgrade the VPS.
+- **Time sync (NTP) fails**: fix time sync before crawling (TLS, scheduling, and log correlation all assume correct UTC).
+- **Docker daemon access fails**: Docker is installed but not usable by the current user (or the daemon is down). Fix `systemctl status docker`, user group membership, and re-run.
+- **DB connectivity / Alembic-at-head fails**: DB is down or the schema is behind the code version; apply migrations (`alembic upgrade head`) and re-run.
+- **Seed reachability fails**: the annual seed URLs aren’t reachable from the VPS right now; fix DNS/network/firewall issues (or investigate upstream downtime) before Jan 01 UTC.
 - **Disk usage is high (>= 80%)**: pause, free space or expand disk before crawling.
 - **Backups are missing/stale**: fix backups before crawling (don’t run long jobs without recoverability).
 - **`/api/health` fails on loopback**: fix API/DB/service health first (check `systemctl status` + `journalctl`).
@@ -40,6 +44,7 @@ This writes a timestamped report under:
   - Missing `Source` rows → run `ha-backend seed-sources`.
   - Duplicated annual jobs for the year → resolve duplicates before scheduling.
   - Active jobs blocking scheduling → finish/index them (or decide not to run annual yet).
+- **Temp cleanup candidates**: the report lists indexed jobs that still have `.tmp*` dirs; use `ha-backend cleanup-job --mode temp-nonwarc` (safe) to reclaim space.
 - **Baseline drift failures**: reconcile production with `docs/operations/production-baseline-policy.toml`, then re-run drift checks.
 - **Admin/metrics auth check fails**: ensure a real `HEALTHARCHIVE_ADMIN_TOKEN` is set in production and routing is correct.
 

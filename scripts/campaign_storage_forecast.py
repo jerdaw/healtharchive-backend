@@ -412,10 +412,11 @@ def main(argv: list[str] | None = None) -> int:
     }
 
     if args.json:
+        should_fail = bool(expected_add_b > free_b or projected_used_b > review_used_max_b)
         import json
 
         print(json.dumps(result, indent=2, sort_keys=True))
-        return 0
+        return 1 if should_fail else 0
 
     print("Campaign storage forecast (annual)")
     print("---------------------------------")

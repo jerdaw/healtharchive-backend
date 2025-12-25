@@ -8,6 +8,9 @@ HealthArchive VPS helper: preflight audit before large crawls (read-only).
 This script is intended to run on the production VPS (or a similar host) and:
   - Checks host resources (disk, memory), service status, and backups
   - Forecasts campaign storage headroom (context-aware; can fail below 80% used)
+  - Verifies Docker daemon access (not just docker CLI presence)
+  - Checks DB connectivity + Alembic schema is at head
+  - Checks seed URL reachability (annual sources)
   - Verifies API health on loopback
   - Runs existing repo verifiers (baseline drift, public surface, admin auth)
   - Optionally dry-runs annual scheduling for a given year (no DB writes)
@@ -255,6 +258,18 @@ step_system_info() {
   echo ""
   echo "[disk]"
   df -h
+  echo ""
+  echo "[disk_inodes]"
+  df -ih
+  echo ""
+  echo "[limits]"
+  echo "ulimit_nofile=$(ulimit -n 2>/dev/null || echo unknown)"
+  if [[ -r /proc/sys/fs/file-max ]]; then
+    echo "fs_file_max=$(cat /proc/sys/fs/file-max)"
+  fi
+  if [[ -r /proc/sys/fs/file-nr ]]; then
+    echo "fs_file_nr=$(cat /proc/sys/fs/file-nr)"
+  fi
 }
 
 step_services() {
@@ -353,14 +368,146 @@ step_resource_headroom() {
   "${VENV_BIN}/python3" ./scripts/vps_resource_headroom.py
 }
 
+step_time_sync() {
+  set -u -o pipefail
+  if ! have_cmd timedatectl; then
+    echo "NOTE: timedatectl not found; skipping time sync check."
+    return 0
+  fi
+  timedatectl status
+  local ntp
+  ntp="$(timedatectl show -p NTPSynchronized --value 2>/dev/null || true)"
+  if [[ "${ntp}" != "yes" ]]; then
+    echo "ERROR: NTP is not synchronized (timedatectl NTPSynchronized=${ntp:-unknown})" >&2
+    return 1
+  fi
+}
+
+step_docker_daemon() {
+  set -u -o pipefail
+  if ! have_cmd docker; then
+    echo "ERROR: docker not found in PATH" >&2
+    return 1
+  fi
+  echo "[docker_version]"
+  docker --version
+  echo ""
+  echo "[docker_info]"
+  docker info
+  echo ""
+  echo "[docker_ps]"
+  docker ps --no-trunc --format '{{.ID}}\t{{.Image}}\t{{.Status}}' | head -n 25 || true
+}
+
+step_db_check() {
+  set -u -o pipefail
+  "${VENV_BIN}/ha-backend" check-db
+}
+
+step_alembic_head_check() {
+  set -u -o pipefail
+  local alembic="${VENV_BIN}/alembic"
+  if [[ ! -x "${alembic}" ]]; then
+    echo "ERROR: alembic not found at ${alembic}" >&2
+    return 1
+  fi
+
+  local heads current
+  heads="$("${alembic}" heads -q 2>/dev/null | awk '{print $1}' | sort -u || true)"
+  current="$("${alembic}" current -q 2>/dev/null | awk '{print $1}' | sort -u || true)"
+
+  echo "alembic_heads=${heads}"
+  echo "alembic_current=${current}"
+
+  if [[ -z "${heads}" ]]; then
+    echo "ERROR: could not determine alembic heads" >&2
+    return 1
+  fi
+  if [[ -z "${current}" ]]; then
+    echo "ERROR: could not determine current alembic revision (DB may be uninitialized)" >&2
+    return 1
+  fi
+
+  local missing=()
+  while IFS= read -r h; do
+    [[ -z "${h}" ]] && continue
+    if ! printf '%s\n' "${current}" | grep -qx "${h}"; then
+      missing+=("${h}")
+    fi
+  done <<<"${heads}"
+
+  if [[ ${#missing[@]} -gt 0 ]]; then
+    echo "ERROR: database schema is not at Alembic head (missing: ${missing[*]})" >&2
+    echo "Hint: ${alembic} upgrade head" >&2
+    return 1
+  fi
+}
+
 step_annual_status_json() {
   set -u -o pipefail
-  "${VENV_BIN}/ha-backend" annual-status --year "${YEAR}" --json
+  local tmp
+  tmp="$(mktemp)"
+  "${VENV_BIN}/ha-backend" annual-status --year "${YEAR}" --json >"${tmp}"
+  cat "${tmp}"
+
+  # Fail preflight if annual-status reports structural errors or blocking jobs
+  # for any annual source (these will prevent a clean annual run).
+  "${VENV_BIN}/python3" - "${tmp}" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+raw = Path(sys.argv[1]).read_text(encoding="utf-8", errors="replace")
+data = json.loads(raw) if raw.strip() else {}
+sources = data.get("sources") or []
+summary = data.get("summary") or {}
+
+errors = int(summary.get("errors") or 0)
+if errors:
+    print(f"ERROR: annual-status reported errors={errors}", file=sys.stderr)
+    sys.exit(1)
+
+blockers = []
+for item in sources:
+    if not isinstance(item, dict):
+        continue
+    code = item.get("sourceCode")
+    blocking = item.get("blockingJob")
+    if blocking:
+        blockers.append(f"{code}:{blocking.get('status')} id={blocking.get('jobId')} name={blocking.get('jobName')}")
+
+if blockers:
+    print("ERROR: blocking jobs exist for annual sources (clear them before annual scheduling/run):", file=sys.stderr)
+    for b in blockers:
+        print(f"  - {b}", file=sys.stderr)
+    sys.exit(1)
+PY
+  local rc=$?
+  rm -f "${tmp}"
+  return "${rc}"
 }
 
 step_schedule_annual_dry_run() {
   set -u -o pipefail
-  "${VENV_BIN}/ha-backend" schedule-annual --year "${YEAR}"
+  local tmp
+  tmp="$(mktemp)"
+  "${VENV_BIN}/ha-backend" schedule-annual --year "${YEAR}" >"${tmp}"
+  cat "${tmp}"
+
+  # schedule-annual is read-only in dry-run mode but may still report errors (e.g. duplicates);
+  # treat those as a failed preflight.
+  local summary
+  summary="$(tail -n 5 "${tmp}" | grep -Eo 'errors=[0-9]+' | head -n 1 || true)"
+  if [[ -n "${summary}" ]]; then
+    local errs
+    errs="$(printf '%s' "${summary}" | cut -d= -f2)"
+    if [[ "${errs}" != "0" ]]; then
+      echo "ERROR: schedule-annual dry-run reported errors=${errs}" >&2
+      rm -f "${tmp}"
+      return 1
+    fi
+  fi
+  rm -f "${tmp}"
 }
 
 step_ops_automation() {
@@ -388,6 +535,44 @@ step_public_surface() {
 step_observability() {
   set -u -o pipefail
   ./scripts/vps-verify-observability.sh
+}
+
+step_seed_reachability() {
+  set -u -o pipefail
+  local urls=(
+    "https://www.canada.ca/en/health-canada.html"
+    "https://www.canada.ca/fr/sante-canada.html"
+    "https://www.canada.ca/en/public-health.html"
+    "https://www.canada.ca/fr/sante-publique.html"
+    "https://cihr-irsc.gc.ca/e/193.html"
+    "https://cihr-irsc.gc.ca/f/193.html"
+  )
+
+  local failed=0
+  for u in "${urls[@]}"; do
+    echo "GET ${u}"
+    if curl -fsSL --max-time 15 --retry 2 --retry-delay 1 --output /dev/null "${u}"; then
+      echo "OK ${u}"
+    else
+      echo "ERROR ${u}" >&2
+      failed=$((failed + 1))
+    fi
+  done
+
+  if [[ "${failed}" -gt 0 ]]; then
+    echo "ERROR: ${failed} seed URL(s) failed reachability checks." >&2
+    return 1
+  fi
+}
+
+step_job_queue_hygiene() {
+  set -u -o pipefail
+  "${VENV_BIN}/python3" ./scripts/vps_job_queue_hygiene.py
+}
+
+step_temp_cleanup_candidates() {
+  set -u -o pipefail
+  "${VENV_BIN}/python3" ./scripts/vps_temp_cleanup_candidates.py
 }
 
 disk_check_one() {
@@ -419,6 +604,37 @@ disk_check_one() {
     warn "${label}: disk usage elevated (${used_pct}% used at ${path}; target <70%)"
   else
     ok "${label}: disk usage OK (${used_pct}% used at ${path})"
+  fi
+}
+
+inode_check_one() {
+  local path="$1"
+  local label="$2"
+
+  if ! have_cmd df; then
+    warn "df not found; skipping inode checks"
+    return 0
+  fi
+
+  if [[ ! -e "${path}" ]]; then
+    warn "${label}: path missing (${path}); skipping inode check"
+    return 0
+  fi
+
+  local line used_pct
+  line="$(df -Pi "${path}" 2>/dev/null | tail -n 1 || true)"
+  used_pct="$(printf '%s' "${line}" | awk '{print $5}' | tr -d '%' || true)"
+  if [[ -z "${used_pct}" ]]; then
+    warn "${label}: could not parse inode df output for ${path}"
+    return 0
+  fi
+
+  if [[ "${used_pct}" -ge 80 ]]; then
+    fail "${label}: inode usage high (${used_pct}% used at ${path}; policy review threshold is 80%)"
+  elif [[ "${used_pct}" -ge 70 ]]; then
+    warn "${label}: inode usage elevated (${used_pct}% used at ${path}; target <70%)"
+  else
+    ok "${label}: inode usage OK (${used_pct}% used at ${path})"
   fi
 }
 
@@ -458,10 +674,13 @@ fi
 run_step "System info" "01-system.txt" step_system_info
 
 disk_check_one "/" "rootfs"
+inode_check_one "/" "rootfs"
 if [[ -n "${HEALTHARCHIVE_ARCHIVE_ROOT:-}" ]]; then
   disk_check_one "${HEALTHARCHIVE_ARCHIVE_ROOT}" "archive_root"
+  inode_check_one "${HEALTHARCHIVE_ARCHIVE_ROOT}" "archive_root"
 elif [[ -d "/srv/healtharchive" ]]; then
   disk_check_one "/srv/healtharchive" "srv_healtharchive"
+  inode_check_one "/srv/healtharchive" "srv_healtharchive"
 fi
 
 if [[ -n "${YEAR}" ]]; then
@@ -472,44 +691,62 @@ fi
 
 run_step "CPU/RAM headroom" "03-resource-headroom.txt" step_resource_headroom
 
-run_step "Services" "04-services.txt" step_services
+run_step "Time sync (NTP)" "04-time-sync.txt" step_time_sync
 
-run_step "API health (loopback)" "05-api-health.json" curl -fsS --max-time 5 "${API_BASE}/api/health"
+run_step "Services" "05-services.txt" step_services
 
-run_step "Backups" "06-backups.txt" step_backups
+run_step "Docker daemon access" "06-docker-daemon.txt" step_docker_daemon
 
-run_step "archive-tool dry-run (Docker wiring)" "07-archive-tool-dry-run.txt" step_archive_tool_dry_run
+run_step "DB connectivity" "07-db-check.txt" step_db_check
+
+run_step "DB schema (Alembic at head)" "08-alembic-head.txt" step_alembic_head_check
+
+run_step "API health (loopback)" "09-api-health.json" curl -fsS --max-time 5 "${API_BASE}/api/health"
+
+run_step "Backups" "10-backups.txt" step_backups
+
+run_step "archive-tool dry-run (Docker wiring)" "11-archive-tool-dry-run.txt" step_archive_tool_dry_run
 
 if [[ -n "${YEAR}" ]]; then
-  run_step "annual-status (json)" "08-annual-status.json" step_annual_status_json
-  run_step "schedule-annual (dry-run)" "09-schedule-annual.txt" step_schedule_annual_dry_run
+  run_step "Seed reachability (annual)" "12-seed-reachability.txt" step_seed_reachability
+else
+  warn "seed reachability check skipped (pass --year YYYY)"
+fi
+
+if [[ -n "${YEAR}" ]]; then
+  run_step "annual-status (json)" "13-annual-status.json" step_annual_status_json
+  run_step "schedule-annual (dry-run)" "14-schedule-annual.txt" step_schedule_annual_dry_run
 else
   warn "annual scheduler dry-run skipped (pass --year YYYY)"
 fi
 
-run_step "Ops automation posture" "10-verify-ops-automation.txt" step_ops_automation
+run_step "Job queue hygiene" "15-job-queue-hygiene.txt" step_job_queue_hygiene
+
+run_step "Temp cleanup candidates" "16-temp-cleanup-candidates.txt" step_temp_cleanup_candidates
+
+run_step "Ops automation posture" "17-verify-ops-automation.txt" step_ops_automation
 
 if [[ "${SKIP_BASELINE_DRIFT}" != "true" ]]; then
-  run_step "Baseline drift" "11-baseline-drift.txt" step_baseline_drift
+  run_step "Baseline drift" "18-baseline-drift.txt" step_baseline_drift
 else
   warn "baseline drift check skipped (--skip-baseline-drift)"
 fi
 
 if [[ "${SKIP_SECURITY_ADMIN}" != "true" ]]; then
-  run_step "Security + admin auth (public)" "12-verify-security-and-admin.txt" step_security_admin_public
+  run_step "Security + admin auth (public)" "19-verify-security-and-admin.txt" step_security_admin_public
 else
   warn "security/admin check skipped (--skip-security-admin)"
 fi
 
 if [[ "${SKIP_PUBLIC_SURFACE}" != "true" ]]; then
-  run_step "Public surface" "13-verify-public-surface.txt" step_public_surface
+  run_step "Public surface" "20-verify-public-surface.txt" step_public_surface
 else
   warn "public surface verify skipped (--skip-public-surface)"
 fi
 
 if [[ "${SKIP_OBSERVABILITY}" != "true" ]]; then
   if [[ -x "./scripts/vps-verify-observability.sh" ]]; then
-    run_step "Observability" "14-verify-observability.txt" step_observability
+    run_step "Observability" "21-verify-observability.txt" step_observability
   else
     warn "observability verifier not present; skipping (scripts/vps-verify-observability.sh)"
   fi
