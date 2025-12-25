@@ -33,7 +33,8 @@ This is an **internal** ops document. Keep it public-safe (no secrets).
 
 Default approach: **tailnet-only** access, using Tailscale.
 
-- Prefer exposing Grafana via `tailscale serve` (tailnet-only HTTPS).
+- Preferred: access Grafana via an SSH port-forward over Tailscale (simple, private, no Tailscale HTTPS certs required).
+- Optional: use `tailscale serve` (tailnet-only HTTPS) if you want a shareable URL and you are OK with the tailnet hostname appearing in public certificate logs.
 - Keep Prometheus UI loopback-only unless operators explicitly need it.
 
 Non-goals:

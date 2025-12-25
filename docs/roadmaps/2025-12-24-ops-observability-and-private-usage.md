@@ -326,6 +326,8 @@ Rollback:
 
 **Goal:** ship dashboards that directly reduce operator time during “something feels wrong”.
 
+Status: implemented in this repo (dashboard JSON + provisioning installer + playbook); requires running on the VPS.
+
 Deliverables (minimum set):
 
 1) **Ops overview** dashboard:
@@ -351,9 +353,17 @@ Deliverables (minimum set):
 
 Steps:
 
-1. List the exact Prometheus series you will use (documented in each panel description).
-2. Create dashboards with a small number of high-signal panels.
-3. Add runbook links on dashboards (to existing playbooks such as deploy/verify).
+1. Add dashboards (JSON):
+   - `ops/observability/dashboards/healtharchive-ops-overview.json`
+   - `ops/observability/dashboards/healtharchive-pipeline-health.json`
+   - `ops/observability/dashboards/healtharchive-search-performance.json`
+2. Add the VPS installer script:
+   - `scripts/vps-install-observability-dashboards.sh`
+3. Add the playbook:
+   - `docs/operations/playbooks/observability-dashboards.md`
+4. Run on the VPS:
+   - dry-run: `./scripts/vps-install-observability-dashboards.sh`
+   - apply: `sudo ./scripts/vps-install-observability-dashboards.sh --apply`
 
 Acceptance criteria:
 
@@ -369,6 +379,8 @@ Rollback:
 
 **Goal:** provide a long-window, operator-only view of usage without collecting identifiers.
 
+Status: implemented in this repo (expanded usage events + dashboard JSON + provisioning installer); requires running on the VPS.
+
 Deliverables:
 
 - A Grafana “Usage” dashboard backed by Postgres queries against `usage_metrics`.
@@ -376,14 +388,11 @@ Deliverables:
 
 Steps:
 
-1. Confirm current `usage_metrics` event set:
-   - `search_request`, `snapshot_detail`, `snapshot_raw`, `report_submitted`.
+1. Confirm current `usage_metrics` event set (aggregate-only; no identifiers):
+   - `search_request`, `snapshot_detail`, `snapshot_raw`, `report_submitted`
+   - `changes_list`, `compare_view`, `timeline_view`
+   - `exports_download_snapshots`, `exports_download_changes`
 2. Decide which additional events are worth adding (still aggregate-only), e.g.:
-   - `changes_list` (GET /api/changes)
-   - `compare_view` (GET /api/changes/compare)
-   - `timeline_view` (GET /api/snapshots/{id}/timeline)
-   - `exports_manifest` (GET /api/exports)
-   - `exports_download_snapshots`, `exports_download_changes` (GET /api/exports/*)
    - `sources_list` (GET /api/sources)
    - `stats_view` (GET /api/stats)
 
@@ -398,15 +407,11 @@ Steps:
    - Expose only a curated subset via public `GET /api/usage`.
    - Optionally create an admin-only endpoint for full usage metrics later.
 
-4. Build the initial usage dashboard using the existing four events:
-   - Daily series
-   - 7d/30d rolling averages
-   - Month-to-date vs previous month comparisons
-   - Report submissions trend (proxy for community engagement)
+4. Add dashboards (JSON):
+   - `ops/observability/dashboards/healtharchive-usage-private.json`
+   - `ops/observability/dashboards/healtharchive-impact-summary.json`
 
-5. Add a dashboard for quarterly summaries to match ops cadence:
-   - 90d / 180d trend panels
-   - Exports/download activity
+5. Install via the same VPS dashboards installer (Phase 6).
 
 Acceptance criteria:
 

@@ -1,0 +1,130 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": "-- Grafana --",
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "description": "Operator-only impact summary (public-safe aggregates): monthly/quarterly totals from Postgres usage_metrics.",
+  "editable": false,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "panels": [
+    {
+      "datasource": "grafana-postgresql-datasource",
+      "description": "Postgres: monthly totals by event (last ~12 months).",
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 1,
+      "options": {
+        "showHeader": true
+      },
+      "targets": [
+        {
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT\\n  date_trunc('month', metric_date)::date AS month,\\n  event,\\n  SUM(count)::bigint AS count\\nFROM usage_metrics\\nWHERE metric_date >= (current_date - INTERVAL '400 days')\\nGROUP BY 1, 2\\nORDER BY 1 DESC, 3 DESC;",
+          "refId": "A"
+        }
+      ],
+      "title": "Monthly Totals by Event",
+      "type": "table"
+    },
+    {
+      "datasource": "grafana-postgresql-datasource",
+      "description": "Postgres: quarterly totals for key events (last ~2 years).",
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 10
+      },
+      "id": 2,
+      "options": {
+        "showHeader": true
+      },
+      "targets": [
+        {
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT\\n  date_trunc('quarter', metric_date)::date AS quarter,\\n  event,\\n  SUM(count)::bigint AS count\\nFROM usage_metrics\\nWHERE metric_date >= (current_date - INTERVAL '800 days')\\n  AND event IN ('search_request', 'snapshot_detail', 'snapshot_raw', 'report_submitted', 'changes_list', 'compare_view', 'timeline_view', 'exports_download_snapshots', 'exports_download_changes')\\nGROUP BY 1, 2\\nORDER BY 1 DESC, 3 DESC;",
+          "refId": "A"
+        }
+      ],
+      "title": "Quarterly Totals (key events)",
+      "type": "table"
+    },
+    {
+      "datasource": "grafana-postgresql-datasource",
+      "description": "Postgres: daily totals for selected events (for trend charts).",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 20
+      },
+      "id": 3,
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        }
+      },
+      "targets": [
+        {
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT\\n  metric_date::timestamp AS time,\\n  event AS metric,\\n  count::bigint AS value\\nFROM usage_metrics\\nWHERE $__timeFilter(metric_date::timestamp)\\n  AND event IN ('search_request', 'snapshot_detail', 'changes_list', 'exports_download_snapshots', 'exports_download_changes')\\nORDER BY metric_date;",
+          "refId": "A"
+        }
+      ],
+      "title": "Trend (selected events)",
+      "type": "timeseries"
+    }
+  ],
+  "refresh": "15m",
+  "schemaVersion": 39,
+  "tags": [
+    "healtharchive",
+    "usage",
+    "impact",
+    "private"
+  ],
+  "templating": {
+    "list": []
+  },
+  "time": {
+    "from": "now-365d",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "utc",
+  "title": "HealthArchive - Impact Summary (Private, Aggregate)",
+  "uid": "ha-impact-summary",
+  "version": 1
+}
