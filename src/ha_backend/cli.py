@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any, ContextManager, Sequence, cast
 
 from sqlalchemy import text
+from sqlalchemy.engine.url import make_url
 
 from .changes import compute_changes_backfill, compute_changes_since
 from .config import (
@@ -78,7 +79,11 @@ def cmd_check_db(args: argparse.Namespace) -> None:
     db_cfg = get_database_config()
     print("HealthArchive Backend – Database Check")
     print("--------------------------------------")
-    print(f"Database URL: {db_cfg.database_url}")
+    try:
+        safe_url = make_url(db_cfg.database_url).render_as_string(hide_password=True)
+    except Exception:
+        safe_url = db_cfg.database_url
+    print(f"Database URL: {safe_url}")
 
     try:
         get_engine()
