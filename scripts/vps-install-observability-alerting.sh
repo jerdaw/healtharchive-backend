@@ -227,7 +227,8 @@ EOF
   if [[ -z "${am_group}" ]]; then
     am_group="${am_user}"
   fi
-  chown "${am_user}:${am_group}" "${am_cfg}" || chown root:root "${am_cfg}"
+  # Prefer root-owned config (service can read but cannot modify).
+  chown "root:${am_group}" "${am_cfg}" || chown root:root "${am_cfg}"
   chmod 0640 "${am_cfg}" || chmod 0600 "${am_cfg}"
 fi
 

@@ -474,9 +474,17 @@ def evaluate(
                     non_loopback_ports.add(port)
             unexpected = sorted(p for p in non_loopback_ports if p not in allowed_set)
             if unexpected:
-                fail(
+                detail = {
+                    port: sorted(
+                        a for a in port_to_addrs.get(port, set()) if not _is_loopback_addr(a)
+                    )
+                    for port in unexpected
+                }
+                port_pat = "|".join(str(p) for p in unexpected)
+                warn(
                     "network:tcp:unexpected_non_loopback_ports",
-                    f"unexpected non-loopback TCP listeners on ports: {unexpected!r}",
+                    "unexpected non-loopback TCP listeners detected; investigate with "
+                    f"`sudo ss -lntp | grep -E ':({port_pat})\\\\b'` (details={detail!r})",
                 )
 
     return required, warned
