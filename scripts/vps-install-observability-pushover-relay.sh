@@ -345,4 +345,3 @@ echo
 echo "Next: point Alertmanager at the relay:"
 echo "  sudoedit ${obs_secrets_dir}/alertmanager_webhook_url"
 echo "  # set to: http://${listen_host}:${listen_port}/alertmanager"
-
