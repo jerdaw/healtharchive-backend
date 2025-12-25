@@ -9,6 +9,12 @@ Phase: "5 — Grafana (private stats page) with tailnet-only access"
 
 Safe-by-default: dry-run unless you pass --apply.
 
+Note: This helper is optional. A simpler/more private alternative is to keep Grafana
+loopback-only and access it via an SSH port-forward over Tailscale:
+
+  ssh -L 3000:127.0.0.1:3000 haadmin@<vps-tailscale-ip-or-name>
+  # then open http://127.0.0.1:3000
+
 Usage (on the VPS):
   cd /opt/healtharchive-backend
 

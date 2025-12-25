@@ -43,6 +43,22 @@ This will:
 
 ### 2) Expose Grafana via tailnet-only HTTPS (Tailscale Serve)
 
+Preferred option (more private than Serve): SSH port-forward over Tailscale
+
+This avoids enabling Tailscale HTTPS certificates (which would place the node hostname in public certificate logs).
+
+From an operator machine on the tailnet:
+
+- `ssh -L 3000:127.0.0.1:3000 haadmin@<vps-tailscale-ip-or-name>`
+
+Then open:
+
+- `http://127.0.0.1:3000`
+
+Optional: tailnet-only HTTPS via Tailscale Serve
+
+This requires enabling HTTPS certificates in the Tailscale admin console for your tailnet.
+
 Dry-run:
 
 - `./scripts/vps-enable-tailscale-serve-grafana.sh`

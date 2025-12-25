@@ -284,7 +284,7 @@ Status: implemented in this repo (installer scripts + playbook); requires runnin
 Deliverables:
 
 - Grafana running.
-- Grafana accessible only via tailnet (Tailscale Serve).
+- Grafana accessible only via tailnet (preferred: SSH port-forward over Tailscale; optional: Tailscale Serve).
 - Data sources configured:
   - Prometheus
   - Postgres (read-only role)
@@ -301,17 +301,19 @@ Steps:
      - dry-run: `./scripts/vps-install-observability-grafana.sh`
      - apply: `sudo ./scripts/vps-install-observability-grafana.sh --apply`
      - note: if `grafana` is not in the default apt sources (common on Ubuntu), the script will add the Grafana Labs apt repo automatically.
-   - Tailnet-only HTTPS:
+   - Operator access (preferred; no Tailscale Serve required):
+     - from an operator machine on the tailnet: `ssh -L 3000:127.0.0.1:3000 haadmin@<vps-tailscale-ip-or-name>`
+     - then open: `http://127.0.0.1:3000`
+   - Tailnet-only HTTPS (optional; requires enabling Tailscale HTTPS certificates + Serve for the tailnet):
      - dry-run: `./scripts/vps-enable-tailscale-serve-grafana.sh`
      - apply: `sudo ./scripts/vps-enable-tailscale-serve-grafana.sh --apply`
-     - note: the script supports both legacy and current `tailscale serve` CLI syntax.
 4. Configure data sources in the Grafana UI:
    - Prometheus: `http://127.0.0.1:9090`
    - Postgres: `127.0.0.1:5432`, DB `healtharchive`, user `grafana_readonly`
 
 Acceptance criteria:
 
-- Grafana is reachable from an operator machine on the tailnet.
+- Grafana is reachable from an operator machine on the tailnet (SSH tunnel or Serve).
 - Grafana is unreachable from the public internet.
 
 Rollback:
