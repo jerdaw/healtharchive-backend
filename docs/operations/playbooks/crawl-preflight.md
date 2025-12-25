@@ -32,6 +32,7 @@ This writes a timestamped report under:
 ## If it fails (common fixes)
 
 - **Campaign storage forecast fails** (even if you’re below 80% *today*): the annual campaign is projected to exceed disk headroom or the 80% review threshold. Follow the report output to free space or expand disk *before* Jan 01 UTC.
+- **CPU/RAM headroom fails**: the VPS is already under sustained load / memory pressure (or swap usage). Stop other heavy work (indexing, other crawls), then re-run preflight; if it persists, reduce crawl concurrency or upgrade the VPS.
 - **Disk usage is high (>= 80%)**: pause, free space or expand disk before crawling.
 - **Backups are missing/stale**: fix backups before crawling (don’t run long jobs without recoverability).
 - **`/api/health` fails on loopback**: fix API/DB/service health first (check `systemctl status` + `journalctl`).
