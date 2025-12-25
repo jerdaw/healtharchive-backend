@@ -32,3 +32,5 @@ If you want alerts when systemd timers stop running:
 
 - External monitors are green and alert routing is confirmed.
 - If enabled, Healthchecks pings are configured without committing URLs to git.
+- If you use internal Prometheus-based alerts (Phase 8), Alertmanager is configured and test alerts deliver:
+  - `observability-alerting.md`

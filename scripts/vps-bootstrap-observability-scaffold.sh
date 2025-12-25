@@ -82,6 +82,7 @@ obs_dir="${ops_dir}/observability"
 install -d -m 2770 -o root -g "${OPS_GROUP}" "${ops_dir}"
 install -d -m 2770 -o root -g "${OPS_GROUP}" "${obs_dir}"
 install -d -m 2770 -o root -g "${OPS_GROUP}" "${obs_dir}/dashboards"
+install -d -m 2770 -o root -g "${OPS_GROUP}" "${obs_dir}/alerting"
 install -d -m 2770 -o root -g "${OPS_GROUP}" "${obs_dir}/provisioning"
 install -d -m 2770 -o root -g "${OPS_GROUP}" "${obs_dir}/notes"
 
@@ -99,6 +100,7 @@ secret_files=(
   postgres_grafana_password
   postgres_exporter_password
   postgres_exporter.env
+  alertmanager_webhook_url
 )
 
 for f in "${secret_files[@]}"; do
@@ -115,6 +117,7 @@ stat -c '%U:%G %a %n' \
   "${ops_dir}" \
   "${obs_dir}" \
   "${obs_dir}/dashboards" \
+  "${obs_dir}/alerting" \
   "${obs_dir}/provisioning" \
   "${obs_dir}/notes" | sed 's/^/  /'
 echo
