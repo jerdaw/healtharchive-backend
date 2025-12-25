@@ -200,7 +200,15 @@ def find_latest_config_yaml(temp_dir_path: Path) -> Optional[Path]:
 
 
 def find_all_warc_files(temp_dir_paths: List[Path]) -> List[Path]:
-    """Finds all unique *.warc.gz files within the 'archive' subdirs of the given temp dirs."""
+    """
+    Find all unique WARC files (compressed or not) under the given temp dirs.
+
+    Historically, Zimit outputs WARCs under paths like:
+      collections/<collection>/archive/**.warc.gz
+
+    In practice the exact collection directory naming can vary, so this
+    function prioritizes correctness over assuming a single fixed layout.
+    """
     all_warcs = set()
     if not temp_dir_paths:
         return []
@@ -210,23 +218,35 @@ def find_all_warc_files(temp_dir_paths: List[Path]) -> List[Path]:
             logger.warning(f"Skipping WARC search in non-existent dir: {temp_dir}")
             continue
         try:
-            archive_dirs = list(temp_dir.glob("collections/crawl-*/archive"))
-            if not archive_dirs:
-                logger.info(f"  No 'archive' subdirectory found within collections in {temp_dir}")
-                continue
             found_in_temp_dir = 0
-            for archive_dir in archive_dirs:
-                if archive_dir.is_dir():
-                    for warc_file in archive_dir.rglob("*.warc.gz"):
-                        try:
-                            if warc_file.is_file() and warc_file.stat().st_size > 0:
-                                all_warcs.add(warc_file.resolve())
-                                found_in_temp_dir += 1
-                        except OSError as stat_e:
-                            logger.warning(f"Could not stat WARC file {warc_file}: {stat_e}")
-                else:
-                    logger.warning(f"  Path is not a directory: {archive_dir}")
-            logger.info(f"  Found {found_in_temp_dir} WARC file(s) in subdirs of {temp_dir}")
+
+            # Prefer searching under collections/ if present (common zimit layout).
+            search_root = temp_dir / "collections"
+            if not search_root.is_dir():
+                logger.info(
+                    f"  No collections/ directory found in {temp_dir}; falling back to scanning temp dir."
+                )
+                search_root = temp_dir
+
+            # Common legacy hint (keep for log clarity, but don't depend on it).
+            archive_dirs = (
+                list(search_root.glob("*/archive")) if search_root.name == "collections" else []
+            )
+            if search_root.name == "collections" and not archive_dirs:
+                logger.info(
+                    f"  No '* /archive' subdirectory found within collections in {temp_dir} (will still scan recursively)."
+                )
+
+            for pattern in ("*.warc.gz", "*.warc"):
+                for warc_file in search_root.rglob(pattern):
+                    try:
+                        if warc_file.is_file() and warc_file.stat().st_size > 0:
+                            all_warcs.add(warc_file.resolve())
+                            found_in_temp_dir += 1
+                    except OSError as stat_e:
+                        logger.warning(f"Could not stat WARC file {warc_file}: {stat_e}")
+
+            logger.info(f"  Found {found_in_temp_dir} WARC file(s) under {search_root}")
         except Exception as e:
             logger.error(f"Error searching WARCs in {temp_dir}: {e}")
     unique_warc_list = sorted(list(all_warcs))
