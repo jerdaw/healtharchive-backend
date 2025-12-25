@@ -103,4 +103,3 @@ Installed rules (minimal, high-signal):
   - `sudo rm -f /etc/prometheus/rules/healtharchive-alerts.yml`
 - Restart Prometheus:
   - `sudo systemctl restart prometheus.service`
-
