@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import shutil
 import sys
 import tempfile
 from dataclasses import dataclass
@@ -35,15 +36,48 @@ def _detect_archive_tool_cmd() -> str:
     """
     explicit = os.environ.get("HEALTHARCHIVE_TOOL_CMD")
     if explicit is not None and explicit.strip():
-        return explicit.strip()
+        explicit = explicit.strip()
+        # Explicit path: use as-is (caller owns correctness).
+        if "/" in explicit:
+            return explicit
+
+        # For the default "archive-tool" name, try to resolve it. If it doesn't
+        # resolve (common when running without an activated venv), fall back to
+        # the venv-local console script if present.
+        if explicit == DEFAULT_ARCHIVE_TOOL_CMD:
+            resolved = shutil.which(explicit)
+            if resolved:
+                return resolved
+
+            venv_candidate = Path(sys.executable).parent / "archive-tool"
+            if venv_candidate.is_file() and os.access(venv_candidate, os.X_OK):
+                return str(venv_candidate)
+            repo_candidate = REPO_ROOT / ".venv" / "bin" / "archive-tool"
+            if repo_candidate.is_file() and os.access(repo_candidate, os.X_OK):
+                return str(repo_candidate)
+
+        # For non-default names, respect the override even if it's not
+        # resolvable in the current PATH.
+        return explicit
 
     try:
-        python_bin_dir = Path(sys.executable).resolve().parent
+        python_bin_dir = Path(sys.executable).parent
         candidate = python_bin_dir / "archive-tool"
         if candidate.is_file() and os.access(candidate, os.X_OK):
             return str(candidate)
     except Exception:
         return DEFAULT_ARCHIVE_TOOL_CMD
+
+    try:
+        repo_candidate = REPO_ROOT / ".venv" / "bin" / "archive-tool"
+        if repo_candidate.is_file() and os.access(repo_candidate, os.X_OK):
+            return str(repo_candidate)
+    except Exception:
+        return DEFAULT_ARCHIVE_TOOL_CMD
+
+    resolved = shutil.which(DEFAULT_ARCHIVE_TOOL_CMD)
+    if resolved:
+        return resolved
 
     return DEFAULT_ARCHIVE_TOOL_CMD
 

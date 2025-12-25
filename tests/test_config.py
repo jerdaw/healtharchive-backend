@@ -25,7 +25,7 @@ def test_archive_tool_config_defaults(monkeypatch) -> None:
     monkeypatch.delenv("HEALTHARCHIVE_ARCHIVE_ROOT", raising=False)
     monkeypatch.delenv("HEALTHARCHIVE_TOOL_CMD", raising=False)
 
-    candidate = Path(sys.executable).resolve().parent / "archive-tool"
+    candidate = Path(sys.executable).parent / "archive-tool"
     expected_cmd = (
         str(candidate)
         if candidate.is_file() and os.access(candidate, os.X_OK)
@@ -50,6 +50,30 @@ def test_archive_tool_config_env_overrides(monkeypatch, tmp_path) -> None:
     cfg = get_archive_tool_config()
     assert cfg.archive_root == custom_root
     assert cfg.archive_tool_cmd == "custom-archive-tool"
+
+
+def test_archive_tool_config_cmd_falls_back_to_venv_when_not_on_path(monkeypatch, tmp_path) -> None:
+    """
+    If HEALTHARCHIVE_TOOL_CMD is set to a bare command name that is not on PATH,
+    prefer a venv-local archive-tool console script when it exists.
+    """
+    fake_venv_bin = tmp_path / "venv" / "bin"
+    fake_venv_bin.mkdir(parents=True)
+
+    fake_python = fake_venv_bin / "python3"
+    fake_python.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+    fake_python.chmod(0o755)
+
+    fake_archive_tool = fake_venv_bin / "archive-tool"
+    fake_archive_tool.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+    fake_archive_tool.chmod(0o755)
+
+    monkeypatch.setenv("HEALTHARCHIVE_TOOL_CMD", "archive-tool")
+    monkeypatch.setattr("ha_backend.config.sys.executable", str(fake_python))
+    monkeypatch.setattr("ha_backend.config.shutil.which", lambda _: None)
+
+    cfg = get_archive_tool_config()
+    assert cfg.archive_tool_cmd == str(fake_archive_tool)
 
 
 def test_database_config_default(monkeypatch) -> None:
