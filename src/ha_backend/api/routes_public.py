@@ -80,10 +80,15 @@ from ha_backend.search_ranking import (
 )
 from ha_backend.url_normalization import normalize_url_for_grouping
 from ha_backend.usage_metrics import (
+    EVENT_CHANGES_LIST,
+    EVENT_COMPARE_VIEW,
+    EVENT_EXPORTS_DOWNLOAD_CHANGES,
+    EVENT_EXPORTS_DOWNLOAD_SNAPSHOTS,
     EVENT_REPORT_SUBMITTED,
     EVENT_SEARCH_REQUEST,
     EVENT_SNAPSHOT_DETAIL,
     EVENT_SNAPSHOT_RAW,
+    EVENT_TIMELINE_VIEW,
     build_usage_summary,
     record_usage_event,
 )
@@ -2172,6 +2177,8 @@ def export_snapshots(
         public_base=public_base,
     )
 
+    record_usage_event(db, EVENT_EXPORTS_DOWNLOAD_SNAPSHOTS)
+
     return _build_export_response(
         rows=rows,
         export_format=export_format,
@@ -2259,6 +2266,8 @@ def export_changes(
         public_base=public_base,
     )
 
+    record_usage_event(db, EVENT_EXPORTS_DOWNLOAD_CHANGES)
+
     return _build_export_response(
         rows=rows,
         export_format=export_format,
@@ -2333,6 +2342,8 @@ def list_changes(
             status_code=422,
             detail="Invalid date range: 'from' must be <= 'to'.",
         )
+
+    record_usage_event(db, EVENT_CHANGES_LIST)
 
     range_start: datetime | None = None
     range_end_exclusive: datetime | None = None
@@ -2462,6 +2473,8 @@ def get_change_compare(
             jobName=job_names.get(snapshot.job_id) if snapshot.job_id else None,
         )
 
+    record_usage_event(db, EVENT_COMPARE_VIEW)
+
     return ChangeCompareSchema(
         event=_build_change_event_schema(change),
         fromSnapshot=_build_compare_snapshot(from_snapshot) if from_snapshot else None,
@@ -2539,6 +2552,8 @@ def get_snapshot_timeline(
                 compareFromSnapshotId=compare_map.get(row.id),
             )
         )
+
+    record_usage_event(db, EVENT_TIMELINE_VIEW)
 
     return SnapshotTimelineSchema(
         sourceCode=snap.source.code if snap.source else None,

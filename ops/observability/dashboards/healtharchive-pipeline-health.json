@@ -1,0 +1,338 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": "-- Grafana --",
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "description": "Pipeline health: are crawls progressing, are snapshots increasing, is temp storage growing, are jobs stuck?",
+  "editable": false,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "links": [
+    {
+      "asDropdown": false,
+      "icon": "external link",
+      "includeVars": false,
+      "keepTime": false,
+      "tags": [],
+      "targetBlank": true,
+      "title": "Automation maintenance playbook",
+      "type": "link",
+      "url": "https://github.com/jerdaw/healtharchive-backend/blob/main/docs/operations/playbooks/automation-maintenance.md"
+    },
+    {
+      "asDropdown": false,
+      "icon": "external link",
+      "includeVars": false,
+      "keepTime": false,
+      "tags": [],
+      "targetBlank": true,
+      "title": "Restore test playbook",
+      "type": "link",
+      "url": "https://github.com/jerdaw/healtharchive-backend/blob/main/docs/operations/playbooks/restore-test.md"
+    }
+  ],
+  "panels": [
+    {
+      "datasource": "prometheus",
+      "description": "PromQL: delta(healtharchive_snapshots_total[24h])",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 0,
+        "y": 0
+      },
+      "id": 1,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "expr": "delta(healtharchive_snapshots_total[24h])",
+          "refId": "A"
+        }
+      ],
+      "title": "Snapshots Added (24h)",
+      "type": "stat"
+    },
+    {
+      "datasource": "prometheus",
+      "description": "PromQL: (time() - healtharchive_pages_updated_at_max_seconds) / 3600",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "h"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 6,
+        "y": 0
+      },
+      "id": 2,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "expr": "(time() - healtharchive_pages_updated_at_max_seconds) / 3600",
+          "refId": "A"
+        }
+      ],
+      "title": "Hours Since Last Pages Update",
+      "type": "stat"
+    },
+    {
+      "datasource": "prometheus",
+      "description": "PromQL: healtharchive_jobs_pages_crawled_total",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 12,
+        "y": 0
+      },
+      "id": 3,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "expr": "healtharchive_jobs_pages_crawled_total",
+          "instant": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Pages Crawled (total)",
+      "type": "stat"
+    },
+    {
+      "datasource": "prometheus",
+      "description": "PromQL: healtharchive_jobs_pages_failed_total",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 18,
+        "y": 0
+      },
+      "id": 4,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "expr": "healtharchive_jobs_pages_failed_total",
+          "instant": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Pages Failed (total)",
+      "type": "stat"
+    },
+    {
+      "datasource": "prometheus",
+      "description": "PromQL: delta(healtharchive_jobs_pages_crawled_total[24h]) and delta(healtharchive_jobs_pages_failed_total[24h])",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 0,
+        "y": 4
+      },
+      "id": 5,
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        }
+      },
+      "targets": [
+        {
+          "expr": "delta(healtharchive_jobs_pages_crawled_total[24h])",
+          "legendFormat": "pages_crawled_24h",
+          "refId": "A"
+        },
+        {
+          "expr": "delta(healtharchive_jobs_pages_failed_total[24h])",
+          "legendFormat": "pages_failed_24h",
+          "refId": "B"
+        }
+      ],
+      "title": "Crawl Activity (24h delta)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": "prometheus",
+      "description": "PromQL: healtharchive_jobs_total (label: status)",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 12,
+        "x": 12,
+        "y": 4
+      },
+      "id": 6,
+      "options": {
+        "displayMode": "gradient",
+        "orientation": "horizontal",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showUnfilled": true,
+        "valueMode": "color"
+      },
+      "targets": [
+        {
+          "expr": "healtharchive_jobs_total",
+          "instant": true,
+          "legendFormat": "{{status}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Jobs by Status (instant)",
+      "type": "bargauge"
+    },
+    {
+      "datasource": "prometheus",
+      "description": "PromQL: healtharchive_jobs_warc_bytes_total, healtharchive_jobs_output_bytes_total, healtharchive_jobs_tmp_bytes_total",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 13
+      },
+      "id": 7,
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        }
+      },
+      "targets": [
+        {
+          "expr": "healtharchive_jobs_warc_bytes_total",
+          "legendFormat": "warc_bytes_total",
+          "refId": "A"
+        },
+        {
+          "expr": "healtharchive_jobs_output_bytes_total",
+          "legendFormat": "output_bytes_total",
+          "refId": "B"
+        },
+        {
+          "expr": "healtharchive_jobs_tmp_bytes_total",
+          "legendFormat": "tmp_bytes_total",
+          "refId": "C"
+        },
+        {
+          "expr": "healtharchive_jobs_tmp_non_warc_bytes_total",
+          "legendFormat": "tmp_non_warc_bytes_total",
+          "refId": "D"
+        }
+      ],
+      "title": "Archive Storage Totals (bytes)",
+      "type": "timeseries"
+    }
+  ],
+  "refresh": "1m",
+  "schemaVersion": 39,
+  "tags": [
+    "healtharchive",
+    "ops",
+    "pipeline"
+  ],
+  "templating": {
+    "list": []
+  },
+  "time": {
+    "from": "now-7d",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "utc",
+  "title": "HealthArchive - Pipeline Health",
+  "uid": "ha-pipeline-health",
+  "version": 1
+}
