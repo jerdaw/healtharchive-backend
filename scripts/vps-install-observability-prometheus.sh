@@ -202,6 +202,8 @@ if [[ -z "${PROMTOOL_BIN}" ]]; then
   PROMTOOL_BIN="/usr/bin/promtool"
 fi
 
+rules_dir="/etc/prometheus/rules"
+rules_file="${rules_dir}/healtharchive-alerts.yml"
 prom_cfg="/etc/prometheus/prometheus.yml"
 if [[ "${APPLY}" == "true" ]]; then
   if [[ ! -x "${PROM_BIN}" ]]; then
@@ -260,6 +262,8 @@ ensure_prometheus_can_read_token() {
 write_prometheus_config() {
   if [[ "${APPLY}" != "true" ]]; then
     echo "+ install -d -m 0755 -o root -g root /etc/prometheus"
+    echo "+ install -d -m 0755 -o root -g root ${rules_dir}"
+    echo "+ (ensure ${rules_file} exists; Phase 8 overwrites with real rules)"
     echo "+ (write ${prom_cfg})"
     return 0
   fi
@@ -270,10 +274,26 @@ write_prometheus_config() {
   fi
 
   install -d -m 0755 -o root -g root /etc/prometheus
+  install -d -m 0755 -o root -g root "${rules_dir}"
+  if [[ ! -f "${rules_file}" ]]; then
+    cat >"${rules_file}" <<'EOF'
+groups: []
+EOF
+    chown root:root "${rules_file}"
+    chmod 0644 "${rules_file}"
+  fi
   cat >"${prom_cfg}" <<EOF
 global:
   scrape_interval: ${SCRAPE_INTERVAL}
   scrape_timeout: ${SCRAPE_TIMEOUT}
+
+rule_files:
+  - ${rules_file}
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ["127.0.0.1:9093"]
 
 scrape_configs:
   - job_name: prometheus

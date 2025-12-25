@@ -118,7 +118,27 @@ dashboards_dest="${ROOT_DIR%/}/ops/observability/dashboards/healtharchive"
 provisioning_dir="/etc/grafana/provisioning/dashboards"
 provisioning_file="${provisioning_dir}/healtharchive.yaml"
 
-run install -d -m 2775 -o root -g "${OPS_GROUP}" "${dashboards_dest}"
+ensure_user_in_group() {
+  local user="$1"
+  local group="$2"
+
+  if ! id "${user}" >/dev/null 2>&1; then
+    return 0
+  fi
+
+  if id -nG "${user}" 2>/dev/null | tr ' ' '\n' | grep -Fxq "${group}"; then
+    return 0
+  fi
+
+  run usermod -aG "${group}" "${user}"
+}
+
+# Grafana must be able to read the ops dashboards directory. The ops tree is
+# typically group-restricted (e.g., root:healtharchive 2770), so we grant access
+# via group membership instead of loosening permissions globally.
+ensure_user_in_group "grafana" "${OPS_GROUP}"
+
+run install -d -m 2770 -o root -g "${OPS_GROUP}" "${dashboards_dest}"
 
 if [[ "${APPLY}" != "true" ]]; then
   echo "+ rm -f ${dashboards_dest}/*.json"

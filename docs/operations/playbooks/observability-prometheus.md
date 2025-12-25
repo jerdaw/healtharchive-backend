@@ -36,8 +36,13 @@ This will:
 
 - install the `prometheus` package
 - write `/etc/prometheus/prometheus.yml`
+- create `/etc/prometheus/rules/healtharchive-alerts.yml` (empty placeholder; Phase 8 overwrites with real rules)
 - force Prometheus to listen on `127.0.0.1:9090` via a systemd override
 - cap retention (time; and size if supported)
+
+Note:
+
+- The Prometheus config includes an Alertmanager target at `127.0.0.1:9093`; Phase 8 installs and configures Alertmanager.
 
 ## Verify
 

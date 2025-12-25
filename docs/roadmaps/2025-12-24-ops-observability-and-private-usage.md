@@ -428,6 +428,8 @@ Rollback:
 
 **Goal:** get notified about real outages without creating pager fatigue.
 
+Status: implemented in this repo (Prometheus rules + Alertmanager webhook routing).
+
 Deliverables:
 
 - A small alert set routed to one operator channel.
@@ -435,9 +437,11 @@ Deliverables:
 
 Steps:
 
-1. Decide routing (recommended minimal options):
+1. Decide routing:
    - Keep existing external uptime checks for public URLs.
-   - Use Grafana managed alerts (simpler than full Alertmanager at this project scale).
+   - Use **Prometheus alert rules + Alertmanager** for “config-as-code” alerting.
+     - Route to a single webhook receiver (Discord/Slack/etc).
+     - Avoids Grafana alert provisioning complexity (datasource UIDs, version drift).
 2. Start with only these alerts:
    - Backend scrape down for >5 minutes.
    - Disk usage >80% (warning) and >90% (critical) on `/srv/healtharchive`.
@@ -445,6 +449,12 @@ Steps:
    - Job failures rising (or `failed` status count increases unexpectedly).
 3. Add runbook links that point to existing playbooks and the production runbook.
 4. Test each alert intentionally once.
+
+Implementation notes:
+
+- Script: `scripts/vps-install-observability-alerting.sh`
+- Playbook: `docs/operations/playbooks/observability-alerting.md`
+- Secret (webhook URL): `/etc/healtharchive/observability/alertmanager_webhook_url`
 
 Acceptance criteria:
 

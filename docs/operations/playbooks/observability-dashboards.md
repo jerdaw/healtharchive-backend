@@ -60,6 +60,13 @@ This will:
 
 ## Troubleshooting
 
+- If Grafana fails to start after provisioning dashboards and you see permission errors for `/srv/healtharchive/ops/observability` in `journalctl`:
+  - Ensure the Grafana service user can traverse the ops tree by joining the shared ops group:
+    - `sudo usermod -aG healtharchive grafana`
+    - `sudo systemctl restart grafana-server.service`
+  - Re-run the installer script to confirm permissions and restart:
+    - `sudo ./scripts/vps-install-observability-dashboards.sh --apply`
+
 - If dashboards appear but panels show “data source not found”:
   - Rename your Grafana data sources to match the expected names:
     - Prometheus: `prometheus`

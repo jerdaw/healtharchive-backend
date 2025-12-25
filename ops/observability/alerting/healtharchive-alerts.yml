@@ -1,0 +1,64 @@
+groups:
+  - name: healtharchive.core
+    rules:
+      - alert: HealthArchiveBackendScrapeDown
+        expr: up{job="healtharchive_backend"} == 0
+        for: 5m
+        labels:
+          severity: critical
+          service: healtharchive
+        annotations:
+          summary: "HealthArchive backend metrics scrape is down"
+          description: "Prometheus cannot scrape /metrics from the backend for 5m. Check healtharchive-api.service and admin token config."
+          runbook_url: "https://github.com/jerdaw/healtharchive-backend/blob/main/docs/operations/playbooks/incident-response.md"
+
+      - alert: HealthArchiveDiskUsageHigh
+        expr: |
+          (100 - (node_filesystem_avail_bytes{mountpoint="__MOUNTPOINT__",fstype!~"tmpfs|overlay"} /
+          node_filesystem_size_bytes{mountpoint="__MOUNTPOINT__",fstype!~"tmpfs|overlay"} * 100)) > 80
+        for: 30m
+        labels:
+          severity: warning
+          service: healtharchive
+        annotations:
+          summary: "Disk usage > 80% on __MOUNTPOINT__"
+          description: "Disk usage has been > 80% for 30m on the filesystem backing __MOUNTPOINT__. On a single-VPS setup, this often includes /srv/healtharchive."
+          runbook_url: "https://github.com/jerdaw/healtharchive-backend/blob/main/docs/operations/playbooks/incident-response.md"
+
+      - alert: HealthArchiveDiskUsageCritical
+        expr: |
+          (100 - (node_filesystem_avail_bytes{mountpoint="__MOUNTPOINT__",fstype!~"tmpfs|overlay"} /
+          node_filesystem_size_bytes{mountpoint="__MOUNTPOINT__",fstype!~"tmpfs|overlay"} * 100)) > 90
+        for: 10m
+        labels:
+          severity: critical
+          service: healtharchive
+        annotations:
+          summary: "Disk usage > 90% on __MOUNTPOINT__"
+          description: "Disk usage has been > 90% for 10m on the filesystem backing __MOUNTPOINT__. Immediate cleanup or storage expansion is recommended."
+          runbook_url: "https://github.com/jerdaw/healtharchive-backend/blob/main/docs/operations/playbooks/incident-response.md"
+
+      - alert: HealthArchiveSearchErrorsSustained
+        expr: |
+          increase(healtharchive_search_errors_total[15m]) >= 3
+          and increase(healtharchive_search_requests_total[15m]) >= 50
+        for: 10m
+        labels:
+          severity: warning
+          service: healtharchive
+        annotations:
+          summary: "Sustained /api/search errors"
+          description: "At least 3 search errors over 15m with meaningful traffic (>=50 requests). Investigate recent deploys, DB health, and logs."
+          runbook_url: "https://github.com/jerdaw/healtharchive-backend/blob/main/docs/operations/playbooks/incident-response.md"
+
+      - alert: HealthArchiveJobFailuresIncreased
+        expr: |
+          delta(healtharchive_jobs_total{status=~"failed|index_failed"}[30m]) > 0
+        for: 5m
+        labels:
+          severity: warning
+          service: healtharchive
+        annotations:
+          summary: "Job failures increased"
+          description: "The number of jobs in failed/index_failed increased in the last 30m. Check admin jobs list for the most recent failures and error messages."
+          runbook_url: "https://github.com/jerdaw/healtharchive-backend/blob/main/docs/operations/playbooks/incident-response.md"

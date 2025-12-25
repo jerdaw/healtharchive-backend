@@ -57,6 +57,7 @@ imply anything is public.
 
 - `/srv/healtharchive/ops/observability/`
   - `dashboards/` — exported dashboard JSON, provisioning files (no secrets)
+  - `alerting/` — public-safe alert rule templates/notes (no secrets)
   - `notes/` — public-safe operational notes
 
 Low-maintenance default:
@@ -71,6 +72,7 @@ Low-maintenance default:
 - `/etc/healtharchive/observability/postgres_grafana_password`
 - `/etc/healtharchive/observability/postgres_exporter.env`
 - `/etc/healtharchive/observability/postgres_exporter_password`
+- `/etc/healtharchive/observability/alertmanager_webhook_url` (Phase 8; routes alerts to one operator channel)
 
 Bootstrap helper (VPS only):
 
@@ -79,6 +81,8 @@ Bootstrap helper (VPS only):
 - `scripts/vps-install-observability-prometheus.sh`
 - `scripts/vps-install-observability-grafana.sh`
 - `scripts/vps-enable-tailscale-serve-grafana.sh`
+- `scripts/vps-install-observability-dashboards.sh`
+- `scripts/vps-install-observability-alerting.sh`
 
 ---
 

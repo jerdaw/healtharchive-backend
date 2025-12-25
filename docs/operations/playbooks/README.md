@@ -22,6 +22,7 @@ Recommended starting points:
 - Prometheus install (scrape config + retention, loopback-only): `observability-prometheus.md`
 - Grafana install (loopback-only) + tailnet access: `observability-grafana.md`
 - Dashboards provisioning (Phase 6/7): `observability-dashboards.md`
+- Alerting (Phase 8; minimal, high-signal): `observability-alerting.md`
 - Cadence overview: `../ops-cadence-checklist.md` (what to do weekly/monthly/quarterly)
 
 Other playbooks:
