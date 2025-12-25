@@ -525,11 +525,12 @@ Rollback:
 Deliverables:
 
 - Production runbook updated with:
-  - how to access Grafana (tailnet URL)
+  - how to access Grafana (tailnet-only; SSH port-forward)
   - how to restart services
   - where dashboards/config live
 - Baseline drift policy extended to include observability invariants.
 - One ops playbook: “Observability maintenance”.
+- One quick verification script (VPS): `scripts/vps-verify-observability.sh`.
 
 Steps:
 

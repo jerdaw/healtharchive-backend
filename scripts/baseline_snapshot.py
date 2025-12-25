@@ -121,6 +121,71 @@ def _systemctl_query(unit: str) -> dict[str, Any]:
     }
 
 
+def _split_host_port(value: str) -> tuple[str, int] | None:
+    value = value.strip()
+    if not value:
+        return None
+
+    # Common formats from `ss -ltn`:
+    # - 127.0.0.1:3000
+    # - *:80
+    # - [::1]:9090
+    # - [::]:9090
+    host: str
+    port_s: str
+
+    if value.startswith("["):
+        end = value.rfind("]:")
+        if end == -1:
+            return None
+        host = value[1:end]
+        port_s = value[end + 2 :]
+    else:
+        if ":" not in value:
+            return None
+        host, port_s = value.rsplit(":", 1)
+
+    try:
+        port = int(port_s)
+    except ValueError:
+        return None
+    return host, port
+
+
+def _collect_tcp_listeners() -> tuple[list[dict[str, Any]], str | None]:
+    try:
+        proc = subprocess.run(
+            ["ss", "-H", "-ltn"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+    except FileNotFoundError:
+        return [], "ss not found"
+
+    if proc.returncode != 0:
+        msg = (proc.stderr or proc.stdout or "").strip()
+        return [], msg or f"ss exited with {proc.returncode}"
+
+    listeners: list[dict[str, Any]] = []
+    for raw_line in (proc.stdout or "").splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+        parts = line.split()
+        # State Recv-Q Send-Q Local Address:Port Peer Address:Port
+        if len(parts) < 4:
+            continue
+        local = parts[3]
+        hp = _split_host_port(local)
+        if hp is None:
+            continue
+        host, port = hp
+        listeners.append({"address": host, "port": port, "local": local})
+
+    return listeners, None
+
+
 def _user_in_group(user: str, group: str) -> bool:
     try:
         pw = pwd.getpwnam(user)
@@ -395,6 +460,7 @@ def collect_observed(*, policy: dict[str, Any], mode: str = "local") -> dict[str
             ),
         },
         "filesystem": {},
+        "network": {},
         "systemd": {},
         "http": {
             "api_base": api_base,
@@ -411,6 +477,11 @@ def collect_observed(*, policy: dict[str, Any], mode: str = "local") -> dict[str
             continue
         fs_out[str(p)] = _stat_path(p)
     observed["filesystem"]["paths"] = fs_out
+
+    tcp_listeners, tcp_err = _collect_tcp_listeners()
+    observed["network"]["tcp_listeners"] = tcp_listeners
+    if tcp_err:
+        observed["network"]["tcp_listeners_error"] = tcp_err
 
     units = policy.get("systemd", {}).get("units", [])
     units_out: dict[str, Any] = {}

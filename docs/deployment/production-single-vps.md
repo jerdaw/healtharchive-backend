@@ -239,6 +239,71 @@ Notes:
 
 ---
 
+## 4.1) Observability (Prometheus + Grafana; operator-only)
+
+This is the **private** ops stack:
+
+- **Prometheus** collects metrics (backend + host + Postgres exporters).
+- **Grafana** shows dashboards (“private stats”).
+- **Alertmanager** sends alerts to one operator channel (via the webhook relay).
+
+The important safety rule:
+
+- These services bind to `127.0.0.1` on the VPS (loopback-only) and are accessed over the **tailnet** (Tailscale) using an **SSH port-forward**.
+- Do **not** add Caddy vhosts for Prometheus/Grafana (keep them off the public internet).
+
+Install flow (VPS):
+
+- Follow the observability playbooks under `docs/operations/playbooks/`:
+  - `observability-bootstrap.md`
+  - `observability-exporters.md`
+  - `observability-prometheus.md`
+  - `observability-grafana.md`
+  - `observability-dashboards.md`
+  - `observability-alerting.md`
+  - `observability-maintenance.md`
+
+Where things live (VPS):
+
+- Secrets (never commit): `/etc/healtharchive/observability/`
+- Prometheus config: `/etc/prometheus/prometheus.yml` and `/etc/prometheus/rules/`
+- Alertmanager config: `/etc/prometheus/alertmanager.yml`
+- Grafana dashboards provisioning: `/etc/grafana/provisioning/dashboards/healtharchive.yaml`
+- Public-safe dashboard JSON + ops artifacts: `/srv/healtharchive/ops/observability/`
+
+Access from your laptop (via tailnet-only SSH):
+
+```bash
+# Tunnel Grafana + Prometheus + admin proxy to your local machine.
+# Keep this terminal open.
+ssh -N \
+  -L 3000:127.0.0.1:3000 \
+  -L 9090:127.0.0.1:9090 \
+  -L 8002:127.0.0.1:8002 \
+  haadmin@<vps-tailscale-ip>
+```
+
+Then open on your laptop:
+
+- Grafana: `http://127.0.0.1:3000/`
+- Prometheus UI (optional): `http://127.0.0.1:9090/`
+- Admin proxy (operator triage; browser-friendly): `http://127.0.0.1:8002/`
+
+Restart services (VPS):
+
+```bash
+sudo systemctl restart \
+  prometheus \
+  prometheus-alertmanager \
+  prometheus-node-exporter \
+  prometheus-postgres-exporter \
+  grafana-server \
+  healtharchive-pushover-relay \
+  healtharchive-admin-proxy
+```
+
+---
+
 ## 5) HTTPS + DNS (Caddy)
 
 1) DNS (Namecheap): `A api.healtharchive.ca -> <VPS_PUBLIC_IP>`
