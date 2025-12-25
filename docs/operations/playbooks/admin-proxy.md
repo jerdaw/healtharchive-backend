@@ -65,4 +65,3 @@ Useful endpoints:
 - `sudo rm -f /etc/systemd/system/healtharchive-admin-proxy.service`
 - `sudo rm -f /usr/local/bin/healtharchive-admin-proxy`
 - `sudo systemctl daemon-reload`
-
