@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import sys
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
@@ -20,6 +21,32 @@ REPO_ROOT = Path(__file__).resolve().parents[2]  # src/ha_backend -> src -> repo
 # We prefer using the console script 'archive-tool', provided by the in-repo
 # archive_tool package (archive_tool.main:main via pyproject.toml).
 DEFAULT_ARCHIVE_TOOL_CMD = "archive-tool"
+
+
+def _detect_archive_tool_cmd() -> str:
+    """
+    Determine the effective archive_tool command.
+
+    Precedence:
+    1) HEALTHARCHIVE_TOOL_CMD (explicit override)
+    2) If running from a venv and the sibling console script exists, use:
+         <venv>/bin/archive-tool
+    3) Fallback: "archive-tool" (PATH lookup)
+    """
+    explicit = os.environ.get("HEALTHARCHIVE_TOOL_CMD")
+    if explicit is not None and explicit.strip():
+        return explicit.strip()
+
+    try:
+        python_bin_dir = Path(sys.executable).resolve().parent
+        candidate = python_bin_dir / "archive-tool"
+        if candidate.is_file() and os.access(candidate, os.X_OK):
+            return str(candidate)
+    except Exception:
+        return DEFAULT_ARCHIVE_TOOL_CMD
+
+    return DEFAULT_ARCHIVE_TOOL_CMD
+
 
 # === Replay (pywb) integration ===
 
@@ -100,7 +127,7 @@ class ArchiveToolConfig:
 def get_archive_tool_config() -> ArchiveToolConfig:
     root_str = os.environ.get("HEALTHARCHIVE_ARCHIVE_ROOT", str(DEFAULT_ARCHIVE_ROOT))
     archive_root = Path(root_str)
-    cmd = os.environ.get("HEALTHARCHIVE_TOOL_CMD", DEFAULT_ARCHIVE_TOOL_CMD)
+    cmd = _detect_archive_tool_cmd()
     return ArchiveToolConfig(archive_root=archive_root, archive_tool_cmd=cmd)
 
 

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import os
+import sys
 from pathlib import Path
 
 from ha_backend.config import (
@@ -23,9 +25,16 @@ def test_archive_tool_config_defaults(monkeypatch) -> None:
     monkeypatch.delenv("HEALTHARCHIVE_ARCHIVE_ROOT", raising=False)
     monkeypatch.delenv("HEALTHARCHIVE_TOOL_CMD", raising=False)
 
+    candidate = Path(sys.executable).resolve().parent / "archive-tool"
+    expected_cmd = (
+        str(candidate)
+        if candidate.is_file() and os.access(candidate, os.X_OK)
+        else DEFAULT_ARCHIVE_TOOL_CMD
+    )
+
     cfg = get_archive_tool_config()
     assert isinstance(cfg, ArchiveToolConfig)
-    assert cfg.archive_tool_cmd == DEFAULT_ARCHIVE_TOOL_CMD
+    assert cfg.archive_tool_cmd == expected_cmd
     assert isinstance(cfg.archive_root, Path)
     assert cfg.archive_root == DEFAULT_ARCHIVE_ROOT
 
