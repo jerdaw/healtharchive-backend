@@ -73,6 +73,8 @@ Low-maintenance default:
 - `/etc/healtharchive/observability/postgres_exporter.env`
 - `/etc/healtharchive/observability/postgres_exporter_password`
 - `/etc/healtharchive/observability/alertmanager_webhook_url` (Phase 8; routes alerts to one operator channel)
+- `/etc/healtharchive/observability/pushover_app_token` (optional; for Pushover relay)
+- `/etc/healtharchive/observability/pushover_user_key` (optional; for Pushover relay)
 
 Bootstrap helper (VPS only):
 
@@ -83,6 +85,7 @@ Bootstrap helper (VPS only):
 - `scripts/vps-enable-tailscale-serve-grafana.sh`
 - `scripts/vps-install-observability-dashboards.sh`
 - `scripts/vps-install-observability-alerting.sh`
+- `scripts/vps-install-observability-pushover-relay.sh` (optional; Alertmanager -> Pushover)
 
 ---
 

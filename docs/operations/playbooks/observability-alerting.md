@@ -39,6 +39,26 @@ Store it on the VPS:
 
 Keep this URL private (it is effectively a secret).
 
+### Pushover (cleaner/safer pattern)
+
+Pushover does not accept Alertmanager’s webhook JSON directly. Use the included
+loopback-only relay so secrets stay under `/etc/healtharchive/observability/`.
+
+1) Put your Pushover secrets on the VPS:
+
+- `sudoedit /etc/healtharchive/observability/pushover_app_token`
+- `sudoedit /etc/healtharchive/observability/pushover_user_key`
+
+2) Install the relay:
+
+- `sudo ./scripts/vps-install-observability-pushover-relay.sh --apply`
+
+3) Point Alertmanager at the relay:
+
+- `sudoedit /etc/healtharchive/observability/alertmanager_webhook_url`
+- Set the single line to:
+  - `http://127.0.0.1:9911/alertmanager`
+
 ## Install / apply
 
 1) Pull latest repo on the VPS:

@@ -101,6 +101,8 @@ secret_files=(
   postgres_exporter_password
   postgres_exporter.env
   alertmanager_webhook_url
+  pushover_app_token
+  pushover_user_key
 )
 
 for f in "${secret_files[@]}"; do
