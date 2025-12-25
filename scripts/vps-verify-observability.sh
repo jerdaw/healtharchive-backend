@@ -56,10 +56,25 @@ expect_loopback_port() {
     return 0
   fi
 
-  local bad
-  bad="$(printf '%s\n' "${locals}" | grep -vE '^(127\\.|\\[::1\\]|::1|\\[0:0:0:0:0:0:0:1\\]|0:0:0:0:0:0:0:1)' || true)"
-  if [[ -n "${bad}" ]]; then
-    fail "${label}: port ${port} is not loopback-only (saw: ${bad})"
+  local bad_lines=()
+  while IFS= read -r local_addr; do
+    [[ -z "${local_addr}" ]] && continue
+
+    if [[ "${local_addr}" == 127.*:* ]]; then
+      continue
+    fi
+    if [[ "${local_addr}" == "[::1]:"* || "${local_addr}" == "::1:"* ]]; then
+      continue
+    fi
+    if [[ "${local_addr}" == "[0:0:0:0:0:0:0:1]:"* || "${local_addr}" == "0:0:0:0:0:0:0:1:"* ]]; then
+      continue
+    fi
+
+    bad_lines+=("${local_addr}")
+  done <<<"${locals}"
+
+  if [[ ${#bad_lines[@]} -gt 0 ]]; then
+    fail "${label}: port ${port} is not loopback-only (saw: ${bad_lines[*]})"
     return 0
   fi
 
