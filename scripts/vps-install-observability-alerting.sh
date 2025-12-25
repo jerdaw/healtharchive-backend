@@ -191,7 +191,9 @@ fi
 
 ensure_service_user_in_group "${AM_UNIT}" "${OPS_GROUP}"
 
-am_dir="/etc/alertmanager"
+# Ubuntu's prometheus-alertmanager package conventionally uses /etc/prometheus/alertmanager.yml.
+# We follow that convention to minimize surprises.
+am_dir="/etc/prometheus"
 am_cfg="${am_dir}/alertmanager.yml"
 run install -d -m 0755 -o root -g root "${am_dir}"
 
@@ -231,13 +233,26 @@ fi
 
 AM_BIN="$(command -v alertmanager 2>/dev/null || true)"
 if [[ -z "${AM_BIN}" ]]; then
-  AM_BIN="/usr/bin/alertmanager"
+  AM_BIN="$(command -v prometheus-alertmanager 2>/dev/null || true)"
+fi
+if [[ -z "${AM_BIN}" ]]; then
+  for cand in "/usr/bin/prometheus-alertmanager" "/usr/bin/alertmanager" "/usr/sbin/alertmanager"; do
+    if [[ -x "${cand}" ]]; then
+      AM_BIN="${cand}"
+      break
+    fi
+  done
+fi
+if [[ -z "${AM_BIN}" ]]; then
+  echo "ERROR: Could not locate an Alertmanager binary (tried alertmanager/prometheus-alertmanager)." >&2
+  exit 1
 fi
 
 am_args=(
   "--config.file=${am_cfg}"
   "--storage.path=/var/lib/alertmanager"
   "--web.listen-address=127.0.0.1:9093"
+  "--cluster.listen-address=127.0.0.1:9094"
 )
 
 dropin_dir="/etc/systemd/system/${AM_UNIT}.d"
@@ -317,4 +332,4 @@ echo "  curl -s http://127.0.0.1:9093/-/ready"
 echo "  curl -s http://127.0.0.1:9090/api/v1/rules | head"
 echo
 echo "Confirm loopback-only:"
-echo "  ss -lntp | grep -E ':9093\\b'"
+echo "  ss -lntp | grep -E ':9093|:9094'"
