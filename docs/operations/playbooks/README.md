@@ -15,6 +15,7 @@ Rules:
 Recommended starting points:
 
 - Deploy + verify: `deploy-and-verify.md`
+- Crawl preflight audit (before annual / large crawls): `crawl-preflight.md`
 - Automation posture: `automation-maintenance.md`
 - Monitoring + alerting setup: `monitoring-and-alerting.md`
 - Admin proxy (browser-friendly ops triage): `admin-proxy.md`
