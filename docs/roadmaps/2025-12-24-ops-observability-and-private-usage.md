@@ -470,6 +470,8 @@ Rollback:
 
 **Goal:** avoid building a bespoke UI unless it clearly reduces toil.
 
+Status: implemented in this repo (Grafana “ops console” + loopback-only admin proxy; bespoke UI deferred).
+
 Decision gate (required):
 
 - Use Grafana + existing JSON endpoints for at least 1–2 weeks.
@@ -477,8 +479,20 @@ Decision gate (required):
   - “What do we still need SSH for?”
   - “What do dashboards not answer?”
   - “What actions are error-prone as CLI-only?”
+  - Log entries using: `docs/operations/ops-ui-friction-log-template.md`
 
-If (and only if) justified, implement **read-only** admin UI MVP.
+Implementation (low-maintenance default):
+
+- Add a Grafana dashboard that covers “read-only ops console” needs via Postgres:
+  - Recent non-indexed jobs
+  - Redacted issue report metadata
+- Add a loopback-only “admin proxy” on the VPS to browse admin endpoints in a browser
+  without manually copying tokens:
+  - Proxies `GET /api/admin/**` and `GET /metrics`
+  - Adds the admin token server-side from `/etc/healtharchive/observability/prometheus_backend_admin_token`
+  - Intended access is via SSH port-forwarding (tailnet-only SSH), not public exposure.
+
+If (and only if) justified later, implement a bespoke **read-only** admin UI MVP.
 
 Read-only MVP scope (no mutating actions):
 
@@ -495,11 +509,12 @@ Security requirements:
 
 Acceptance criteria:
 
-- Operator can triage jobs and reports without SSH.
+- Operator can triage jobs and reports without copying tokens into the browser.
+  - If using SSH port-forwarding, SSH is used only as the transport (tailnet-only), not as the primary UI.
 
 Rollback:
 
-- Remove the admin UI service; no data migrations required.
+- Disable/remove the admin proxy service; no data migrations required.
 
 ---
 

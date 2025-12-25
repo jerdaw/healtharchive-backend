@@ -17,6 +17,7 @@ Recommended starting points:
 - Deploy + verify: `deploy-and-verify.md`
 - Automation posture: `automation-maintenance.md`
 - Monitoring + alerting setup: `monitoring-and-alerting.md`
+- Admin proxy (browser-friendly ops triage): `admin-proxy.md`
 - Observability scaffolding (dirs + secrets): `observability-bootstrap.md`
 - Exporters install (node + Postgres, loopback-only): `observability-exporters.md`
 - Prometheus install (scrape config + retention, loopback-only): `observability-prometheus.md`

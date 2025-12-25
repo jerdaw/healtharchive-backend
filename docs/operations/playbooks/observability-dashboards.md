@@ -46,6 +46,7 @@ This will:
 - Find the `HealthArchive` folder
 - Open:
   - `HealthArchive - Ops Overview`
+  - `HealthArchive - Ops Console (Read-only)`
   - `HealthArchive - Pipeline Health`
   - `HealthArchive - Search Performance`
   - `HealthArchive - Usage (Private, Aggregate)`
