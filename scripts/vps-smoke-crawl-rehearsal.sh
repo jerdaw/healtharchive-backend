@@ -145,6 +145,9 @@ run_capture() {
     return 0
   fi
 
+  echo "Running: ${label} (capturing to ${RUN_DIR}/${outfile})"
+
+  set +e
   {
     echo "== ${label} =="
     echo "timestamp_utc=${timestamp}"
@@ -152,6 +155,16 @@ run_capture() {
     echo ""
     "${cmd[@]}"
   } >"${RUN_DIR}/${outfile}" 2>&1
+  local rc=$?
+  set -e
+
+  if [[ "${rc}" -ne 0 ]]; then
+    echo "ERROR: ${label} failed (rc=${rc})" >&2
+    echo "  See: ${RUN_DIR}/${outfile}" >&2
+    tail -n 30 "${RUN_DIR}/${outfile}" 2>/dev/null | sed 's/^/  | /' >&2 || true
+    return "${rc}"
+  fi
+  return 0
 }
 
 cleanup_sandbox() {

@@ -319,12 +319,15 @@ step_archive_tool_dry_run() {
   set -u -o pipefail
   local tmp
   tmp="$(mktemp -d)"
-  cleanup() { rm -rf "${tmp}"; }
-  trap cleanup EXIT
+  if [[ -z "${tmp}" || ! -d "${tmp}" ]]; then
+    echo "ERROR: failed to create temp dir" >&2
+    return 1
+  fi
 
   local archive_tool="${VENV_BIN}/archive-tool"
   if [[ ! -x "${archive_tool}" ]]; then
     echo "ERROR: archive-tool not found at ${archive_tool}" >&2
+    rm -rf "${tmp}"
     return 1
   fi
 
@@ -333,6 +336,9 @@ step_archive_tool_dry_run() {
     --name ha-preflight \
     --output-dir "${tmp}" \
     --dry-run
+  local rc=$?
+  rm -rf "${tmp}"
+  return "${rc}"
 }
 
 step_annual_status_json() {
