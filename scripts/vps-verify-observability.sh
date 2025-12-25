@@ -57,7 +57,7 @@ expect_loopback_port() {
   fi
 
   local bad
-  bad="$(printf '%s\n' "${locals}" | grep -vE '^(127\\.|\\[::1\\]|::1|\\[0:0:0:0:0:0:0:1\\]|0:0:0:0:0:0:0:1):' || true)"
+  bad="$(printf '%s\n' "${locals}" | grep -vE '^(127\\.|\\[::1\\]|::1|\\[0:0:0:0:0:0:0:1\\]|0:0:0:0:0:0:0:1)' || true)"
   if [[ -n "${bad}" ]]; then
     fail "${label}: port ${port} is not loopback-only (saw: ${bad})"
     return 0
