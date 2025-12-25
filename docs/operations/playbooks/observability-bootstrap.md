@@ -34,7 +34,7 @@ Canonical reference for boundaries (read first):
    - These files are created root-only (`0600`) by default.
    - Later installation steps may adjust permissions so services can read them.
    - You may also see `postgres_exporter.env` and `postgres_exporter_password` in this directory;
-     those are created/used by the Phase 3 exporters installer.
+     those are created/used by the exporters installer.
 
 ## Verify
 

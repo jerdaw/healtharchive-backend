@@ -2,6 +2,12 @@
 
 This folder contains **historical implementation plans** that have already been executed.
 
+Implemented plans:
+
+- `2025-12-24-6-phase-upgrade-roadmap-2025.md`
+- `2025-12-24-sequential-implementation-plan.md`
+- `2025-12-24-ops-observability-and-private-usage.md`
+
 Rules:
 
 - Treat these as a record; avoid ongoing edits except for small errata.

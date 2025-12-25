@@ -1,6 +1,5 @@
 # Operations docs
 
-
 - Ops playbooks (task-oriented checklists): `playbooks/README.md`
 - Observability + private stats contract (public vs private boundaries): `observability-and-private-stats.md`
 - Annual capture campaign (scope + seeds): `annual-campaign.md`
@@ -14,6 +13,7 @@
 - Dataset release runbook (verification checklist): `dataset-release-runbook.md`
 - Risk register (top risks + mitigations): `risk-register.md`
 - Ops cadence checklist (internal routine): `ops-cadence-checklist.md`
+- Ops UI friction log template (internal; ongoing): `ops-ui-friction-log-template.md`
 - Growth constraints (storage + scope budgets): `growth-constraints.md`
 - Restore test procedure (quarterly): `restore-test-procedure.md`
 - Restore test log template: `restore-test-log-template.md`

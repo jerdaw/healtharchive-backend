@@ -1,4 +1,4 @@
-# Admin proxy (Phase 9; browser-friendly ops triage; VPS)
+# Admin proxy (browser-friendly ops triage; VPS)
 
 Goal: make it easy to browse admin/metrics endpoints in a browser **without** copying tokens into the browser.
 

@@ -14,7 +14,7 @@ Canonical boundary doc (read first):
 ## Preconditions
 
 - You are on the VPS and can `sudo`.
-- Phase 2 scaffold has been applied:
+- Observability directories exist:
   - `/srv/healtharchive/ops/observability/` exists
   - `/etc/healtharchive/observability/` exists
 - Postgres is installed and running locally (production default).

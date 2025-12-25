@@ -1,6 +1,6 @@
 # Observability dashboards (Grafana provisioning; VPS)
 
-Goal: install the Phase 6 (ops health) and Phase 7 (private usage) dashboards into Grafana in a reproducible way.
+Goal: install the ops health and private aggregate usage dashboards into Grafana in a reproducible way.
 
 Canonical boundary doc (read first):
 
@@ -9,9 +9,9 @@ Canonical boundary doc (read first):
 ## Preconditions
 
 - You are on the VPS and can `sudo`.
-- Phase 4 Prometheus is installed and scraping targets are `UP`:
+- Prometheus is installed and scraping targets are `UP`:
   - `curl -s http://127.0.0.1:9090/-/ready`
-- Phase 5 Grafana is installed and reachable on loopback:
+- Grafana is installed and reachable on loopback:
   - `curl -s http://127.0.0.1:3000/api/health`
 - Grafana data sources exist (configured once in the UI):
   - Prometheus data source named `prometheus` pointing to `http://127.0.0.1:9090`

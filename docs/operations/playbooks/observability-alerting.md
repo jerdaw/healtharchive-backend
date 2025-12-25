@@ -1,4 +1,4 @@
-# Observability alerting (Phase 8; Prometheus + Alertmanager; VPS)
+# Observability alerting (Prometheus + Alertmanager; VPS)
 
 Goal: get notified about real outages without creating pager fatigue.
 

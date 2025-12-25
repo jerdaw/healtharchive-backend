@@ -1,0 +1,38 @@
+# Backend testing guidelines (internal)
+
+This doc describes the **backend** testing expectations and how to run checks locally.
+
+If you want step-by-step “run the app and click it” workflows, use:
+
+- `live-testing.md`
+
+## What CI runs (recommended locally)
+
+From the repo root:
+
+- `make check`
+
+This is the canonical “everything should be green” command.
+
+## Running subsets
+
+- Unit tests: `pytest`
+- One test file: `pytest tests/test_something.py`
+- One test: `pytest -k some_keyword`
+- Lint + format: `ruff check .` and `ruff format --check .`
+- Type-check: `mypy src tests`
+
+## Writing tests
+
+- Put tests in `tests/` and prefer plain `pytest` tests (no custom harness).
+- Keep tests deterministic:
+  - avoid real network calls
+  - avoid wall-clock dependencies
+  - avoid global state between tests
+- If you add a new API route, add at least one test that exercises the route and asserts the key behavior.
+- If you change DB behavior, prefer tests that set up a temporary DB using the existing test fixtures/patterns.
+
+## Scope (what belongs in tests vs scripts)
+
+- Application behavior belongs in `tests/`.
+- VPS automation scripts under `scripts/` should stay simple and safe; when logic grows (parsing, policy evaluation), prefer moving that logic into a small Python module that can be tested.

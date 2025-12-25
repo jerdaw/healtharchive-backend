@@ -72,7 +72,7 @@ Low-maintenance default:
 - `/etc/healtharchive/observability/postgres_grafana_password`
 - `/etc/healtharchive/observability/postgres_exporter.env`
 - `/etc/healtharchive/observability/postgres_exporter_password`
-- `/etc/healtharchive/observability/alertmanager_webhook_url` (Phase 8; routes alerts to one operator channel)
+- `/etc/healtharchive/observability/alertmanager_webhook_url` (routes alerts to one operator channel)
 - `/etc/healtharchive/observability/pushover_app_token` (optional; for Pushover relay)
 - `/etc/healtharchive/observability/pushover_user_key` (optional; for Pushover relay)
 
