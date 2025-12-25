@@ -1052,6 +1052,15 @@ def main():
     if final_status == "pending_final_build" and not stop_event.is_set():
         logger.info("Crawl/Resume phase successful. Proceeding to final WARC consolidation stage.")
 
+        # If Docker/Zimit wrote temp dirs with root-only permissions, the host
+        # process may not be able to discover WARCs for the final build. When
+        # enabled, relax permissions before scanning so WARC discovery works.
+        if script_args.relax_perms:
+            try:
+                utils.relax_permissions(host_output_dir, crawl_state.get_temp_dir_paths())
+            except Exception as exc:
+                logger.warning(f"Failed to relax permissions before WARC discovery: {exc}")
+
         logger.info("Finding all WARC files from all tracked temporary directories...")
         warc_host_paths = utils.find_all_warc_files(crawl_state.get_temp_dir_paths())
         if not warc_host_paths:
