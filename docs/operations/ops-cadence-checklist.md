@@ -79,6 +79,8 @@ See: `../deployment/systemd/README.md`
 - **Annual edition readiness**
   - Review `annual-campaign.md` for scope changes.
   - Ensure enough storage headroom for a full capture cycle.
+  - Run the crawl preflight audit:
+    - `cd /opt/healtharchive-backend && ./scripts/vps-preflight-crawl.sh --year <YYYY>`
   - Dry-run the scheduler if it is enabled:
     - `sudo systemctl start healtharchive-schedule-annual-dry-run.service`
     - `sudo journalctl -u healtharchive-schedule-annual-dry-run.service -n 200 --no-pager`

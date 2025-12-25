@@ -12,6 +12,9 @@ Canonical references:
 
 - Review and update scope/seeds in `../annual-campaign.md` (docs-only change).
 - Ensure you have storage headroom and backups are healthy.
+- Run the crawl preflight audit (recommended):
+  - `./scripts/vps-preflight-crawl.sh --year <YYYY>`
+  - See: `crawl-preflight.md`
 - If the annual scheduler is enabled, dry-run it:
   - `sudo systemctl start healtharchive-schedule-annual-dry-run.service`
   - `sudo journalctl -u healtharchive-schedule-annual-dry-run.service -n 200 --no-pager`
