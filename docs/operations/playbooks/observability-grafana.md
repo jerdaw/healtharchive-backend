@@ -10,7 +10,7 @@ Canonical boundary doc (read first):
 ## Preconditions
 
 - You are on the VPS and can `sudo`.
-- Phase 4 Prometheus is installed and loopback-only on `127.0.0.1:9090`.
+- Prometheus is installed and loopback-only on `127.0.0.1:9090`.
 - Tailscale is installed and the VPS is connected to your tailnet.
 - You have set these secret files:
   - `/etc/healtharchive/observability/grafana_admin_password`

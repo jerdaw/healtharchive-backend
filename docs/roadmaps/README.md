@@ -9,7 +9,7 @@
 Implementation plans live directly under `docs/roadmaps/` while they are active.
 When complete, move them to `docs/roadmaps/implemented/` and date them.
 
-- Ops observability + private usage dashboards (Prometheus/Grafana; operator-only): `2025-12-24-ops-observability-and-private-usage.md`
+None currently.
 
 ## Implemented plans (history)
 
