@@ -17,6 +17,31 @@ Canonical references:
 - Venv exists at: `/opt/healtharchive-backend/.venv`
 - Backend env file exists: `/etc/healtharchive/backend.env`
 
+## If you need to temporarily defer the annual crawl
+
+If you aren’t ready to run the annual campaign on Jan 01 UTC, disable the
+systemd timer **and** remove the automation sentinel:
+
+```bash
+sudo systemctl disable --now healtharchive-schedule-annual.timer
+sudo rm -f /etc/healtharchive/automation-enabled
+```
+
+Verify:
+
+```bash
+systemctl is-enabled healtharchive-schedule-annual.timer
+systemctl status healtharchive-schedule-annual.timer
+ls -la /etc/healtharchive/automation-enabled
+```
+
+Notes:
+
+- This prevents **automatic** annual job enqueueing; it does not cancel any
+  already-queued jobs.
+- The safe validation unit `healtharchive-schedule-annual-dry-run.service` can
+  still be run manually.
+
 ## Procedure (recommended)
 
 1. Choose the annual campaign year:
