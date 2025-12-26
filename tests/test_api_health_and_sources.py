@@ -668,6 +668,7 @@ def test_replay_resolve_endpoint_finds_capture_across_www_variants(tmp_path, mon
     assert body["found"] is True
     assert body["snapshotId"] == snap_id
     assert body["resolvedUrl"] == "https://www.canada.ca/en/health-canada.html"
+    assert body["mimeType"] == "text/html"
     assert (
         body["browseUrl"]
         == f"https://replay.healtharchive.ca/job-{job_id}/20250418232234/https://www.canada.ca/en/health-canada.html#ha_snapshot={snap_id}"
@@ -725,6 +726,7 @@ def test_replay_resolve_endpoint_falls_back_to_url_group_match(tmp_path, monkeyp
     assert body["found"] is True
     assert body["snapshotId"] == snap_id
     assert body["resolvedUrl"] == "https://www.canada.ca/en/health-canada.html"
+    assert body["mimeType"] == "text/html"
     assert (
         body["browseUrl"]
         == f"https://replay.healtharchive.ca/job-{job_id}/20250421125048/https://www.canada.ca/en/health-canada.html#ha_snapshot={snap_id}"

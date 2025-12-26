@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import difflib
 import ipaddress
 import socket
 from dataclasses import dataclass
@@ -12,8 +13,10 @@ import httpx
 from ha_backend.diffing import (
     DIFF_VERSION,
     NORMALIZATION_VERSION,
+    DiffDocument,
     compute_diff,
     normalize_html_for_diff,
+    normalize_html_for_diff_full_page,
 )
 from ha_backend.indexing.viewer import find_record_for_snapshot
 from ha_backend.models import Snapshot
@@ -72,6 +75,29 @@ class CompareResult:
     diff_version: str
     normalization_version: str
     stats: CompareStats
+
+
+@dataclass
+class CompareRenderInstruction:
+    type: str
+    line_index_a: Optional[int] = None
+    line_index_b: Optional[int] = None
+
+
+@dataclass
+class CompareRenderPayload:
+    archived_lines: list[str]
+    live_lines: list[str]
+    render_instructions: list[CompareRenderInstruction]
+    render_truncated: bool
+    render_line_limit: int
+
+
+@dataclass
+class CompareTextExtraction:
+    requested_mode: str
+    used_mode: str
+    fallback_applied: bool
 
 
 _MAX_URL_LEN = 4096
@@ -283,9 +309,122 @@ def _compute_section_stats(
     return added, removed, changed
 
 
-def compute_live_compare(archived_html: str, live_html: str) -> CompareResult:
+def build_compare_documents(
+    archived_html: str,
+    live_html: str,
+    *,
+    mode: str = "main",
+) -> tuple[DiffDocument, DiffDocument, CompareTextExtraction]:
+    requested_mode = mode.lower().strip() if mode else "main"
+    if requested_mode not in {"main", "full"}:
+        requested_mode = "main"
+
+    if requested_mode == "full":
+        doc_a = normalize_html_for_diff_full_page(archived_html)
+        doc_b = normalize_html_for_diff_full_page(live_html)
+        extraction = CompareTextExtraction(
+            requested_mode=requested_mode,
+            used_mode="full",
+            fallback_applied=False,
+        )
+        return doc_a, doc_b, extraction
+
     doc_a = normalize_html_for_diff(archived_html)
     doc_b = normalize_html_for_diff(live_html)
+
+    fallback_applied = False
+    used_mode = "main"
+    if not doc_a.lines or not doc_b.lines:
+        doc_a = normalize_html_for_diff_full_page(archived_html)
+        doc_b = normalize_html_for_diff_full_page(live_html)
+        fallback_applied = True
+        used_mode = "full"
+
+    extraction = CompareTextExtraction(
+        requested_mode=requested_mode,
+        used_mode=used_mode,
+        fallback_applied=fallback_applied,
+    )
+    return doc_a, doc_b, extraction
+
+
+def _build_render_instructions(
+    lines_a: list[str],
+    lines_b: list[str],
+) -> list[CompareRenderInstruction]:
+    matcher = difflib.SequenceMatcher(isjunk=None, a=lines_a, b=lines_b, autojunk=False)
+    instructions: list[CompareRenderInstruction] = []
+    for tag, i1, i2, j1, j2 in matcher.get_opcodes():
+        if tag == "equal":
+            for offset in range(j2 - j1):
+                instructions.append(
+                    CompareRenderInstruction(type="unchanged", line_index_b=j1 + offset)
+                )
+        elif tag == "delete":
+            for offset in range(i2 - i1):
+                instructions.append(
+                    CompareRenderInstruction(type="removed", line_index_a=i1 + offset)
+                )
+        elif tag == "insert":
+            for offset in range(j2 - j1):
+                instructions.append(
+                    CompareRenderInstruction(type="added", line_index_b=j1 + offset)
+                )
+        elif tag == "replace":
+            removed_count = i2 - i1
+            added_count = j2 - j1
+            paired = min(removed_count, added_count)
+            for offset in range(paired):
+                instructions.append(
+                    CompareRenderInstruction(
+                        type="replace",
+                        line_index_a=i1 + offset,
+                        line_index_b=j1 + offset,
+                    )
+                )
+            for offset in range(paired, removed_count):
+                instructions.append(
+                    CompareRenderInstruction(type="removed", line_index_a=i1 + offset)
+                )
+            for offset in range(paired, added_count):
+                instructions.append(
+                    CompareRenderInstruction(type="added", line_index_b=j1 + offset)
+                )
+    return instructions
+
+
+def build_compare_render_payload(
+    doc_a: DiffDocument,
+    doc_b: DiffDocument,
+    *,
+    max_lines: int,
+) -> CompareRenderPayload:
+    archived_lines = doc_a.lines
+    live_lines = doc_b.lines
+    render_truncated = False
+
+    if len(archived_lines) > max_lines or len(live_lines) > max_lines:
+        render_truncated = True
+        archived_lines = archived_lines[:max_lines]
+        live_lines = live_lines[:max_lines]
+
+    render_instructions = _build_render_instructions(archived_lines, live_lines)
+
+    return CompareRenderPayload(
+        archived_lines=archived_lines,
+        live_lines=live_lines,
+        render_instructions=render_instructions,
+        render_truncated=render_truncated,
+        render_line_limit=max_lines,
+    )
+
+
+def compute_live_compare(archived_html: str, live_html: str) -> CompareResult:
+    doc_a, doc_b, _extraction = build_compare_documents(archived_html, live_html)
+    return compute_live_compare_from_docs(doc_a, doc_b)
+
+
+def compute_live_compare_from_docs(doc_a: DiffDocument, doc_b: DiffDocument) -> CompareResult:
     diff = compute_diff(doc_a, doc_b)
 
     section_map_a = {title: text for title, text in doc_a.sections}

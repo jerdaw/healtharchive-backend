@@ -130,6 +130,7 @@ DEFAULT_COMPARE_LIVE_TIMEOUT_SECONDS = 8
 DEFAULT_COMPARE_LIVE_MAX_REDIRECTS = 4
 DEFAULT_COMPARE_LIVE_MAX_BYTES = 2_000_000
 DEFAULT_COMPARE_LIVE_MAX_ARCHIVE_BYTES = 2_000_000
+DEFAULT_COMPARE_LIVE_MAX_RENDER_LINES = 5000
 DEFAULT_COMPARE_LIVE_MAX_CONCURRENCY = 4
 DEFAULT_COMPARE_LIVE_USER_AGENT = "HealthArchiveCompareLive/1.0 (+https://healtharchive.ca)"
 
@@ -378,6 +379,21 @@ def get_compare_live_max_archive_bytes() -> int:
     except ValueError:
         value = DEFAULT_COMPARE_LIVE_MAX_ARCHIVE_BYTES
     return max(100_000, min(value, 20_000_000))
+
+
+def get_compare_live_max_render_lines() -> int:
+    """
+    Return the maximum number of lines included in compare-live render payloads.
+    """
+    raw = os.environ.get(
+        "HEALTHARCHIVE_COMPARE_LIVE_MAX_RENDER_LINES",
+        str(DEFAULT_COMPARE_LIVE_MAX_RENDER_LINES),
+    ).strip()
+    try:
+        value = int(raw)
+    except ValueError:
+        value = DEFAULT_COMPARE_LIVE_MAX_RENDER_LINES
+    return max(500, min(value, 20_000))
 
 
 def get_compare_live_max_concurrency() -> int:

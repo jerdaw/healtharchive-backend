@@ -26,6 +26,7 @@ from ha_backend.config import (
     get_compare_live_max_bytes,
     get_compare_live_max_concurrency,
     get_compare_live_max_redirects,
+    get_compare_live_max_render_lines,
     get_compare_live_timeout_seconds,
     get_compare_live_user_agent,
     get_exports_default_limit,
@@ -47,7 +48,9 @@ from ha_backend.live_compare import (
     LiveFetchError,
     LiveFetchNotHtml,
     LiveFetchTooLarge,
-    compute_live_compare,
+    build_compare_documents,
+    build_compare_render_payload,
+    compute_live_compare_from_docs,
     fetch_live_html,
     is_html_mime_type,
     load_snapshot_html,
@@ -122,6 +125,8 @@ from .schemas import (
     ChangeFeedSchema,
     CompareLiveDiffSchema,
     CompareLiveFetchSchema,
+    CompareLiveRenderInstructionSchema,
+    CompareLiveRenderSchema,
     CompareLiveSchema,
     CompareLiveStatsSchema,
     ExportManifestSchema,
@@ -766,13 +771,13 @@ def _candidate_resolve_urls(original_url: str) -> List[str]:
 def _select_best_replay_candidate(
     rows: Iterable[Sequence[Any]],
     anchor: Optional[datetime],
-) -> Optional[tuple[int, str, Any, Optional[int]]]:
-    best: Optional[tuple[int, str, Any, Optional[int]]] = None
+) -> Optional[tuple[int, str, Any, Optional[int], Optional[str]]]:
+    best: Optional[tuple[int, str, Any, Optional[int], Optional[str]]] = None
     best_key: Optional[tuple] = None
 
     anchor_ts = anchor.timestamp() if anchor else None
 
-    for snap_id, snap_url, capture_ts, status_code in rows:
+    for snap_id, snap_url, capture_ts, status_code, mime_type in rows:
         quality = _status_quality(status_code)
 
         ts_value = 0.0
@@ -789,7 +794,7 @@ def _select_best_replay_candidate(
         key = (quality, -diff, ts_value, snap_id)
         if best_key is None or key > best_key:
             best_key = key
-            best = (snap_id, snap_url, capture_ts, status_code)
+            best = (snap_id, snap_url, capture_ts, status_code, mime_type)
 
     return best
 
@@ -2521,6 +2526,7 @@ def get_change_compare(
 def get_compare_live(
     snapshot_id: int,
     response: Response,
+    mode: str = Query(default="main", pattern=r"^(main|full)$"),
     db: Session = Depends(get_db),
 ) -> CompareLiveSchema:
     """
@@ -2572,7 +2578,17 @@ def get_compare_live(
         except LiveFetchError as exc:
             raise HTTPException(status_code=502, detail=str(exc)) from exc
 
-        compare = compute_live_compare(archived_html, live_result.html)
+        doc_a, doc_b, extraction = build_compare_documents(
+            archived_html,
+            live_result.html,
+            mode=mode,
+        )
+        compare = compute_live_compare_from_docs(doc_a, doc_b)
+        render_payload = build_compare_render_payload(
+            doc_a,
+            doc_b,
+            max_lines=get_compare_live_max_render_lines(),
+        )
         summary = summarize_live_compare(compare.stats)
 
         job_names: Dict[int, str] = {}
@@ -2618,6 +2634,23 @@ def get_compare_live(
                 diffVersion=compare.diff_version,
                 normalizationVersion=compare.normalization_version,
             ),
+            render=CompareLiveRenderSchema(
+                archivedLines=render_payload.archived_lines,
+                liveLines=render_payload.live_lines,
+                renderInstructions=[
+                    CompareLiveRenderInstructionSchema(
+                        type=instruction.type,
+                        lineIndexA=instruction.line_index_a,
+                        lineIndexB=instruction.line_index_b,
+                    )
+                    for instruction in render_payload.render_instructions
+                ],
+                renderTruncated=render_payload.render_truncated,
+                renderLineLimit=render_payload.render_line_limit,
+            ),
+            textModeRequested=extraction.requested_mode,
+            textModeUsed=extraction.used_mode,
+            textModeFallback=extraction.fallback_applied,
         )
     finally:
         _COMPARE_LIVE_SEMAPHORE.release()
@@ -3345,7 +3378,13 @@ def resolve_replay_url(
         return ReplayResolveSchema(found=False)
 
     rows = (
-        db.query(Snapshot.id, Snapshot.url, Snapshot.capture_timestamp, Snapshot.status_code)
+        db.query(
+            Snapshot.id,
+            Snapshot.url,
+            Snapshot.capture_timestamp,
+            Snapshot.status_code,
+            Snapshot.mime_type,
+        )
         .filter(Snapshot.job_id == jobId)
         .filter(Snapshot.url.in_(candidate_urls))
         .all()
@@ -3374,6 +3413,7 @@ def resolve_replay_url(
                     Snapshot.url,
                     Snapshot.capture_timestamp,
                     Snapshot.status_code,
+                    Snapshot.mime_type,
                 )
                 .filter(Snapshot.job_id == jobId)
                 .filter(Snapshot.normalized_url_group.in_(sorted(group_candidates)))
@@ -3386,7 +3426,7 @@ def resolve_replay_url(
     if best is None:
         return ReplayResolveSchema(found=False)
 
-    snap_id, resolved_url, capture_ts, _status = best
+    snap_id, resolved_url, capture_ts, _status, mime_type = best
 
     return ReplayResolveSchema(
         found=True,
@@ -3394,6 +3434,7 @@ def resolve_replay_url(
         captureTimestamp=_format_capture_timestamp(capture_ts),
         resolvedUrl=resolved_url,
         browseUrl=_build_browse_url(jobId, resolved_url, capture_ts, snap_id),
+        mimeType=mime_type,
     )
 
 
