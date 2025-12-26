@@ -425,7 +425,7 @@ step_alembic_head_check() {
   echo ""
   echo "[alembic_heads_raw]"
   local heads_raw
-  heads_raw="$("${alembic}" -c "${cfg}" heads -q)"
+  heads_raw="$("${alembic}" -c "${cfg}" heads 2>&1)"
   local rc_heads=$?
   printf '%s\n' "${heads_raw}"
   if [[ "${rc_heads}" -ne 0 ]]; then
@@ -436,7 +436,7 @@ step_alembic_head_check() {
   echo ""
   echo "[alembic_current_raw]"
   local current_raw
-  current_raw="$("${alembic}" -c "${cfg}" current -q)"
+  current_raw="$("${alembic}" -c "${cfg}" current 2>&1)"
   local rc_current=$?
   printf '%s\n' "${current_raw}"
   if [[ "${rc_current}" -ne 0 ]]; then
@@ -445,18 +445,19 @@ step_alembic_head_check() {
   fi
 
   local heads current
-  heads="$(printf '%s\n' "${heads_raw}" | awk '{print $1}' | sort -u)"
-  current="$(printf '%s\n' "${current_raw}" | awk '{print $1}' | sort -u)"
+  heads="$(printf '%s\n' "${heads_raw}" | grep -Eo '[0-9]{4}_[A-Za-z0-9_]+' | sort -u || true)"
+  current="$(printf '%s\n' "${current_raw}" | grep -Eo '[0-9]{4}_[A-Za-z0-9_]+' | sort -u || true)"
 
   echo "alembic_heads=${heads}"
   echo "alembic_current=${current}"
 
   if [[ -z "${heads}" ]]; then
-    echo "ERROR: could not determine alembic heads" >&2
+    echo "ERROR: could not determine alembic heads from output" >&2
     return 1
   fi
   if [[ -z "${current}" ]]; then
     echo "ERROR: could not determine current alembic revision (DB may be uninitialized)" >&2
+    echo "Hint: ${alembic} -c ${cfg} upgrade head" >&2
     return 1
   fi
 
@@ -470,7 +471,7 @@ step_alembic_head_check() {
 
   if [[ ${#missing[@]} -gt 0 ]]; then
     echo "ERROR: database schema is not at Alembic head (missing: ${missing[*]})" >&2
-    echo "Hint: ${alembic} upgrade head" >&2
+    echo "Hint: ${alembic} -c ${cfg} upgrade head" >&2
     return 1
   fi
 }
