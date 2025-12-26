@@ -172,6 +172,41 @@ class ChangeCompareSchema(BaseModel):
     normalizationVersion: Optional[str]
 
 
+class CompareLiveFetchSchema(BaseModel):
+    requestedUrl: str
+    finalUrl: str
+    statusCode: int
+    contentType: Optional[str]
+    bytesRead: int
+    fetchedAt: datetime
+
+
+class CompareLiveStatsSchema(BaseModel):
+    summary: str
+    addedSections: int
+    removedSections: int
+    changedSections: int
+    addedLines: int
+    removedLines: int
+    changeRatio: float
+    highNoise: bool
+
+
+class CompareLiveDiffSchema(BaseModel):
+    diffFormat: str
+    diffHtml: str
+    diffTruncated: bool
+    diffVersion: str
+    normalizationVersion: str
+
+
+class CompareLiveSchema(BaseModel):
+    archivedSnapshot: ChangeCompareSnapshotSchema
+    liveFetch: CompareLiveFetchSchema
+    stats: CompareLiveStatsSchema
+    diff: CompareLiveDiffSchema
+
+
 class SnapshotTimelineItemSchema(BaseModel):
     snapshotId: int
     captureDate: str
@@ -231,6 +266,10 @@ __all__ = [
     "ChangeFeedSchema",
     "ChangeCompareSnapshotSchema",
     "ChangeCompareSchema",
+    "CompareLiveFetchSchema",
+    "CompareLiveStatsSchema",
+    "CompareLiveDiffSchema",
+    "CompareLiveSchema",
     "SnapshotTimelineItemSchema",
     "SnapshotTimelineSchema",
     "IssueReportCategory",

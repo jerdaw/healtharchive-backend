@@ -148,6 +148,16 @@ HEALTHARCHIVE_USAGE_METRICS_WINDOW_DAYS=30
 # Optional: change tracking + diff feeds.
 HEALTHARCHIVE_CHANGE_TRACKING_ENABLED=1
 
+# Optional: compare-live (snapshot vs current live page).
+# Defaults are safe, but you can tune these if needed.
+HEALTHARCHIVE_COMPARE_LIVE_ENABLED=1
+HEALTHARCHIVE_COMPARE_LIVE_TIMEOUT_SECONDS=8
+HEALTHARCHIVE_COMPARE_LIVE_MAX_REDIRECTS=4
+HEALTHARCHIVE_COMPARE_LIVE_MAX_BYTES=2000000
+HEALTHARCHIVE_COMPARE_LIVE_MAX_ARCHIVE_BYTES=2000000
+HEALTHARCHIVE_COMPARE_LIVE_MAX_CONCURRENCY=4
+# HEALTHARCHIVE_COMPARE_LIVE_USER_AGENT=HealthArchiveCompareLive/1.0 (+https://healtharchive.ca)
+
 # Optional: research exports.
 # Controls the public metadata export endpoints under `/api/exports`.
 HEALTHARCHIVE_EXPORTS_ENABLED=1

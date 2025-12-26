@@ -122,6 +122,17 @@ DEFAULT_USAGE_METRICS_WINDOW_DAYS = 30
 # Precomputed change events and diff artifacts (change tracking pipeline).
 DEFAULT_CHANGE_TRACKING_ENABLED = True
 
+# === Compare-to-live ===
+
+# Enable public compare-to-live diffing against the current URL.
+DEFAULT_COMPARE_LIVE_ENABLED = True
+DEFAULT_COMPARE_LIVE_TIMEOUT_SECONDS = 8
+DEFAULT_COMPARE_LIVE_MAX_REDIRECTS = 4
+DEFAULT_COMPARE_LIVE_MAX_BYTES = 2_000_000
+DEFAULT_COMPARE_LIVE_MAX_ARCHIVE_BYTES = 2_000_000
+DEFAULT_COMPARE_LIVE_MAX_CONCURRENCY = 4
+DEFAULT_COMPARE_LIVE_USER_AGENT = "HealthArchiveCompareLive/1.0 (+https://healtharchive.ca)"
+
 # === Research exports ===
 
 # Public, metadata-only exports for research.
@@ -298,6 +309,101 @@ def get_change_tracking_enabled() -> bool:
     default = "1" if DEFAULT_CHANGE_TRACKING_ENABLED else "0"
     raw = os.environ.get("HEALTHARCHIVE_CHANGE_TRACKING_ENABLED", default).strip().lower()
     return raw not in ("0", "false", "no", "off")
+
+
+def get_compare_live_enabled() -> bool:
+    """
+    Return whether public compare-to-live is enabled.
+    """
+    default = "1" if DEFAULT_COMPARE_LIVE_ENABLED else "0"
+    raw = os.environ.get("HEALTHARCHIVE_COMPARE_LIVE_ENABLED", default).strip().lower()
+    return raw not in ("0", "false", "no", "off")
+
+
+def get_compare_live_timeout_seconds() -> float:
+    """
+    Return the total timeout for live fetches (seconds).
+    """
+    raw = os.environ.get(
+        "HEALTHARCHIVE_COMPARE_LIVE_TIMEOUT_SECONDS",
+        str(DEFAULT_COMPARE_LIVE_TIMEOUT_SECONDS),
+    ).strip()
+    try:
+        value = float(raw)
+    except ValueError:
+        value = float(DEFAULT_COMPARE_LIVE_TIMEOUT_SECONDS)
+    return max(1.0, min(value, 30.0))
+
+
+def get_compare_live_max_redirects() -> int:
+    """
+    Return the maximum number of live redirects to follow.
+    """
+    raw = os.environ.get(
+        "HEALTHARCHIVE_COMPARE_LIVE_MAX_REDIRECTS",
+        str(DEFAULT_COMPARE_LIVE_MAX_REDIRECTS),
+    ).strip()
+    try:
+        value = int(raw)
+    except ValueError:
+        value = DEFAULT_COMPARE_LIVE_MAX_REDIRECTS
+    return max(0, min(value, 10))
+
+
+def get_compare_live_max_bytes() -> int:
+    """
+    Return the maximum number of bytes read from the live URL.
+    """
+    raw = os.environ.get(
+        "HEALTHARCHIVE_COMPARE_LIVE_MAX_BYTES",
+        str(DEFAULT_COMPARE_LIVE_MAX_BYTES),
+    ).strip()
+    try:
+        value = int(raw)
+    except ValueError:
+        value = DEFAULT_COMPARE_LIVE_MAX_BYTES
+    return max(100_000, min(value, 20_000_000))
+
+
+def get_compare_live_max_archive_bytes() -> int:
+    """
+    Return the maximum number of bytes read from archived HTML.
+    """
+    raw = os.environ.get(
+        "HEALTHARCHIVE_COMPARE_LIVE_MAX_ARCHIVE_BYTES",
+        str(DEFAULT_COMPARE_LIVE_MAX_ARCHIVE_BYTES),
+    ).strip()
+    try:
+        value = int(raw)
+    except ValueError:
+        value = DEFAULT_COMPARE_LIVE_MAX_ARCHIVE_BYTES
+    return max(100_000, min(value, 20_000_000))
+
+
+def get_compare_live_max_concurrency() -> int:
+    """
+    Return the per-process max concurrent compare-live requests.
+    """
+    raw = os.environ.get(
+        "HEALTHARCHIVE_COMPARE_LIVE_MAX_CONCURRENCY",
+        str(DEFAULT_COMPARE_LIVE_MAX_CONCURRENCY),
+    ).strip()
+    try:
+        value = int(raw)
+    except ValueError:
+        value = DEFAULT_COMPARE_LIVE_MAX_CONCURRENCY
+    return max(1, min(value, 50))
+
+
+def get_compare_live_user_agent() -> str:
+    """
+    Return the User-Agent used for compare-live fetches.
+    """
+    raw = os.environ.get(
+        "HEALTHARCHIVE_COMPARE_LIVE_USER_AGENT",
+        DEFAULT_COMPARE_LIVE_USER_AGENT,
+    )
+    return raw.strip() or DEFAULT_COMPARE_LIVE_USER_AGENT
 
 
 def get_exports_enabled() -> bool:
