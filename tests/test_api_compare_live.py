@@ -150,6 +150,84 @@ def test_compare_live_success(tmp_path, monkeypatch) -> None:
     assert body["liveFetch"]["statusCode"] == 200
     assert "diffHtml" in body["diff"]
     assert "New text" in body["diff"]["diffHtml"]
+    assert "render" in body
+    assert body["textModeRequested"] == "main"
+    assert body["textModeUsed"] == "main"
+    assert body["textModeFallback"] is False
+    assert "Old text" in body["render"]["archivedLines"]
+    assert "New text" in body["render"]["liveLines"]
+    assert any(
+        instruction["type"] == "replace" for instruction in body["render"]["renderInstructions"]
+    )
+
+
+def test_compare_live_full_mode_includes_page_chrome(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("HEALTHARCHIVE_COMPARE_LIVE_ENABLED", "1")
+    client = _init_test_app(tmp_path, monkeypatch)
+
+    snapshot_id = _seed_snapshot_with_warc(
+        tmp_path,
+        url="https://example.org/page",
+        html="<html><body><header>Banner</header><main><h1>Title</h1><p>Old text</p></main></body></html>",
+        mime_type="text/html; charset=utf-8",
+    )
+
+    def _fake_fetch_live_html(*_args, **_kwargs):
+        return LiveFetchResult(
+            requested_url="https://example.org/page",
+            final_url="https://example.org/page",
+            status_code=200,
+            content_type="text/html; charset=utf-8",
+            bytes_read=123,
+            fetched_at=datetime(2025, 12, 25, 12, 0, tzinfo=timezone.utc),
+            html="<html><body><header>Banner</header><main><h1>Title</h1><p>New text</p></main></body></html>",
+        )
+
+    monkeypatch.setattr("ha_backend.api.routes_public.fetch_live_html", _fake_fetch_live_html)
+
+    resp = client.get(f"/api/snapshots/{snapshot_id}/compare-live", params={"mode": "full"})
+    assert resp.status_code == 200
+
+    body = resp.json()
+    assert body["textModeRequested"] == "full"
+    assert body["textModeUsed"] == "full"
+    assert body["textModeFallback"] is False
+    assert "Banner" in body["render"]["archivedLines"]
+
+
+def test_compare_live_falls_back_to_full_page_when_main_is_empty(tmp_path, monkeypatch) -> None:
+    monkeypatch.setenv("HEALTHARCHIVE_COMPARE_LIVE_ENABLED", "1")
+    client = _init_test_app(tmp_path, monkeypatch)
+
+    snapshot_id = _seed_snapshot_with_warc(
+        tmp_path,
+        url="https://example.org/page",
+        html="<html><body><header><h1>Title</h1><p>Old text</p></header></body></html>",
+        mime_type="text/html; charset=utf-8",
+    )
+
+    def _fake_fetch_live_html(*_args, **_kwargs):
+        return LiveFetchResult(
+            requested_url="https://example.org/page",
+            final_url="https://example.org/page",
+            status_code=200,
+            content_type="text/html; charset=utf-8",
+            bytes_read=123,
+            fetched_at=datetime(2025, 12, 25, 12, 0, tzinfo=timezone.utc),
+            html="<html><body><header><h1>Title</h1><p>New text</p></header></body></html>",
+        )
+
+    monkeypatch.setattr("ha_backend.api.routes_public.fetch_live_html", _fake_fetch_live_html)
+
+    resp = client.get(f"/api/snapshots/{snapshot_id}/compare-live")
+    assert resp.status_code == 200
+
+    body = resp.json()
+    assert body["textModeRequested"] == "main"
+    assert body["textModeUsed"] == "full"
+    assert body["textModeFallback"] is True
+    assert "Old text" in body["render"]["archivedLines"]
+    assert "New text" in body["render"]["liveLines"]
 
 
 def test_compare_live_live_not_html_maps_to_422(tmp_path, monkeypatch) -> None:

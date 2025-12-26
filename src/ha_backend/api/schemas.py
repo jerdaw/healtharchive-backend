@@ -36,6 +36,7 @@ class ReplayResolveSchema(BaseModel):
     captureTimestamp: Optional[str] = None
     resolvedUrl: Optional[str] = None
     browseUrl: Optional[str] = None
+    mimeType: Optional[str] = None
 
 
 class SnapshotSummarySchema(BaseModel):
@@ -200,11 +201,29 @@ class CompareLiveDiffSchema(BaseModel):
     normalizationVersion: str
 
 
+class CompareLiveRenderInstructionSchema(BaseModel):
+    type: str
+    lineIndexA: Optional[int] = None
+    lineIndexB: Optional[int] = None
+
+
+class CompareLiveRenderSchema(BaseModel):
+    archivedLines: List[str]
+    liveLines: List[str]
+    renderInstructions: List[CompareLiveRenderInstructionSchema]
+    renderTruncated: bool
+    renderLineLimit: int
+
+
 class CompareLiveSchema(BaseModel):
     archivedSnapshot: ChangeCompareSnapshotSchema
     liveFetch: CompareLiveFetchSchema
     stats: CompareLiveStatsSchema
     diff: CompareLiveDiffSchema
+    render: CompareLiveRenderSchema
+    textModeRequested: str
+    textModeUsed: str
+    textModeFallback: bool
 
 
 class SnapshotTimelineItemSchema(BaseModel):

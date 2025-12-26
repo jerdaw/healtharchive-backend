@@ -61,12 +61,13 @@ def _is_noise_tag(tag: Tag) -> bool:
     return any(token in haystack for token in _NOISE_KEYWORDS)
 
 
-def _strip_noise(soup: BeautifulSoup) -> None:
+def _strip_noise(soup: BeautifulSoup, *, strip_chrome: bool = True) -> None:
     for tag in soup.find_all(["script", "style", "noscript"]):
         tag.decompose()
 
-    for tag in soup.find_all(["nav", "header", "footer", "aside", "form"]):
-        tag.decompose()
+    if strip_chrome:
+        for tag in soup.find_all(["nav", "header", "footer", "aside", "form"]):
+            tag.decompose()
 
     for tag in soup.find_all(True):
         if _is_noise_tag(tag):
@@ -111,9 +112,25 @@ def _extract_sections(root: Tag) -> List[Tuple[str, str]]:
 
 def normalize_html_for_diff(html: str) -> DiffDocument:
     soup = BeautifulSoup(html, "html.parser")
-    _strip_noise(soup)
+    _strip_noise(soup, strip_chrome=True)
 
     root = soup.find("main") or soup.find(attrs={"role": "main"}) or soup.body or soup
+
+    raw_text = root.get_text(separator="\n", strip=True)
+    lines = [
+        _normalize_whitespace(line) for line in raw_text.splitlines() if _normalize_whitespace(line)
+    ]
+
+    sections = _extract_sections(root)
+
+    return DiffDocument(text=_normalize_whitespace(raw_text), lines=lines, sections=sections)
+
+
+def normalize_html_for_diff_full_page(html: str) -> DiffDocument:
+    soup = BeautifulSoup(html, "html.parser")
+    _strip_noise(soup, strip_chrome=False)
+
+    root = soup.body or soup
 
     raw_text = root.get_text(separator="\n", strip=True)
     lines = [
@@ -182,5 +199,6 @@ __all__ = [
     "DiffDocument",
     "DiffResult",
     "normalize_html_for_diff",
+    "normalize_html_for_diff_full_page",
     "compute_diff",
 ]
