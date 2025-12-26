@@ -9,7 +9,7 @@ import time
 from datetime import date, datetime, timedelta, timezone
 from enum import Enum
 from pathlib import Path
-from threading import Lock
+from threading import BoundedSemaphore, Lock
 from typing import Any, Dict, Iterable, Iterator, List, Optional, Sequence
 from urllib.parse import urlsplit, urlunsplit
 
@@ -21,6 +21,13 @@ from sqlalchemy.orm import Session, joinedload, load_only
 from ha_backend.changes import CHANGE_TYPE_UNCHANGED, get_latest_job_ids_by_source
 from ha_backend.config import (
     get_change_tracking_enabled,
+    get_compare_live_enabled,
+    get_compare_live_max_archive_bytes,
+    get_compare_live_max_bytes,
+    get_compare_live_max_concurrency,
+    get_compare_live_max_redirects,
+    get_compare_live_timeout_seconds,
+    get_compare_live_user_agent,
     get_exports_default_limit,
     get_exports_enabled,
     get_exports_max_limit,
@@ -33,6 +40,19 @@ from ha_backend.config import (
 )
 from ha_backend.db import get_session
 from ha_backend.indexing.viewer import find_record_for_snapshot
+from ha_backend.live_compare import (
+    LiveCompareError,
+    LiveCompareTooLarge,
+    LiveFetchBlocked,
+    LiveFetchError,
+    LiveFetchNotHtml,
+    LiveFetchTooLarge,
+    compute_live_compare,
+    fetch_live_html,
+    is_html_mime_type,
+    load_snapshot_html,
+    summarize_live_compare,
+)
 from ha_backend.models import (
     ArchiveJob,
     IssueReport,
@@ -81,6 +101,7 @@ from ha_backend.search_ranking import (
 from ha_backend.url_normalization import normalize_url_for_grouping
 from ha_backend.usage_metrics import (
     EVENT_CHANGES_LIST,
+    EVENT_COMPARE_LIVE_VIEW,
     EVENT_COMPARE_VIEW,
     EVENT_EXPORTS_DOWNLOAD_CHANGES,
     EVENT_EXPORTS_DOWNLOAD_SNAPSHOTS,
@@ -99,6 +120,10 @@ from .schemas import (
     ChangeCompareSnapshotSchema,
     ChangeEventSchema,
     ChangeFeedSchema,
+    CompareLiveDiffSchema,
+    CompareLiveFetchSchema,
+    CompareLiveSchema,
+    CompareLiveStatsSchema,
     ExportManifestSchema,
     ExportResourceSchema,
     IssueReportCreateSchema,
@@ -131,6 +156,8 @@ _PG_TRGM_EXISTS_LOCK = Lock()
 # verification (e.g., backup restore checks). These should not surface in
 # public browsing/search UI.
 _PUBLIC_EXCLUDED_SOURCE_CODES = {"test"}
+
+_COMPARE_LIVE_SEMAPHORE = BoundedSemaphore(get_compare_live_max_concurrency())
 
 
 def _has_pg_trgm(db: Session) -> bool:
@@ -2009,6 +2036,25 @@ def _build_change_event_schema(change: SnapshotChange) -> ChangeEventSchema:
     )
 
 
+def _build_compare_snapshot(
+    snapshot: Snapshot, job_names: Dict[int, str]
+) -> ChangeCompareSnapshotSchema:
+    capture_date = (
+        snapshot.capture_timestamp.date().isoformat()
+        if isinstance(snapshot.capture_timestamp, datetime)
+        else str(snapshot.capture_timestamp)
+    )
+    return ChangeCompareSnapshotSchema(
+        snapshotId=snapshot.id,
+        title=snapshot.title,
+        captureDate=capture_date,
+        captureTimestamp=_format_capture_timestamp(snapshot.capture_timestamp),
+        originalUrl=snapshot.url,
+        jobId=snapshot.job_id,
+        jobName=job_names.get(snapshot.job_id) if snapshot.job_id else None,
+    )
+
+
 @router.post("/reports", response_model=IssueReportReceiptSchema, status_code=201)
 def submit_issue_report(
     payload: IssueReportCreateSchema, db: Session = Depends(get_db)
@@ -2457,34 +2503,124 @@ def get_change_compare(
         rows = db.query(ArchiveJob.id, ArchiveJob.name).filter(ArchiveJob.id.in_(job_ids)).all()
         job_names = {int(job_id): job_name for job_id, job_name in rows}
 
-    def _build_compare_snapshot(snapshot: Snapshot) -> ChangeCompareSnapshotSchema:
-        capture_date = (
-            snapshot.capture_timestamp.date().isoformat()
-            if isinstance(snapshot.capture_timestamp, datetime)
-            else str(snapshot.capture_timestamp)
-        )
-        return ChangeCompareSnapshotSchema(
-            snapshotId=snapshot.id,
-            title=snapshot.title,
-            captureDate=capture_date,
-            captureTimestamp=_format_capture_timestamp(snapshot.capture_timestamp),
-            originalUrl=snapshot.url,
-            jobId=snapshot.job_id,
-            jobName=job_names.get(snapshot.job_id) if snapshot.job_id else None,
-        )
-
     record_usage_event(db, EVENT_COMPARE_VIEW)
 
     return ChangeCompareSchema(
         event=_build_change_event_schema(change),
-        fromSnapshot=_build_compare_snapshot(from_snapshot) if from_snapshot else None,
-        toSnapshot=_build_compare_snapshot(to_snapshot),
+        fromSnapshot=_build_compare_snapshot(from_snapshot, job_names) if from_snapshot else None,
+        toSnapshot=_build_compare_snapshot(to_snapshot, job_names),
         diffFormat=change.diff_format,
         diffHtml=change.diff_html,
         diffTruncated=bool(change.diff_truncated),
         diffVersion=change.diff_version,
         normalizationVersion=change.normalization_version,
     )
+
+
+@router.get("/snapshots/{snapshot_id}/compare-live", response_model=CompareLiveSchema)
+def get_compare_live(
+    snapshot_id: int,
+    response: Response,
+    db: Session = Depends(get_db),
+) -> CompareLiveSchema:
+    """
+    Return a live diff between an archived snapshot and the current URL.
+    """
+    if not get_compare_live_enabled():
+        raise HTTPException(status_code=404, detail="Compare-live not enabled")
+
+    if not _COMPARE_LIVE_SEMAPHORE.acquire(blocking=False):
+        raise HTTPException(
+            status_code=429,
+            detail="Too many concurrent live comparisons. Please retry shortly.",
+            headers={"Retry-After": "5"},
+        )
+
+    try:
+        snapshot = db.query(Snapshot).filter(Snapshot.id == snapshot_id).first()
+        if not snapshot:
+            raise HTTPException(status_code=404, detail="Snapshot not found")
+        if not snapshot.url:
+            raise HTTPException(status_code=404, detail="Snapshot URL not found")
+        if not is_html_mime_type(snapshot.mime_type):
+            raise HTTPException(status_code=422, detail="Snapshot is not HTML")
+
+        try:
+            archived_html = load_snapshot_html(
+                snapshot,
+                max_bytes=get_compare_live_max_archive_bytes(),
+            )
+        except LiveCompareTooLarge as exc:
+            raise HTTPException(status_code=413, detail=str(exc)) from exc
+        except LiveCompareError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+        try:
+            live_result = fetch_live_html(
+                snapshot.url,
+                timeout_seconds=get_compare_live_timeout_seconds(),
+                max_redirects=get_compare_live_max_redirects(),
+                max_bytes=get_compare_live_max_bytes(),
+                user_agent=get_compare_live_user_agent(),
+            )
+        except LiveFetchBlocked as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        except LiveFetchNotHtml as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
+        except LiveFetchTooLarge as exc:
+            raise HTTPException(status_code=413, detail=str(exc)) from exc
+        except LiveFetchError as exc:
+            raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+        compare = compute_live_compare(archived_html, live_result.html)
+        summary = summarize_live_compare(compare.stats)
+
+        job_names: Dict[int, str] = {}
+        if snapshot.job_id:
+            row = (
+                db.query(ArchiveJob.id, ArchiveJob.name)
+                .filter(ArchiveJob.id == snapshot.job_id)
+                .first()
+            )
+            if row:
+                job_names = {int(row[0]): row[1]}
+
+        record_usage_event(db, EVENT_COMPARE_LIVE_VIEW)
+
+        response.headers["Cache-Control"] = "no-store"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["X-Robots-Tag"] = "noindex, nofollow"
+
+        return CompareLiveSchema(
+            archivedSnapshot=_build_compare_snapshot(snapshot, job_names),
+            liveFetch=CompareLiveFetchSchema(
+                requestedUrl=live_result.requested_url,
+                finalUrl=live_result.final_url,
+                statusCode=live_result.status_code,
+                contentType=live_result.content_type,
+                bytesRead=live_result.bytes_read,
+                fetchedAt=live_result.fetched_at,
+            ),
+            stats=CompareLiveStatsSchema(
+                summary=summary,
+                addedSections=compare.stats.added_sections,
+                removedSections=compare.stats.removed_sections,
+                changedSections=compare.stats.changed_sections,
+                addedLines=compare.stats.added_lines,
+                removedLines=compare.stats.removed_lines,
+                changeRatio=compare.stats.change_ratio,
+                highNoise=compare.stats.high_noise,
+            ),
+            diff=CompareLiveDiffSchema(
+                diffFormat="html",
+                diffHtml=compare.diff_html,
+                diffTruncated=compare.diff_truncated,
+                diffVersion=compare.diff_version,
+                normalizationVersion=compare.normalization_version,
+            ),
+        )
+    finally:
+        _COMPARE_LIVE_SEMAPHORE.release()
 
 
 @router.get(

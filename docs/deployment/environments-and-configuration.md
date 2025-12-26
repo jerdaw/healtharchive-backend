@@ -133,6 +133,14 @@ Notes:
   counts are recorded; disable it for a metrics-free deployment.
 - `HEALTHARCHIVE_CHANGE_TRACKING_ENABLED` controls whether change tracking
   endpoints/diff feeds are active (disable if you are not running the pipeline).
+- Compare-live controls (public snapshot vs live diffs):
+  - `HEALTHARCHIVE_COMPARE_LIVE_ENABLED` (default `1`).
+  - `HEALTHARCHIVE_COMPARE_LIVE_TIMEOUT_SECONDS` (default `8`).
+  - `HEALTHARCHIVE_COMPARE_LIVE_MAX_REDIRECTS` (default `4`).
+  - `HEALTHARCHIVE_COMPARE_LIVE_MAX_BYTES` (default `2000000`).
+  - `HEALTHARCHIVE_COMPARE_LIVE_MAX_ARCHIVE_BYTES` (default `2000000`).
+  - `HEALTHARCHIVE_COMPARE_LIVE_MAX_CONCURRENCY` (default `4`).
+  - `HEALTHARCHIVE_COMPARE_LIVE_USER_AGENT` (default identifies HealthArchive).
 - `HEALTHARCHIVE_PUBLIC_SITE_URL` sets the public base URL used in RSS links.
 - In `production` (and `staging`), if the admin token is missing, admin/metrics
   endpoints fail closed (HTTP 500) instead of being left open.

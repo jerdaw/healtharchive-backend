@@ -7,6 +7,7 @@ Implemented plans:
 - `2025-12-24-6-phase-upgrade-roadmap-2025.md`
 - `2025-12-24-sequential-implementation-plan.md`
 - `2025-12-24-ops-observability-and-private-usage.md`
+- `2025-12-25-compare-live.md`
 
 Rules:
 
