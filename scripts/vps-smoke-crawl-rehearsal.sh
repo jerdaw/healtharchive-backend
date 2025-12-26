@@ -31,6 +31,7 @@ Options:
   --out-root DIR          Root dir for artifacts (default: /srv/healtharchive/ops/rehearsal)
   --keep-sandbox          Do not remove sandbox files on success (default: keep)
   --cleanup-on-success    Remove sandbox files on success (DB + archive-root) (default: keep)
+  --no-resource-monitor   Do not record resource peaks during crawl/index
   -h, --help              Show help
 
 Notes:
@@ -46,6 +47,7 @@ DEPTH="1"
 OUT_ROOT="/srv/healtharchive/ops/rehearsal"
 KEEP_SANDBOX="true"
 CLEANUP_ON_SUCCESS="false"
+RESOURCE_MONITOR="true"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -77,6 +79,10 @@ while [[ $# -gt 0 ]]; do
     --cleanup-on-success)
       CLEANUP_ON_SUCCESS="true"
       KEEP_SANDBOX="false"
+      shift 1
+      ;;
+    --no-resource-monitor)
+      RESOURCE_MONITOR="false"
       shift 1
       ;;
     -h|--help)
@@ -233,6 +239,172 @@ fi
 echo "Job ID: ${job_id}"
 
 run_capture "Validate job config (archive-tool dry-run)" "04-validate-job-config.txt" "${VENV_BIN}/ha-backend" validate-job-config --id "${job_id}"
+
+monitor_pid=""
+monitor_file="${RUN_DIR}/98-resource-monitor.jsonl"
+
+cleanup_on_exit() {
+  stop_monitor
+  write_resource_summary || true
+}
+trap cleanup_on_exit EXIT
+
+start_monitor() {
+  if [[ "${APPLY}" != "true" || "${RESOURCE_MONITOR}" != "true" ]]; then
+    return 0
+  fi
+  if [[ -n "${monitor_pid}" ]]; then
+    return 0
+  fi
+  : > "${monitor_file}"
+  (
+    set +e
+    while true; do
+      ts="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+      load="$(cat /proc/loadavg 2>/dev/null | awk '{print $1" "$2" "$3}' || echo '')"
+      mem_kv="$(awk -F':' '/^(MemTotal|MemAvailable|SwapTotal|SwapFree):/ {gsub(/^[[:space:]]+|[[:space:]]+$/, "", $2); print $1":"$2}' /proc/meminfo 2>/dev/null)"
+      root_df="$(df -P / 2>/dev/null | tail -n 1 | awk '{print $5}' | tr -d '%' || echo '')"
+      arc_df="$(df -P "${ARCHIVE_ROOT}" 2>/dev/null | tail -n 1 | awk '{print $5}' | tr -d '%' || echo '')"
+
+      zimit_id="$(docker ps -q --filter 'ancestor=ghcr.io/openzim/zimit' 2>/dev/null | head -n 1 || true)"
+      zimit_cpu=""
+      zimit_mem=""
+      zimit_mem_perc=""
+      if [[ -n "${zimit_id}" ]]; then
+        stats="$(docker stats --no-stream --format '{{.CPUPerc}}\t{{.MemUsage}}\t{{.MemPerc}}' "${zimit_id}" 2>/dev/null || true)"
+        zimit_cpu="$(printf '%s' "${stats}" | awk -F'\t' '{print $1}' || true)"
+        zimit_mem="$(printf '%s' "${stats}" | awk -F'\t' '{print $2}' || true)"
+        zimit_mem_perc="$(printf '%s' "${stats}" | awk -F'\t' '{print $3}' || true)"
+      fi
+
+      printf '{'
+      printf '"ts":"%s",' "${ts}"
+      printf '"load":"%s",' "${load}"
+      printf '"meminfo":"%s",' "$(printf '%s' "${mem_kv}" | tr '\n' ';' | sed 's/;*$//')"
+      printf '"rootUsedPct":"%s",' "${root_df}"
+      printf '"archiveUsedPct":"%s",' "${arc_df}"
+      printf '"zimitContainerId":"%s",' "${zimit_id}"
+      printf '"zimitCpuPerc":"%s",' "${zimit_cpu}"
+      printf '"zimitMemUsage":"%s",' "${zimit_mem}"
+      printf '"zimitMemPerc":"%s"' "${zimit_mem_perc}"
+      printf '}\n'
+
+      sleep 5
+    done
+  ) >> "${monitor_file}" 2>/dev/null &
+  monitor_pid=$!
+}
+
+stop_monitor() {
+  if [[ -z "${monitor_pid}" ]]; then
+    return 0
+  fi
+  kill "${monitor_pid}" >/dev/null 2>&1 || true
+  wait "${monitor_pid}" >/dev/null 2>&1 || true
+  monitor_pid=""
+}
+
+write_resource_summary() {
+  if [[ "${APPLY}" != "true" || "${RESOURCE_MONITOR}" != "true" ]]; then
+    return 0
+  fi
+  if [[ ! -s "${monitor_file}" ]]; then
+    return 0
+  fi
+  "${VENV_BIN}/python3" - "${monitor_file}" "${RUN_DIR}/98-resource-summary.json" <<'PY'
+import json
+import re
+import sys
+from pathlib import Path
+
+monitor_path = Path(sys.argv[1])
+out_path = Path(sys.argv[2])
+
+def parse_meminfo(meminfo: str) -> dict[str, int]:
+    out: dict[str, int] = {}
+    for part in (meminfo or "").split(";"):
+        if ":" not in part:
+            continue
+        k, v = part.split(":", 1)
+        m = re.search(r"([0-9]+)\s*kB", v)
+        if not m:
+            continue
+        out[k.strip()] = int(m.group(1)) * 1024
+    return out
+
+def parse_percent(s: str) -> float | None:
+    s = (s or "").strip().rstrip("%")
+    try:
+        return float(s)
+    except ValueError:
+        return None
+
+def parse_load(s: str) -> tuple[float, float, float] | None:
+    parts = (s or "").split()
+    if len(parts) < 3:
+        return None
+    try:
+        return float(parts[0]), float(parts[1]), float(parts[2])
+    except ValueError:
+        return None
+
+cpu_peak: float | None = None
+mem_min: int | None = None
+swap_peak: int | None = None
+root_peak: float | None = None
+arc_peak: float | None = None
+load15_peak: float | None = None
+samples = 0
+
+for line in monitor_path.read_text(encoding="utf-8", errors="replace").splitlines():
+    line = line.strip()
+    if not line:
+        continue
+    try:
+        row = json.loads(line)
+    except json.JSONDecodeError:
+        continue
+    samples += 1
+
+    mi = parse_meminfo(row.get("meminfo", ""))
+    mem_av = mi.get("MemAvailable")
+    if mem_av is not None:
+        mem_min = mem_av if mem_min is None else min(mem_min, mem_av)
+    swap_total = mi.get("SwapTotal")
+    swap_free = mi.get("SwapFree")
+    if swap_total is not None and swap_free is not None:
+        swap_used = max(0, swap_total - swap_free)
+        swap_peak = swap_used if swap_peak is None else max(swap_peak, swap_used)
+
+    root = parse_percent(row.get("rootUsedPct", ""))
+    if root is not None:
+        root_peak = root if root_peak is None else max(root_peak, root)
+    arc = parse_percent(row.get("archiveUsedPct", ""))
+    if arc is not None:
+        arc_peak = arc if arc_peak is None else max(arc_peak, arc)
+
+    load = parse_load(row.get("load", ""))
+    if load is not None:
+        load15_peak = load[2] if load15_peak is None else max(load15_peak, load[2])
+
+    cpu = parse_percent(row.get("zimitCpuPerc", ""))
+    if cpu is not None:
+        cpu_peak = cpu if cpu_peak is None else max(cpu_peak, cpu)
+
+out = {
+    "samples": samples,
+    "minMemAvailableBytes": mem_min,
+    "maxSwapUsedBytes": swap_peak,
+    "maxRootUsedPercent": root_peak,
+    "maxArchiveUsedPercent": arc_peak,
+    "maxZimitCpuPercent": cpu_peak,
+    "maxLoad15": load15_peak,
+}
+out_path.write_text(json.dumps(out, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+PY
+}
+
+start_monitor
 run_capture "Run crawl" "05-run-db-job.txt" "${VENV_BIN}/ha-backend" run-db-job --id "${job_id}"
 run_capture "Index job" "06-index-job.txt" "${VENV_BIN}/ha-backend" index-job --id "${job_id}"
 run_capture "Show job" "07-show-job.txt" "${VENV_BIN}/ha-backend" show-job --id "${job_id}"

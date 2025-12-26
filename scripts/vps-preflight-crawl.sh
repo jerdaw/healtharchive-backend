@@ -37,6 +37,7 @@ Options:
   --skip-public-surface       Skip verify_public_surface.py
   --skip-security-admin       Skip verify-security-and-admin.sh
   --skip-observability        Skip vps-verify-observability.sh (if present)
+  --skip-rehearsal-evidence   Skip rehearsal evidence check (active crawl headroom)
   -h, --help                  Show this help
 
 Exit codes:
@@ -58,6 +59,7 @@ SKIP_BASELINE_DRIFT="false"
 SKIP_PUBLIC_SURFACE="false"
 SKIP_SECURITY_ADMIN="false"
 SKIP_OBSERVABILITY="false"
+SKIP_REHEARSAL_EVIDENCE="false"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -107,6 +109,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --skip-observability)
       SKIP_OBSERVABILITY="true"
+      shift 1
+      ;;
+    --skip-rehearsal-evidence)
+      SKIP_REHEARSAL_EVIDENCE="true"
       shift 1
       ;;
     -h|--help)
@@ -366,6 +372,11 @@ step_campaign_storage_forecast() {
 step_resource_headroom() {
   set -u -o pipefail
   "${VENV_BIN}/python3" ./scripts/vps_resource_headroom.py
+}
+
+step_rehearsal_evidence() {
+  set -u -o pipefail
+  "${VENV_BIN}/python3" ./scripts/vps_rehearsal_evidence_check.py --require
 }
 
 step_time_sync() {
@@ -723,6 +734,16 @@ else
 fi
 
 run_step "CPU/RAM headroom" "03-resource-headroom.txt" step_resource_headroom
+
+if [[ -n "${YEAR}" ]]; then
+  if [[ "${SKIP_REHEARSAL_EVIDENCE}" != "true" ]]; then
+    run_step "Rehearsal evidence (active crawl headroom)" "03a-rehearsal-evidence.txt" step_rehearsal_evidence
+  else
+    warn "rehearsal evidence check skipped (--skip-rehearsal-evidence)"
+  fi
+else
+  warn "rehearsal evidence check skipped (pass --year YYYY)"
+fi
 
 run_step "Time sync (NTP)" "04-time-sync.txt" step_time_sync
 

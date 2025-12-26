@@ -21,7 +21,10 @@ Canonical references:
 
 1. Choose the annual campaign year:
    - If it’s before Jan 01 (UTC), use the upcoming year (e.g., Dec 2025 → `2026`).
-2. Run the preflight audit:
+2. (Recommended) Run a rehearsal with caps (generates active-load evidence):
+   - `cd /opt/healtharchive-backend`
+   - `./scripts/vps-smoke-crawl-rehearsal.sh --apply --source cihr --page-limit 25 --depth 1`
+3. Run the preflight audit:
    - `cd /opt/healtharchive-backend`
    - `./scripts/vps-preflight-crawl.sh --year <YYYY>`
 
@@ -32,6 +35,7 @@ This writes a timestamped report under:
 ## If it fails (common fixes)
 
 - **Campaign storage forecast fails** (even if you’re below 80% *today*): the annual campaign is projected to exceed disk headroom or the 80% review threshold. Follow the report output to free space or expand disk *before* Jan 01 UTC.
+- **Rehearsal evidence (active crawl headroom) fails**: you don’t have a recent `--apply` rehearsal (or it recorded low MemAvailable / high swap). Run `./scripts/vps-smoke-crawl-rehearsal.sh --apply ...` to generate evidence, or upgrade the VPS / reduce crawl concurrency.
 - **CPU/RAM headroom fails**: the VPS is already under sustained load / memory pressure (or swap usage). Stop other heavy work (indexing, other crawls), then re-run preflight; if it persists, reduce crawl concurrency or upgrade the VPS.
 - **Time sync (NTP) fails**: fix time sync before crawling (TLS, scheduling, and log correlation all assume correct UTC).
 - **Docker daemon access fails**: Docker is installed but not usable by the current user (or the daemon is down). Fix `systemctl status docker`, user group membership, and re-run.
@@ -50,10 +54,11 @@ This writes a timestamped report under:
 
 ## Optional deep checks
 
-- Run a small crawl rehearsal (capped crawl + indexing, isolated sandbox DB):
+- Run a small crawl rehearsal (capped crawl + indexing, isolated sandbox DB). This is the best way to validate headroom under active crawl load, not just idle host metrics:
   - `cd /opt/healtharchive-backend`
   - Dry-run: `./scripts/vps-smoke-crawl-rehearsal.sh --source cihr`
   - Apply: `./scripts/vps-smoke-crawl-rehearsal.sh --apply --source cihr --page-limit 25 --depth 1`
+  - Evidence artifacts: `.../98-resource-monitor.jsonl` and `.../98-resource-summary.json`
 
 - Validate the systemd wrapper (safe dry-run):
   - `sudo systemctl start healtharchive-schedule-annual-dry-run.service`
