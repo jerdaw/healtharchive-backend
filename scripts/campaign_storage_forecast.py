@@ -230,6 +230,24 @@ def main(argv: list[str] | None = None) -> int:
         help="Multiplier applied to historical job sizes to estimate the next run (default: 1.15).",
     )
     parser.add_argument(
+        "--active-overhead-factor",
+        type=float,
+        default=0.10,
+        help=(
+            "Extra temporary/peak overhead as a fraction of expected additional output (default: 0.10). "
+            "This approximates crawl-time scratch space and consolidation overhead."
+        ),
+    )
+    parser.add_argument(
+        "--free-reserve-gib",
+        type=float,
+        default=10.0,
+        help=(
+            "Minimum free disk to keep in reserve after accounting for expected growth + overhead "
+            "(default: 10 GiB)."
+        ),
+    )
+    parser.add_argument(
         "--policy-review-percent",
         type=int,
         default=80,
@@ -381,6 +399,13 @@ def main(argv: list[str] | None = None) -> int:
 
     projected_used_b = used_b + expected_add_b
     projected_pct = (projected_used_b / total_b) * 100.0 if total_b else 0.0
+    active_overhead_b = int(
+        math.ceil(expected_add_b * max(0.0, float(args.active_overhead_factor)))
+    )
+    free_reserve_b = int(max(0.0, float(args.free_reserve_gib)) * GiB)
+    required_free_b = expected_add_b + active_overhead_b + free_reserve_b
+    projected_peak_used_b = used_b + expected_add_b + active_overhead_b
+    projected_peak_pct = (projected_peak_used_b / total_b) * 100.0 if total_b else 0.0
 
     result = {
         "archiveRoot": str(archive_root),
@@ -400,19 +425,25 @@ def main(argv: list[str] | None = None) -> int:
             "year": int(args.year),
             "sources": list(sources),
             "growthFactor": float(args.growth_factor),
+            "activeOverheadFactor": float(args.active_overhead_factor),
+            "freeReserveBytes": int(free_reserve_b),
         },
         "estimates": estimates,
         "summary": {
             "expectedAdditionalBytes": int(expected_add_b),
+            "activeOverheadBytes": int(active_overhead_b),
+            "requiredFreeBytes": int(required_free_b),
             "projectedUsedBytes": int(projected_used_b),
             "projectedUsedPercent": projected_pct,
+            "projectedPeakUsedBytes": int(projected_peak_used_b),
+            "projectedPeakUsedPercent": projected_peak_pct,
             "missingHistoricalSources": missing_estimates,
             "dbError": db_error,
         },
     }
 
     if args.json:
-        should_fail = bool(expected_add_b > free_b or projected_used_b > review_used_max_b)
+        should_fail = bool(required_free_b > free_b or projected_peak_used_b > review_used_max_b)
         import json
 
         print(json.dumps(result, indent=2, sort_keys=True))
@@ -435,6 +466,10 @@ def main(argv: list[str] | None = None) -> int:
     print("")
     print(f"Campaign year: {args.year} (sources: {', '.join(sources)})")
     print(f"Growth factor: {args.growth_factor:.2f}")
+    print(
+        f"Active overhead: {args.active_overhead_factor:.2f} "
+        f"(+{_human_bytes(active_overhead_b)}), free reserve: {_human_bytes(free_reserve_b)}"
+    )
     print("")
 
     for item in estimates:
@@ -456,29 +491,33 @@ def main(argv: list[str] | None = None) -> int:
 
     print("")
     print(f"Expected additional: {_human_bytes(expected_add_b)}")
+    print(f"Required free (add+overhead+reserve): {_human_bytes(required_free_b)}")
     print(
         f"Projected after campaign: {_human_bytes(projected_used_b)} used ({projected_pct:.1f}% used)"
     )
+    print(
+        f"Projected peak during campaign: {_human_bytes(projected_peak_used_b)} used ({projected_peak_pct:.1f}% used)"
+    )
 
-    if expected_add_b > free_b:
-        shortfall_b = expected_add_b - free_b
+    if required_free_b > free_b:
+        shortfall_b = required_free_b - free_b
         print("")
         print(
-            "FAIL: projected additional storage exceeds free disk. "
-            f"Need {_human_bytes(expected_add_b)} but only {_human_bytes(free_b)} free."
+            "FAIL: insufficient free disk for campaign when accounting for crawl-time overhead and reserve. "
+            f"Need {_human_bytes(required_free_b)} but only {_human_bytes(free_b)} free."
         )
         print(f"Shortfall: {_human_bytes(shortfall_b)}")
         return 1
 
-    if projected_used_b > review_used_max_b:
-        shortfall_b = projected_used_b - review_used_max_b
+    if projected_peak_used_b > review_used_max_b:
+        shortfall_b = projected_peak_used_b - review_used_max_b
         print("")
         print(
             "FAIL: projected disk usage exceeds policy review threshold "
             f"({args.policy_review_percent}%)."
         )
         print(
-            f"Projected {_human_bytes(projected_used_b)} used vs policy max {_human_bytes(review_used_max_b)} used."
+            f"Projected {_human_bytes(projected_peak_used_b)} used vs policy max {_human_bytes(review_used_max_b)} used."
         )
         print(
             f"To meet policy, free at least {_human_bytes(shortfall_b)} (or expand disk) before running the campaign."

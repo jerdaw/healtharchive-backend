@@ -242,3 +242,92 @@ def test_vps_temp_cleanup_candidates_reports_indexed_jobs_with_tmp_dirs(
     payload = json.loads(capsys.readouterr().out)
     assert payload["candidates"]
     assert payload["candidates"][0]["jobId"] == job_id
+
+
+def test_vps_rehearsal_evidence_check_fails_when_missing_and_required(tmp_path, capsys) -> None:
+    mod = _load_script_module(
+        "vps_rehearsal_evidence_check.py",
+        module_name="ha_test_vps_rehearsal_evidence_check_missing",
+    )
+
+    rc = mod.main(["--out-root", str(tmp_path), "--require", "--json"])
+    assert rc == 1
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["evidence"] is None
+
+
+def test_vps_rehearsal_evidence_check_passes_with_recent_apply(tmp_path, capsys) -> None:
+    mod = _load_script_module(
+        "vps_rehearsal_evidence_check.py",
+        module_name="ha_test_vps_rehearsal_evidence_check_pass",
+    )
+
+    ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    run_dir = tmp_path / ts
+    run_dir.mkdir(parents=True)
+    (run_dir / "00-meta.txt").write_text(
+        "\n".join(
+            [
+                f"timestamp_utc={ts}",
+                "apply=true",
+                "source=cihr",
+                "page_limit=25",
+                "depth=1",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    (run_dir / "98-resource-summary.json").write_text(
+        json.dumps(
+            {
+                "samples": 12,
+                "minMemAvailableBytes": int(2.5 * mod.GiB),
+                "maxSwapUsedBytes": 0,
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    rc = mod.main(["--out-root", str(tmp_path), "--require", "--json"])
+    assert rc == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["evidence"]["apply"] is True
+
+
+def test_vps_rehearsal_evidence_check_fails_on_low_mem(tmp_path) -> None:
+    mod = _load_script_module(
+        "vps_rehearsal_evidence_check.py",
+        module_name="ha_test_vps_rehearsal_evidence_check_low_mem",
+    )
+
+    ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    run_dir = tmp_path / ts
+    run_dir.mkdir(parents=True)
+    (run_dir / "00-meta.txt").write_text("apply=true\n", encoding="utf-8")
+    (run_dir / "98-resource-summary.json").write_text(
+        json.dumps(
+            {
+                "samples": 12,
+                "minMemAvailableBytes": int(0.25 * mod.GiB),
+                "maxSwapUsedBytes": 0,
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    assert (
+        mod.main(
+            [
+                "--out-root",
+                str(tmp_path),
+                "--require",
+                "--min-mem-available-gib",
+                "1.5",
+                "--json",
+            ]
+        )
+        == 1
+    )
