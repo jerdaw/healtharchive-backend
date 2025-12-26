@@ -412,9 +412,41 @@ step_alembic_head_check() {
     return 1
   fi
 
+  local cfg="${REPO_DIR}/alembic.ini"
+  if [[ ! -f "${cfg}" ]]; then
+    echo "ERROR: alembic config not found: ${cfg}" >&2
+    return 1
+  fi
+
+  echo "alembic_bin=${alembic}"
+  echo "alembic_cfg=${cfg}"
+  "${alembic}" --version
+
+  echo ""
+  echo "[alembic_heads_raw]"
+  local heads_raw
+  heads_raw="$("${alembic}" -c "${cfg}" heads -q)"
+  local rc_heads=$?
+  printf '%s\n' "${heads_raw}"
+  if [[ "${rc_heads}" -ne 0 ]]; then
+    echo "ERROR: alembic heads failed (rc=${rc_heads})" >&2
+    return 1
+  fi
+
+  echo ""
+  echo "[alembic_current_raw]"
+  local current_raw
+  current_raw="$("${alembic}" -c "${cfg}" current -q)"
+  local rc_current=$?
+  printf '%s\n' "${current_raw}"
+  if [[ "${rc_current}" -ne 0 ]]; then
+    echo "ERROR: alembic current failed (rc=${rc_current})" >&2
+    return 1
+  fi
+
   local heads current
-  heads="$("${alembic}" heads -q 2>/dev/null | awk '{print $1}' | sort -u || true)"
-  current="$("${alembic}" current -q 2>/dev/null | awk '{print $1}' | sort -u || true)"
+  heads="$(printf '%s\n' "${heads_raw}" | awk '{print $1}' | sort -u)"
+  current="$(printf '%s\n' "${current_raw}" | awk '{print $1}' | sort -u)"
 
   echo "alembic_heads=${heads}"
   echo "alembic_current=${current}"
