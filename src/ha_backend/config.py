@@ -191,8 +191,11 @@ DEFAULT_DATABASE_URL = f"sqlite:///{REPO_ROOT / 'healtharchive.db'}"
 DEFAULT_CORS_ORIGINS: List[str] = [
     "http://localhost:3000",
     "http://localhost:5173",
+    "http://localhost:8090",
+    "http://127.0.0.1:8090",
     "https://healtharchive.ca",
     "https://www.healtharchive.ca",
+    "https://replay.healtharchive.ca",
 ]
 
 
