@@ -39,6 +39,13 @@ class ReplayResolveSchema(BaseModel):
     mimeType: Optional[str] = None
 
 
+class SnapshotLatestSchema(BaseModel):
+    found: bool
+    snapshotId: Optional[int] = None
+    captureTimestamp: Optional[str] = None
+    mimeType: Optional[str] = None
+
+
 class SnapshotSummarySchema(BaseModel):
     id: int
     title: Optional[str]

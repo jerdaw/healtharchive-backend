@@ -136,6 +136,7 @@ from .schemas import (
     ReplayResolveSchema,
     SearchResponseSchema,
     SnapshotDetailSchema,
+    SnapshotLatestSchema,
     SnapshotSummarySchema,
     SnapshotTimelineItemSchema,
     SnapshotTimelineSchema,
@@ -2654,6 +2655,60 @@ def get_compare_live(
         )
     finally:
         _COMPARE_LIVE_SEMAPHORE.release()
+
+
+@router.get("/snapshots/{snapshot_id}/latest", response_model=SnapshotLatestSchema)
+def get_snapshot_latest(
+    snapshot_id: int,
+    requireHtml: bool = Query(
+        default=True,
+        description="When true (default), only return the most recent HTML snapshot for this page group.",
+    ),
+    db: Session = Depends(get_db),
+) -> SnapshotLatestSchema:
+    """
+    Return the most recent snapshot for the same normalized_url_group as snapshot_id.
+    """
+    snap = (
+        db.query(Snapshot.id, Snapshot.source_id, Snapshot.url, Snapshot.normalized_url_group)
+        .filter(Snapshot.id == snapshot_id)
+        .first()
+    )
+    if not snap:
+        raise HTTPException(status_code=404, detail="Snapshot not found")
+
+    source_id: int | None = snap[1]
+    url: str = snap[2]
+    group: str | None = snap[3]
+    if not group:
+        group = normalize_url_for_grouping(url)
+    if not group or source_id is None:
+        return SnapshotLatestSchema(found=False)
+
+    query = (
+        db.query(Snapshot.id, Snapshot.capture_timestamp, Snapshot.mime_type)
+        .filter(Snapshot.source_id == source_id)
+        .filter(Snapshot.normalized_url_group == group)
+    )
+    if requireHtml:
+        query = query.filter(
+            or_(
+                Snapshot.mime_type.ilike("text/html%"),
+                Snapshot.mime_type.ilike("application/xhtml+xml%"),
+            )
+        )
+
+    row = query.order_by(Snapshot.capture_timestamp.desc(), Snapshot.id.desc()).first()
+    if not row:
+        return SnapshotLatestSchema(found=False)
+
+    latest_id, capture_ts, mime_type = row
+    return SnapshotLatestSchema(
+        found=True,
+        snapshotId=int(latest_id),
+        captureTimestamp=_format_capture_timestamp(capture_ts),
+        mimeType=mime_type,
+    )
 
 
 @router.get(
