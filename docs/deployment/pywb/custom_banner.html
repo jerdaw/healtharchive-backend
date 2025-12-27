@@ -234,9 +234,11 @@ Implementation note:
 	<script id="ha-replay-banner-js">
 	  (function () {
 	    var MESSAGE_TYPE = "haReplayNavigation";
+	    var HEIGHT_MESSAGE_TYPE = "haReplayHeight";
 	    var SNAPSHOT_STORAGE_KEY = "haReplaySnapshotId";
 	    var COMPARE_LATEST_STORAGE_KEY = "haReplayLatestSnapshotId";
 	    var refreshCompareLink = null;
+	    var heightTimer = null;
 
 	    function isEmbedded() {
 	      try {
@@ -270,8 +272,58 @@ Implementation note:
       }
 	    }
 
+	    function computeDocumentHeight() {
+	      try {
+	        var doc = document.documentElement;
+	        var body = document.body;
+	        var heights = [
+	          body ? body.scrollHeight : 0,
+	          body ? body.offsetHeight : 0,
+	          doc ? doc.clientHeight : 0,
+	          doc ? doc.scrollHeight : 0,
+	          doc ? doc.offsetHeight : 0,
+	        ];
+	        var max = 0;
+	        for (var i = 0; i < heights.length; i++) {
+	          var v = heights[i];
+	          if (typeof v === "number" && isFinite(v)) max = Math.max(max, v);
+	        }
+	        return max > 0 ? max : null;
+	      } catch (e) {
+	        return null;
+	      }
+	    }
+
+	    function sendReplayHeight() {
+	      if (!isEmbedded()) return;
+
+	      var height = computeDocumentHeight();
+	      if (!height) return;
+	      height = Math.max(0, Math.floor(height));
+	      if (height < 120) return;
+
+	      if (sendReplayHeight._lastHeight === height) return;
+	      sendReplayHeight._lastHeight = height;
+
+	      try {
+	        window.parent.postMessage({ type: HEIGHT_MESSAGE_TYPE, height: height }, "*");
+	      } catch (e) {
+	        // Ignore cross-origin messaging failures.
+	      }
+	    }
+
+	    function scheduleReplayHeight() {
+	      if (!isEmbedded()) return;
+	      if (heightTimer) return;
+	      heightTimer = setTimeout(function () {
+	        heightTimer = null;
+	        sendReplayHeight();
+	      }, 120);
+	    }
+
 	    function onNavigationChanged() {
 	      sendReplayNavigation();
+	      scheduleReplayHeight();
 	      try {
 	        if (typeof refreshCompareLink === "function") refreshCompareLink();
 	      } catch (e) {}
@@ -282,6 +334,8 @@ Implementation note:
 	    window.addEventListener("pageshow", onNavigationChanged);
 	    window.addEventListener("hashchange", onNavigationChanged);
 	    window.addEventListener("popstate", onNavigationChanged);
+	    window.addEventListener("load", scheduleReplayHeight);
+	    window.addEventListener("resize", scheduleReplayHeight);
 
 	    try {
 	      var origPushState = history.pushState;
