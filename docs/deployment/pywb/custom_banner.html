@@ -739,22 +739,24 @@ Implementation note:
 	            }
 
 	            if (snapshotSummaryPendingId === snapshotId) return;
-	            snapshotSummaryPendingId = snapshotId;
+	            var nextSnapshotId = snapshotId;
+	            var nextJsonUrl = routes.json;
+	            snapshotSummaryPendingId = nextSnapshotId;
 
-	            safeJson(routes.json, 3500)
+	            safeJson(nextJsonUrl, 3500)
 	              .then(function (detail) {
 	                if (!detail) return;
-	                if (!snapshotId) return;
+	                if (!nextSnapshotId) return;
 	                var summary = buildSnapshotSummary(detail);
 	                if (!summary) return;
-	                snapshotSummaryCache[snapshotId] = summary;
-	                if (snapshotSummaryPendingId !== snapshotId) return;
+	                snapshotSummaryCache[nextSnapshotId] = summary;
+	                if (snapshotId !== nextSnapshotId) return;
 	                metaEl.textContent = summary;
 	                metaEl.setAttribute("title", summary);
 	              })
 	              .catch(function () {})
 	              .finally(function () {
-	                snapshotSummaryPendingId = null;
+	                if (snapshotSummaryPendingId === nextSnapshotId) snapshotSummaryPendingId = null;
 	              });
 	          } catch (e) {}
 	        }
