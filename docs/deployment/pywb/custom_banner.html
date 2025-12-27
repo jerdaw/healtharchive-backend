@@ -71,6 +71,12 @@ Implementation note:
     flex-shrink: 0;
   }
 
+  #ha-replay-banner .ha-replay-right {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    row-gap: 0.25rem;
+  }
+
   #ha-replay-banner .ha-replay-pill {
     display: inline-flex;
     align-items: center;
@@ -190,6 +196,22 @@ Implementation note:
     background: rgba(148, 163, 184, 0.16);
   }
 
+  #ha-replay-banner .ha-replay-navlink {
+    padding: 0.15rem 0.35rem;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    color: rgba(15, 23, 42, 0.72);
+    font-weight: 600;
+  }
+
+  #ha-replay-banner .ha-replay-navlink:hover {
+    color: rgba(15, 23, 42, 0.95);
+    background: rgba(148, 163, 184, 0.12);
+    transform: none;
+    text-decoration: underline;
+  }
+
 	  #ha-replay-banner .ha-replay-divider {
 	    width: 1px;
 	    height: 20px;
@@ -200,8 +222,11 @@ Implementation note:
 	  #ha-replay-banner.ha-replay-embedded .ha-replay-pill,
 	  #ha-replay-banner.ha-replay-embedded [data-ha-action="browse"],
 	  #ha-replay-banner.ha-replay-embedded [data-ha-action="details"],
+	  #ha-replay-banner.ha-replay-embedded [data-ha-action="history"],
 	  #ha-replay-banner.ha-replay-embedded [data-ha-action="raw"],
 	  #ha-replay-banner.ha-replay-embedded [data-ha-action="json"],
+	  #ha-replay-banner.ha-replay-embedded [data-ha-action="cite"],
+	  #ha-replay-banner.ha-replay-embedded [data-ha-action="report"],
 	  #ha-replay-banner.ha-replay-embedded .ha-replay-divider {
 	    display: none !important;
 	  }
@@ -520,11 +545,13 @@ Implementation note:
 	        '    <div class="ha-replay-disclaimer">Independent archive \u00b7 Not an official government website \u00b7 Content may be outdated</div>' +
 	        "  </div>" +
 	        '  <div class="ha-replay-right" id="ha-replay-actions">' +
-	        '    <a class="ha-replay-action-link" data-ha-action="compare" href="#" aria-label="Compare this archived page to the live page">Compare</a>' +
+	        '    <a class="ha-replay-navlink" data-ha-action="compare" href="#" aria-label="Compare this archived page to the live page">View diff</a>' +
 	        (snapshotId
-	          ? '    <a class="ha-replay-link" data-ha-action="details" href="#">Snapshot details</a>' +
-	            '    <a class="ha-replay-link" data-ha-action="raw" href="#">Raw HTML</a>' +
-	            '    <a class="ha-replay-link" data-ha-action="json" href="#">Metadata JSON</a>' +
+	          ? '    <a class="ha-replay-navlink" data-ha-action="raw" href="#" aria-label="View raw HTML for this snapshot">Raw HTML</a>' +
+	            '    <a class="ha-replay-navlink" data-ha-action="json" href="#" aria-label="View metadata JSON for this snapshot">Metadata JSON</a>' +
+	            '    <a class="ha-replay-navlink" data-ha-action="cite" href="#" aria-label="How to cite HealthArchive snapshots">Cite</a>' +
+	            '    <a class="ha-replay-navlink" data-ha-action="report" href="#" aria-label="Report an issue with this snapshot">Report issue</a>' +
+	            '    <a class="ha-replay-navlink" data-ha-action="history" href="#" aria-label="View other snapshots of this page">Other snapshots</a>' +
 	            '    <span class="ha-replay-divider" aria-hidden="true"></span>'
 	          : "") +
 	        '    <button type="button" id="ha-replay-hide" class="ha-replay-link" aria-label="Hide this banner">Hide</button>' +
@@ -561,8 +588,31 @@ Implementation note:
 	          browse: snapshotId ? haBase + "/snapshot/" + snapshotId : haBase + "/",
 	        };
 
+	        routes.cite = haBase + "/cite";
+
+	        function stripUrlFragment(value) {
+	          if (!value || typeof value !== "string") return "";
+	          var idx = value.indexOf("#");
+	          return idx >= 0 ? value.slice(0, idx) : value;
+	        }
+
+	        function buildReportUrl(snapshotIdValue, originalUrlValue) {
+	          try {
+	            var params = [];
+	            if (snapshotIdValue) params.push("snapshot=" + encodeURIComponent(String(snapshotIdValue)));
+	            var cleanUrl = stripUrlFragment(originalUrlValue);
+	            if (cleanUrl) params.push("url=" + encodeURIComponent(cleanUrl));
+	            if (snapshotIdValue) params.push("page=" + encodeURIComponent("/snapshot/" + snapshotIdValue));
+	            return haBase + "/report?" + params.join("&");
+	          } catch (e) {
+	            return haBase + "/report";
+	          }
+	        }
+
 	        if (snapshotId) {
 	          routes.details = haBase + "/snapshot/" + snapshotId;
+	          routes.history = haBase + "/snapshot/" + snapshotId + "?view=details";
+	          routes.report = buildReportUrl(snapshotId, getWbInfo().url);
 	          routes.raw = apiBase + "/api/snapshots/raw/" + snapshotId;
 	          routes.json = apiBase + "/api/snapshot/" + snapshotId;
 	        }
@@ -681,6 +731,12 @@ Implementation note:
 	          var originalUrl = wb.url;
 	          var timestamp14 = typeof wb.timestamp === "string" && /^\d{14}$/.test(wb.timestamp) ? wb.timestamp : null;
 
+	          if (snapshotId) {
+	            routes.browse = haBase + "/snapshot/" + snapshotId;
+	            routes.history = haBase + "/snapshot/" + snapshotId + "?view=details";
+	            routes.report = buildReportUrl(snapshotId, originalUrl);
+	          }
+
 	          if (!jobId || !originalUrl) {
 	            var cached = loadCachedLatestSnapshotId();
 	            if (cached) setCompareRoute(cached);
@@ -699,6 +755,8 @@ Implementation note:
 	                snapshotId = String(resolved.snapshotId);
 	                routes.browse = haBase + "/snapshot/" + snapshotId;
 	                routes.details = haBase + "/snapshot/" + snapshotId;
+	                routes.history = haBase + "/snapshot/" + snapshotId + "?view=details";
+	                routes.report = buildReportUrl(snapshotId, originalUrl);
 	                routes.raw = base + "/api/snapshots/raw/" + snapshotId;
 	                routes.json = base + "/api/snapshot/" + snapshotId;
 	                return safeJson(buildLatestUrl(base, snapshotId), 3500).then(function (latest) {
