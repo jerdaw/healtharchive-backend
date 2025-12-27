@@ -3671,7 +3671,7 @@ def get_snapshot_raw(
     record_usage_event(db, EVENT_SNAPSHOT_RAW)
 
     try:
-        html = record.body_bytes.decode("utf-8", errors="replace")
+        html_body = record.body_bytes.decode("utf-8", errors="replace")
     except Exception:
         raise HTTPException(
             status_code=500,
@@ -3986,16 +3986,16 @@ def get_snapshot_raw(
 
     # Try to inject after the first <body ...> tag to avoid breaking <head> content.
     try:
-        match = re.search(r"<body\\b[^>]*>", html, flags=re.IGNORECASE)
+        match = re.search(r"<body\\b[^>]*>", html_body, flags=re.IGNORECASE)
         if match:
             insert_at = match.end()
-            html = html[:insert_at] + banner + html[insert_at:]
+            html_body = html_body[:insert_at] + banner + html_body[insert_at:]
         else:
-            html = banner + html
+            html_body = banner + html_body
     except Exception:
-        html = banner + html
+        html_body = banner + html_body
 
-    return HTMLResponse(content=html, media_type="text/html")
+    return HTMLResponse(content=html_body, media_type="text/html")
 
 
 __all__ = ["router"]
