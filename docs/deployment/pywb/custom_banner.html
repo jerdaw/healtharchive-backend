@@ -717,6 +717,14 @@ Implementation note:
 
 	                event.preventDefault();
 	                event.stopPropagation();
+	                // When embedded, avoid navigating the replay iframe to a HealthArchive page
+	                // (which would create a nested HealthArchive-in-HealthArchive experience).
+	                try {
+	                  if (isEmbedded() && window.top) {
+	                    window.top.location.href = dest;
+	                    return;
+	                  }
+	                } catch (e) {}
 	                window.location.href = dest;
 	              });
 	            });
