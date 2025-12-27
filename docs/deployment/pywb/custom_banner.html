@@ -558,7 +558,7 @@ Implementation note:
 	        var apiCandidates = getApiBaseCandidates(window.location.hostname);
 	        var apiBase = apiCandidates[0];
 	        var routes = {
-	          browse: haBase + "/archive",
+	          browse: snapshotId ? haBase + "/snapshot/" + snapshotId : haBase + "/archive",
 	        };
 
 	        if (snapshotId) {
@@ -650,6 +650,7 @@ Implementation note:
 	                if (!resolved || !resolved.snapshotId) return;
 	                if (resolved.mimeType != null && !isHtmlMimeType(resolved.mimeType)) return;
 	                snapshotId = String(resolved.snapshotId);
+	                routes.browse = haBase + "/snapshot/" + snapshotId;
 	                routes.details = haBase + "/snapshot/" + snapshotId;
 	                routes.raw = base + "/api/snapshots/raw/" + snapshotId;
 	                routes.json = base + "/api/snapshot/" + snapshotId;
