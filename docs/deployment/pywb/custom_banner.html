@@ -558,7 +558,7 @@ Implementation note:
 	        var apiCandidates = getApiBaseCandidates(window.location.hostname);
 	        var apiBase = apiCandidates[0];
 	        var routes = {
-	          browse: snapshotId ? haBase + "/snapshot/" + snapshotId : haBase + "/archive",
+	          browse: snapshotId ? haBase + "/snapshot/" + snapshotId : haBase + "/",
 	        };
 
 	        if (snapshotId) {
@@ -600,6 +600,53 @@ Implementation note:
 	          if (!value || typeof value !== "string") return false;
 	          var normalized = value.split(";")[0].trim().toLowerCase();
 	          return normalized === "text/html" || normalized === "application/xhtml+xml";
+	        }
+
+	        function formatIsoDate(value) {
+	          if (!value || typeof value !== "string") return null;
+	          try {
+	            var d = new Date(value);
+	            if (isNaN(d.getTime())) return null;
+	            return d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+	          } catch (e) {
+	            return null;
+	          }
+	        }
+
+	        function compactUrl(value) {
+	          if (!value || typeof value !== "string") return null;
+	          var raw = value.trim();
+	          if (!raw) return null;
+	          try {
+	            var u = new URL(raw);
+	            var host = u.hostname || "";
+	            var path = (u.pathname || "") + (u.search || "");
+	            var out = host + path;
+	            if (out.length > 1 && out[out.length - 1] === "/") out = out.slice(0, -1);
+	            return out || raw;
+	          } catch (e) {
+	            return raw.replace(/^https?:\/\//i, "");
+	          }
+	        }
+
+	        function buildSnapshotSummary(snapshotDetail) {
+	          try {
+	            var parts = [];
+	            if (snapshotDetail && snapshotDetail.title) parts.push(String(snapshotDetail.title));
+	            if (snapshotDetail && snapshotDetail.sourceName) parts.push(String(snapshotDetail.sourceName));
+	            var wb = getWbInfo();
+	            var capture =
+	              formatTimestamp(wb.timestamp) ||
+	              (snapshotDetail ? formatIsoDate(snapshotDetail.captureTimestamp) : null) ||
+	              (snapshotDetail ? formatIsoDate(snapshotDetail.captureDate) : null);
+	            if (capture) parts.push(capture);
+	            if (snapshotDetail && snapshotDetail.language) parts.push(String(snapshotDetail.language));
+	            var urlValue = snapshotDetail && snapshotDetail.originalUrl ? compactUrl(snapshotDetail.originalUrl) : null;
+	            if (urlValue) parts.push(urlValue);
+	            return parts.filter(Boolean).join(" \u00b7 ");
+	          } catch (e) {
+	            return null;
+	          }
 	        }
 
 	        function setCompareRoute(latestSnapshotId) {
@@ -668,6 +715,48 @@ Implementation note:
 	          }
 
 	          return tryResolveAt(0);
+	        }
+
+	        var snapshotSummaryCache = {};
+	        var snapshotSummaryPendingId = null;
+
+	        function updateSnapshotSummary() {
+	          try {
+	            if (embedded) return;
+	            var metaEl = document.getElementById("ha-replay-meta");
+	            if (!metaEl) return;
+
+	            if (!snapshotId || !routes.json) {
+	              metaEl.textContent = buildMeta() || "";
+	              return;
+	            }
+
+	            var cached = snapshotSummaryCache[snapshotId];
+	            if (cached) {
+	              metaEl.textContent = cached;
+	              metaEl.setAttribute("title", cached);
+	              return;
+	            }
+
+	            if (snapshotSummaryPendingId === snapshotId) return;
+	            snapshotSummaryPendingId = snapshotId;
+
+	            safeJson(routes.json, 3500)
+	              .then(function (detail) {
+	                if (!detail) return;
+	                if (!snapshotId) return;
+	                var summary = buildSnapshotSummary(detail);
+	                if (!summary) return;
+	                snapshotSummaryCache[snapshotId] = summary;
+	                if (snapshotSummaryPendingId !== snapshotId) return;
+	                metaEl.textContent = summary;
+	                metaEl.setAttribute("title", summary);
+	              })
+	              .catch(function () {})
+	              .finally(function () {
+	                snapshotSummaryPendingId = null;
+	              });
+	          } catch (e) {}
 	        }
 
 	        function makeRedirectBlobUrl(dest) {
@@ -796,6 +885,7 @@ Implementation note:
 	            resolveSnapshotAndLatest()
 	              .finally(function () {
 	                applyRoutes();
+	                updateSnapshotSummary();
 	              })
 	              .catch(function () {});
 	          }, 250);
