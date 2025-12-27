@@ -7,9 +7,10 @@ Deploy by copying this file to:
 Then restart the replay service:
   sudo systemctl restart healtharchive-replay.service
 
-Note: This template also sends lightweight postMessage events when replay is
-embedded inside HealthArchive (iframe) so the frontend can track the current
-archived URL for edition switching.
+Note: When replay is embedded inside HealthArchive (iframe), this template:
+- collapses to a minimal UI (Compare + Hide), and
+- sends lightweight postMessage events so the wrapper UI can track the current
+  archived URL for edition switching.
 
 Implementation note:
 - pywb rewrites absolute `href="https://..."` links inside replayed pages.
@@ -18,11 +19,11 @@ Implementation note:
   URL that immediately redirects the browser to the real HealthArchive URL.
 -->
 
-<style id="ha-replay-banner-css">
-  #ha-replay-banner {
-    position: sticky;
-    top: 0;
-    z-index: 2147483647;
+	<style id="ha-replay-banner-css">
+	  #ha-replay-banner {
+	    position: sticky;
+	    top: 0;
+	    z-index: 2147483647;
     border-bottom: 1px solid rgba(148, 163, 184, 0.35);
     background-color: rgba(255, 255, 255, 0.9);
     background-color: color-mix(in srgb, rgba(255, 255, 255, 0.9) 82%, transparent);
@@ -189,16 +190,35 @@ Implementation note:
     background: rgba(148, 163, 184, 0.16);
   }
 
-  #ha-replay-banner .ha-replay-divider {
-    width: 1px;
-    height: 20px;
-    background: rgba(148, 163, 184, 0.35);
-  }
+	  #ha-replay-banner .ha-replay-divider {
+	    width: 1px;
+	    height: 20px;
+	    background: rgba(148, 163, 184, 0.35);
+	  }
 
-  @media (max-width: 640px) {
-    #ha-replay-banner .ha-replay-inner {
-      padding-inline: 0.9rem;
-    }
+	  #ha-replay-banner.ha-replay-embedded .ha-replay-center,
+	  #ha-replay-banner.ha-replay-embedded .ha-replay-pill,
+	  #ha-replay-banner.ha-replay-embedded [data-ha-action="browse"],
+	  #ha-replay-banner.ha-replay-embedded [data-ha-action="details"],
+	  #ha-replay-banner.ha-replay-embedded [data-ha-action="raw"],
+	  #ha-replay-banner.ha-replay-embedded [data-ha-action="json"],
+	  #ha-replay-banner.ha-replay-embedded .ha-replay-divider {
+	    display: none !important;
+	  }
+
+	  #ha-replay-banner.ha-replay-embedded .ha-replay-inner {
+	    padding: 0.4rem 0.6rem;
+	    justify-content: flex-end;
+	  }
+
+	  #ha-replay-banner.ha-replay-embedded .ha-replay-right {
+	    gap: 0.35rem;
+	  }
+
+	  @media (max-width: 640px) {
+	    #ha-replay-banner .ha-replay-inner {
+	      padding-inline: 0.9rem;
+	    }
   }
 
   @media (max-width: 780px) {
@@ -211,22 +231,24 @@ Implementation note:
   }
 </style>
 
-<script id="ha-replay-banner-js">
-  (function () {
-    var MESSAGE_TYPE = "haReplayNavigation";
-    var SNAPSHOT_STORAGE_KEY = "haReplaySnapshotId";
+	<script id="ha-replay-banner-js">
+	  (function () {
+	    var MESSAGE_TYPE = "haReplayNavigation";
+	    var SNAPSHOT_STORAGE_KEY = "haReplaySnapshotId";
+	    var COMPARE_LATEST_STORAGE_KEY = "haReplayLatestSnapshotId";
+	    var refreshCompareLink = null;
 
-    function isEmbedded() {
-      try {
-        return window !== window.top;
+	    function isEmbedded() {
+	      try {
+	        return window !== window.top;
       } catch (e) {
         // If we can't access window.top, assume we're embedded.
         return true;
       }
     }
 
-    function sendReplayNavigation() {
-      if (!isEmbedded()) return;
+	    function sendReplayNavigation() {
+	      if (!isEmbedded()) return;
 
       var wb = window.wbinfo || {};
       var payload = {
@@ -246,48 +268,44 @@ Implementation note:
       } catch (e) {
         // Ignore cross-origin messaging failures.
       }
-    }
+	    }
 
-    if (isEmbedded()) {
-      sendReplayNavigation();
+	    function onNavigationChanged() {
+	      sendReplayNavigation();
+	      try {
+	        if (typeof refreshCompareLink === "function") refreshCompareLink();
+	      } catch (e) {}
+	    }
 
-      window.addEventListener("pageshow", sendReplayNavigation);
-      window.addEventListener("hashchange", sendReplayNavigation);
-      window.addEventListener("popstate", sendReplayNavigation);
+	    onNavigationChanged();
 
-      try {
-        var origPushState = history.pushState;
-        var origReplaceState = history.replaceState;
+	    window.addEventListener("pageshow", onNavigationChanged);
+	    window.addEventListener("hashchange", onNavigationChanged);
+	    window.addEventListener("popstate", onNavigationChanged);
 
-        history.pushState = function () {
-          var result = origPushState.apply(this, arguments);
-          setTimeout(sendReplayNavigation, 0);
-          return result;
-        };
+	    try {
+	      var origPushState = history.pushState;
+	      var origReplaceState = history.replaceState;
 
-        history.replaceState = function () {
-          var result = origReplaceState.apply(this, arguments);
-          setTimeout(sendReplayNavigation, 0);
-          return result;
-        };
-      } catch (e) {
-        // Ignore history patching failures.
-      }
-    }
+	      history.pushState = function () {
+	        var result = origPushState.apply(this, arguments);
+	        setTimeout(onNavigationChanged, 0);
+	        return result;
+	      };
 
-    // Only show the banner when replay is opened directly, not when embedded
-    // inside the HealthArchive wrapper iframe.
-    try {
-      if (isEmbedded()) return;
-    } catch (e) {
-      // If we can't access window.top, assume we're embedded and skip.
-      return;
-    }
+	      history.replaceState = function () {
+	        var result = origReplaceState.apply(this, arguments);
+	        setTimeout(onNavigationChanged, 0);
+	        return result;
+	      };
+	    } catch (e) {
+	      // Ignore history patching failures.
+	    }
 
-    // Allow the banner UI to be disabled for screenshot generation or debugging.
-    // We use a fragment flag (not a query param) because replay URLs already
-    // embed the original URL and its query string.
-    try {
+	    // Allow the banner UI to be disabled for screenshot generation or debugging.
+	    // We use a fragment flag (not a query param) because replay URLs already
+	    // embed the original URL and its query string.
+	    try {
       if (/ha_nobanner/i.test(window.location.hash || "")) return;
     } catch (e) {
       // Ignore location access failures.
@@ -300,10 +318,10 @@ Implementation note:
       // Ignore storage failures.
     }
 
-    function loadSnapshotId() {
-      var raw = "";
-      try {
-        raw = window.location.hash || "";
+	    function loadSnapshotId() {
+	      var raw = "";
+	      try {
+	        raw = window.location.hash || "";
       } catch (e) {
         raw = "";
       }
@@ -327,12 +345,76 @@ Implementation note:
         var stored = sessionStorage.getItem(SNAPSHOT_STORAGE_KEY);
         if (stored) return stored;
       } catch (e) {}
-      return null;
-    }
+	      return null;
+	    }
 
-    function formatTimestamp(ts) {
-      if (!ts || typeof ts !== "string" || ts.length < 8) return null;
-      var year = Number(ts.slice(0, 4));
+	    function parseJobIdFromColl(value) {
+	      if (!value || typeof value !== "string") return null;
+	      var match = /^job-(\d+)$/.exec(value.trim());
+	      if (!match) return null;
+	      var parsed = Number(match[1]);
+	      return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+	    }
+
+	    function getWbInfo() {
+	      var wb = window.wbinfo || {};
+	      return {
+	        coll: wb.coll || null,
+	        timestamp: wb.timestamp || null,
+	        url: wb.url || null,
+	        topUrl: wb.top_url || null,
+	      };
+	    }
+
+	    function getApiBaseCandidates(hostname) {
+	      // Prefer api.<apex>, but also try the public site origin (some deployments proxy /api there).
+	      // Include window.location.origin as a last-ditch candidate for localhost/IP debugging.
+	      var scheme = "https://";
+	      try {
+	        scheme = window.location.protocol === "http:" ? "http://" : "https://";
+	      } catch (e) {}
+
+	      var host = String(hostname || "");
+	      var isLocal = host === "localhost" || /^\d+\.\d+\.\d+\.\d+$/.test(host);
+	      if (isLocal) {
+	        var origin = null;
+	        try {
+	          origin = window.location.origin;
+	        } catch (e) {
+	          origin = null;
+	        }
+	        return [
+	          "https://api.healtharchive.ca",
+	          "https://www.healtharchive.ca",
+	          origin,
+	        ].filter(Boolean);
+	      }
+
+	      var parts = host.split(".").filter(Boolean);
+	      var apex = parts.length >= 2 ? parts.slice(-2).join(".") : host;
+	      var apiBase = scheme + "api." + apex;
+	      var siteBase = scheme + "www." + apex;
+	      var apexBase = scheme + apex;
+	      return [apiBase, siteBase, apexBase];
+	    }
+
+	    function getSiteBase(hostname) {
+	      var host = String(hostname || "");
+	      if (host.indexOf("replay.") === 0) {
+	        return "https://" + "www." + host.slice("replay.".length);
+	      }
+	      var parts = host.split(".").filter(Boolean);
+	      if (parts.length >= 3 && parts[0] === "replay") {
+	        parts[0] = "www";
+	        return "https://" + parts.join(".");
+	      }
+	      if (host) return "https://" + host;
+	      return "https://" + "www." + "healtharchive.ca";
+	    }
+
+	    function formatTimestamp(ts) {
+	      if (!ts || typeof ts !== "string" || ts.length < 8) return null;
+	      var year = Number(ts.slice(0, 4));
       var month = Number(ts.slice(4, 6));
       var day = Number(ts.slice(6, 8));
       if (!year || !month || !day) return null;
@@ -350,39 +432,50 @@ Implementation note:
       return parts.join(" \u00b7 ");
     }
 
-    function inject() {
-      if (!document.body) return;
+	    function inject() {
+	      if (!document.body) return;
 
       var banner = document.getElementById("ha-replay-banner");
       if (banner) return;
 
-      var snapshotId = loadSnapshotId();
+	      var embedded = false;
+	      try {
+	        embedded = isEmbedded();
+	      } catch (e) {
+	        embedded = true;
+	      }
 
-      banner = document.createElement("div");
-      banner.id = "ha-replay-banner";
-      banner.setAttribute("role", "region");
-      banner.setAttribute("aria-label", "HealthArchive replay notice");
+	      var snapshotId = loadSnapshotId();
 
-      banner.innerHTML =
-        '<div class="ha-replay-inner">' +
-        '  <div class="ha-replay-left">' +
-        '    <a class="ha-replay-action-link" data-ha-action="browse" href="#" aria-label="Back to HealthArchive.ca">\u2190 HealthArchive.ca</a>' +
-        '    <span class="ha-replay-pill" aria-label="Archived replay notice">Archived replay</span>' +
-        "  </div>" +
-        '  <div class="ha-replay-center">' +
-        '    <div class="ha-replay-meta" id="ha-replay-meta"></div>' +
-        '    <div class="ha-replay-disclaimer">Independent archive \u00b7 Not an official government website \u00b7 Content may be outdated</div>' +
-        "  </div>" +
-        '  <div class="ha-replay-right" id="ha-replay-actions">' +
-        (snapshotId
-          ? '    <a class="ha-replay-link" data-ha-action="details" href="#">Snapshot details</a>' +
-            '    <a class="ha-replay-link" data-ha-action="raw" href="#">Raw HTML</a>' +
-            '    <a class="ha-replay-link" data-ha-action="json" href="#">Metadata JSON</a>' +
-            '    <span class="ha-replay-divider" aria-hidden="true"></span>'
-          : "") +
-        '    <button type="button" id="ha-replay-hide" class="ha-replay-link" aria-label="Hide this banner">Hide</button>' +
-        "  </div>" +
-        "</div>";
+	      banner = document.createElement("div");
+	      banner.id = "ha-replay-banner";
+	      banner.setAttribute("role", "region");
+	      banner.setAttribute("aria-label", "HealthArchive replay notice");
+	      if (embedded) {
+	        banner.className = "ha-replay-embedded";
+	      }
+
+	      banner.innerHTML =
+	        '<div class="ha-replay-inner">' +
+	        '  <div class="ha-replay-left">' +
+	        '    <a class="ha-replay-action-link" data-ha-action="browse" href="#" aria-label="Back to HealthArchive.ca">\u2190 HealthArchive.ca</a>' +
+	        '    <span class="ha-replay-pill" aria-label="Archived replay notice">Archived replay</span>' +
+	        "  </div>" +
+	        '  <div class="ha-replay-center">' +
+	        '    <div class="ha-replay-meta" id="ha-replay-meta"></div>' +
+	        '    <div class="ha-replay-disclaimer">Independent archive \u00b7 Not an official government website \u00b7 Content may be outdated</div>' +
+	        "  </div>" +
+	        '  <div class="ha-replay-right" id="ha-replay-actions">' +
+	        '    <a class="ha-replay-action-link" data-ha-action="compare" href="#" aria-label="Compare this archived page to the live page">Compare</a>' +
+	        (snapshotId
+	          ? '    <a class="ha-replay-link" data-ha-action="details" href="#">Snapshot details</a>' +
+	            '    <a class="ha-replay-link" data-ha-action="raw" href="#">Raw HTML</a>' +
+	            '    <a class="ha-replay-link" data-ha-action="json" href="#">Metadata JSON</a>' +
+	            '    <span class="ha-replay-divider" aria-hidden="true"></span>'
+	          : "") +
+	        '    <button type="button" id="ha-replay-hide" class="ha-replay-link" aria-label="Hide this banner">Hide</button>' +
+	        "  </div>" +
+	        "</div>";
 
       document.body.insertBefore(banner, document.body.firstChild);
 
@@ -403,24 +496,127 @@ Implementation note:
         });
       }
 
-      // Avoid pywb rewriting our "escape hatch" navigation by:
-      //  - not embedding HealthArchive URLs directly in HTML attributes, and
-      //  - using buttons with explicit JS navigation.
-      try {
-        var haBase = "https://" + "www." + "healtharchive.ca";
-        var apiBase = "https://" + "api." + "healtharchive.ca";
-        var routes = {
-          browse: haBase + "/archive",
-        };
+	      // Avoid pywb rewriting our "escape hatch" navigation by:
+	      //  - not embedding HealthArchive URLs directly in HTML attributes, and
+	      //  - using buttons with explicit JS navigation.
+	      try {
+	        var haBase = getSiteBase(window.location.hostname);
+	        var apiCandidates = getApiBaseCandidates(window.location.hostname);
+	        var apiBase = apiCandidates[0];
+	        var routes = {
+	          browse: haBase + "/archive",
+	        };
 
-        if (snapshotId) {
-          routes.details = haBase + "/snapshot/" + snapshotId;
-          routes.raw = apiBase + "/api/snapshots/raw/" + snapshotId;
-          routes.json = apiBase + "/api/snapshot/" + snapshotId;
-        }
+	        if (snapshotId) {
+	          routes.details = haBase + "/snapshot/" + snapshotId;
+	          routes.raw = apiBase + "/api/snapshots/raw/" + snapshotId;
+	          routes.json = apiBase + "/api/snapshot/" + snapshotId;
+	        }
 
-        function makeRedirectBlobUrl(dest) {
-          try {
+	        function safeJson(url, timeoutMs) {
+	          return new Promise(function (resolve, reject) {
+	            var timer = null;
+	            try {
+	              timer = setTimeout(function () {
+	                reject(new Error("timeout"));
+	              }, timeoutMs || 3500);
+	            } catch (e) {}
+
+	            fetch(url, {
+	              method: "GET",
+	              cache: "no-store",
+	              credentials: "omit",
+	              headers: { Accept: "application/json" },
+	            })
+	              .then(function (res) {
+	                if (!res.ok) throw new Error("status " + res.status);
+	                return res.json();
+	              })
+	              .then(function (data) {
+	                resolve(data);
+	              })
+	              .catch(reject)
+	              .finally(function () {
+	                if (timer) clearTimeout(timer);
+	              });
+	          });
+	        }
+
+	        function isHtmlMimeType(value) {
+	          if (!value || typeof value !== "string") return false;
+	          var normalized = value.split(";")[0].trim().toLowerCase();
+	          return normalized === "text/html" || normalized === "application/xhtml+xml";
+	        }
+
+	        function setCompareRoute(latestSnapshotId) {
+	          if (!latestSnapshotId) return;
+	          routes.compare = haBase + "/compare-live?to=" + latestSnapshotId + "&run=1";
+	          try {
+	            sessionStorage.setItem(COMPARE_LATEST_STORAGE_KEY, String(latestSnapshotId));
+	          } catch (e) {}
+	        }
+
+	        function loadCachedLatestSnapshotId() {
+	          try {
+	            var stored = sessionStorage.getItem(COMPARE_LATEST_STORAGE_KEY);
+	            if (stored) return stored;
+	          } catch (e) {}
+	          return null;
+	        }
+
+	        function buildResolveUrl(base, jobId, originalUrl, timestamp14) {
+	          var query = "jobId=" + encodeURIComponent(String(jobId)) + "&url=" + encodeURIComponent(originalUrl);
+	          if (timestamp14) query += "&timestamp=" + encodeURIComponent(String(timestamp14));
+	          return base + "/api/replay/resolve?" + query;
+	        }
+
+	        function buildLatestUrl(base, snapshotIdValue) {
+	          return base + "/api/snapshots/" + encodeURIComponent(String(snapshotIdValue)) + "/latest";
+	        }
+
+	        function resolveSnapshotAndLatest() {
+	          var wb = getWbInfo();
+	          var jobId = parseJobIdFromColl(wb.coll);
+	          var originalUrl = wb.url;
+	          var timestamp14 = typeof wb.timestamp === "string" && /^\d{14}$/.test(wb.timestamp) ? wb.timestamp : null;
+
+	          if (!jobId || !originalUrl) {
+	            var cached = loadCachedLatestSnapshotId();
+	            if (cached) setCompareRoute(cached);
+	            return Promise.resolve();
+	          }
+
+	          var bases = apiCandidates.slice();
+	          function tryResolveAt(index) {
+	            if (index >= bases.length) return Promise.resolve();
+	            var base = bases[index];
+	            var resolveUrl = buildResolveUrl(base, jobId, originalUrl, timestamp14);
+	            return safeJson(resolveUrl, 3500)
+	              .then(function (resolved) {
+	                if (!resolved || !resolved.snapshotId) return;
+	                if (resolved.mimeType != null && !isHtmlMimeType(resolved.mimeType)) return;
+	                snapshotId = String(resolved.snapshotId);
+	                routes.details = haBase + "/snapshot/" + snapshotId;
+	                routes.raw = base + "/api/snapshots/raw/" + snapshotId;
+	                routes.json = base + "/api/snapshot/" + snapshotId;
+	                return safeJson(buildLatestUrl(base, snapshotId), 3500).then(function (latest) {
+	                  if (latest && latest.found && latest.snapshotId) {
+	                    setCompareRoute(String(latest.snapshotId));
+	                  } else {
+	                    setCompareRoute(snapshotId);
+	                  }
+	                });
+	              })
+	              .catch(function () {
+	                return tryResolveAt(index + 1);
+	              });
+	          }
+
+	          return tryResolveAt(0);
+	        }
+
+	        function makeRedirectBlobUrl(dest) {
+	          try {
             function escapeHtmlAttr(value) {
               return String(value)
                 .replace(/&/g, "&amp;")
@@ -454,44 +650,99 @@ Implementation note:
           }
         }
 
-        var blobCache = {};
+	        var blobCache = {};
 
-        banner.querySelectorAll("[data-ha-action]").forEach(function (el) {
-          var action = el.getAttribute("data-ha-action");
-          var dest = routes[action];
-          if (!dest) return;
+	        function setActionHref(el, dest) {
+	          if (!el) return;
+	          try {
+	            if (!dest) {
+	              el.removeAttribute("data-ha-dest");
+	              if (el.tagName && el.tagName.toLowerCase() === "a") {
+	                el.setAttribute("href", "#");
+	                el.setAttribute("aria-disabled", "true");
+	              }
+	              return;
+	            }
 
-          // Set a stable href so right-click / middle-click open-in-new-tab works.
-          // Use a blob redirect URL to avoid pywb rewriting the destination.
-          var blobUrl = blobCache[dest] || (blobCache[dest] = makeRedirectBlobUrl(dest));
-          try {
-            if (el.tagName && el.tagName.toLowerCase() === "a") {
-              el.setAttribute("href", blobUrl);
-              el.setAttribute("data-ha-dest", dest);
-            }
-          } catch (e) {}
+	            var blobUrl = blobCache[dest] || (blobCache[dest] = makeRedirectBlobUrl(dest));
+	            if (el.tagName && el.tagName.toLowerCase() === "a") {
+	              el.setAttribute("href", blobUrl);
+	              el.setAttribute("data-ha-dest", dest);
+	              el.removeAttribute("aria-disabled");
+	            } else {
+	              el.setAttribute("data-ha-dest", dest);
+	              el.removeAttribute("aria-disabled");
+	            }
+	          } catch (e) {}
+	        }
 
-          el.addEventListener("click", function (event) {
-            // Only intercept plain left-click; allow ctrl/cmd/middle clicks to
-            // open in a new tab using the href.
-            if (
-              event.button !== 0 ||
-              event.metaKey ||
-              event.ctrlKey ||
-              event.shiftKey ||
-              event.altKey
-            ) {
-              return;
-            }
-            event.preventDefault();
-            event.stopPropagation();
-            window.location.href = dest;
-          });
-        });
-      } catch (e) {}
-    }
+	        function applyRoutes() {
+	          try {
+	            banner.querySelectorAll("[data-ha-action]").forEach(function (el) {
+	              var action = el.getAttribute("data-ha-action");
+	              var dest = routes[action];
+	              setActionHref(el, dest);
+	            });
+	          } catch (e) {}
+	        }
 
-    if (document.readyState === "loading") {
+	        function ensureActionClickHandlers() {
+	          try {
+	            banner.querySelectorAll("[data-ha-action]").forEach(function (el) {
+	              if (el._haClickBound) return;
+	              el._haClickBound = true;
+	              el.addEventListener("click", function (event) {
+	                // Only intercept plain left-click; allow ctrl/cmd/middle clicks to open in a new tab.
+	                if (
+	                  event.button !== 0 ||
+	                  event.metaKey ||
+	                  event.ctrlKey ||
+	                  event.shiftKey ||
+	                  event.altKey
+	                ) {
+	                  return;
+	                }
+
+	                var dest = null;
+	                try {
+	                  dest = el.getAttribute("data-ha-dest");
+	                } catch (e) {
+	                  dest = null;
+	                }
+	                if (!dest) {
+	                  event.preventDefault();
+	                  event.stopPropagation();
+	                  return;
+	                }
+
+	                event.preventDefault();
+	                event.stopPropagation();
+	                window.location.href = dest;
+	              });
+	            });
+	          } catch (e) {}
+	        }
+
+	        ensureActionClickHandlers();
+	        applyRoutes();
+
+	        var refreshTimer = null;
+	        refreshCompareLink = function () {
+	          if (refreshTimer) clearTimeout(refreshTimer);
+	          refreshTimer = setTimeout(function () {
+	            resolveSnapshotAndLatest()
+	              .finally(function () {
+	                applyRoutes();
+	              })
+	              .catch(function () {});
+	          }, 250);
+	        };
+
+	        refreshCompareLink();
+	      } catch (e) {}
+	    }
+
+	    if (document.readyState === "loading") {
       document.addEventListener("DOMContentLoaded", inject, { once: true });
     } else {
       inject();
