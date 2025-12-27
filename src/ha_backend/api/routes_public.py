@@ -3744,9 +3744,7 @@ def get_snapshot_raw(
         compare_snapshot_id = snap.id
 
     compare_url = (
-        f"{site_base}/compare-live?to={compare_snapshot_id}&run=1"
-        if compare_snapshot_id
-        else None
+        f"{site_base}/compare-live?to={compare_snapshot_id}&run=1" if compare_snapshot_id else None
     )
     cite_url = f"{site_base}/cite"
 
@@ -3774,9 +3772,7 @@ def get_snapshot_raw(
     action_links.append(
         f'<a class="ha-replay-navlink" href="{snapshot_json_url}" rel="noreferrer">Metadata JSON</a>'
     )
-    action_links.append(
-        f'<a class="ha-replay-navlink" href="{cite_url}" rel="noreferrer">Cite</a>'
-    )
+    action_links.append(f'<a class="ha-replay-navlink" href="{cite_url}" rel="noreferrer">Cite</a>')
     action_links.append(
         f'<a class="ha-replay-navlink" href="{report_url}" rel="noreferrer">Report issue</a>'
     )
