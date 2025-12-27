@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import csv
 import gzip
+import html
 import io
 import json
 import re
@@ -11,7 +12,7 @@ from enum import Enum
 from pathlib import Path
 from threading import BoundedSemaphore, Lock
 from typing import Any, Dict, Iterable, Iterator, List, Optional, Sequence
-from urllib.parse import urlsplit, urlunsplit
+from urllib.parse import urlencode, urlsplit, urlunsplit
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, StreamingResponse
@@ -3633,11 +3634,16 @@ def get_snapshot_raw(
             load_only(
                 Snapshot.id,
                 Snapshot.job_id,
+                Snapshot.source_id,
                 Snapshot.url,
                 Snapshot.capture_timestamp,
+                Snapshot.mime_type,
+                Snapshot.title,
+                Snapshot.language,
                 Snapshot.warc_path,
                 Snapshot.warc_record_id,
-            )
+            ),
+            joinedload(Snapshot.source).load_only(Source.name),
         )
         .filter(Snapshot.id == snapshot_id)
         .first()
@@ -3672,14 +3678,112 @@ def get_snapshot_raw(
             detail="Failed to decode archived HTML content",
         )
 
+    site_base = get_public_site_base_url()
     replay_url = _build_browse_url(snap.job_id, snap.url, snap.capture_timestamp, snap.id)
-    snapshot_details_url = f"https://www.healtharchive.ca/snapshot/{snap.id}"
-    snapshot_json_url = f"https://api.healtharchive.ca/api/snapshot/{snap.id}"
-    replay_link_html = (
-        f'<a class="ha-replay-link" href="{replay_url}" rel="noreferrer">Replay</a>'
-        if replay_url
-        else ""
+    snapshot_details_url = f"{site_base}/snapshot/{snap.id}"
+    back_url = snapshot_details_url if snap.id else f"{site_base}/"
+    snapshot_history_url = f"{snapshot_details_url}?view=details"
+    snapshot_json_url = f"/api/snapshot/{snap.id}"
+    snapshot_raw_url = f"/api/snapshots/raw/{snap.id}"
+
+    capture_date = (
+        snap.capture_timestamp.date().isoformat()
+        if isinstance(snap.capture_timestamp, datetime)
+        else str(snap.capture_timestamp)
     )
+    summary_parts = [
+        snap.title or "",
+        snap.source.name if snap.source else "",
+        capture_date or "",
+        snap.language or "",
+    ]
+
+    def _compact_url(value: str) -> str:
+        cleaned = value.strip()
+        if not cleaned:
+            return ""
+        try:
+            parsed = urlsplit(cleaned)
+            host = parsed.netloc or ""
+            rest = f"{parsed.path}{parsed.query and f'?{parsed.query}' or ''}"
+            rest = rest or ""
+            if rest.endswith("/") and len(rest) > 1:
+                rest = rest[:-1]
+            if host:
+                return f"{host}{rest}"
+        except Exception:
+            pass
+        return re.sub(r"^https?://", "", cleaned, flags=re.IGNORECASE)
+
+    compact_url = _compact_url(snap.url)
+    if compact_url:
+        summary_parts.append(compact_url)
+    summary_text = " \u00b7 ".join(part for part in summary_parts if part)
+    summary_html = html.escape(summary_text or "Raw HTML debug view")
+
+    compare_snapshot_id: Optional[int] = None
+    if is_html_mime_type(snap.mime_type):
+        group = normalize_url_for_grouping(snap.url)
+        if group and snap.source_id:
+            latest = (
+                db.query(Snapshot.id)
+                .filter(Snapshot.source_id == snap.source_id)
+                .filter(Snapshot.normalized_url_group == group)
+                .filter(
+                    or_(
+                        Snapshot.mime_type.ilike("text/html%"),
+                        Snapshot.mime_type.ilike("application/xhtml+xml%"),
+                    )
+                )
+                .order_by(Snapshot.capture_timestamp.desc(), Snapshot.id.desc())
+                .first()
+            )
+            if latest:
+                compare_snapshot_id = int(latest[0])
+    if compare_snapshot_id is None and is_html_mime_type(snap.mime_type):
+        compare_snapshot_id = snap.id
+
+    compare_url = (
+        f"{site_base}/compare-live?to={compare_snapshot_id}&run=1"
+        if compare_snapshot_id
+        else None
+    )
+    cite_url = f"{site_base}/cite"
+
+    report_params = []
+    if snap.id:
+        report_params.append(("snapshot", str(snap.id)))
+        report_params.append(("page", f"/snapshot/{snap.id}"))
+    if snap.url:
+        report_params.append(("url", snap.url))
+    report_query = urlencode(report_params) if report_params else ""
+    report_url = f"{site_base}/report?{report_query}" if report_query else f"{site_base}/report"
+
+    action_links = []
+    if compare_url:
+        action_links.append(
+            f'<a class="ha-replay-navlink" href="{compare_url}" rel="noreferrer">View diff</a>'
+        )
+    if replay_url:
+        action_links.append(
+            f'<a class="ha-replay-navlink" href="{replay_url}" rel="noreferrer">Replay</a>'
+        )
+    action_links.append(
+        f'<a class="ha-replay-navlink" href="{snapshot_raw_url}" rel="noreferrer">Raw HTML</a>'
+    )
+    action_links.append(
+        f'<a class="ha-replay-navlink" href="{snapshot_json_url}" rel="noreferrer">Metadata JSON</a>'
+    )
+    action_links.append(
+        f'<a class="ha-replay-navlink" href="{cite_url}" rel="noreferrer">Cite</a>'
+    )
+    action_links.append(
+        f'<a class="ha-replay-navlink" href="{report_url}" rel="noreferrer">Report issue</a>'
+    )
+    action_links.append(
+        f'<a class="ha-replay-navlink" href="{snapshot_history_url}" rel="noreferrer">Other snapshots</a>'
+    )
+    action_links_html = "".join(action_links)
 
     banner = f"""
 <style id="ha-replay-banner-css">
@@ -3731,6 +3835,12 @@ def get_snapshot_raw(
     align-items: center;
     gap: 0.45rem;
     flex-shrink: 0;
+  }}
+
+  #ha-replay-banner .ha-replay-right {{
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    row-gap: 0.25rem;
   }}
 
   #ha-replay-banner .ha-replay-pill {{
@@ -3812,6 +3922,28 @@ def get_snapshot_raw(
     color: #ffffff;
   }}
 
+  #ha-replay-banner .ha-replay-navlink {{
+    padding: 0.15rem 0.35rem;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    color: rgba(15, 23, 42, 0.72);
+    font-weight: 600;
+  }}
+
+  #ha-replay-banner .ha-replay-navlink:hover {{
+    color: rgba(15, 23, 42, 0.95);
+    background: rgba(148, 163, 184, 0.12);
+    transform: none;
+    text-decoration: underline;
+  }}
+
+  #ha-replay-banner .ha-replay-divider {{
+    width: 1px;
+    height: 20px;
+    background: rgba(148, 163, 184, 0.35);
+  }}
+
   @media (max-width: 780px) {{
     #ha-replay-banner .ha-replay-center {{
       display: none;
@@ -3821,17 +3953,16 @@ def get_snapshot_raw(
 <div id="ha-replay-banner" role="region" aria-label="HealthArchive snapshot header">
   <div class="ha-replay-inner">
     <div class="ha-replay-left">
-      <a class="ha-replay-action-link" href="https://www.healtharchive.ca/archive" rel="noreferrer">\u2190 HealthArchive.ca</a>
+      <a class="ha-replay-action-link" href="{back_url}" rel="noreferrer">\u2190 HealthArchive.ca</a>
       <span class="ha-replay-pill">Raw HTML</span>
     </div>
     <div class="ha-replay-center">
-      <div class="ha-replay-meta">Raw HTML debug view</div>
+      <div class="ha-replay-meta">{summary_html}</div>
       <div class="ha-replay-disclaimer">Independent archive \u00b7 Not an official government website \u00b7 Content may be outdated</div>
     </div>
     <div class="ha-replay-right">
-      <a class="ha-replay-link" href="{snapshot_details_url}" rel="noreferrer">Snapshot details</a>
-      {replay_link_html}
-      <a class="ha-replay-link" href="{snapshot_json_url}" rel="noreferrer">Metadata JSON</a>
+      {action_links_html}
+      <span class="ha-replay-divider" aria-hidden="true"></span>
       <button type="button" class="ha-replay-link" id="ha-replay-hide" aria-label="Hide this banner">Hide</button>
     </div>
   </div>
