@@ -1460,6 +1460,68 @@ Implementation note:
 	          } catch (e) {}
 	        }
 
+	        function ensureActionClickHandlers() {
+	          try {
+	            banner.querySelectorAll("[data-ha-action]").forEach(function (el) {
+	              if (el._haClickBound) return;
+	              el._haClickBound = true;
+	              el.addEventListener("click", function (event) {
+	                // Allow ctrl/cmd/middle clicks to open in a new tab using the (blob) href.
+	                if (
+	                  event.button !== 0 ||
+	                  event.metaKey ||
+	                  event.ctrlKey ||
+	                  event.shiftKey ||
+	                  event.altKey
+	                ) {
+	                  return;
+	                }
+
+	                var dest = null;
+	                try {
+	                  dest = el.getAttribute("data-ha-dest");
+	                } catch (e) {
+	                  dest = null;
+	                }
+	                if (!dest) {
+	                  event.preventDefault();
+	                  event.stopPropagation();
+	                  return;
+	                }
+
+	                event.preventDefault();
+	                event.stopPropagation();
+
+	                var target = null;
+	                try {
+	                  target = el.getAttribute("target");
+	                } catch (e) {
+	                  target = null;
+	                }
+
+	                try {
+	                  if (String(target || "").toLowerCase() === "_blank") {
+	                    window.open(dest, "_blank", "noopener,noreferrer");
+	                    return;
+	                  }
+	                } catch (e) {}
+
+	                try {
+	                  if (isEmbedded() && window.top) {
+	                    window.top.location.href = dest;
+	                    return;
+	                  }
+	                } catch (e) {}
+
+	                try {
+	                  window.location.href = dest;
+	                } catch (e) {}
+	              });
+	            });
+	          } catch (e) {}
+	        }
+
+	        ensureActionClickHandlers();
 	        applyRoutes();
 
 	        var historyOpen = false;
