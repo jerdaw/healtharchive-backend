@@ -171,6 +171,7 @@ Key public endpoints (all prefixed with `/api`):
   Per-source summaries derived from indexed snapshots.
 
   When `HEALTHARCHIVE_REPLAY_BASE_URL` is set, the response also includes:
+
   - `entryRecordId` – a “best effort” entry-point snapshot ID for browsing a source
   - `entryBrowseUrl` – a timestamp-locked replay URL for that entry point
 
@@ -179,10 +180,12 @@ Key public endpoints (all prefixed with `/api`):
   etc.).
 
   When `HEALTHARCHIVE_REPLAY_BASE_URL` is set, each result may include:
+
   - `jobId` + `captureTimestamp` – used to lock replay to a specific capture
   - `browseUrl` – a timestamp-locked replay URL for browsing within the backup
 
   Ranking controls:
+
   - Default ranking is controlled by `HA_SEARCH_RANKING_VERSION` (`v1` or `v2`).
   - Per-request override: add `ranking=v1|v2` to `/api/search`.
 
@@ -267,6 +270,7 @@ This repo includes lightweight scripts to capture and compare search results:
   - `python ./scripts/search-eval-diff.py --a /tmp/ha-search-eval/<TS_A> --b /tmp/ha-search-eval/<TS_B> --top 20`
 
 Docs:
+
 - `docs/operations/search-quality.md`
 - `docs/operations/search-golden-queries.md`
 
@@ -457,6 +461,7 @@ defaults:
 
 - `HEALTHARCHIVE_ENV`
   High-level environment hint used by admin auth. Recognised values:
+
   - `"development"` (default when unset): admin endpoints are open when
     `HEALTHARCHIVE_ADMIN_TOKEN` is unset (dev convenience).
   - `"staging"` or `"production"`: admin endpoints fail closed with HTTP 500
@@ -464,14 +469,15 @@ defaults:
 
 - `HEALTHARCHIVE_ADMIN_TOKEN`
   Optional admin token. If set, `/api/admin/*` and `/metrics` require either:
+
   - `Authorization: Bearer <token>` or
   - `X-Admin-Token: <token>`
-  If unset and `HEALTHARCHIVE_ENV` is `"development"` (or unset), admin
-  endpoints are open (intended only for local development). In staging and
-  production you should **always** set a long, random token and store it as a
-  secret in your hosting platform (never committed to the repo); when
-  `HEALTHARCHIVE_ENV` is `"staging"` or `"production"` and this token is
-  missing, admin and metrics endpoints return HTTP 500.
+    If unset and `HEALTHARCHIVE_ENV` is `"development"` (or unset), admin
+    endpoints are open (intended only for local development). In staging and
+    production you should **always** set a long, random token and store it as a
+    secret in your hosting platform (never committed to the repo); when
+    `HEALTHARCHIVE_ENV` is `"staging"` or `"production"` and this token is
+    missing, admin and metrics endpoints return HTTP 500.
 
 - `HEALTHARCHIVE_LOG_LEVEL`
   Global log level (`DEBUG`, `INFO`, etc.). Defaults to `INFO`.
@@ -496,9 +502,9 @@ defaults:
 
 - **Preview (frontend at healtharchive.vercel.app):**
 
-    ```bash
-    export HEALTHARCHIVE_CORS_ORIGINS="https://healtharchive.vercel.app"
-    ```
+  ```bash
+  export HEALTHARCHIVE_CORS_ORIGINS="https://healtharchive.vercel.app"
+  ```
 
   You can also include `http://localhost:3000` if you want local development
   to talk directly to a remote API instance.
@@ -591,3 +597,5 @@ quick end-to-end smoke test:
 The `archive_tool` subpackage also has its own detailed documentation in
 `src/archive_tool/docs/documentation.md` describing its internal state
 machine and Docker orchestration, and how it cooperates with the backend.
+
+Developed, in part, with the use of artificial intelligence tooling.

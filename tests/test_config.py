@@ -11,6 +11,7 @@ from ha_backend.config import (
     ArchiveToolConfig,
     DatabaseConfig,
     get_archive_tool_config,
+    get_cors_origins,
     get_database_config,
     get_exports_default_limit,
     get_exports_enabled,
@@ -114,3 +115,30 @@ def test_exports_config_overrides(monkeypatch) -> None:
     assert get_exports_enabled() is False
     assert get_exports_default_limit() == 50
     assert get_exports_max_limit() == 75
+
+
+def test_cors_origins_appends_replay_origin_when_replay_base_url_set(monkeypatch) -> None:
+    monkeypatch.setenv(
+        "HEALTHARCHIVE_CORS_ORIGINS",
+        "https://healtharchive.ca,https://www.healtharchive.ca",
+    )
+    monkeypatch.setenv("HEALTHARCHIVE_REPLAY_BASE_URL", "https://replay.healtharchive.ca")
+    origins = get_cors_origins()
+    assert "https://replay.healtharchive.ca" in origins
+
+
+def test_cors_origins_does_not_duplicate_replay_origin(monkeypatch) -> None:
+    monkeypatch.setenv(
+        "HEALTHARCHIVE_CORS_ORIGINS",
+        "https://healtharchive.ca,https://replay.healtharchive.ca",
+    )
+    monkeypatch.setenv("HEALTHARCHIVE_REPLAY_BASE_URL", "https://replay.healtharchive.ca")
+    origins = get_cors_origins()
+    assert origins.count("https://replay.healtharchive.ca") == 1
+
+
+def test_cors_origins_parses_replay_origin_without_scheme(monkeypatch) -> None:
+    monkeypatch.setenv("HEALTHARCHIVE_CORS_ORIGINS", "https://healtharchive.ca")
+    monkeypatch.setenv("HEALTHARCHIVE_REPLAY_BASE_URL", "replay.healtharchive.ca")
+    origins = get_cors_origins()
+    assert "https://replay.healtharchive.ca" in origins

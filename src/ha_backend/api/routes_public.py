@@ -2775,6 +2775,12 @@ def get_snapshot_timeline(
                 title=row.title,
                 statusCode=row.status_code,
                 compareFromSnapshotId=compare_map.get(row.id),
+                browseUrl=_build_browse_url(
+                    row.job_id,
+                    row.url,
+                    row.capture_timestamp,
+                    row.id,
+                ),
             )
         )
 

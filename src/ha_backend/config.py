@@ -7,6 +7,7 @@ import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import List
+from urllib.parse import urlsplit
 
 # === Core paths ===
 
@@ -199,6 +200,23 @@ DEFAULT_CORS_ORIGINS: List[str] = [
 ]
 
 
+def _origin_from_url(raw: str | None) -> str | None:
+    if not raw:
+        return None
+    cleaned = raw.strip()
+    if not cleaned:
+        return None
+    if not (cleaned.startswith("http://") or cleaned.startswith("https://")):
+        cleaned = f"https://{cleaned}"
+    try:
+        parts = urlsplit(cleaned)
+    except Exception:
+        return None
+    if not parts.scheme or not parts.netloc:
+        return None
+    return f"{parts.scheme}://{parts.netloc}"
+
+
 @dataclass
 class DatabaseConfig:
     """
@@ -230,9 +248,17 @@ def get_cors_origins() -> List[str]:
     raw = os.environ.get("HEALTHARCHIVE_CORS_ORIGINS")
     if raw is not None:
         origins = [origin.strip() for origin in raw.split(",") if origin.strip()]
-        if origins:
-            return origins
-    return DEFAULT_CORS_ORIGINS
+    else:
+        origins = []
+
+    if not origins:
+        origins = list(DEFAULT_CORS_ORIGINS)
+
+    replay_origin = _origin_from_url(get_replay_base_url())
+    if replay_origin and replay_origin not in origins:
+        origins.append(replay_origin)
+
+    return origins
 
 
 def get_replay_base_url() -> str | None:

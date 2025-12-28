@@ -283,6 +283,14 @@ if [[ "${SKIP_RESTART}" != "true" ]]; then
   run sudo systemctl status healtharchive-api healtharchive-worker --no-pager -l
 
   if [[ "${RESTART_REPLAY}" == "true" ]]; then
+    BANNER_SRC="${REPO_DIR}/docs/deployment/pywb/custom_banner.html"
+    if [[ -f "${BANNER_SRC}" ]]; then
+      run sudo mkdir -p /srv/healtharchive/replay/templates
+      run sudo install -o hareplay -g healtharchive -m 0640 \
+        "${BANNER_SRC}" /srv/healtharchive/replay/templates/custom_banner.html
+    else
+      echo "WARN: Replay banner template not found at ${BANNER_SRC}" >&2
+    fi
     run sudo systemctl restart healtharchive-replay.service
     run bash -lc "sleep 1; curl -fsSI http://127.0.0.1:8090/ | head"
   fi
