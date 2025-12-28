@@ -972,6 +972,8 @@ Implementation note:
 	        applyRoutes();
 
 	        var refreshTimer = null;
+	        var resolveAttempts = 0;
+	        var resolveTimer = null;
 	        refreshCompareLink = function () {
 	          if (refreshTimer) clearTimeout(refreshTimer);
 	          refreshTimer = setTimeout(function () {
@@ -979,6 +981,14 @@ Implementation note:
 	              .finally(function () {
 	                applyRoutes();
 	                updateSnapshotSummary();
+	              })
+	              .finally(function () {
+	                if (snapshotId || resolveAttempts >= 6) return;
+	                resolveAttempts += 1;
+	                if (resolveTimer) clearTimeout(resolveTimer);
+	                resolveTimer = setTimeout(function () {
+	                  refreshCompareLink();
+	                }, 700);
 	              })
 	              .catch(function () {});
 	          }, 250);
