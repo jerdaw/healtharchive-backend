@@ -3757,6 +3757,7 @@ def get_snapshot_raw(
     report_query = urlencode(report_params) if report_params else ""
     report_url = f"{site_base}/report?{report_query}" if report_query else f"{site_base}/report"
 
+    action_links = []
     if replay_url:
         action_links.append(
             f'<a class="ha-replay-navlink" href="{replay_url}" rel="noreferrer">Replay</a>'
