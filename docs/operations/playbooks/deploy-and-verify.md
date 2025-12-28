@@ -30,6 +30,11 @@ Canonical references:
    - baseline drift verification
    - public surface verification
 
+   If you are updating the replay banner/template or replay service config on a
+   single-VPS deployment, include replay restart + banner install:
+
+   - `./scripts/vps-deploy.sh --apply --baseline-mode live --restart-replay`
+
 3. If the deploy gate fails:
 
    - Do **not** retry blindly.

@@ -100,6 +100,63 @@ Implementation note:
     overflow: hidden;
   }
 
+  #ha-replay-banner .ha-replay-title {
+    font-weight: 650;
+    color: rgba(15, 23, 42, 0.95);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 100%;
+  }
+
+  #ha-replay-banner .ha-replay-fields {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.15rem 1.15rem;
+    font-size: 0.78rem;
+    color: rgba(15, 23, 42, 0.7);
+    width: 100%;
+  }
+
+  #ha-replay-banner .ha-replay-field {
+    display: flex;
+    gap: 0.45rem;
+    min-width: 0;
+  }
+
+  #ha-replay-banner .ha-replay-field-label {
+    color: rgba(15, 23, 42, 0.52);
+    font-weight: 650;
+    white-space: nowrap;
+  }
+
+  #ha-replay-banner .ha-replay-field-value {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: rgba(15, 23, 42, 0.78);
+  }
+
+  #ha-replay-banner .ha-replay-field-value.ha-replay-field-url {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  #ha-replay-banner .ha-replay-field-value a,
+  #ha-replay-banner a.ha-replay-field-value {
+    color: rgba(37, 99, 235, 0.95);
+    text-decoration: none;
+    font-weight: 600;
+  }
+
+  #ha-replay-banner a.ha-replay-field-value:hover {
+    text-decoration: underline;
+    background: transparent;
+    transform: none;
+  }
+
   #ha-replay-banner .ha-replay-meta {
     color: rgba(15, 23, 42, 0.7);
     overflow: hidden;
@@ -116,6 +173,94 @@ Implementation note:
     display: -webkit-box;
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
+  }
+
+  #ha-replay-banner .ha-replay-history-panel {
+    display: none;
+    border-top: 1px solid rgba(148, 163, 184, 0.28);
+    background: rgba(255, 255, 255, 0.96);
+  }
+
+  #ha-replay-banner .ha-replay-history-panel.is-open {
+    display: block;
+  }
+
+  #ha-replay-banner .ha-replay-history-inner {
+    padding: 0.6rem 1.25rem 0.85rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+  }
+
+  #ha-replay-banner .ha-replay-history-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+  }
+
+  #ha-replay-banner .ha-replay-history-title {
+    font-weight: 650;
+    color: rgba(15, 23, 42, 0.92);
+  }
+
+  #ha-replay-banner .ha-replay-history-body {
+    font-size: 0.82rem;
+    color: rgba(15, 23, 42, 0.8);
+  }
+
+  #ha-replay-banner .ha-replay-history-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+  }
+
+  #ha-replay-banner .ha-replay-history-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.4rem 0.55rem;
+    border-radius: 12px;
+    border: 1px solid rgba(148, 163, 184, 0.26);
+    background: rgba(248, 250, 252, 0.9);
+  }
+
+  #ha-replay-banner .ha-replay-history-item-title {
+    font-weight: 650;
+    color: rgba(15, 23, 42, 0.92);
+  }
+
+  #ha-replay-banner .ha-replay-history-item-subtitle {
+    margin-top: 0.15rem;
+    font-size: 0.74rem;
+    color: rgba(15, 23, 42, 0.6);
+  }
+
+  #ha-replay-banner .ha-replay-history-item-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+
+  #ha-replay-banner .ha-replay-history-item-actions a {
+    padding: 0.2rem 0.55rem;
+    border-radius: 999px;
+    border: 1px solid rgba(148, 163, 184, 0.26);
+    background: rgba(255, 255, 255, 0.8);
+    color: rgba(15, 23, 42, 0.72);
+    font-weight: 650;
+  }
+
+  #ha-replay-banner .ha-replay-history-item-actions a:hover {
+    background: rgba(148, 163, 184, 0.14);
+    transform: none;
+    text-decoration: none;
   }
 
   #ha-replay-banner a,
@@ -222,7 +367,8 @@ Implementation note:
 	  #ha-replay-banner.ha-replay-embedded .ha-replay-pill,
 	  #ha-replay-banner.ha-replay-embedded [data-ha-action="browse"],
 	  #ha-replay-banner.ha-replay-embedded [data-ha-action="details"],
-	  #ha-replay-banner.ha-replay-embedded [data-ha-action="history"],
+	  #ha-replay-banner.ha-replay-embedded #ha-replay-history-toggle,
+	  #ha-replay-banner.ha-replay-embedded #ha-replay-history-panel,
 	  #ha-replay-banner.ha-replay-embedded [data-ha-action="raw"],
 	  #ha-replay-banner.ha-replay-embedded [data-ha-action="json"],
 	  #ha-replay-banner.ha-replay-embedded [data-ha-action="cite"],
@@ -252,6 +398,9 @@ Implementation note:
     }
     #ha-replay-banner .ha-replay-divider {
       display: none;
+    }
+    #ha-replay-banner .ha-replay-fields {
+      grid-template-columns: 1fr;
     }
   }
 </style>
@@ -397,6 +546,137 @@ Implementation note:
       // Ignore storage failures.
     }
 
+    function detectLocaleFromOriginalUrl(value) {
+      if (!value || typeof value !== "string") return null;
+      var raw = value.trim();
+      if (!raw) return null;
+
+      try {
+        var u = new URL(raw, window.location.origin);
+        var path = (u.pathname || "").toLowerCase();
+        if (/^\/fr(?:\/|$)/.test(path)) return "fr";
+        if (/^\/en(?:\/|$)/.test(path)) return "en";
+
+        var lang = (u.searchParams.get("lang") || u.searchParams.get("language") || "").toLowerCase();
+        if (lang === "fr" || lang.indexOf("fr") === 0) return "fr";
+        if (lang === "en" || lang.indexOf("en") === 0) return "en";
+
+        var host = (u.hostname || "").toLowerCase();
+        if (host.indexOf("fr.") === 0) return "fr";
+      } catch (e) {
+        var lower = raw.toLowerCase();
+        if (lower.indexOf("/fr/") >= 0) return "fr";
+        if (lower.indexOf("/en/") >= 0) return "en";
+      }
+
+      return null;
+    }
+
+    function resolveUiLocale() {
+      try {
+        var wb = window.wbinfo || {};
+        return (
+          detectLocaleFromOriginalUrl(wb.url) ||
+          detectLocaleFromOriginalUrl(wb.top_url || wb.topUrl) ||
+          "en"
+        );
+      } catch (e) {
+        return "en";
+      }
+    }
+
+    var UI_LOCALE = resolveUiLocale();
+    var UI_LOCALE_TAG = UI_LOCALE === "fr" ? "fr-CA" : "en-CA";
+    var UI_COPY = {
+      en: {
+        archivedReplay: "Archived replay",
+        backupLabel: "Backup:",
+        capturedLabel: "Captured:",
+        disclaimerPrefix: "Independent archive \u00b7 Not an official government website.",
+        disclaimerCapturePrefix: "Archived capture from",
+        disclaimerCaptureSuffix: "\u2014 not current guidance or medical advice.",
+        backAria: "Back to HealthArchive.ca",
+        pageTitleLabel: "Page title",
+        sourceLabel: "Source",
+        snapshotDateLabel: "Snapshot date",
+        languageLabel: "Language",
+        originalUrlLabel: "Original URL",
+        editionLabel: "edition",
+        unknownLabel: "Unknown",
+        detailsLabel: "Details",
+        detailsAria: "View snapshot details on HealthArchive.ca",
+        compareLabel: "View diff",
+        compareAria: "Compare this archived page to the live page",
+        rawLabel: "Raw HTML",
+        rawAria: "View raw HTML for this snapshot",
+        jsonLabel: "Metadata JSON",
+        jsonAria: "View metadata JSON for this snapshot",
+        citeLabel: "Cite",
+        citeAria: "How to cite HealthArchive snapshots",
+        reportLabel: "Report issue",
+        reportAria: "Report an issue with this snapshot",
+        historyLabel: "Other snapshots",
+        historyAria: "Toggle other snapshots for this page",
+        historyTitle: "Other snapshots",
+        historyAllLabel: "All snapshots",
+        historyLoading: "Loading other snapshots\u2026",
+        historyUnavailable: "History is not available for this snapshot.",
+        historyNone: "No other snapshots are available for this page.",
+        historyViewLabel: "View",
+        historyCompareLabel: "Compare",
+        hideLabel: "Hide",
+        hideAria: "Hide this banner",
+        redirectTitle: "Redirecting...",
+        redirectBody: "Redirecting to",
+      },
+      fr: {
+        archivedReplay: "Relecture archivée",
+        backupLabel: "Sauvegarde\u00a0:",
+        capturedLabel: "Capturée\u00a0:",
+        disclaimerPrefix: "Archive indépendante \u00b7 Pas un site officiel du gouvernement.",
+        disclaimerCapturePrefix: "Capture archivée du",
+        disclaimerCaptureSuffix: "\u2014 pas des conseils actuels ni un avis médical.",
+        backAria: "Retour à HealthArchive.ca",
+        pageTitleLabel: "Titre de la page",
+        sourceLabel: "Source",
+        snapshotDateLabel: "Date de capture",
+        languageLabel: "Langue",
+        originalUrlLabel: "URL d’origine",
+        editionLabel: "édition",
+        unknownLabel: "Inconnu",
+        detailsLabel: "Détails",
+        detailsAria: "Voir les détails de la capture sur HealthArchive.ca",
+        compareLabel: "Voir diff",
+        compareAria: "Comparer cette capture archivée à la page en direct",
+        rawLabel: "HTML brut",
+        rawAria: "Voir le HTML brut de cette capture",
+        jsonLabel: "Métadonnées JSON",
+        jsonAria: "Voir les métadonnées JSON de cette capture",
+        citeLabel: "Citer",
+        citeAria: "Comment citer les captures HealthArchive",
+        reportLabel: "Signaler un problème",
+        reportAria: "Signaler un problème avec cette capture",
+        historyLabel: "Autres captures",
+        historyAria: "Afficher ou masquer les autres captures de cette page",
+        historyTitle: "Autres captures",
+        historyAllLabel: "Toutes les captures",
+        historyLoading: "Chargement des autres captures\u2026",
+        historyUnavailable: "L’historique n’est pas disponible pour cette capture.",
+        historyNone: "Aucune autre capture n’est disponible pour cette page.",
+        historyViewLabel: "Voir",
+        historyCompareLabel: "Comparer",
+        hideLabel: "Masquer",
+        hideAria: "Masquer cette bannière",
+        redirectTitle: "Redirection…",
+        redirectBody: "Redirection vers",
+      },
+    };
+
+    function t(key) {
+      var table = UI_COPY[UI_LOCALE] || UI_COPY.en;
+      return table[key] || UI_COPY.en[key] || String(key);
+    }
+
 	    function loadSnapshotId() {
 	      function readSnapshotId(params) {
 	        if (!params) return null;
@@ -531,15 +811,15 @@ Implementation note:
       if (!year || !month || !day) return null;
       var d = new Date(Date.UTC(year, month - 1, day));
       if (isNaN(d.getTime())) return null;
-      return d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+      return d.toLocaleDateString(UI_LOCALE_TAG, { year: "numeric", month: "short", day: "numeric" });
     }
 
     function buildMeta() {
       var wb = window.wbinfo || {};
       var parts = [];
-      if (wb.coll) parts.push("Backup: " + wb.coll);
+      if (wb.coll) parts.push(t("backupLabel") + " " + wb.coll);
       var capture = formatTimestamp(wb.timestamp);
-      if (capture) parts.push("Captured: " + capture);
+      if (capture) parts.push(t("capturedLabel") + " " + capture);
       return parts.join(" \u00b7 ");
     }
 
@@ -561,7 +841,10 @@ Implementation note:
 	      banner = document.createElement("div");
 	      banner.id = "ha-replay-banner";
 	      banner.setAttribute("role", "region");
-	      banner.setAttribute("aria-label", "HealthArchive replay notice");
+	      banner.setAttribute(
+	        "aria-label",
+	        UI_LOCALE === "fr" ? "Avis de relecture HealthArchive" : "HealthArchive replay notice"
+	      );
 	      if (embedded) {
 	        banner.className = "ha-replay-embedded";
 	      }
@@ -569,32 +852,130 @@ Implementation note:
 	      banner.innerHTML =
 	        '<div class="ha-replay-inner">' +
 	        '  <div class="ha-replay-left">' +
-	        '    <a class="ha-replay-action-link" data-ha-action="browse" href="#" aria-label="Back to HealthArchive.ca">\u2190 HealthArchive.ca</a>' +
-	        '    <span class="ha-replay-pill" aria-label="Archived replay notice">Archived replay</span>' +
+	        '    <a class="ha-replay-action-link" data-ha-action="browse" href="#" target="_top" rel="noreferrer noopener" aria-label="' +
+	        t("backAria") +
+	        '">\u2190 HealthArchive.ca</a>' +
+	        '    <span class="ha-replay-pill" aria-label="' +
+	        t("archivedReplay") +
+	        '">' +
+	        t("archivedReplay") +
+	        "</span>" +
 	        "  </div>" +
 	        '  <div class="ha-replay-center">' +
+	        '    <div class="ha-replay-title" id="ha-replay-title"></div>' +
+	        '    <div class="ha-replay-fields" id="ha-replay-fields" aria-label="' +
+	        (UI_LOCALE === "fr" ? "Résumé de la capture" : "Snapshot summary") +
+	        '">' +
+	        '      <div class="ha-replay-field" id="ha-replay-field-source">' +
+	        '        <span class="ha-replay-field-label">' +
+	        t("sourceLabel") +
+	        "</span>" +
+	        '        <span class="ha-replay-field-value" id="ha-replay-value-source"></span>' +
+	        "      </div>" +
+	        '      <div class="ha-replay-field" id="ha-replay-field-date">' +
+	        '        <span class="ha-replay-field-label">' +
+	        t("snapshotDateLabel") +
+	        "</span>" +
+	        '        <span class="ha-replay-field-value" id="ha-replay-value-date"></span>' +
+	        "      </div>" +
+	        '      <div class="ha-replay-field" id="ha-replay-field-language">' +
+	        '        <span class="ha-replay-field-label">' +
+	        t("languageLabel") +
+	        "</span>" +
+	        '        <span class="ha-replay-field-value" id="ha-replay-value-language"></span>' +
+	        "      </div>" +
+	        '      <div class="ha-replay-field" id="ha-replay-field-url">' +
+	        '        <span class="ha-replay-field-label">' +
+	        t("originalUrlLabel") +
+	        "</span>" +
+	        '        <a class="ha-replay-field-value ha-replay-field-url" data-ha-action="origin" id="ha-replay-value-url" href="#" target="_blank" rel="noreferrer noopener"></a>' +
+	        "      </div>" +
+	        "    </div>" +
 	        '    <div class="ha-replay-meta" id="ha-replay-meta"></div>' +
-	        '    <div class="ha-replay-disclaimer">Independent archive \u00b7 Not an official government website \u00b7 Content may be outdated</div>' +
+	        '    <div class="ha-replay-disclaimer" id="ha-replay-disclaimer"></div>' +
 	        "  </div>" +
 	        '  <div class="ha-replay-right" id="ha-replay-actions">' +
-	        '    <a class="ha-replay-navlink" data-ha-action="compare" href="#" aria-label="Compare this archived page to the live page">View diff</a>' +
-	        '    <a class="ha-replay-navlink" data-ha-action="raw" href="#" aria-label="View raw HTML for this snapshot">Raw HTML</a>' +
-	        '    <a class="ha-replay-navlink" data-ha-action="json" href="#" aria-label="View metadata JSON for this snapshot">Metadata JSON</a>' +
-	        '    <a class="ha-replay-navlink" data-ha-action="cite" href="#" aria-label="How to cite HealthArchive snapshots">Cite</a>' +
-	        '    <a class="ha-replay-navlink" data-ha-action="report" href="#" aria-label="Report an issue with this snapshot">Report issue</a>' +
-	        '    <a class="ha-replay-navlink" data-ha-action="history" href="#" aria-label="View other snapshots of this page">Other snapshots</a>' +
+	        '    <a class="ha-replay-navlink" data-ha-action="details" href="#" target="_top" rel="noreferrer noopener" aria-label="' +
+	        t("detailsAria") +
+	        '">' +
+	        t("detailsLabel") +
+	        "</a>" +
+	        '    <a class="ha-replay-navlink" data-ha-action="compare" href="#" target="_top" rel="noreferrer noopener" aria-label="' +
+	        t("compareAria") +
+	        '">' +
+	        t("compareLabel") +
+	        "</a>" +
+	        '    <a class="ha-replay-navlink" data-ha-action="raw" href="#" target="_blank" rel="noreferrer noopener" aria-label="' +
+	        t("rawAria") +
+	        '">' +
+	        t("rawLabel") +
+	        "</a>" +
+	        '    <a class="ha-replay-navlink" data-ha-action="json" href="#" target="_blank" rel="noreferrer noopener" aria-label="' +
+	        t("jsonAria") +
+	        '">' +
+	        t("jsonLabel") +
+	        "</a>" +
+	        '    <a class="ha-replay-navlink" data-ha-action="cite" href="#" target="_top" rel="noreferrer noopener" aria-label="' +
+	        t("citeAria") +
+	        '">' +
+	        t("citeLabel") +
+	        "</a>" +
+	        '    <a class="ha-replay-navlink" data-ha-action="report" href="#" target="_top" rel="noreferrer noopener" aria-label="' +
+	        t("reportAria") +
+	        '">' +
+	        t("reportLabel") +
+	        "</a>" +
+	        '    <button type="button" class="ha-replay-navlink" id="ha-replay-history-toggle" aria-label="' +
+	        t("historyAria") +
+	        '" aria-expanded="false">' +
+	        t("historyLabel") +
+	        "</button>" +
 	        '    <span class="ha-replay-divider" aria-hidden="true"></span>' +
-	        '    <button type="button" id="ha-replay-hide" class="ha-replay-link" aria-label="Hide this banner">Hide</button>' +
+	        '    <button type="button" id="ha-replay-hide" class="ha-replay-link" aria-label="' +
+	        t("hideAria") +
+	        '">' +
+	        t("hideLabel") +
+	        "</button>" +
+	        "  </div>" +
+	        "</div>" +
+	        '<div class="ha-replay-history-panel" id="ha-replay-history-panel" aria-hidden="true">' +
+	        '  <div class="ha-replay-history-inner">' +
+	        '    <div class="ha-replay-history-heading">' +
+	        '      <div class="ha-replay-history-title">' +
+	        t("historyTitle") +
+	        "</div>" +
+	        '      <a class="ha-replay-navlink" data-ha-action="historyPage" href="#" target="_top" rel="noreferrer noopener">' +
+	        t("historyAllLabel") +
+	        "</a>" +
+	        "    </div>" +
+	        '    <div class="ha-replay-history-body" id="ha-replay-history-body"></div>' +
 	        "  </div>" +
 	        "</div>";
 
       document.body.insertBefore(banner, document.body.firstChild);
 
-      var metaEl = document.getElementById("ha-replay-meta");
-      if (metaEl) {
-        var meta = buildMeta();
-        metaEl.textContent = meta || "";
+      var titleEl = document.getElementById("ha-replay-title");
+      if (titleEl) {
+        try {
+          titleEl.textContent = document.title || "";
+          titleEl.setAttribute("title", document.title || "");
+        } catch (e) {}
       }
+
+      var metaEl = document.getElementById("ha-replay-meta");
+      if (metaEl) metaEl.textContent = buildMeta() || "";
+
+      var disclaimerEl = document.getElementById("ha-replay-disclaimer");
+      if (disclaimerEl) disclaimerEl.textContent = t("disclaimerPrefix");
+
+      var urlEl = document.getElementById("ha-replay-value-url");
+      try {
+        var wbUrl = getWbInfo().url;
+        if (urlEl && wbUrl) {
+          urlEl.textContent = String(wbUrl).replace(/^https?:\/\//i, "");
+          urlEl.setAttribute("title", wbUrl);
+        }
+      } catch (e) {}
 
       var hideBtn = document.getElementById("ha-replay-hide");
       if (hideBtn) {
@@ -612,13 +993,47 @@ Implementation note:
 	      //  - using buttons with explicit JS navigation.
 	      try {
 	        var haBase = getSiteBase(window.location.hostname);
+	        var haLocalePrefix = UI_LOCALE === "fr" ? "/fr" : "";
+	        var haRoot = haBase + haLocalePrefix;
 	        var apiCandidates = getApiBaseCandidates(window.location.hostname);
 	        var apiBase = apiCandidates[0];
+	        var wbInfo = getWbInfo();
+	        var originalUrl = wbInfo.url || "";
+
+	        function buildArchiveSearchUrl(originalUrlValue) {
+	          try {
+	            var cleanUrl = stripUrlFragment(originalUrlValue);
+	            if (!cleanUrl) return haRoot + "/archive?focus=results";
+	            return (
+	              haRoot +
+	              "/archive?view=snapshots&q=" +
+	              encodeURIComponent(cleanUrl) +
+	              "&focus=results"
+	            );
+	          } catch (e) {
+	            return haRoot + "/archive?focus=results";
+	          }
+	        }
+
+	        var archiveSearchUrl = buildArchiveSearchUrl(originalUrl);
 	        var routes = {
-	          browse: snapshotId ? haBase + "/snapshot/" + snapshotId : haBase + "/",
+	          browse: snapshotId ? haRoot + "/snapshot/" + snapshotId : archiveSearchUrl,
 	        };
 
-	        routes.cite = haBase + "/cite";
+	        routes.details = routes.browse;
+	        routes.compare = originalUrl
+	          ? haRoot + "/compare-live?url=" + encodeURIComponent(stripUrlFragment(originalUrl)) + "&run=1"
+	          : haRoot + "/compare-live";
+	        routes.origin = originalUrl ? stripUrlFragment(originalUrl) : "";
+	        routes.historyPage = archiveSearchUrl;
+
+	        if (snapshotId) {
+	          routes.cite = haRoot + "/cite?snapshot=" + snapshotId;
+	        } else if (originalUrl) {
+	          routes.cite = haRoot + "/cite?url=" + encodeURIComponent(stripUrlFragment(originalUrl));
+	        } else {
+	          routes.cite = haRoot + "/cite";
+	        }
 
 	        function stripUrlFragment(value) {
 	          if (!value || typeof value !== "string") return "";
@@ -632,19 +1047,27 @@ Implementation note:
 	            if (snapshotIdValue) params.push("snapshot=" + encodeURIComponent(String(snapshotIdValue)));
 	            var cleanUrl = stripUrlFragment(originalUrlValue);
 	            if (cleanUrl) params.push("url=" + encodeURIComponent(cleanUrl));
-	            if (snapshotIdValue) params.push("page=" + encodeURIComponent("/snapshot/" + snapshotIdValue));
-	            return haBase + "/report?" + params.join("&");
+	            if (snapshotIdValue) {
+	              params.push(
+	                "page=" +
+	                  encodeURIComponent(haLocalePrefix + "/snapshot/" + snapshotIdValue)
+	              );
+	            }
+	            return haRoot + "/report?" + params.join("&");
 	          } catch (e) {
-	            return haBase + "/report";
+	            return haRoot + "/report";
 	          }
 	        }
 
+	        routes.report = buildReportUrl(snapshotId, originalUrl);
+	        routes.history = snapshotId
+	          ? haRoot + "/snapshot/" + snapshotId + "?view=details"
+	          : archiveSearchUrl;
+
 	        if (snapshotId) {
-	          routes.details = haBase + "/snapshot/" + snapshotId;
-	          routes.history = haBase + "/snapshot/" + snapshotId + "?view=details";
-	          routes.report = buildReportUrl(snapshotId, getWbInfo().url);
 	          routes.raw = apiBase + "/api/snapshots/raw/" + snapshotId;
 	          routes.json = apiBase + "/api/snapshot/" + snapshotId;
+	          routes.timeline = apiBase + "/api/snapshots/" + snapshotId + "/timeline";
 	        }
 
 	        function safeJson(url, timeoutMs) {
@@ -687,7 +1110,7 @@ Implementation note:
 	          try {
 	            var d = new Date(value);
 	            if (isNaN(d.getTime())) return null;
-	            return d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+	            return d.toLocaleDateString(UI_LOCALE_TAG, { year: "numeric", month: "short", day: "numeric" });
 	          } catch (e) {
 	            return null;
 	          }
@@ -711,27 +1134,141 @@ Implementation note:
 
 	        function buildSnapshotSummary(snapshotDetail) {
 	          try {
-	            var parts = [];
-	            if (snapshotDetail && snapshotDetail.title) parts.push(String(snapshotDetail.title));
-	            if (snapshotDetail && snapshotDetail.sourceName) parts.push(String(snapshotDetail.sourceName));
-	            var wb = getWbInfo();
-	            var capture =
-	              formatTimestamp(wb.timestamp) ||
-	              (snapshotDetail ? formatIsoDate(snapshotDetail.captureTimestamp) : null) ||
-	              (snapshotDetail ? formatIsoDate(snapshotDetail.captureDate) : null);
-	            if (capture) parts.push(capture);
-	            if (snapshotDetail && snapshotDetail.language) parts.push(String(snapshotDetail.language));
-	            var urlValue = snapshotDetail && snapshotDetail.originalUrl ? compactUrl(snapshotDetail.originalUrl) : null;
-	            if (urlValue) parts.push(urlValue);
-	            return parts.filter(Boolean).join(" \u00b7 ");
+	            if (!snapshotDetail) return null;
+	            return String(snapshotDetail.id || "") || null;
 	          } catch (e) {
 	            return null;
 	          }
 	        }
 
+	        function formatIsoDateYmd(value) {
+	          if (!value || typeof value !== "string" || value.length < 10) return null;
+	          try {
+	            var year = Number(value.slice(0, 4));
+	            var month = Number(value.slice(5, 7));
+	            var day = Number(value.slice(8, 10));
+	            if (!year || !month || !day) return null;
+	            var d = new Date(Date.UTC(year, month - 1, day));
+	            if (isNaN(d.getTime())) return null;
+	            return d.toLocaleDateString(UI_LOCALE_TAG, { year: "numeric", month: "short", day: "numeric" });
+	          } catch (e) {
+	            return null;
+	          }
+	        }
+
+	        function buildSnapshotDateLabel(detail) {
+	          var wb = getWbInfo();
+	          var captureLabel =
+	            formatTimestamp(wb.timestamp) ||
+	            (detail ? formatIsoDate(detail.captureTimestamp) : null) ||
+	            (detail ? formatIsoDateYmd(detail.captureDate) : null);
+	          var jobId = null;
+	          if (detail && detail.jobId != null) jobId = detail.jobId;
+	          if (jobId == null) jobId = parseJobIdFromColl(wb.coll);
+	          if (captureLabel && jobId != null) {
+	            return (
+	              captureLabel +
+	              " \u00b7 " +
+	              t("editionLabel") +
+	              " #" +
+	              String(jobId)
+	            );
+	          }
+	          if (captureLabel) return captureLabel;
+	          return null;
+	        }
+
+	        function setValueText(valueId, value, fallbackText) {
+	          var el = document.getElementById(valueId);
+	          if (!el) return;
+	          if (!value) {
+	            el.textContent = fallbackText || "";
+	            return;
+	          }
+	          el.textContent = String(value);
+	        }
+
+	        function applySnapshotDetail(detail) {
+	          if (embedded) return;
+	          try {
+	            var hasDetail = Boolean(detail && detail.id);
+	            var titleText =
+	              (detail && detail.title ? String(detail.title) : "") ||
+	              (function () {
+	                try {
+	                  return document.title || "";
+	                } catch (e) {
+	                  return "";
+	                }
+	              })();
+	            var titleEl = document.getElementById("ha-replay-title");
+	            if (titleEl) {
+	              titleEl.textContent = titleText;
+	              titleEl.setAttribute("title", titleText);
+	            }
+
+	            var sourceField = document.getElementById("ha-replay-field-source");
+	            if (sourceField) {
+	              sourceField.style.display = hasDetail && detail.sourceName ? "flex" : "none";
+	            }
+	            setValueText("ha-replay-value-source", detail && detail.sourceName ? detail.sourceName : null, "");
+
+	            var dateLabel = buildSnapshotDateLabel(detail);
+	            setValueText("ha-replay-value-date", dateLabel, t("unknownLabel"));
+
+	            var languageField = document.getElementById("ha-replay-field-language");
+	            if (languageField) {
+	              languageField.style.display = hasDetail && detail.language ? "flex" : "none";
+	            }
+	            setValueText("ha-replay-value-language", detail && detail.language ? detail.language : null, "");
+
+	            var originalUrlValue =
+	              (detail && detail.originalUrl ? String(detail.originalUrl) : "") ||
+	              (function () {
+	                try {
+	                  return getWbInfo().url || "";
+	                } catch (e) {
+	                  return "";
+	                }
+	              })();
+	            var urlEl = document.getElementById("ha-replay-value-url");
+	            if (urlEl) {
+	              var compact = compactUrl(originalUrlValue) || originalUrlValue;
+	              urlEl.textContent = compact;
+	              urlEl.setAttribute("title", originalUrlValue);
+	            }
+
+	            var disclaimerEl = document.getElementById("ha-replay-disclaimer");
+	            if (disclaimerEl) {
+	              var captureForDisclaimer =
+	                formatTimestamp(getWbInfo().timestamp) ||
+	                (detail ? formatIsoDate(detail.captureTimestamp) : null) ||
+	                (detail ? formatIsoDateYmd(detail.captureDate) : null);
+	              if (captureForDisclaimer) {
+	                disclaimerEl.textContent =
+	                  t("disclaimerPrefix") +
+	                  " " +
+	                  t("disclaimerCapturePrefix") +
+	                  " " +
+	                  captureForDisclaimer +
+	                  " " +
+	                  t("disclaimerCaptureSuffix");
+	              } else {
+	                disclaimerEl.textContent = t("disclaimerPrefix");
+	              }
+	            }
+
+	            var metaEl = document.getElementById("ha-replay-meta");
+	            if (metaEl) {
+	              metaEl.textContent = buildMeta() || "";
+	              metaEl.style.display = hasDetail ? "none" : "";
+	            }
+	          } catch (e) {}
+	        }
+
 	        function setCompareRoute(latestSnapshotId) {
 	          if (!latestSnapshotId) return;
-	          routes.compare = haBase + "/compare-live?to=" + latestSnapshotId + "&run=1";
+	          routes.compare = haRoot + "/compare-live?to=" + latestSnapshotId + "&run=1";
 	          try {
 	            sessionStorage.setItem(COMPARE_LATEST_STORAGE_KEY, String(latestSnapshotId));
 	          } catch (e) {}
@@ -762,9 +1299,11 @@ Implementation note:
 	          var timestamp14 = typeof wb.timestamp === "string" && /^\d{14}$/.test(wb.timestamp) ? wb.timestamp : null;
 
 	          if (snapshotId) {
-	            routes.browse = haBase + "/snapshot/" + snapshotId;
-	            routes.history = haBase + "/snapshot/" + snapshotId + "?view=details";
+	            routes.browse = haRoot + "/snapshot/" + snapshotId;
+	            routes.details = haRoot + "/snapshot/" + snapshotId;
+	            routes.history = haRoot + "/snapshot/" + snapshotId + "?view=details";
 	            routes.report = buildReportUrl(snapshotId, originalUrl);
+	            routes.cite = haRoot + "/cite?snapshot=" + snapshotId;
 	          }
 
 	          if (!jobId || !originalUrl) {
@@ -786,12 +1325,14 @@ Implementation note:
 	                try {
 	                  sessionStorage.setItem(SNAPSHOT_STORAGE_KEY, String(snapshotId));
 	                } catch (e) {}
-	                routes.browse = haBase + "/snapshot/" + snapshotId;
-	                routes.details = haBase + "/snapshot/" + snapshotId;
-	                routes.history = haBase + "/snapshot/" + snapshotId + "?view=details";
+	                routes.browse = haRoot + "/snapshot/" + snapshotId;
+	                routes.details = haRoot + "/snapshot/" + snapshotId;
+	                routes.history = haRoot + "/snapshot/" + snapshotId + "?view=details";
 	                routes.report = buildReportUrl(snapshotId, originalUrl);
+	                routes.cite = haRoot + "/cite?snapshot=" + snapshotId;
 	                routes.raw = base + "/api/snapshots/raw/" + snapshotId;
 	                routes.json = base + "/api/snapshot/" + snapshotId;
+	                routes.timeline = base + "/api/snapshots/" + snapshotId + "/timeline";
 	                return safeJson(buildLatestUrl(base, snapshotId), 3500).then(function (latest) {
 	                  if (latest && latest.found && latest.snapshotId) {
 	                    setCompareRoute(String(latest.snapshotId));
@@ -808,46 +1349,38 @@ Implementation note:
 	          return tryResolveAt(0);
 	        }
 
-	        var snapshotSummaryCache = {};
-	        var snapshotSummaryPendingId = null;
+	        var snapshotDetailCache = {};
+	        var snapshotDetailPendingId = null;
 
-	        function updateSnapshotSummary() {
+	        function updateSnapshotDetailUi() {
 	          try {
 	            if (embedded) return;
-	            var metaEl = document.getElementById("ha-replay-meta");
-	            if (!metaEl) return;
-
 	            if (!snapshotId || !routes.json) {
-	              metaEl.textContent = buildMeta() || "";
+	              applySnapshotDetail(null);
 	              return;
 	            }
 
-	            var cached = snapshotSummaryCache[snapshotId];
+	            var cached = snapshotDetailCache[snapshotId];
 	            if (cached) {
-	              metaEl.textContent = cached;
-	              metaEl.setAttribute("title", cached);
+	              applySnapshotDetail(cached);
 	              return;
 	            }
 
-	            if (snapshotSummaryPendingId === snapshotId) return;
+	            if (snapshotDetailPendingId === snapshotId) return;
 	            var nextSnapshotId = snapshotId;
 	            var nextJsonUrl = routes.json;
-	            snapshotSummaryPendingId = nextSnapshotId;
+	            snapshotDetailPendingId = nextSnapshotId;
 
 	            safeJson(nextJsonUrl, 3500)
 	              .then(function (detail) {
 	                if (!detail) return;
-	                if (!nextSnapshotId) return;
-	                var summary = buildSnapshotSummary(detail);
-	                if (!summary) return;
-	                snapshotSummaryCache[nextSnapshotId] = summary;
+	                snapshotDetailCache[nextSnapshotId] = detail;
 	                if (snapshotId !== nextSnapshotId) return;
-	                metaEl.textContent = summary;
-	                metaEl.setAttribute("title", summary);
+	                applySnapshotDetail(detail);
 	              })
 	              .catch(function () {})
 	              .finally(function () {
-	                if (snapshotSummaryPendingId === nextSnapshotId) snapshotSummaryPendingId = null;
+	                if (snapshotDetailPendingId === nextSnapshotId) snapshotDetailPendingId = null;
 	              });
 	          } catch (e) {}
 	        }
@@ -872,11 +1405,15 @@ Implementation note:
             var html =
               "<!doctype html><meta charset=utf-8>" +
               "<meta name=referrer content=no-referrer>" +
-              "<title>Redirecting...</title>" +
+              "<title>" +
+              escapeHtmlText(t("redirectTitle")) +
+              "</title>" +
               '<meta http-equiv="refresh" content="0;url=' +
               escapeHtmlAttr(dest) +
               '">' +
-              "<p>Redirecting to <a href=" +
+              "<p>" +
+              escapeHtmlText(t("redirectBody")) +
+              " <a href=" +
               JSON.stringify(dest) +
               ">" +
               escapeHtmlText(dest) +
@@ -923,53 +1460,185 @@ Implementation note:
 	          } catch (e) {}
 	        }
 
-	        function ensureActionClickHandlers() {
-	          try {
-	            banner.querySelectorAll("[data-ha-action]").forEach(function (el) {
-	              if (el._haClickBound) return;
-	              el._haClickBound = true;
-	              el.addEventListener("click", function (event) {
-	                // Only intercept plain left-click; allow ctrl/cmd/middle clicks to open in a new tab.
-	                if (
-	                  event.button !== 0 ||
-	                  event.metaKey ||
-	                  event.ctrlKey ||
-	                  event.shiftKey ||
-	                  event.altKey
-	                ) {
-	                  return;
-	                }
+	        applyRoutes();
 
-	                var dest = null;
-	                try {
-	                  dest = el.getAttribute("data-ha-dest");
-	                } catch (e) {
-	                  dest = null;
-	                }
-	                if (!dest) {
-	                  event.preventDefault();
-	                  event.stopPropagation();
-	                  return;
-	                }
+	        var historyOpen = false;
+	        var historyPanel = document.getElementById("ha-replay-history-panel");
+	        var historyBody = document.getElementById("ha-replay-history-body");
+	        var historyToggle = document.getElementById("ha-replay-history-toggle");
+	        var timelineCache = {};
+	        var timelinePendingId = null;
 
-	                event.preventDefault();
-	                event.stopPropagation();
-	                // When embedded, avoid navigating the replay iframe to a HealthArchive page
-	                // (which would create a nested HealthArchive-in-HealthArchive experience).
-	                try {
-	                  if (isEmbedded() && window.top) {
-	                    window.top.location.href = dest;
-	                    return;
-	                  }
-	                } catch (e) {}
-	                window.location.href = dest;
-	              });
-	            });
-	          } catch (e) {}
+	        function formatCaptureDate(value) {
+	          if (!value || typeof value !== "string") return null;
+	          var ymd = value.trim();
+	          if (!/^\d{4}-\d{2}-\d{2}$/.test(ymd)) return formatIsoDateYmd(ymd);
+	          return formatIsoDateYmd(ymd);
 	        }
 
-	        ensureActionClickHandlers();
-	        applyRoutes();
+	        function buildOtherSnapshotsButtonLabel(otherCount) {
+	          if (otherCount == null) return t("historyLabel");
+	          if (otherCount < 1) return UI_LOCALE === "fr" ? "Aucune autre capture" : "No other snapshots";
+	          var plural = otherCount === 1 ? "" : "s";
+	          if (UI_LOCALE === "fr") {
+	            return (
+	              otherCount +
+	              " autre" +
+	              (otherCount === 1 ? "" : "s") +
+	              " capture" +
+	              (otherCount === 1 ? "" : "s")
+	            );
+	          }
+	          return otherCount + " other snapshot" + plural;
+	        }
+
+	        function setHistoryToggleLabel() {
+	          if (!historyToggle) return;
+	          try {
+	            var cached = snapshotId && timelineCache[snapshotId] ? timelineCache[snapshotId] : null;
+	            var otherCount = null;
+	            if (cached && cached.snapshots && snapshotId) {
+	              otherCount = cached.snapshots.filter(function (it) {
+	                return String(it.snapshotId) !== String(snapshotId);
+	              }).length;
+	            }
+	            if (otherCount == null) {
+	              historyToggle.textContent = t("historyLabel");
+	              historyToggle.disabled = false;
+	              return;
+	            }
+	            if (otherCount < 1) {
+	              historyToggle.textContent = buildOtherSnapshotsButtonLabel(otherCount);
+	              historyToggle.disabled = true;
+	              if (historyOpen) setHistoryOpen(false);
+	              return;
+	            }
+	            historyToggle.disabled = false;
+	            var baseLabel = buildOtherSnapshotsButtonLabel(otherCount);
+	            if (historyOpen) {
+	              historyToggle.textContent = UI_LOCALE === "fr" ? "Masquer " + baseLabel : "Hide " + baseLabel;
+	            } else {
+	              historyToggle.textContent = UI_LOCALE === "fr" ? "Afficher " + baseLabel : "Show " + baseLabel;
+	            }
+	          } catch (e) {
+	            historyToggle.textContent = t("historyLabel");
+	          }
+	        }
+
+	        function renderTimeline(timeline) {
+	          if (!historyBody) return;
+	          if (!timeline || !timeline.snapshots || !snapshotId) {
+	            historyBody.textContent = t("historyUnavailable");
+	            return;
+	          }
+	          var others = timeline.snapshots.filter(function (it) {
+	            return String(it.snapshotId) !== String(snapshotId);
+	          });
+	          if (!others.length) {
+	            historyBody.textContent = t("historyNone");
+	            return;
+	          }
+	          historyBody.innerHTML = "";
+	          var ul = document.createElement("ul");
+	          ul.className = "ha-replay-history-list";
+	          others
+	            .slice()
+	            .reverse()
+	            .forEach(function (item) {
+	              var li = document.createElement("li");
+	              li.className = "ha-replay-history-item";
+
+	              var left = document.createElement("div");
+	              var title = document.createElement("div");
+	              title.className = "ha-replay-history-item-title";
+	              title.textContent = formatCaptureDate(item.captureDate) || item.captureDate || t("unknownLabel");
+	              var subtitle = document.createElement("div");
+	              subtitle.className = "ha-replay-history-item-subtitle";
+	              subtitle.textContent =
+	                item.jobName ||
+	                (UI_LOCALE === "fr" ? "Capture d’édition" : "Edition capture");
+	              left.appendChild(title);
+	              left.appendChild(subtitle);
+
+	              var actions = document.createElement("div");
+	              actions.className = "ha-replay-history-item-actions";
+
+	              var view = document.createElement("a");
+	              view.textContent = t("historyViewLabel");
+	              view.href = item.browseUrl || (haRoot + "/snapshot/" + item.snapshotId);
+	              view.rel = "noreferrer noopener";
+	              view.target = item.browseUrl ? "_self" : "_top";
+	              actions.appendChild(view);
+
+	              if (item.compareFromSnapshotId != null) {
+	                var compare = document.createElement("a");
+	                compare.textContent = t("historyCompareLabel");
+	                var compareDest =
+	                  haRoot +
+	                  "/compare?from=" +
+	                  encodeURIComponent(String(item.compareFromSnapshotId)) +
+	                  "&to=" +
+	                  encodeURIComponent(String(item.snapshotId));
+	                compare.href = makeRedirectBlobUrl(compareDest);
+	                compare.rel = "noreferrer noopener";
+	                compare.target = "_top";
+	                actions.appendChild(compare);
+	              }
+
+	              li.appendChild(left);
+	              li.appendChild(actions);
+	              ul.appendChild(li);
+	            });
+	          historyBody.appendChild(ul);
+	        }
+
+	        function fetchTimelineIfNeeded() {
+	          if (!historyBody) return Promise.resolve();
+	          if (!snapshotId || !routes.timeline) {
+	            historyBody.textContent = t("historyUnavailable");
+	            return Promise.resolve();
+	          }
+	          if (timelineCache[snapshotId]) {
+	            renderTimeline(timelineCache[snapshotId]);
+	            setHistoryToggleLabel();
+	            return Promise.resolve();
+	          }
+	          if (timelinePendingId === snapshotId) return Promise.resolve();
+	          timelinePendingId = snapshotId;
+	          historyBody.textContent = t("historyLoading");
+	          return safeJson(routes.timeline, 4500)
+	            .then(function (timeline) {
+	              if (!timeline || !snapshotId) return;
+	              timelineCache[snapshotId] = timeline;
+	              if (timelinePendingId === snapshotId) timelinePendingId = null;
+	              renderTimeline(timeline);
+	              setHistoryToggleLabel();
+	            })
+	            .catch(function () {
+	              historyBody.textContent = t("historyUnavailable");
+	            })
+	            .finally(function () {
+	              if (timelinePendingId === snapshotId) timelinePendingId = null;
+	            });
+	        }
+
+	        function setHistoryOpen(nextOpen) {
+	          historyOpen = Boolean(nextOpen);
+	          if (historyPanel) {
+	            historyPanel.classList.toggle("is-open", historyOpen);
+	            historyPanel.setAttribute("aria-hidden", historyOpen ? "false" : "true");
+	          }
+	          if (historyToggle) historyToggle.setAttribute("aria-expanded", historyOpen ? "true" : "false");
+	          setHistoryToggleLabel();
+	          if (historyOpen) fetchTimelineIfNeeded();
+	        }
+
+	        if (historyToggle) {
+	          historyToggle.addEventListener("click", function () {
+	            setHistoryOpen(!historyOpen);
+	          });
+	          setHistoryToggleLabel();
+	        }
 
 	        var refreshTimer = null;
 	        var resolveAttempts = 0;
@@ -980,7 +1649,9 @@ Implementation note:
 	            resolveSnapshotAndLatest()
 	              .finally(function () {
 	                applyRoutes();
-	                updateSnapshotSummary();
+	                updateSnapshotDetailUi();
+	                if (historyOpen) fetchTimelineIfNeeded();
+	                setHistoryToggleLabel();
 	              })
 	              .finally(function () {
 	                if (snapshotId || resolveAttempts >= 6) return;

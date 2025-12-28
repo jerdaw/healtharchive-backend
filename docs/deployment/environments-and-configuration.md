@@ -33,6 +33,7 @@ For deeper operational details, see:
   - `https://healtharchive.ca`
   - `https://www.healtharchive.ca`
   - `https://healtharchive.vercel.app`
+  - `https://replay.healtharchive.ca` (for the optional replay banner and direct replay UX)
 
 Expected limitation (by design):
 
@@ -108,7 +109,7 @@ export HEALTHARCHIVE_ENV=production
 export HEALTHARCHIVE_DATABASE_URL=postgresql+psycopg://healtharchive:<DB_PASSWORD>@127.0.0.1:5432/healtharchive
 export HEALTHARCHIVE_ARCHIVE_ROOT=/srv/healtharchive/jobs
 export HEALTHARCHIVE_ADMIN_TOKEN=<LONG_RANDOM_SECRET>
-export HEALTHARCHIVE_CORS_ORIGINS=https://healtharchive.ca,https://www.healtharchive.ca,https://healtharchive.vercel.app
+export HEALTHARCHIVE_CORS_ORIGINS=https://healtharchive.ca,https://www.healtharchive.ca,https://healtharchive.vercel.app,https://replay.healtharchive.ca
 export HEALTHARCHIVE_LOG_LEVEL=INFO
 export HA_SEARCH_RANKING_VERSION=v2
 export HA_PAGES_FASTPATH=1
@@ -147,6 +148,8 @@ Notes:
   endpoints fail closed (HTTP 500) instead of being left open.
 - `HEALTHARCHIVE_CORS_ORIGINS` should be kept as narrow as possible; it controls
   which browser origins can call public API routes.
+- If you use the optional replay banner / direct replay UX, the replay origin
+  must also be allowed by CORS so the banner can call `/api/replay/resolve`.
 
 ### 2.3 Optional: staging backend (future)
 
