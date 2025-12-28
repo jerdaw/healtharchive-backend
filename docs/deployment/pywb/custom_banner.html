@@ -176,7 +176,7 @@ Implementation note:
     font: inherit;
     font-weight: 550;
     cursor: pointer;
-    box-shadow: 0 10px 24px rgba(37, 99, 235, 0.35);
+    box-shadow: 0 7.5px 18px rgba(37, 99, 235, 0.26);
   }
 
   #ha-replay-banner .ha-replay-action-link:hover {
@@ -398,32 +398,64 @@ Implementation note:
     }
 
 	    function loadSnapshotId() {
-	      var raw = "";
+	      function readSnapshotId(params) {
+	        if (!params) return null;
+	        return params.get("ha_snapshot") || params.get("haSnapshot");
+	      }
+
+	      function extractSnapshotId(value) {
+	        if (!value || typeof value !== "string") return null;
+	        var rawValue = value.trim();
+	        if (!rawValue) return null;
+
+	        try {
+	          var url = new URL(rawValue, window.location.origin);
+	          var fromQuery = readSnapshotId(url.searchParams);
+	          if (fromQuery) return fromQuery;
+	          var hashValue = url.hash ? url.hash.replace(/^#/, "") : "";
+	          if (hashValue) {
+	            var hashParams = new URLSearchParams(hashValue);
+	            var fromHash = readSnapshotId(hashParams);
+	            if (fromHash) return fromHash;
+	          }
+	        } catch (e) {
+	          try {
+	            var cleaned = rawValue.replace(/^[?#]/, "");
+	            var params = new URLSearchParams(cleaned);
+	            return readSnapshotId(params);
+	          } catch (e2) {}
+	        }
+
+	        return null;
+	      }
+
+	      var snapshotId = null;
 	      try {
-	        raw = window.location.hash || "";
-      } catch (e) {
-        raw = "";
-      }
-      var hash = raw.replace(/^#/, "");
-      var snapshotId = null;
-      try {
-        var params = new URLSearchParams(hash);
-        snapshotId = params.get("ha_snapshot") || params.get("haSnapshot");
-      } catch (e) {
-        snapshotId = null;
-      }
+	        snapshotId = extractSnapshotId(window.location.href);
+	      } catch (e) {
+	        snapshotId = null;
+	      }
 
-      if (snapshotId) {
-        try {
-          sessionStorage.setItem(SNAPSHOT_STORAGE_KEY, String(snapshotId));
-        } catch (e) {}
-        return String(snapshotId);
-      }
+	      if (!snapshotId) {
+	        try {
+	          var wb = window.wbinfo || {};
+	          snapshotId = extractSnapshotId(wb.top_url || wb.topUrl || "");
+	        } catch (e) {
+	          snapshotId = null;
+	        }
+	      }
 
-      try {
-        var stored = sessionStorage.getItem(SNAPSHOT_STORAGE_KEY);
-        if (stored) return stored;
-      } catch (e) {}
+	      if (snapshotId) {
+	        try {
+	          sessionStorage.setItem(SNAPSHOT_STORAGE_KEY, String(snapshotId));
+	        } catch (e) {}
+	        return String(snapshotId);
+	      }
+
+	      try {
+	        var stored = sessionStorage.getItem(SNAPSHOT_STORAGE_KEY);
+	        if (stored) return stored;
+	      } catch (e) {}
 	      return null;
 	    }
 
@@ -546,14 +578,12 @@ Implementation note:
 	        "  </div>" +
 	        '  <div class="ha-replay-right" id="ha-replay-actions">' +
 	        '    <a class="ha-replay-navlink" data-ha-action="compare" href="#" aria-label="Compare this archived page to the live page">View diff</a>' +
-	        (snapshotId
-	          ? '    <a class="ha-replay-navlink" data-ha-action="raw" href="#" aria-label="View raw HTML for this snapshot">Raw HTML</a>' +
-	            '    <a class="ha-replay-navlink" data-ha-action="json" href="#" aria-label="View metadata JSON for this snapshot">Metadata JSON</a>' +
-	            '    <a class="ha-replay-navlink" data-ha-action="cite" href="#" aria-label="How to cite HealthArchive snapshots">Cite</a>' +
-	            '    <a class="ha-replay-navlink" data-ha-action="report" href="#" aria-label="Report an issue with this snapshot">Report issue</a>' +
-	            '    <a class="ha-replay-navlink" data-ha-action="history" href="#" aria-label="View other snapshots of this page">Other snapshots</a>' +
-	            '    <span class="ha-replay-divider" aria-hidden="true"></span>'
-	          : "") +
+	        '    <a class="ha-replay-navlink" data-ha-action="raw" href="#" aria-label="View raw HTML for this snapshot">Raw HTML</a>' +
+	        '    <a class="ha-replay-navlink" data-ha-action="json" href="#" aria-label="View metadata JSON for this snapshot">Metadata JSON</a>' +
+	        '    <a class="ha-replay-navlink" data-ha-action="cite" href="#" aria-label="How to cite HealthArchive snapshots">Cite</a>' +
+	        '    <a class="ha-replay-navlink" data-ha-action="report" href="#" aria-label="Report an issue with this snapshot">Report issue</a>' +
+	        '    <a class="ha-replay-navlink" data-ha-action="history" href="#" aria-label="View other snapshots of this page">Other snapshots</a>' +
+	        '    <span class="ha-replay-divider" aria-hidden="true"></span>' +
 	        '    <button type="button" id="ha-replay-hide" class="ha-replay-link" aria-label="Hide this banner">Hide</button>' +
 	        "  </div>" +
 	        "</div>";
@@ -753,6 +783,9 @@ Implementation note:
 	                if (!resolved || !resolved.snapshotId) return;
 	                if (resolved.mimeType != null && !isHtmlMimeType(resolved.mimeType)) return;
 	                snapshotId = String(resolved.snapshotId);
+	                try {
+	                  sessionStorage.setItem(SNAPSHOT_STORAGE_KEY, String(snapshotId));
+	                } catch (e) {}
 	                routes.browse = haBase + "/snapshot/" + snapshotId;
 	                routes.details = haBase + "/snapshot/" + snapshotId;
 	                routes.history = haBase + "/snapshot/" + snapshotId + "?view=details";
