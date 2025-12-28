@@ -3712,7 +3712,7 @@ def get_snapshot_raw(
             if host:
                 return f"{host}{rest}"
         except Exception:
-            pass
+            return re.sub(r"^https?://", "", cleaned, flags=re.IGNORECASE)
         return re.sub(r"^https?://", "", cleaned, flags=re.IGNORECASE)
 
     compact_url = _compact_url(snap.url)
