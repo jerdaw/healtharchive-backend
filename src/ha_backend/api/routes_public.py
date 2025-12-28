@@ -3757,14 +3757,13 @@ def get_snapshot_raw(
     report_query = urlencode(report_params) if report_params else ""
     report_url = f"{site_base}/report?{report_query}" if report_query else f"{site_base}/report"
 
-    action_links = []
-    if compare_url:
-        action_links.append(
-            f'<a class="ha-replay-navlink" href="{compare_url}" rel="noreferrer">View diff</a>'
-        )
     if replay_url:
         action_links.append(
             f'<a class="ha-replay-navlink" href="{replay_url}" rel="noreferrer">Replay</a>'
+        )
+    if compare_url:
+        action_links.append(
+            f'<a class="ha-replay-navlink" href="{compare_url}" rel="noreferrer">View diff</a>'
         )
     action_links.append(
         f'<a class="ha-replay-navlink" href="{snapshot_raw_url}" rel="noreferrer">Raw HTML</a>'
@@ -3910,7 +3909,7 @@ def get_snapshot_raw(
   #ha-replay-banner .ha-replay-action-link {{
     background-color: #2563eb;
     color: #ffffff;
-    box-shadow: 0 10px 24px rgba(37, 99, 235, 0.35);
+    box-shadow: 0 7.5px 18px rgba(37, 99, 235, 0.26);
   }}
 
   #ha-replay-banner .ha-replay-action-link:hover {{
