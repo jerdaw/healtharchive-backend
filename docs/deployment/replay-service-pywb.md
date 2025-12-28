@@ -296,6 +296,17 @@ sudo install -o hareplay -g healtharchive -m 0640 \
 sudo systemctl restart healtharchive-replay.service
 ```
 
+Notes:
+
+- The banner script calls the HealthArchive public API from the replay origin
+  (for example, `GET /api/replay/resolve`) to resolve the snapshot ID and build
+  the correct “back to snapshot” and compare links. Ensure the backend CORS
+  allowlist includes `https://replay.healtharchive.ca` when the banner is
+  enabled.
+- If you deploy the backend using `./scripts/vps-deploy.sh --apply --restart-replay`,
+  the deploy helper will also install `custom_banner.html` and restart the replay
+  service as part of that run (single-VPS setup).
+
 Note: the banner can be disabled for screenshot generation by adding a fragment:
 
 ```

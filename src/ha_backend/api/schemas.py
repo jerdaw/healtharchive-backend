@@ -242,6 +242,7 @@ class SnapshotTimelineItemSchema(BaseModel):
     title: Optional[str]
     statusCode: Optional[int]
     compareFromSnapshotId: Optional[int]
+    browseUrl: Optional[str] = None
 
 
 class SnapshotTimelineSchema(BaseModel):
