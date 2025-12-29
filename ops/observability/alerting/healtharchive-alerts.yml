@@ -86,3 +86,16 @@ groups:
           summary: "WARC tiering bind mounts failed"
           description: "The tiering bind-mount service is in a failed state. Canonical WARC paths may not resolve after reboot. Check healtharchive-warc-tiering.service logs and /etc/healtharchive/warc-tiering.binds."
           runbook_url: "https://github.com/jerdaw/healtharchive-backend/blob/main/docs/operations/playbooks/warc-storage-tiering.md"
+
+  - name: healtharchive.campaign
+    rules:
+      - alert: HealthArchiveAnnualCampaignSentinelFailed
+        expr: healtharchive_annual_campaign_sentinel_ok == 0
+        for: 2m
+        labels:
+          severity: critical
+          service: healtharchive
+        annotations:
+          summary: "Annual campaign sentinel failed (preflight/scheduling/tiering)"
+          description: "The annual campaign sentinel reported failure. This usually means campaign preflight failed, annual jobs were not scheduled, or annual output dirs were not tiered onto the Storage Box."
+          runbook_url: "https://github.com/jerdaw/healtharchive-backend/blob/main/docs/operations/playbooks/annual-campaign.md"

@@ -1,0 +1,19 @@
+[Unit]
+Description=HealthArchive annual campaign sentinel (preflight + tiering verification)
+Wants=network-online.target
+After=network-online.target postgresql.service healtharchive-storagebox-sshfs.service
+Requires=healtharchive-storagebox-sshfs.service
+ConditionPathExists=/etc/healtharchive/backend.env
+ConditionPathExists=/etc/healtharchive/automation-enabled
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+WorkingDirectory=/opt/healtharchive-backend
+EnvironmentFile=/etc/healtharchive/backend.env
+EnvironmentFile=-/etc/healtharchive/healthchecks.env
+ExecStart=/opt/healtharchive-backend/scripts/systemd-healthchecks-wrapper.sh --ping-var HEALTHARCHIVE_HC_PING_ANNUAL_SENTINEL -- /opt/healtharchive-backend/.venv/bin/python3 /opt/healtharchive-backend/scripts/vps-annual-campaign-sentinel.py
+
+[Install]
+WantedBy=multi-user.target

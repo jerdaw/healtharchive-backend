@@ -439,3 +439,37 @@ def test_vps_annual_output_tiering_plan_window_override_includes_recent_jobs(
         created_before=datetime(2025, 12, 30, tzinfo=timezone.utc),
     )
     assert [p.job_name for p in plan] == ["hc-annual-2026-created-in-dec"]
+
+
+def test_vps_annual_campaign_sentinel_parses_annual_status_payload() -> None:
+    mod = _load_script_module(
+        "vps-annual-campaign-sentinel.py",
+        module_name="ha_test_vps_annual_campaign_sentinel",
+    )
+
+    payload = {
+        "campaignYear": 2026,
+        "campaignDate": "2026-01-01",
+        "sources": [
+            {"sourceCode": "hc", "status": "queued", "job": {"jobId": 1, "outputDir": "/a/b"}},
+            {"sourceCode": "phac", "status": "missing", "job": None},
+            {"sourceCode": "cihr", "status": "error", "job": None},
+        ],
+        "summary": {
+            "totalSources": 3,
+            "indexed": 0,
+            "inProgress": 1,
+            "failed": 0,
+            "missing": 1,
+            "errors": 1,
+            "readyForSearch": False,
+        },
+    }
+
+    summary, jobs = mod._parse_annual_status(payload)
+    assert summary.total_sources == 3
+    assert summary.missing == 1
+    assert summary.errors == 1
+    assert [j.source_code for j in jobs] == ["hc", "phac", "cihr"]
+    assert jobs[0].job_id == 1
+    assert jobs[0].output_dir == Path("/a/b")
