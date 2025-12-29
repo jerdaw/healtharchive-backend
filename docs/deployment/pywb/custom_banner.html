@@ -398,47 +398,103 @@ Implementation note:
 	    min-height: 44px;
 	  }
 
-	  @media (max-width: 780px) {
-	    #ha-replay-banner .ha-replay-bar {
-	      padding: 0.45rem 0.65rem;
-	      column-gap: 0.55rem;
-	      min-height: 48px;
-	    }
+		  @media (max-width: 980px) {
+		    #ha-replay-banner:not(.ha-replay-embedded) .ha-replay-right {
+		      overflow-x: auto;
+		      -webkit-overflow-scrolling: touch;
+		      max-width: 70vw;
+		      scrollbar-width: thin;
+		      justify-content: flex-start;
+		    }
 
-	    #ha-replay-banner .ha-replay-hide-sm {
-	      display: none !important;
-	    }
+		    #ha-replay-banner:not(.ha-replay-embedded) .ha-replay-right > * {
+		      flex: 0 0 auto;
+		    }
+		  }
 
-	    #ha-replay-banner .ha-replay-history-panel {
-	      left: 0.6rem;
-	      right: 0.6rem;
-	      width: auto;
-	    }
-	  }
+		  @media (max-width: 780px) {
+		    #ha-replay-banner .ha-replay-bar {
+		      grid-template-columns: minmax(0, 1fr) max-content;
+		      grid-template-rows: auto auto;
+		      align-items: start;
+		      row-gap: 0.45rem;
+		      padding: 0.55rem 0.65rem;
+		      column-gap: 0.65rem;
+		      min-height: 0;
+		    }
 
-	  @media (max-width: 980px) {
-	    #ha-replay-banner:not(.ha-replay-embedded) .ha-replay-right {
-	      overflow-x: auto;
-	      -webkit-overflow-scrolling: touch;
-	      max-width: 70vw;
-	      scrollbar-width: thin;
-	    }
+		    #ha-replay-banner .ha-replay-left {
+		      padding-right: 0.35rem;
+		      grid-column: 1;
+		      grid-row: 1;
+		    }
 
-	    #ha-replay-banner:not(.ha-replay-embedded) .ha-replay-right > * {
-	      flex: 0 0 auto;
-	    }
-	  }
-</style>
+		    #ha-replay-banner .ha-replay-right {
+		      grid-column: 2;
+		      grid-row: 1;
+		      max-width: min(66vw, 420px);
+		      gap: 0.25rem;
+		    }
+
+		    #ha-replay-banner .ha-replay-center {
+		      grid-column: 1 / -1;
+		      grid-row: 2;
+		    }
+
+		    #ha-replay-banner .ha-replay-meta {
+		      flex-direction: column;
+		      align-items: flex-start;
+		      gap: 0.12rem;
+		    }
+
+		    #ha-replay-banner .ha-replay-meta-item + .ha-replay-meta-item {
+		      padding-left: 0;
+		    }
+
+		    #ha-replay-banner .ha-replay-meta-item + .ha-replay-meta-item::before {
+		      content: none;
+		    }
+
+		    #ha-replay-banner .ha-replay-disclaimer-inline {
+		      white-space: normal;
+		      display: -webkit-box;
+		      -webkit-box-orient: vertical;
+		      -webkit-line-clamp: 2;
+		      overflow: hidden;
+		    }
+
+		    #ha-replay-banner .ha-replay-btn,
+		    #ha-replay-banner .ha-replay-icon-btn {
+		      padding: 0.5rem 0.75rem;
+		    }
+
+		    #ha-replay-banner .ha-replay-navlink {
+		      padding: 0.42rem 0.5rem;
+		    }
+
+		    #ha-replay-banner .ha-replay-hide-sm {
+		      display: none !important;
+		    }
+
+		    #ha-replay-banner .ha-replay-history-panel {
+		      left: 0.6rem;
+		      right: 0.6rem;
+		      width: auto;
+		    }
+		  }
+	</style>
 
 	<script id="ha-replay-banner-js">
 	  (function () {
-	    var MESSAGE_TYPE = "haReplayNavigation";
-	    var HEIGHT_MESSAGE_TYPE = "haReplayHeight";
-	    var SNAPSHOT_STORAGE_KEY = "haReplaySnapshotId";
-	    var COMPARE_LATEST_STORAGE_KEY = "haReplayLatestSnapshotId";
-	    var refreshCompareLink = null;
-	    var heightTimer = null;
-	    var snapshotIdExplicit = false;
+		    var MESSAGE_TYPE = "haReplayNavigation";
+		    var HEIGHT_MESSAGE_TYPE = "haReplayHeight";
+		    var SNAPSHOT_STORAGE_KEY = "haReplaySnapshotId";
+		    var COMPARE_LATEST_STORAGE_KEY = "haReplayLatestSnapshotId";
+		    var RETURN_URL_STORAGE_KEY = "haReplayReturnUrl";
+		    var RETURN_HISTORY_LENGTH_STORAGE_KEY = "haReplayReturnHistoryLength";
+		    var refreshCompareLink = null;
+		    var heightTimer = null;
+		    var snapshotIdExplicit = false;
 
 	    function isEmbedded() {
 	      try {
@@ -907,9 +963,9 @@ Implementation note:
 			        '<div class="ha-replay-inner">' +
 			        '  <div class="ha-replay-bar">' +
 			        '    <div class="ha-replay-left">' +
-			        '      <a class="ha-replay-btn ha-replay-btn-primary" data-ha-action="browse" href="#" target="_top" rel="noreferrer noopener" aria-label="' +
-			        t("backAria") +
-			        '">' +
+				        '      <a class="ha-replay-btn ha-replay-btn-primary" id="ha-replay-back" data-ha-action="browse" href="#" target="_top" rel="noreferrer noopener" aria-label="' +
+				        t("backAria") +
+				        '">' +
 			        "\u2190 HealthArchive.ca" +
 			        "      </a>" +
 			        "    </div>" +
@@ -993,8 +1049,11 @@ Implementation note:
         } catch (e) {}
       }
 
-      var disclaimerEl = document.getElementById("ha-replay-disclaimer");
-      if (disclaimerEl) disclaimerEl.textContent = t("disclaimerPrefix");
+	      var disclaimerEl = document.getElementById("ha-replay-disclaimer");
+	      if (disclaimerEl) {
+	        disclaimerEl.textContent = t("disclaimerPrefix");
+	        disclaimerEl.setAttribute("title", t("disclaimerPrefix"));
+	      }
 
 	      var urlEl = document.getElementById("ha-replay-top-url");
 		      try {
@@ -1022,19 +1081,61 @@ Implementation note:
 	      // Avoid pywb rewriting our "escape hatch" navigation by:
 	      //  - not embedding HealthArchive URLs directly in HTML attributes, and
 	      //  - using buttons with explicit JS navigation.
-	      try {
-	        var haBase = getSiteBase(window.location.hostname);
-	        var haLocalePrefix = UI_LOCALE === "fr" ? "/fr" : "";
-	        var haRoot = haBase + haLocalePrefix;
-	        var apiCandidates = getApiBaseCandidates(window.location.hostname);
-	        var apiBase = apiCandidates[0];
-	        var wbInfo = getWbInfo();
-	        var originalUrl = wbInfo.url || "";
+		      try {
+		        var haBase = getSiteBase(window.location.hostname);
+		        var haLocalePrefix = UI_LOCALE === "fr" ? "/fr" : "";
+		        var haRoot = haBase + haLocalePrefix;
+		        var haHome = haRoot + "/";
+		        var apiCandidates = getApiBaseCandidates(window.location.hostname);
+		        var apiBase = apiCandidates[0];
+		        var wbInfo = getWbInfo();
+		        var originalUrl = wbInfo.url || "";
 
-	        function buildArchiveSearchUrl(originalUrlValue) {
-	          try {
-	            var cleanUrl = stripUrlFragment(originalUrlValue);
-	            if (!cleanUrl) return haRoot + "/archive?focus=results";
+		        function normalizeHost(hostname) {
+		          return String(hostname || "").trim().toLowerCase().replace(/^www\./, "");
+		        }
+
+		        var haApexHost = null;
+		        try {
+		          haApexHost = normalizeHost(new URL(haBase).hostname);
+		        } catch (e) {
+		          haApexHost = null;
+		        }
+
+		        function isHealthArchiveHost(hostname) {
+		          if (!hostname || !haApexHost) return false;
+		          return normalizeHost(hostname) === haApexHost;
+		        }
+
+		        function loadHaReturnUrl() {
+		          var stored = null;
+		          try {
+		            stored = sessionStorage.getItem(RETURN_URL_STORAGE_KEY);
+		          } catch (e) {}
+
+		          try {
+		            var ref = document.referrer || "";
+		            if (ref) {
+			              var refUrl = new URL(ref);
+			              if (isHealthArchiveHost(refUrl.hostname)) {
+			                stored = refUrl.href;
+			                try {
+			                  sessionStorage.setItem(RETURN_URL_STORAGE_KEY, stored);
+			                } catch (e) {}
+			                try {
+			                  sessionStorage.setItem(RETURN_HISTORY_LENGTH_STORAGE_KEY, String(history.length));
+			                } catch (e) {}
+			              }
+			            }
+			          } catch (e) {}
+
+		          return stored || null;
+		        }
+
+		        function buildArchiveSearchUrl(originalUrlValue) {
+		          try {
+		            var cleanUrl = stripUrlFragment(originalUrlValue);
+		            if (!cleanUrl) return haRoot + "/archive?focus=results";
 	            return (
 	              haRoot +
 	              "/archive?view=snapshots&q=" +
@@ -1044,17 +1145,18 @@ Implementation note:
 	          } catch (e) {
 	            return haRoot + "/archive?focus=results";
 	          }
-	        }
+		        }
 
-	        var archiveSearchUrl = buildArchiveSearchUrl(originalUrl);
-	        var routes = {
-	          browse: snapshotId ? haRoot + "/snapshot/" + snapshotId : archiveSearchUrl,
-	        };
+		        var archiveSearchUrl = buildArchiveSearchUrl(originalUrl);
+		        var returnUrl = loadHaReturnUrl();
+		        var routes = {
+		          browse: returnUrl || haHome,
+		        };
 
-	        routes.details = routes.browse;
-	        routes.compare = originalUrl
-	          ? haRoot + "/compare-live?url=" + encodeURIComponent(stripUrlFragment(originalUrl)) + "&run=1"
-	          : haRoot + "/compare-live";
+		        routes.details = snapshotId ? haRoot + "/snapshot/" + snapshotId : archiveSearchUrl;
+		        routes.compare = originalUrl
+		          ? haRoot + "/compare-live?url=" + encodeURIComponent(stripUrlFragment(originalUrl)) + "&run=1"
+		          : haRoot + "/compare-live";
 	        routes.origin = originalUrl ? stripUrlFragment(originalUrl) : "";
 	        routes.historyPage = archiveSearchUrl;
 
@@ -1607,15 +1709,21 @@ Implementation note:
 	          } catch (e) {}
 	        }
 
-	        function ensureActionClickHandlers() {
-	          try {
-	            banner.querySelectorAll("[data-ha-action]").forEach(function (el) {
-	              if (el._haClickBound) return;
-	              el._haClickBound = true;
-	              el.addEventListener("click", function (event) {
-	                // Allow ctrl/cmd/middle clicks to open in a new tab using the (blob) href.
-	                if (
-	                  event.button !== 0 ||
+		        function ensureActionClickHandlers() {
+		          try {
+		            banner.querySelectorAll("[data-ha-action]").forEach(function (el) {
+		              if (el._haClickBound) return;
+		              el._haClickBound = true;
+		              var action = null;
+		              try {
+		                action = el.getAttribute("data-ha-action");
+		              } catch (e) {
+		                action = null;
+		              }
+		              el.addEventListener("click", function (event) {
+		                // Allow ctrl/cmd/middle clicks to open in a new tab using the (blob) href.
+		                if (
+		                  event.button !== 0 ||
 	                  event.metaKey ||
 	                  event.ctrlKey ||
 	                  event.shiftKey ||
@@ -1636,13 +1744,33 @@ Implementation note:
 	                  return;
 	                }
 
-	                event.preventDefault();
-	                event.stopPropagation();
+		                event.preventDefault();
+		                event.stopPropagation();
 
-	                var target = null;
-	                try {
-	                  target = el.getAttribute("target");
-	                } catch (e) {
+		                if (action === "browse" && el.id === "ha-replay-back") {
+		                  try {
+		                    var entryLenRaw = sessionStorage.getItem(RETURN_HISTORY_LENGTH_STORAGE_KEY) || "";
+		                    var entryLen = parseInt(entryLenRaw, 10);
+		                    var currentLen = history.length;
+		                    var steps = currentLen - entryLen + 1;
+		                    if (
+		                      Number.isFinite(entryLen) &&
+		                      entryLen > 0 &&
+		                      Number.isFinite(currentLen) &&
+		                      currentLen > 1 &&
+		                      steps > 0 &&
+		                      steps <= 250
+		                    ) {
+		                      history.go(-steps);
+		                      return;
+		                    }
+		                  } catch (e) {}
+		                }
+
+		                var target = null;
+		                try {
+		                  target = el.getAttribute("target");
+		                } catch (e) {
 	                  target = null;
 	                }
 
