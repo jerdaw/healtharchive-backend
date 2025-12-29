@@ -109,9 +109,9 @@ groups:
           (
             absent(healtharchive_annual_campaign_sentinel_last_run_timestamp_seconds)
             or (
-              year(healtharchive_annual_campaign_sentinel_last_run_timestamp_seconds) != on() year()
-              or month(healtharchive_annual_campaign_sentinel_last_run_timestamp_seconds) != on() month()
-              or day_of_month(healtharchive_annual_campaign_sentinel_last_run_timestamp_seconds) != on() day_of_month()
+              year(max(healtharchive_annual_campaign_sentinel_last_run_timestamp_seconds)) != on() year()
+              or month(max(healtharchive_annual_campaign_sentinel_last_run_timestamp_seconds)) != on() month()
+              or day_of_month(max(healtharchive_annual_campaign_sentinel_last_run_timestamp_seconds)) != on() day_of_month()
             )
           )
           and on() month() == 1
