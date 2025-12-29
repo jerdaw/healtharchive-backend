@@ -242,6 +242,11 @@ Notes:
   - Artifacts are written to: `/srv/healtharchive/ops/baseline/`
   - You can skip in emergencies: `./scripts/vps-deploy.sh --apply --skip-baseline-drift`
   - To include live HTTPS checks (HSTS, CORS headers, admin/metrics auth): `./scripts/vps-deploy.sh --apply --baseline-mode live`
+- If you update systemd unit templates in the repo, you can apply them during deploy:
+  - `./scripts/vps-deploy.sh --apply --install-systemd-units`
+- If you update Prometheus alert rules, you can apply them during deploy:
+  - `./scripts/vps-deploy.sh --apply --apply-alerting`
+  - Requires alerting to be configured (webhook secret present at `/etc/healtharchive/observability/alertmanager_webhook_url`).
 - The baseline policy (desired state) is versioned in git at:
   `docs/operations/production-baseline-policy.toml`
 - The deploy script runs a **public-surface smoke verify** by default (public API + frontend + replay + usage):
