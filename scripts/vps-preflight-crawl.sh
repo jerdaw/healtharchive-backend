@@ -26,6 +26,7 @@ Usage (on the VPS):
 
 Options:
   --year YYYY                 Dry-run annual scheduler for YYYY (recommended pre-Jan-01)
+  --campaign-archive-root DIR Filesystem path that will hold the upcoming campaign outputs (defaults to auto-detect; falls back to HEALTHARCHIVE_ARCHIVE_ROOT)
   --env-file FILE             Env file to source (default: /etc/healtharchive/backend.env)
   --api-base URL              Loopback API base for health checks (default: http://127.0.0.1:8001)
   --public-api-base URL       Public API base for verifiers (default: https://api.healtharchive.ca)
@@ -48,6 +49,7 @@ EOF
 }
 
 YEAR=""
+CAMPAIGN_ARCHIVE_ROOT=""
 ENV_FILE="/etc/healtharchive/backend.env"
 API_BASE="http://127.0.0.1:8001"
 PUBLIC_API_BASE="https://api.healtharchive.ca"
@@ -65,6 +67,10 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     --year)
       YEAR="$2"
+      shift 2
+      ;;
+    --campaign-archive-root)
+      CAMPAIGN_ARCHIVE_ROOT="$2"
       shift 2
       ;;
     --env-file)
@@ -139,6 +145,19 @@ if [[ "${BASELINE_MODE}" != "local" && "${BASELINE_MODE}" != "live" ]]; then
   exit 2
 fi
 
+if [[ -n "${CAMPAIGN_ARCHIVE_ROOT}" && ! -e "${CAMPAIGN_ARCHIVE_ROOT}" ]]; then
+  echo "ERROR: --campaign-archive-root path does not exist: ${CAMPAIGN_ARCHIVE_ROOT}" >&2
+  exit 2
+fi
+
+if [[ -n "${CAMPAIGN_ARCHIVE_ROOT}" && "${CAMPAIGN_ARCHIVE_ROOT}" == /srv/healtharchive/storagebox/* ]]; then
+  if ! is_mounted "/srv/healtharchive/storagebox"; then
+    echo "ERROR: --campaign-archive-root points at Storage Box but /srv/healtharchive/storagebox is not mounted" >&2
+    echo "Hint: mount the Storage Box (sshfs) first, then re-run preflight." >&2
+    exit 2
+  fi
+fi
+
 API_BASE="${API_BASE%/}"
 PUBLIC_API_BASE="${PUBLIC_API_BASE%/}"
 PUBLIC_FRONTEND_BASE="${PUBLIC_FRONTEND_BASE%/}"
@@ -166,6 +185,15 @@ fail() {
 
 have_cmd() {
   command -v "$1" >/dev/null 2>&1
+}
+
+is_mounted() {
+  local path="$1"
+  if have_cmd mountpoint; then
+    mountpoint -q "${path}"
+    return $?
+  fi
+  mount | grep -q " on ${path} " 2>/dev/null
 }
 
 require_venv() {
@@ -242,7 +270,17 @@ run_step() {
   fail "${label} (rc=${rc})"
   if [[ "${WRITE_REPORTS}" == "true" ]]; then
     warn "  see: ${OUT_DIR}/${outfile}"
-    tail -n 12 "${OUT_DIR}/${outfile}" 2>/dev/null | sed 's/^/  | /' >&2 || true
+    local fail_lines
+    if have_cmd rg; then
+      fail_lines="$(rg -n "^(FAIL|ERROR):" "${OUT_DIR}/${outfile}" 2>/dev/null | head -n 12 || true)"
+    else
+      fail_lines="$(grep -nE "^(FAIL|ERROR):" "${OUT_DIR}/${outfile}" 2>/dev/null | head -n 12 || true)"
+    fi
+    if [[ -n "${fail_lines}" ]]; then
+      echo "  | [failure_lines]" >&2
+      printf '%s\n' "${fail_lines}" | sed 's/^/  | /' >&2
+    fi
+    tail -n 18 "${OUT_DIR}/${outfile}" 2>/dev/null | sed 's/^/  | /' >&2 || true
   fi
   return 0
 }
@@ -365,7 +403,11 @@ step_archive_tool_dry_run() {
 
 step_campaign_storage_forecast() {
   set -u -o pipefail
-  local archive_root="${HEALTHARCHIVE_ARCHIVE_ROOT:-/srv/healtharchive/jobs}"
+  local archive_root="${1:-}"
+  if [[ -z "${archive_root}" ]]; then
+    echo "ERROR: missing archive_root argument to step_campaign_storage_forecast" >&2
+    return 1
+  fi
   "${VENV_BIN}/python3" ./scripts/campaign_storage_forecast.py --year "${YEAR}" --archive-root "${archive_root}"
 }
 
@@ -408,6 +450,39 @@ step_docker_daemon() {
   echo ""
   echo "[docker_ps]"
   docker ps --no-trunc --format '{{.ID}}\t{{.Image}}\t{{.Status}}' | head -n 25 || true
+}
+
+step_campaign_tier_docker_probe() {
+  set -u -o pipefail
+  local archive_root="${1:-}"
+  if [[ -z "${archive_root}" ]]; then
+    echo "ERROR: missing archive_root argument to step_campaign_tier_docker_probe" >&2
+    return 1
+  fi
+  if ! have_cmd docker; then
+    echo "ERROR: docker not found in PATH" >&2
+    return 1
+  fi
+  if ! docker image inspect alpine >/dev/null 2>&1; then
+    echo "NOTE: docker image 'alpine' not present; skipping docker mount probe (pre-pull images on the VPS for this check)." >&2
+    return 0
+  fi
+  if [[ ! -d "${archive_root}" ]]; then
+    echo "ERROR: archive_root not a directory: ${archive_root}" >&2
+    return 1
+  fi
+
+  local tmp
+  tmp="$(mktemp -d -p "${archive_root}" ha-preflight-docker-probe.XXXXXX)"
+  if [[ -z "${tmp}" || ! -d "${tmp}" ]]; then
+    echo "ERROR: failed to create temp dir under: ${archive_root}" >&2
+    return 1
+  fi
+
+  docker run --rm --pull=never -v "${tmp}:/probe" alpine sh -c 'set -e; echo ok >/probe/ok.txt; ls -la /probe'
+  local rc=$?
+  rm -rf "${tmp}" || true
+  return "${rc}"
 }
 
 step_db_check() {
@@ -703,6 +778,7 @@ public_api_base=${PUBLIC_API_BASE}
 public_frontend_base=${PUBLIC_FRONTEND_BASE}
 baseline_mode=${BASELINE_MODE}
 annual_year=${YEAR:-}
+campaign_archive_root=${CAMPAIGN_ARCHIVE_ROOT:-}
 META
 )"
 
@@ -719,6 +795,32 @@ run_step "System info" "01-system.txt" step_system_info
 
 disk_check_one "/" "rootfs"
 inode_check_one "/" "rootfs"
+
+# Determine the filesystem that will hold the upcoming campaign outputs.
+# In a tiered setup (small local SSD + Storage Box), HEALTHARCHIVE_ARCHIVE_ROOT may
+# still point at /srv/healtharchive/jobs even though most bytes live on a nested
+# mount. For campaign forecasting we want the *actual* tier that new jobs will land on.
+campaign_root="${CAMPAIGN_ARCHIVE_ROOT}"
+if [[ -z "${campaign_root}" ]]; then
+  # Auto-detect: prefer Storage Box tier if present.
+  if [[ -d "/srv/healtharchive/storagebox/jobs" ]] && is_mounted "/srv/healtharchive/storagebox"; then
+    campaign_root="/srv/healtharchive/storagebox/jobs"
+  else
+    if [[ -d "/srv/healtharchive/storagebox/jobs" ]] && ! is_mounted "/srv/healtharchive/storagebox"; then
+      warn "storagebox dir exists but is not mounted; campaign forecast will use ${HEALTHARCHIVE_ARCHIVE_ROOT:-/srv/healtharchive/jobs}"
+    fi
+    campaign_root="${HEALTHARCHIVE_ARCHIVE_ROOT:-/srv/healtharchive/jobs}"
+  fi
+fi
+
+write_file "01-storage-tier.txt" "$(cat <<TIER
+timestamp_utc=${timestamp}
+campaign_archive_root=${campaign_root}
+healtharchive_archive_root=${HEALTHARCHIVE_ARCHIVE_ROOT:-}
+storagebox_mounted=$([[ -d "/srv/healtharchive/storagebox" ]] && is_mounted "/srv/healtharchive/storagebox" && echo true || echo false)
+TIER
+)"
+
 if [[ -n "${HEALTHARCHIVE_ARCHIVE_ROOT:-}" ]]; then
   disk_check_one "${HEALTHARCHIVE_ARCHIVE_ROOT}" "archive_root"
   inode_check_one "${HEALTHARCHIVE_ARCHIVE_ROOT}" "archive_root"
@@ -727,8 +829,13 @@ elif [[ -d "/srv/healtharchive" ]]; then
   inode_check_one "/srv/healtharchive" "srv_healtharchive"
 fi
 
+if [[ "${campaign_root}" != "${HEALTHARCHIVE_ARCHIVE_ROOT:-/srv/healtharchive/jobs}" ]]; then
+  disk_check_one "${campaign_root}" "campaign_archive_root"
+  inode_check_one "${campaign_root}" "campaign_archive_root"
+fi
+
 if [[ -n "${YEAR}" ]]; then
-  run_step "Campaign storage forecast" "02-storage-forecast.txt" step_campaign_storage_forecast
+  run_step "Campaign storage forecast" "02-storage-forecast.txt" step_campaign_storage_forecast "${campaign_root}"
 else
   warn "campaign storage forecast skipped (pass --year YYYY)"
 fi
@@ -750,6 +857,10 @@ run_step "Time sync (NTP)" "04-time-sync.txt" step_time_sync
 run_step "Services" "05-services.txt" step_services
 
 run_step "Docker daemon access" "06-docker-daemon.txt" step_docker_daemon
+
+if [[ "${campaign_root}" != "${HEALTHARCHIVE_ARCHIVE_ROOT:-/srv/healtharchive/jobs}" ]]; then
+  run_step "Campaign tier docker mount probe" "06a-campaign-tier-docker-probe.txt" step_campaign_tier_docker_probe "${campaign_root}"
+fi
 
 run_step "DB connectivity" "07-db-check.txt" step_db_check
 
