@@ -20,6 +20,7 @@ Follow `../../deployment/replay-service-pywb.md`.
    - `cd /opt/healtharchive-backend && ./scripts/verify_public_surface.py`
 3. Verify the replay banner works on a direct replay page:
    - Open a known `browseUrl` on `https://replay.healtharchive.ca/` and confirm the banner loads quickly, shows the page title + meta line (capture date + original URL) + disclaimer, and that the action links (View diff, Details, All snapshots, Raw HTML, Metadata JSON, Cite, Report issue, Hide) behave as expected.
+   - From HealthArchive search results, click `View` and confirm “← HealthArchive.ca” returns to the same search results page.
 
 ## Retention warning
 
