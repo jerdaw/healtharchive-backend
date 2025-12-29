@@ -89,6 +89,9 @@ Assumptions (adjust paths/user if your VPS differs):
 - `healtharchive-annual-output-tiering.service`
   - After annual jobs are enqueued, bind-mounts each annual job output_dir onto the Storage Box tier.
   - Triggered via `OnSuccess=` in `healtharchive-schedule-annual.service` (template).
+- `healtharchive-annual-campaign-sentinel.service` + `.timer`
+  - Runs a “day-of” annual readiness gate automatically: preflight + annual-status + tiering checks.
+  - Writes a small Prometheus textfile metric so Alertmanager can notify on failures.
 
 ---
 
@@ -251,6 +254,7 @@ Edit `/etc/healtharchive/healthchecks.env` and set (examples):
 ```bash
 HEALTHARCHIVE_HC_PING_REPLAY_RECONCILE=https://hc-ping.com/<uuid>
 HEALTHARCHIVE_HC_PING_SCHEDULE_ANNUAL=https://hc-ping.com/<uuid>
+HEALTHARCHIVE_HC_PING_ANNUAL_SENTINEL=https://hc-ping.com/<uuid>
 HEALTHARCHIVE_HC_PING_CHANGE_TRACKING=https://hc-ping.com/<uuid>
 HEALTHARCHIVE_HC_PING_BASELINE_DRIFT=https://hc-ping.com/<uuid>
 HEALTHARCHIVE_HC_PING_PUBLIC_VERIFY=https://hc-ping.com/<uuid>

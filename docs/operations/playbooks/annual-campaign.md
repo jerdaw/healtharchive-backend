@@ -18,11 +18,24 @@ Canonical references:
 - If the annual scheduler is enabled, dry-run it:
   - `sudo systemctl start healtharchive-schedule-annual-dry-run.service`
   - `sudo journalctl -u healtharchive-schedule-annual-dry-run.service -n 200 --no-pager`
+- Enable the annual campaign sentinel (recommended; sends notification on failure):
+  - `sudo systemctl enable --now healtharchive-annual-campaign-sentinel.timer`
+  - Optional: configure Healthchecks ping URL at `/etc/healtharchive/healthchecks.env`:
+    - `HEALTHARCHIVE_HC_PING_ANNUAL_SENTINEL=https://hc-ping.com/<uuid>`
 
 ## During/after the campaign (high level)
 
 - Use the automation plan (`../automation-implementation-plan.md`) to decide what is enabled and what is manual.
 - Prefer safe, idempotent entrypoints (systemd services/timers or the provided scripts).
+
+## Manual trigger (day-of)
+
+If you want to run the annual sentinel immediately (safe; read-only except for metrics output):
+
+```bash
+sudo systemctl start healtharchive-annual-campaign-sentinel.service
+sudo journalctl -u healtharchive-annual-campaign-sentinel.service -n 200 --no-pager
+```
 
 ## What “done” means
 
