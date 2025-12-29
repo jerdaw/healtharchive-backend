@@ -278,7 +278,7 @@ Implementation notes:
 
 - The banner is inserted only for non-framed replay (our default).
 - When replay is embedded in an iframe, the banner collapses to a minimal UI
-  (Compare + Hide) to avoid duplicating the HealthArchive wrapper header.
+  (View diff + Details + Hide) to avoid duplicating the HealthArchive wrapper header.
 - When embedded, the script also emits lightweight `postMessage` events with
   the current replay URL/timestamp so the HealthArchive frontend can support
   edition switching while you browse.
@@ -303,6 +303,10 @@ Notes:
   the correct “back to snapshot” and compare links. Ensure the backend CORS
   allowlist includes `https://replay.healtharchive.ca` when the banner is
   enabled.
+- The direct-replay banner is a compact sticky top bar: title, capture date,
+  original URL, an always-visible disclaimer line, and action links (View diff,
+  Details, All snapshots, Raw HTML, Metadata JSON, Cite, Report issue, Hide).
+  “All snapshots” opens a right-aligned popover list.
 - The banner uses `XMLHttpRequest` with pywb’s wombat opt-out (`xhr._no_rewrite = true`)
   so API requests are not replay-rewritten. Ensure CORS allows the
   `X-Pywb-Requested-With` header from `https://replay.healtharchive.ca`.

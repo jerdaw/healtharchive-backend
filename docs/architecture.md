@@ -954,7 +954,9 @@ Public Pydantic models:
 
   - Validates `Snapshot` exists and `warc_path` points to an existing file.
   - Uses `find_record_for_snapshot(snapshot)` to get a WARC record.
-  - Returns HTML via `HTMLResponse`.
+  - Returns an HTML page via `HTMLResponse` that includes the reconstructed archived HTML
+    plus a lightweight HealthArchive top bar (navigation links + disclaimer) so it can be
+    viewed standalone.
 
 ### 8.3 Admin auth (`deps.py`)
 
