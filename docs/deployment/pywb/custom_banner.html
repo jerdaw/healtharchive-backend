@@ -491,7 +491,6 @@ Implementation note:
 		    var SNAPSHOT_STORAGE_KEY = "haReplaySnapshotId";
 		    var COMPARE_LATEST_STORAGE_KEY = "haReplayLatestSnapshotId";
 		    var RETURN_URL_STORAGE_KEY = "haReplayReturnUrl";
-		    var RETURN_HISTORY_LENGTH_STORAGE_KEY = "haReplayReturnHistoryLength";
 		    var refreshCompareLink = null;
 		    var heightTimer = null;
 		    var snapshotIdExplicit = false;
@@ -1085,7 +1084,6 @@ Implementation note:
 		        var haBase = getSiteBase(window.location.hostname);
 		        var haLocalePrefix = UI_LOCALE === "fr" ? "/fr" : "";
 		        var haRoot = haBase + haLocalePrefix;
-		        var haHome = haRoot + "/";
 		        var apiCandidates = getApiBaseCandidates(window.location.hostname);
 		        var apiBase = apiCandidates[0];
 		        var wbInfo = getWbInfo();
@@ -1108,28 +1106,111 @@ Implementation note:
 		        }
 
 		        function loadHaReturnUrl() {
+		          function readReturn(params) {
+		            if (!params) return null;
+		            return params.get("ha_return") || params.get("haReturn");
+		          }
+
+		          function extractReturn(value) {
+		            if (!value || typeof value !== "string") return null;
+		            var rawValue = value.trim();
+		            if (!rawValue) return null;
+
+		            try {
+		              var url = new URL(rawValue, window.location.origin);
+		              var fromQuery = readReturn(url.searchParams);
+		              if (fromQuery) return fromQuery;
+		              var hashValue = url.hash ? url.hash.replace(/^#/, "") : "";
+		              if (hashValue) {
+		                var hashParams = new URLSearchParams(hashValue);
+		                var fromHash = readReturn(hashParams);
+		                if (fromHash) return fromHash;
+		              }
+		            } catch (e) {
+		              try {
+		                var cleaned = rawValue.replace(/^[?#]/, "");
+		                var params = new URLSearchParams(cleaned);
+		                return readReturn(params);
+		              } catch (e2) {}
+		            }
+
+		            return null;
+		          }
+
+		          function normalizeReturnDest(value) {
+		            if (!value || typeof value !== "string") return null;
+		            var raw = value.trim();
+		            if (!raw) return null;
+
+		            if (/^https?:\/\//i.test(raw)) {
+		              try {
+		                var u = new URL(raw);
+		                return isHealthArchiveHost(u.hostname) ? u.href : null;
+		              } catch (e) {
+		                return null;
+		              }
+		            }
+
+		            if (raw[0] === "/") return haBase + raw;
+		            return null;
+		          }
+
 		          var stored = null;
 		          try {
 		            stored = sessionStorage.getItem(RETURN_URL_STORAGE_KEY);
 		          } catch (e) {}
 
+		          var rawReturn = null;
 		          try {
-		            var ref = document.referrer || "";
-		            if (ref) {
-			              var refUrl = new URL(ref);
-			              if (isHealthArchiveHost(refUrl.hostname)) {
-			                stored = refUrl.href;
-			                try {
-			                  sessionStorage.setItem(RETURN_URL_STORAGE_KEY, stored);
-			                } catch (e) {}
-			                try {
-			                  sessionStorage.setItem(RETURN_HISTORY_LENGTH_STORAGE_KEY, String(history.length));
-			                } catch (e) {}
-			              }
-			            }
-			          } catch (e) {}
+		            rawReturn = extractReturn(window.location.hash || "");
+		          } catch (e) {
+		            rawReturn = null;
+		          }
 
-		          return stored || null;
+		          if (!rawReturn) {
+		            var hrefCandidates = [];
+		            try {
+		              if (window.WB_wombat_location && window.WB_wombat_location._orig_loc) {
+		                hrefCandidates.push(window.WB_wombat_location._orig_loc.href);
+		              }
+		            } catch (e) {}
+		            try {
+		              if (window.location && window.location._orig_loc) {
+		                hrefCandidates.push(window.location._orig_loc.href);
+		              }
+		            } catch (e) {}
+		            try {
+		              hrefCandidates.push(window.location.href);
+		            } catch (e) {}
+
+		            for (var i = 0; i < hrefCandidates.length; i++) {
+		              try {
+		                rawReturn = extractReturn(hrefCandidates[i]);
+		                if (rawReturn) break;
+		              } catch (e) {}
+		            }
+		          }
+
+		          if (!rawReturn) {
+		            try {
+		              var ref = document.referrer || "";
+		              if (ref) {
+		                var refUrl = new URL(ref);
+		                if (isHealthArchiveHost(refUrl.hostname)) {
+		                  rawReturn = refUrl.href;
+		                }
+		              }
+		            } catch (e) {}
+		          }
+
+		          var dest = normalizeReturnDest(rawReturn) || normalizeReturnDest(stored) || stored || null;
+		          if (dest) {
+		            try {
+		              sessionStorage.setItem(RETURN_URL_STORAGE_KEY, dest);
+		            } catch (e) {}
+		          }
+
+		          return dest || null;
 		        }
 
 		        function buildArchiveSearchUrl(originalUrlValue) {
@@ -1150,7 +1231,7 @@ Implementation note:
 		        var archiveSearchUrl = buildArchiveSearchUrl(originalUrl);
 		        var returnUrl = loadHaReturnUrl();
 		        var routes = {
-		          browse: returnUrl || haHome,
+		          browse: returnUrl || archiveSearchUrl,
 		        };
 
 		        routes.details = snapshotId ? haRoot + "/snapshot/" + snapshotId : archiveSearchUrl;
@@ -1714,12 +1795,6 @@ Implementation note:
 		            banner.querySelectorAll("[data-ha-action]").forEach(function (el) {
 		              if (el._haClickBound) return;
 		              el._haClickBound = true;
-		              var action = null;
-		              try {
-		                action = el.getAttribute("data-ha-action");
-		              } catch (e) {
-		                action = null;
-		              }
 		              el.addEventListener("click", function (event) {
 		                // Allow ctrl/cmd/middle clicks to open in a new tab using the (blob) href.
 		                if (
@@ -1746,26 +1821,6 @@ Implementation note:
 
 		                event.preventDefault();
 		                event.stopPropagation();
-
-		                if (action === "browse" && el.id === "ha-replay-back") {
-		                  try {
-		                    var entryLenRaw = sessionStorage.getItem(RETURN_HISTORY_LENGTH_STORAGE_KEY) || "";
-		                    var entryLen = parseInt(entryLenRaw, 10);
-		                    var currentLen = history.length;
-		                    var steps = currentLen - entryLen + 1;
-		                    if (
-		                      Number.isFinite(entryLen) &&
-		                      entryLen > 0 &&
-		                      Number.isFinite(currentLen) &&
-		                      currentLen > 1 &&
-		                      steps > 0 &&
-		                      steps <= 250
-		                    ) {
-		                      history.go(-steps);
-		                      return;
-		                    }
-		                  } catch (e) {}
-		                }
 
 		                var target = null;
 		                try {
