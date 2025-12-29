@@ -15,6 +15,9 @@ What this does (when run with --apply):
 - Forces exporters to listen on loopback only:
   - node exporter: 127.0.0.1:9100
   - postgres exporter: 127.0.0.1:9187
+- Enables the node_exporter textfile collector at:
+    /var/lib/node_exporter/textfile_collector
+  (used by HealthArchive ops scripts to emit small, high-signal health metrics).
 - Creates a dedicated Postgres role for scraping DB metrics (pg_monitor).
 - Writes exporter credentials to root-owned files under:
   - /etc/healtharchive/observability/
@@ -69,6 +72,7 @@ DB_USER="postgres_exporter"
 
 NODE_LISTEN="127.0.0.1:9100"
 PG_LISTEN="127.0.0.1:9187"
+NODE_TEXTFILE_DIR="/var/lib/node_exporter/textfile_collector"
 
 SKIP_DB_ROLE="false"
 SKIP_APT="false"
@@ -334,9 +338,11 @@ ${content}
 EOF
 }
 
+run install -d -m 0755 -o root -g root "${NODE_TEXTFILE_DIR}"
+
 write_dropin "${NODE_UNIT}" "[Service]
 ExecStart=
-ExecStart=${NODE_BIN} --web.listen-address=${NODE_LISTEN}
+ExecStart=${NODE_BIN} --web.listen-address=${NODE_LISTEN} --collector.textfile.directory=${NODE_TEXTFILE_DIR}
 "
 
 write_dropin "${PG_UNIT}" "[Service]

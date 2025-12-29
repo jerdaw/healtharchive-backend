@@ -331,3 +331,74 @@ def test_vps_rehearsal_evidence_check_fails_on_low_mem(tmp_path) -> None:
         )
         == 1
     )
+
+
+def test_vps_annual_output_tiering_cold_path_mapping() -> None:
+    mod = _load_script_module(
+        "vps-annual-output-tiering.py",
+        module_name="ha_test_vps_annual_output_tiering",
+    )
+
+    out = mod._cold_path_for_output_dir(
+        output_dir=Path("/srv/healtharchive/jobs/cihr/20260101T000000Z__cihr-2026"),
+        archive_root=Path("/srv/healtharchive/jobs"),
+        campaign_archive_root=Path("/srv/healtharchive/storagebox/jobs"),
+    )
+    assert out == Path("/srv/healtharchive/storagebox/jobs/cihr/20260101T000000Z__cihr-2026")
+
+
+def test_vps_annual_output_tiering_plan_selects_annual_jobs(tmp_path, monkeypatch) -> None:
+    mod = _load_script_module(
+        "vps-annual-output-tiering.py",
+        module_name="ha_test_vps_annual_output_tiering_plan",
+    )
+    _init_test_db(tmp_path, monkeypatch, "annual_tiering.db")
+
+    monkeypatch.setattr(mod, "_is_mountpoint", lambda _p: False)
+
+    with get_session() as session:
+        seed_sources(session)
+        session.flush()
+        hc = session.query(Source).filter_by(code="hc").one()
+
+        session.add(
+            ArchiveJob(
+                source=hc,
+                name="hc-annual-2026",
+                output_dir="/srv/healtharchive/jobs/hc/20260101T000000Z__hc-annual-2026",
+                status="queued",
+                created_at=datetime(2026, 1, 1, 0, 5, tzinfo=timezone.utc),
+                config={"campaign_kind": "annual", "campaign_year": 2026},
+            )
+        )
+        session.add(
+            ArchiveJob(
+                source=hc,
+                name="hc-nonannual-2026",
+                output_dir="/srv/healtharchive/jobs/hc/20260101T000000Z__hc-nonannual-2026",
+                status="queued",
+                created_at=datetime(2026, 1, 1, 0, 6, tzinfo=timezone.utc),
+                config={},
+            )
+        )
+        session.add(
+            ArchiveJob(
+                source=hc,
+                name="hc-annual-2025",
+                output_dir="/srv/healtharchive/jobs/hc/20250101T000000Z__hc-annual-2025",
+                status="queued",
+                created_at=datetime(2025, 1, 1, 0, 5, tzinfo=timezone.utc),
+                config={"campaign_kind": "annual", "campaign_year": 2025},
+            )
+        )
+
+    plan = mod._plan(
+        year=2026,
+        sources=["hc"],
+        archive_root=Path("/srv/healtharchive/jobs"),
+        campaign_archive_root=Path("/srv/healtharchive/storagebox/jobs"),
+    )
+    assert [p.job_name for p in plan] == ["hc-annual-2026"]
+    assert plan[0].cold_dir == Path(
+        "/srv/healtharchive/storagebox/jobs/hc/20260101T000000Z__hc-annual-2026"
+    )

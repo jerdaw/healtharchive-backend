@@ -227,6 +227,38 @@ Manual validation (safe):
 sudo /opt/healtharchive-backend/scripts/vps-warc-tiering-bind-mounts.sh
 ```
 
+## Annual outputs: automatically tier to Storage Box
+
+If you use the annual scheduler timer (`healtharchive-schedule-annual.timer`), the
+systemd template now triggers `healtharchive-annual-output-tiering.service` on
+success. This bind-mounts the newly enqueued annual job output directories onto
+the Storage Box tier and briefly stops the worker to reduce race conditions.
+
+To apply the updated template on the VPS:
+
+```bash
+cd /opt/healtharchive-backend
+git pull
+sudo ./scripts/vps-install-systemd-units.sh --apply
+sudo systemctl daemon-reload
+```
+
+## Alerting for tiering (recommended)
+
+If you use Prometheus alerting, enable the tiering metrics writer:
+
+```bash
+sudo systemctl enable --now healtharchive-tiering-metrics.timer
+```
+
+This requires node_exporter to have the textfile collector enabled (the repo installer does this):
+
+```bash
+cd /opt/healtharchive-backend
+git pull
+sudo ./scripts/vps-install-observability-exporters.sh --apply
+```
+
 ## Promote (cold → hot) later (optional)
 
 If you decide a job should be “hot” again:

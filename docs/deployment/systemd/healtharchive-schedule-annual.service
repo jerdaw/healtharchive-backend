@@ -5,6 +5,7 @@ After=network-online.target postgresql.service
 ConditionPathExists=/etc/healtharchive/backend.env
 ConditionPathExists=/etc/healtharchive/automation-enabled
 RefuseManualStart=yes
+OnSuccess=healtharchive-annual-output-tiering.service
 
 [Service]
 Type=oneshot

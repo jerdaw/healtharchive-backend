@@ -1,0 +1,21 @@
+[Unit]
+Description=HealthArchive annual campaign output tiering (bind-mount onto Storage Box)
+After=healtharchive-storagebox-sshfs.service
+Requires=healtharchive-storagebox-sshfs.service
+ConditionPathExists=/etc/healtharchive/backend.env
+ConditionPathExists=/etc/healtharchive/storagebox.env
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+WorkingDirectory=/opt/healtharchive-backend
+EnvironmentFile=/etc/healtharchive/backend.env
+
+# Reduce race with the worker picking up newly enqueued annual jobs.
+ExecStartPre=-/bin/systemctl stop healtharchive-worker.service
+ExecStart=/opt/healtharchive-backend/.venv/bin/python3 /opt/healtharchive-backend/scripts/vps-annual-output-tiering.py --apply
+ExecStartPost=-/bin/systemctl start healtharchive-worker.service
+
+[Install]
+WantedBy=multi-user.target
