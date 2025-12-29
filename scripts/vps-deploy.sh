@@ -12,6 +12,7 @@ Usage:
                          [--skip-deps] [--skip-migrations] [--skip-restart] [--restart-replay]
                          [--skip-baseline-drift] [--baseline-mode MODE]
                          [--skip-public-surface-verify]
+                         [--install-systemd-units] [--apply-alerting]
                          [--public-api-base URL] [--public-frontend-base URL] [--public-timeout-seconds SECONDS]
                          [--allow-dirty] [--no-pull] [--lock-file FILE]
 
@@ -50,6 +51,8 @@ RESTART_REPLAY="false"
 SKIP_BASELINE_DRIFT="false"
 BASELINE_MODE="local"
 SKIP_PUBLIC_SURFACE_VERIFY="false"
+INSTALL_SYSTEMD_UNITS="false"
+APPLY_ALERTING="false"
 PUBLIC_API_BASE="https://api.healtharchive.ca"
 PUBLIC_FRONTEND_BASE="https://www.healtharchive.ca"
 PUBLIC_TIMEOUT_SECONDS="20"
@@ -114,6 +117,14 @@ while [[ $# -gt 0 ]]; do
       ;;
     --skip-public-surface-verify)
       SKIP_PUBLIC_SURFACE_VERIFY="true"
+      shift 1
+      ;;
+    --install-systemd-units)
+      INSTALL_SYSTEMD_UNITS="true"
+      shift 1
+      ;;
+    --apply-alerting)
+      APPLY_ALERTING="true"
       shift 1
       ;;
     --public-api-base)
@@ -234,6 +245,8 @@ echo "Health URL:  ${HEALTH_URL}"
 echo "Lock file:   ${LOCK_FILE}"
 echo "Baseline:    $([[ "${SKIP_BASELINE_DRIFT}" == "true" ]] && echo SKIPPED || echo "ENABLED (mode=${BASELINE_MODE})")"
 echo "Public verify: $([[ "${SKIP_PUBLIC_SURFACE_VERIFY}" == "true" ]] && echo SKIPPED || echo "ENABLED (api=${PUBLIC_API_BASE}, frontend=${PUBLIC_FRONTEND_BASE})")"
+echo "Systemd units: $([[ "${INSTALL_SYSTEMD_UNITS}" == "true" ]] && echo INSTALL || echo SKIP)"
+echo "Alerting:     $([[ "${APPLY_ALERTING}" == "true" ]] && echo APPLY || echo SKIP)"
 if [[ -n "${REF}" ]]; then
   echo "Ref:         ${REF}"
 fi
@@ -275,6 +288,10 @@ if [[ "${SKIP_MIGRATIONS}" != "true" ]]; then
   run_shell "set -a; source \"${ENV_FILE}\"; set +a; \"${VENV_BIN}/alembic\" -c alembic.ini upgrade head"
 else
   echo "Skipping migrations (--skip-migrations)."
+fi
+
+if [[ "${INSTALL_SYSTEMD_UNITS}" == "true" ]]; then
+  run sudo "${REPO_DIR}/scripts/vps-install-systemd-units.sh" --apply
 fi
 
 if [[ "${SKIP_RESTART}" != "true" ]]; then
@@ -326,6 +343,10 @@ if [[ "${SKIP_PUBLIC_SURFACE_VERIFY}" != "true" ]]; then
     --timeout-seconds "${PUBLIC_TIMEOUT_SECONDS}"
 else
   echo "Skipping public surface verification (--skip-public-surface-verify)."
+fi
+
+if [[ "${APPLY_ALERTING}" == "true" ]]; then
+  run sudo "${REPO_DIR}/scripts/vps-install-observability-alerting.sh" --apply
 fi
 
 echo ""
