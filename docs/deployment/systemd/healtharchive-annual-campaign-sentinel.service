@@ -13,7 +13,7 @@ Group=root
 WorkingDirectory=/opt/healtharchive-backend
 EnvironmentFile=/etc/healtharchive/backend.env
 EnvironmentFile=-/etc/healtharchive/healthchecks.env
-ExecStart=/opt/healtharchive-backend/scripts/systemd-healthchecks-wrapper.sh --ping-var HEALTHARCHIVE_HC_PING_ANNUAL_SENTINEL -- /opt/healtharchive-backend/.venv/bin/python3 /opt/healtharchive-backend/scripts/vps-annual-campaign-sentinel.py
+ExecStart=/opt/healtharchive-backend/scripts/systemd-healthchecks-wrapper.sh --ping-var HEALTHARCHIVE_HC_PING_ANNUAL_SENTINEL -- /usr/bin/bash -lc '/opt/healtharchive-backend/.venv/bin/python3 /opt/healtharchive-backend/scripts/vps-annual-campaign-sentinel.py --year $(date -u +%%Y) --campaign-archive-root /srv/healtharchive/storagebox/jobs'
 
 [Install]
 WantedBy=multi-user.target
