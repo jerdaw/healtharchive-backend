@@ -20,7 +20,7 @@ Implementation note:
 -->
 
 	<style id="ha-replay-banner-css">
-	  #ha-replay-banner {
+  #ha-replay-banner {
 	    position: sticky;
 	    top: 0;
 	    z-index: 2147483647;
@@ -29,8 +29,8 @@ Implementation note:
     background-color: color-mix(in srgb, rgba(255, 255, 255, 0.9) 82%, transparent);
     font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI",
       sans-serif;
-    font-size: 0.85rem;
-    line-height: 1.25;
+    font-size: 0.95rem;
+    line-height: 1.2;
     -webkit-font-smoothing: antialiased;
     backdrop-filter: blur(10px) saturate(1.1);
     box-shadow: 0 8px 16px rgba(15, 23, 42, 0.04);
@@ -58,9 +58,9 @@ Implementation note:
   #ha-replay-banner .ha-replay-inner {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    gap: 0.6rem;
-    padding: 0.65rem 1.05rem;
+    justify-content: flex-start;
+    gap: 0.55rem;
+    padding: 0.55rem 0.95rem;
   }
 
   #ha-replay-banner .ha-replay-left,
@@ -72,9 +72,18 @@ Implementation note:
   }
 
   #ha-replay-banner .ha-replay-right {
+    margin-left: auto;
     flex-wrap: wrap;
     justify-content: flex-end;
     row-gap: 0.2rem;
+  }
+
+  #ha-replay-banner .ha-replay-toprow {
+    display: flex;
+    align-items: baseline;
+    gap: 0.7rem;
+    width: 100%;
+    min-width: 0;
   }
 
   #ha-replay-banner .ha-replay-pill {
@@ -107,15 +116,18 @@ Implementation note:
     text-overflow: ellipsis;
     white-space: nowrap;
     max-width: 100%;
+    flex: 0 1 40%;
+    min-width: 10rem;
   }
 
   #ha-replay-banner .ha-replay-fields {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 0.1rem 0.9rem;
-    font-size: 0.76rem;
+    display: flex;
+    align-items: baseline;
+    flex: 1 1 auto;
+    min-width: 0;
+    gap: 0.55rem;
+    font-size: 0.8rem;
     color: rgba(15, 23, 42, 0.7);
-    width: 100%;
   }
 
   #ha-replay-banner .ha-replay-field {
@@ -171,8 +183,9 @@ Implementation note:
     max-width: 100%;
     white-space: normal;
     display: -webkit-box;
-    -webkit-line-clamp: 2;
+    -webkit-line-clamp: 1;
     -webkit-box-orient: vertical;
+    font-size: 0.82rem;
   }
 
   #ha-replay-banner .ha-replay-history-panel {
@@ -377,7 +390,7 @@ Implementation note:
 	    display: none !important;
 	  }
 
-	  #ha-replay-banner.ha-replay-embedded .ha-replay-inner {
+  #ha-replay-banner.ha-replay-embedded .ha-replay-inner {
 	    padding: 0.4rem 0.6rem;
 	    justify-content: flex-end;
 	  }
@@ -419,11 +432,13 @@ Implementation note:
       display: -webkit-box;
       -webkit-line-clamp: 1;
       -webkit-box-orient: vertical;
+      flex: 1 1 auto;
     }
 
     #ha-replay-banner:not(.ha-replay-embedded) .ha-replay-fields {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
       font-size: 0.74rem;
+      flex-wrap: wrap;
+      gap: 0.35rem 0.7rem;
     }
 
     #ha-replay-banner:not(.ha-replay-embedded) .ha-replay-meta {
@@ -439,6 +454,7 @@ Implementation note:
     }
 
     #ha-replay-banner:not(.ha-replay-embedded) .ha-replay-right {
+      margin-left: 0;
       width: 100%;
       justify-content: flex-start;
       flex-wrap: nowrap;
@@ -461,7 +477,9 @@ Implementation note:
 
   @media (max-width: 420px) {
     #ha-replay-banner:not(.ha-replay-embedded) .ha-replay-fields {
-      grid-template-columns: 1fr;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 0.25rem;
     }
   }
 </style>
@@ -818,7 +836,7 @@ Implementation note:
 	      };
 	    }
 
-	    function getApiBaseCandidates(hostname) {
+	        function getApiBaseCandidates(hostname) {
 	      // Prefer api.<apex>, but also try the public site origin (some deployments proxy /api there).
 	      // Include window.location.origin as a last-ditch candidate for localhost/IP debugging.
 	      var scheme = "https://";
@@ -847,7 +865,8 @@ Implementation note:
 	      var apiBase = scheme + "api." + apex;
 	      var siteBase = scheme + "www." + apex;
 	      var apexBase = scheme + apex;
-	      return [apiBase, siteBase, apexBase];
+	      // Most deployments serve /api on the public origin; prefer that first.
+	      return [siteBase, apiBase, apexBase];
 	    }
 
 	    function getSiteBase(hostname) {
@@ -923,8 +942,9 @@ Implementation note:
 	        "</span>" +
 	        "  </div>" +
 	        '  <div class="ha-replay-center">' +
-	        '    <div class="ha-replay-title" id="ha-replay-title"></div>' +
-	        '    <div class="ha-replay-fields" id="ha-replay-fields" aria-label="' +
+	        '    <div class="ha-replay-toprow">' +
+	        '      <div class="ha-replay-title" id="ha-replay-title"></div>' +
+	        '      <div class="ha-replay-fields" id="ha-replay-fields" aria-label="' +
 	        (UI_LOCALE === "fr" ? "Résumé de la capture" : "Snapshot summary") +
 	        '">' +
 	        '      <div class="ha-replay-field" id="ha-replay-field-source">' +
@@ -951,8 +971,8 @@ Implementation note:
 	        "</span>" +
 	        '        <a class="ha-replay-field-value ha-replay-field-url" data-ha-action="origin" id="ha-replay-value-url" href="#" target="_blank" rel="noreferrer noopener"></a>' +
 	        "      </div>" +
+	        "      </div>" +
 	        "    </div>" +
-	        '    <div class="ha-replay-meta" id="ha-replay-meta"></div>' +
 	        '    <div class="ha-replay-disclaimer" id="ha-replay-disclaimer"></div>' +
 	        "  </div>" +
 	        '  <div class="ha-replay-right" id="ha-replay-actions">' +
@@ -1022,9 +1042,6 @@ Implementation note:
           titleEl.setAttribute("title", document.title || "");
         } catch (e) {}
       }
-
-      var metaEl = document.getElementById("ha-replay-meta");
-      if (metaEl) metaEl.textContent = buildMeta() || "";
 
       var disclaimerEl = document.getElementById("ha-replay-disclaimer");
       if (disclaimerEl) disclaimerEl.textContent = t("disclaimerPrefix");
@@ -1319,11 +1336,8 @@ Implementation note:
 	              }
 	            }
 
-	            var metaEl = document.getElementById("ha-replay-meta");
-	            if (metaEl) {
-	              metaEl.textContent = buildMeta() || "";
-	              metaEl.style.display = hasDetail ? "none" : "";
-	            }
+	            // Intentionally omit the "Backup/Captured" meta line from the banner
+	            // to keep the header compact; the snapshot date above is the primary cue.
 	          } catch (e) {}
 	        }
 
@@ -1365,6 +1379,9 @@ Implementation note:
 	            routes.history = haRoot + "/snapshot/" + snapshotId + "?view=details";
 	            routes.report = buildReportUrl(snapshotId, originalUrl);
 	            routes.cite = haRoot + "/cite?snapshot=" + snapshotId;
+	            routes.raw = apiBase + "/api/snapshots/raw/" + snapshotId;
+	            routes.json = apiBase + "/api/snapshot/" + snapshotId;
+	            routes.timeline = apiBase + "/api/snapshots/" + snapshotId + "/timeline";
 	          }
 
 	          if (!jobId || !originalUrl) {
@@ -1439,7 +1456,9 @@ Implementation note:
 	                if (snapshotId !== nextSnapshotId) return;
 	                applySnapshotDetail(detail);
 	              })
-	              .catch(function () {})
+	              .catch(function () {
+	                if (snapshotId === nextSnapshotId) applySnapshotDetail(null);
+	              })
 	              .finally(function () {
 	                if (snapshotDetailPendingId === nextSnapshotId) snapshotDetailPendingId = null;
 	              });
@@ -1584,6 +1603,9 @@ Implementation note:
 
 	        ensureActionClickHandlers();
 	        applyRoutes();
+	        // Ensure we start from a clean, compact state (hide optional fields and
+	        // show a best-effort snapshot date) even if API calls fail.
+	        updateSnapshotDetailUi();
 
 	        var historyOpen = false;
 	        var historyPanel = document.getElementById("ha-replay-history-panel");
