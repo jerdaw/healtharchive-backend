@@ -103,7 +103,6 @@ Implementation note:
     flex: 1 1 auto;
     min-width: 0;
     color: rgba(15, 23, 42, 0.6);
-    font-size: 0.975rem;
     font-weight: 600;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -165,14 +164,12 @@ Implementation note:
     white-space: nowrap;
     color: rgba(15, 23, 42, 0.92);
     font-weight: 500;
-    font-size: 1.05rem;
   }
 
   #ha-replay-banner .ha-replay-summary-label {
     flex: 0 0 auto;
     color: rgba(15, 23, 42, 0.55);
     font-weight: 500;
-    font-size: 0.95em;
   }
 
   #ha-replay-banner .ha-replay-summary-value {
@@ -1201,171 +1198,71 @@ Implementation note:
 	        }
 
 	        function safeJson(url, timeoutMs) {
-	          // NOTE: pywb's wombat overrides fetch/XHR to replay archived resources. For
-	          // live HealthArchive APIs, we use a tiny hidden iframe loaded from a
-	          // blob: URL (no wombat) to perform the network request and postMessage
-	          // results back to this banner.
-	          var LIVE_MARKER = "__haLiveJsonBridge";
-	          var LIVE_REQ_TYPE = "request";
-	          var LIVE_RES_TYPE = "response";
-	          var LIVE_READY_TYPE = "ready";
-
-	          var liveBridge = safeJson._haLiveBridge || null;
-	          var liveSeq = safeJson._haLiveSeq || 0;
-
-	          function ensureBridge() {
-	            if (safeJson._haLiveBridge) return safeJson._haLiveBridge;
-	            var bridge = {
-	              iframe: null,
-	              ready: false,
-	              queue: [],
-	              pending: {},
-	            };
-
-	            function handleMessage(event) {
-	              try {
-	                if (!bridge.iframe) return;
-	                if (event.source !== bridge.iframe.contentWindow) return;
-	                var msg = event.data;
-	                if (!msg || msg[LIVE_MARKER] !== true) return;
-
-	                if (msg.type === LIVE_READY_TYPE) {
-	                  bridge.ready = true;
-	                  try {
-	                    var q = bridge.queue.slice();
-	                    bridge.queue.length = 0;
-	                    q.forEach(function (fn) {
-	                      try {
-	                        fn();
-	                      } catch (e) {}
-	                    });
-	                  } catch (e) {}
-	                  return;
-	                }
-
-	                if (msg.type !== LIVE_RES_TYPE || !msg.id) return;
-	                var entry = bridge.pending[msg.id];
-	                if (!entry) return;
-	                delete bridge.pending[msg.id];
-	                if (entry.timer) clearTimeout(entry.timer);
-	                if (msg.ok) entry.resolve(msg.data);
-	                else entry.reject(new Error(msg.error || "request_failed"));
-	              } catch (e) {}
-	            }
-
-	            try {
-	              window.addEventListener("message", handleMessage);
-	            } catch (e) {}
-
-	            var iframe = document.createElement("iframe");
-	            iframe.style.display = "none";
-	            iframe.setAttribute("aria-hidden", "true");
-	            iframe.setAttribute("tabindex", "-1");
-	            iframe.title = "HealthArchive live JSON bridge";
-
-	            var html =
-	              "<!doctype html><meta charset=utf-8>" +
-	              "<meta name=referrer content=no-referrer>" +
-	              "<title>HealthArchive bridge</title>" +
-	              "<script>(function(){\\n" +
-	              "function post(m){try{parent.postMessage(m,'*')}catch(e){}}\\n" +
-	              "window.addEventListener('message', async function(ev){\\n" +
-	              "  var msg = ev.data;\\n" +
-	              "  if(!msg || msg." +
-	              LIVE_MARKER +
-	              " !== true || msg.type !== '" +
-	              LIVE_REQ_TYPE +
-	              "') return;\\n" +
-	              "  var id = msg.id;\\n" +
-	              "  var url = msg.url;\\n" +
-	              "  try {\\n" +
-	              "    var res = await fetch(url,{method:'GET',cache:'no-store',credentials:'omit',headers:{Accept:'application/json'}});\\n" +
-	              "    if(!res.ok) throw new Error('status ' + res.status);\\n" +
-	              "    var data = await res.json();\\n" +
-	              "    post({" +
-	              LIVE_MARKER +
-	              ":true,type:'" +
-	              LIVE_RES_TYPE +
-	              "',id:id,ok:true,data:data});\\n" +
-	              "  } catch(err) {\\n" +
-	              "    post({" +
-	              LIVE_MARKER +
-	              ":true,type:'" +
-	              LIVE_RES_TYPE +
-	              "',id:id,ok:false,error:String(err)});\\n" +
-	              "  }\\n" +
-	              "});\\n" +
-	              "post({" +
-	              LIVE_MARKER +
-	              ":true,type:'" +
-	              LIVE_READY_TYPE +
-	              "'});\\n" +
-	              "})();<\\/script>";
-
-	            try {
-	              var blob = new Blob([html], { type: "text/html" });
-	              var blobUrl = URL.createObjectURL(blob);
-	              iframe.src = blobUrl;
-	            } catch (e) {}
-
-	            bridge.iframe = iframe;
-	            try {
-	              document.body.appendChild(iframe);
-	            } catch (e) {}
-
-	            safeJson._haLiveBridge = bridge;
-	            safeJson._haLiveSeq = 0;
-	            return bridge;
-	          }
-
-	          function nextReqId() {
-	            liveSeq = liveSeq + 1;
-	            safeJson._haLiveSeq = liveSeq;
-	            return "ha_live_" + String(Date.now()) + "_" + String(liveSeq);
-	          }
-
+	          // pywb's wombat rewrites fetch() but supports opt-out for XHR via the
+	          // per-instance `_no_rewrite` flag.
 	          return new Promise(function (resolve, reject) {
-	            var bridge = liveBridge || ensureBridge();
-	            if (!bridge || !bridge.iframe || !bridge.iframe.contentWindow) {
-	              reject(new Error("bridge_unavailable"));
+	            if (!url) {
+	              reject(new Error("missing_url"));
 	              return;
 	            }
 
-	            var requestId = nextReqId();
+	            var xhr = null;
+	            try {
+	              xhr = new XMLHttpRequest();
+	            } catch (e) {
+	              reject(e);
+	              return;
+	            }
+
+	            var timedOut = false;
 	            var timer = null;
 	            try {
 	              timer = setTimeout(function () {
-	                var entry = bridge.pending[requestId];
-	                if (!entry) return;
-	                delete bridge.pending[requestId];
-	                entry.reject(new Error("timeout"));
+	                timedOut = true;
+	                try {
+	                  xhr.abort();
+	                } catch (e) {}
+	                reject(new Error("timeout"));
 	              }, timeoutMs || 3500);
-	            } catch (e) {}
-
-	            bridge.pending[requestId] = { resolve: resolve, reject: reject, timer: timer };
-
-	            function send() {
-	              try {
-	                bridge.iframe.contentWindow.postMessage(
-	                  {
-	                    __haLiveJsonBridge: true,
-	                    type: "request",
-	                    id: requestId,
-	                    url: String(url || ""),
-	                  },
-	                  "*"
-	                );
-	              } catch (e) {
-	                var entry = bridge.pending[requestId];
-	                if (!entry) return;
-	                delete bridge.pending[requestId];
-	                if (entry.timer) clearTimeout(entry.timer);
-	                entry.reject(e);
-	              }
+	            } catch (e) {
+	              timer = null;
 	            }
 
-	            if (bridge.ready) send();
-	            else bridge.queue.push(send);
+	            try {
+	              xhr._no_rewrite = true;
+	            } catch (e) {}
+
+	            xhr.onreadystatechange = function () {
+	              if (xhr.readyState !== 4 || timedOut) return;
+	              if (timer) clearTimeout(timer);
+
+	              try {
+	                var ok = xhr.status >= 200 && xhr.status < 300;
+	                if (!ok) throw new Error("status " + xhr.status);
+	                var text = xhr.responseText || "";
+	                resolve(JSON.parse(text));
+	              } catch (e) {
+	                reject(e);
+	              }
+	            };
+
+	            xhr.onerror = function () {
+	              if (timer) clearTimeout(timer);
+	              if (timedOut) return;
+	              reject(new Error("network_error"));
+	            };
+
+	            try {
+	              xhr.open("GET", String(url), true);
+	              xhr.withCredentials = false;
+	              try {
+	                xhr.setRequestHeader("Accept", "application/json");
+	              } catch (e) {}
+	              xhr.send(null);
+	            } catch (e) {
+	              if (timer) clearTimeout(timer);
+	              reject(e);
+	            }
 	          });
 	        }
 
@@ -2043,8 +1940,6 @@ Implementation note:
 	        }
 
 	        var refreshTimer = null;
-	        var resolveAttempts = 0;
-	        var resolveTimer = null;
 	        refreshCompareLink = function () {
 	          if (refreshTimer) clearTimeout(refreshTimer);
 	          refreshTimer = setTimeout(function () {
@@ -2054,14 +1949,6 @@ Implementation note:
 	                updateSnapshotDetailUi();
 	                if (historyOpen) fetchTimelineIfNeeded();
 	                setHistoryToggleLabel();
-	              })
-	              .finally(function () {
-	                if (snapshotId || resolveAttempts >= 6) return;
-	                resolveAttempts += 1;
-	                if (resolveTimer) clearTimeout(resolveTimer);
-	                resolveTimer = setTimeout(function () {
-	                  refreshCompareLink();
-	                }, 700);
 	              })
 	              .catch(function () {});
 	          }, 250);
