@@ -17,13 +17,13 @@ Environment=STORAGEBOX_PORT=23
 Environment=STORAGEBOX_REMOTE_PATH=/
 Environment=STORAGEBOX_MOUNT=/srv/healtharchive/storagebox
 
-ExecStartPre=/usr/bin/install -d -m 0755 -o root -g root $STORAGEBOX_MOUNT
+ExecStartPre=/usr/bin/install -d -m 0755 -o root -g root ${STORAGEBOX_MOUNT}
 ExecStartPre=/usr/bin/install -d -m 0700 -o root -g root /root/.ssh
 
 # -f keeps sshfs in the foreground so systemd can supervise it.
-ExecStart=/usr/bin/sshfs -f -p $STORAGEBOX_PORT -o IdentityFile=$STORAGEBOX_IDENTITY -o allow_other,default_permissions -o uid=$STORAGEBOX_UID,gid=$STORAGEBOX_GID,umask=0027 -o reconnect,ServerAliveInterval=15,ServerAliveCountMax=3,kernel_cache $STORAGEBOX_USER@$STORAGEBOX_HOST:$STORAGEBOX_REMOTE_PATH $STORAGEBOX_MOUNT
+ExecStart=/usr/bin/sshfs -f -p ${STORAGEBOX_PORT} -o IdentityFile=${STORAGEBOX_IDENTITY} -o allow_other,default_permissions -o uid=${STORAGEBOX_UID},gid=${STORAGEBOX_GID},umask=0027 -o reconnect,ServerAliveInterval=15,ServerAliveCountMax=3,kernel_cache ${STORAGEBOX_USER}@${STORAGEBOX_HOST}:${STORAGEBOX_REMOTE_PATH} ${STORAGEBOX_MOUNT}
 
-ExecStop=/bin/fusermount3 -u $STORAGEBOX_MOUNT
+ExecStop=/bin/fusermount3 -u ${STORAGEBOX_MOUNT}
 Restart=on-failure
 RestartSec=5
 TimeoutStartSec=30
