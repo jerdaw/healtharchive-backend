@@ -449,10 +449,10 @@ Implementation note:
 		    }
 		  }
 
-		  @media (max-width: 780px) {
-		    #ha-replay-banner .ha-replay-bar {
-		      grid-template-columns: minmax(0, 1fr);
-		      grid-template-rows: auto auto auto;
+			  @media (max-width: 780px) {
+			    #ha-replay-banner .ha-replay-bar {
+			      grid-template-columns: minmax(0, 1fr);
+			      grid-template-rows: auto auto auto;
 		      align-items: start;
 		      row-gap: 0.45rem;
 		      padding: 0.55rem 0.65rem;
@@ -466,20 +466,27 @@ Implementation note:
 		      grid-row: 1;
 		    }
 
-		    #ha-replay-banner .ha-replay-right {
-		      grid-column: 1;
-		      grid-row: 2;
-		      max-width: 100%;
-		      overflow-x: auto;
-		      -webkit-overflow-scrolling: touch;
-		      gap: 0.25rem;
-		      justify-content: flex-start;
-		    }
+			    #ha-replay-banner .ha-replay-right {
+			      grid-column: 1;
+			      grid-row: 2;
+			      max-width: 100%;
+			      overflow-x: auto;
+			      -webkit-overflow-scrolling: touch;
+			      gap: 0.25rem;
+			      justify-content: flex-start;
+			    }
 
-		    #ha-replay-banner .ha-replay-center {
-		      grid-column: 1;
-		      grid-row: 3;
-		    }
+			    /* Override the (more specific) <=980px max-width clamp so mobile can use the full bar width. */
+			    #ha-replay-banner:not(.ha-replay-embedded) .ha-replay-right {
+			      max-width: none;
+			      width: 100%;
+			      scrollbar-width: thin;
+			    }
+
+			    #ha-replay-banner .ha-replay-center {
+			      grid-column: 1;
+			      grid-row: 3;
+			    }
 
 		    #ha-replay-banner .ha-replay-meta {
 		      flex-direction: column;
@@ -534,13 +541,13 @@ Implementation note:
 		      grid-row: 1;
 		    }
 
-		    #ha-replay-banner.ha-replay-compact .ha-replay-right {
-		      grid-column: 2;
-		      grid-row: 1;
-		      overflow-x: auto;
-		      max-width: none;
-		      justify-content: flex-end;
-		    }
+			    #ha-replay-banner.ha-replay-compact .ha-replay-right {
+			      grid-column: 2;
+			      grid-row: 1;
+			      overflow-x: auto;
+			      max-width: none;
+			      justify-content: flex-start;
+			    }
 
 		    #ha-replay-banner.ha-replay-compact .ha-replay-center {
 		      display: none;
