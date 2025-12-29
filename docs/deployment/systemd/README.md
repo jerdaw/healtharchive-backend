@@ -7,6 +7,8 @@ They implement:
 
 - Annual scheduling timer (Jan 01 UTC)
 - Worker priority lowering during campaign (always-on, low-risk)
+- Storage Box mount (sshfs) for cold WARC storage (optional but recommended for tiering)
+- WARC tiering bind mounts (Storage Box -> canonical paths) (optional; for tiny-SSD setups)
 - Replay reconciliation timer (pywb indexing; capped)
 - Change tracking timer (edition-aware diffs; capped)
 - Baseline drift check timer (policy vs observed; detects config drift)
@@ -71,6 +73,14 @@ Assumptions (adjust paths/user if your VPS differs):
   - Intended as a deeper “synthetic check” than external uptime monitors.
 - `healtharchive-public-surface-verify.timer`
   - Daily timer for `healtharchive-public-surface-verify.service`.
+- `healtharchive-storagebox-sshfs.service`
+  - Mounts a Hetzner Storage Box at `/srv/healtharchive/storagebox` via `sshfs`.
+  - Reads configuration from `/etc/healtharchive/storagebox.env`.
+  - Intended for tiered WARC storage on small SSD hosts.
+- `healtharchive-warc-tiering.service`
+  - Applies bind mounts from `/etc/healtharchive/warc-tiering.binds` so canonical
+    archive paths under `/srv/healtharchive/jobs/**` resolve to Storage Box data.
+  - Runs before the API/worker/replay services start.
 
 ---
 
@@ -105,6 +115,15 @@ Preferred (one command; installs templates + worker priority drop-in):
 cd /opt/healtharchive-backend
 sudo ./scripts/vps-install-systemd-units.sh --apply --restart-worker
 ```
+
+If you are using WARC tiering with a Storage Box, also create these files on the VPS:
+
+- `/etc/healtharchive/storagebox.env`
+  - Configuration consumed by `healtharchive-storagebox-sshfs.service`.
+- `/etc/healtharchive/warc-tiering.binds`
+  - Bind mount manifest consumed by `healtharchive-warc-tiering.service`.
+
+See: `docs/operations/playbooks/warc-storage-tiering.md`.
 
 Before enabling timers that write artifacts under `/srv/healtharchive/ops/`, ensure
 the ops directories exist with the expected permissions:
