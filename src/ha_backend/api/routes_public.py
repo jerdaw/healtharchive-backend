@@ -3766,26 +3766,33 @@ def get_snapshot_raw(
     action_links = []
     if replay_url:
         action_links.append(
-            f'<a class="ha-replay-navlink" href="{replay_url}" rel="noreferrer">Replay</a>'
+            f'<a class="ha-replay-navlink ha-replay-navlink--primary" href="{replay_url}" rel="noreferrer">View replay</a>'
         )
     if compare_url:
         action_links.append(
             f'<a class="ha-replay-navlink" href="{compare_url}" rel="noreferrer">View diff</a>'
         )
     action_links.append(
-        f'<a class="ha-replay-navlink" href="{snapshot_raw_url}" rel="noreferrer">Raw HTML</a>'
+        f'<a class="ha-replay-navlink" href="{snapshot_details_url}" rel="noreferrer">Details</a>'
     )
     action_links.append(
-        f'<a class="ha-replay-navlink" href="{snapshot_json_url}" rel="noreferrer">Metadata JSON</a>'
+        f'<a class="ha-replay-navlink" href="{snapshot_json_url}" rel="noreferrer" target="_blank">Metadata JSON</a>'
     )
-    action_links.append(f'<a class="ha-replay-navlink" href="{cite_url}" rel="noreferrer">Cite</a>')
+    action_links.append(
+        f'<a class="ha-replay-navlink" href="{cite_url}" rel="noreferrer">Cite</a>'
+    )
     action_links.append(
         f'<a class="ha-replay-navlink" href="{report_url}" rel="noreferrer">Report issue</a>'
     )
     action_links.append(
-        f'<a class="ha-replay-navlink" href="{snapshot_history_url}" rel="noreferrer">Other snapshots</a>'
+        f'<a class="ha-replay-navlink" href="{snapshot_history_url}" rel="noreferrer">All snapshots</a>'
     )
     action_links_html = "".join(action_links)
+
+    title_html = html.escape(snap.title or "Raw HTML")
+    date_html = html.escape(capture_date or "")
+    url_text_html = html.escape(_compact_url(snap.url) or snap.url or "")
+    url_href_html = html.escape(snap.url or "", quote=True)
 
     banner = f"""
 <style id="ha-replay-banner-css">
@@ -3793,151 +3800,186 @@ def get_snapshot_raw(
     position: sticky;
     top: 0;
     z-index: 2147483647;
-    border-bottom: 1px solid rgba(148, 163, 184, 0.35);
-    background-color: rgba(255, 255, 255, 0.9);
+    overflow: visible;
+    border-bottom: 1px solid rgba(148, 163, 184, 0.32);
+    background-color: rgba(255, 255, 255, 0.86);
     background-color: color-mix(in srgb, rgba(255, 255, 255, 0.9) 82%, transparent);
     font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
-    font-size: 0.85rem;
-    line-height: 1.25;
+    font-size: 14px;
+    line-height: 1.35;
     -webkit-font-smoothing: antialiased;
     backdrop-filter: blur(10px) saturate(1.1);
-    box-shadow: 0 8px 16px rgba(15, 23, 42, 0.04);
-  }}
-
-  #ha-replay-banner::after {{
-    content: "";
-    position: absolute;
-    left: 0;
-    right: 0;
-    bottom: -23px;
-    height: 27px;
-    pointer-events: none;
-    background: linear-gradient(
-      to bottom,
-      rgba(15, 23, 42, 0.02) 0%,
-      rgba(15, 23, 42, 0) 100%
-    );
+    box-shadow: 0 8px 18px rgba(15, 23, 42, 0.06);
   }}
 
   #ha-replay-banner * {{
     box-sizing: border-box;
   }}
 
-  #ha-replay-banner .ha-replay-inner {{
-    display: flex;
+  #ha-replay-banner a {{
+    color: inherit;
+    text-decoration: none;
+  }}
+
+  #ha-replay-banner .ha-replay-bar {{
+    display: grid;
+    grid-template-columns: max-content minmax(0, 1fr) max-content;
     align-items: center;
-    justify-content: space-between;
-    gap: 0.75rem;
-    padding: 0.8rem 1.25rem;
+    column-gap: 1.15rem;
+    padding: 0.55rem 0.9rem;
+    min-height: 56px;
   }}
 
   #ha-replay-banner .ha-replay-left,
   #ha-replay-banner .ha-replay-right {{
     display: flex;
     align-items: center;
-    gap: 0.45rem;
-    flex-shrink: 0;
+    gap: 0.4rem;
+    min-width: 0;
+  }}
+
+  #ha-replay-banner .ha-replay-left {{
+    padding-right: 0.8rem;
   }}
 
   #ha-replay-banner .ha-replay-right {{
-    flex-wrap: wrap;
     justify-content: flex-end;
-    row-gap: 0.25rem;
-  }}
-
-  #ha-replay-banner .ha-replay-pill {{
-    display: inline-flex;
-    align-items: center;
-    gap: 0.35rem;
-    padding: 0.18rem 0.6rem;
-    border-radius: 999px;
-    background: rgba(37, 99, 235, 0.1);
-    border: 1px solid rgba(37, 99, 235, 0.25);
-    color: #2563eb;
-    font-weight: 650;
-    white-space: nowrap;
+    flex-wrap: nowrap;
   }}
 
   #ha-replay-banner .ha-replay-center {{
-    flex: 1;
     min-width: 0;
-    overflow: hidden;
     display: flex;
     flex-direction: column;
-    align-items: flex-start;
-    gap: 0.2rem;
+    gap: 0.15rem;
+    overflow: hidden;
   }}
 
-  #ha-replay-banner .ha-replay-meta {{
-    color: rgba(15, 23, 42, 0.7);
+  #ha-replay-banner .ha-replay-title {{
+    min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    max-width: 100%;
+    color: rgba(15, 23, 42, 0.92);
+    font-weight: 700;
+    letter-spacing: -0.01em;
   }}
 
-  #ha-replay-banner .ha-replay-disclaimer {{
-    color: rgba(15, 23, 42, 0.55);
+  #ha-replay-banner .ha-replay-meta {{
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
     overflow: hidden;
-    max-width: 100%;
-    white-space: normal;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
+    white-space: nowrap;
+    font-size: 1.05rem;
+    color: rgba(15, 23, 42, 0.72);
+    font-weight: 650;
   }}
 
-  #ha-replay-banner a,
-  #ha-replay-banner button {{
-    appearance: none;
-    border: 1px solid transparent;
-    background: transparent;
-    color: rgba(15, 23, 42, 0.72);
+  #ha-replay-banner .ha-replay-meta-item {{
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }}
+
+  #ha-replay-banner .ha-replay-meta-item + .ha-replay-meta-item {{
+    position: relative;
+    padding-left: 0.65rem;
+  }}
+
+  #ha-replay-banner .ha-replay-meta-item + .ha-replay-meta-item::before {{
+    content: "";
+    position: absolute;
+    left: 0.22rem;
+    top: 50%;
+    width: 4px;
+    height: 4px;
     border-radius: 999px;
-    padding: 0.3rem 0.85rem;
+    background: rgba(148, 163, 184, 0.95);
+    transform: translateY(-50%);
+  }}
+
+  #ha-replay-banner .ha-replay-meta-link {{
+    color: rgba(37, 99, 235, 0.95);
+  }}
+
+  #ha-replay-banner .ha-replay-meta-link:hover {{
+    text-decoration: underline;
+  }}
+
+  #ha-replay-banner .ha-replay-disclaimer-inline {{
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: #92400e;
+    font-weight: 600;
+    font-size: 1rem;
+    line-height: 1.35;
+  }}
+
+  #ha-replay-banner .ha-replay-back-btn {{
+    appearance: none;
+    border: 1px solid rgba(37, 99, 235, 0.6);
+    background-color: #2563eb;
+    color: #ffffff;
+    border-radius: 12px;
+    padding: 0.55rem 0.9rem;
     font: inherit;
-    font-weight: 550;
+    font-weight: 650;
     cursor: pointer;
     line-height: 1;
     text-decoration: none;
-    transition: background 120ms ease, transform 120ms ease;
+    box-shadow: 0 8px 18px rgba(37, 99, 235, 0.2);
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    white-space: nowrap;
   }}
 
-  #ha-replay-banner a:hover,
-  #ha-replay-banner button:hover {{
-    color: rgba(15, 23, 42, 0.95);
-    transform: translateY(-1px);
-    background: rgba(148, 163, 184, 0.16);
-    text-decoration: none;
-  }}
-
-  #ha-replay-banner .ha-replay-action-link {{
-    background-color: #2563eb;
-    color: #ffffff;
-    box-shadow: 0 7.5px 18px rgba(37, 99, 235, 0.26);
-  }}
-
-  #ha-replay-banner .ha-replay-action-link:hover {{
+  #ha-replay-banner .ha-replay-back-btn:hover {{
     background-color: #1d4ed8;
     color: #ffffff;
   }}
 
-  #ha-replay-banner .ha-replay-navlink {{
-    padding: 0.15rem 0.35rem;
-    border: none;
-    border-radius: 6px;
+  #ha-replay-banner .ha-replay-navlink,
+  #ha-replay-banner .ha-replay-hide {{
+    appearance: none;
+    border: 1px solid transparent;
     background: transparent;
-    color: rgba(15, 23, 42, 0.72);
-    font-weight: 600;
+    color: rgba(15, 23, 42, 0.78);
+    border-radius: 10px;
+    padding: 0.45rem 0.55rem;
+    font: inherit;
+    font-weight: 550;
+    cursor: pointer;
+    line-height: 1.1;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    white-space: nowrap;
   }}
 
-  #ha-replay-banner .ha-replay-navlink:hover {{
+  #ha-replay-banner .ha-replay-navlink:hover,
+  #ha-replay-banner .ha-replay-hide:hover {{
     color: rgba(15, 23, 42, 0.95);
-    background: rgba(148, 163, 184, 0.12);
-    transform: none;
     text-decoration: underline;
+    background: rgba(148, 163, 184, 0.12);
+    border-color: rgba(148, 163, 184, 0.12);
+  }}
+
+  #ha-replay-banner .ha-replay-navlink--primary {{
+    color: rgba(37, 99, 235, 0.98);
+  }}
+
+  #ha-replay-banner .ha-replay-back-btn:focus-visible,
+  #ha-replay-banner .ha-replay-navlink:focus-visible,
+  #ha-replay-banner .ha-replay-hide:focus-visible {{
+    outline: 3px solid rgba(37, 99, 235, 0.45);
+    outline-offset: 2px;
   }}
 
   #ha-replay-banner .ha-replay-divider {{
@@ -3951,21 +3993,37 @@ def get_snapshot_raw(
       display: none;
     }}
   }}
+
+  @media (max-width: 980px) {{
+    #ha-replay-banner .ha-replay-right {{
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      max-width: 70vw;
+      scrollbar-width: thin;
+    }}
+
+    #ha-replay-banner .ha-replay-right > * {{
+      flex: 0 0 auto;
+    }}
+  }}
 </style>
 <div id="ha-replay-banner" role="region" aria-label="HealthArchive snapshot header">
-  <div class="ha-replay-inner">
+  <div class="ha-replay-bar">
     <div class="ha-replay-left">
-      <a class="ha-replay-action-link" href="{back_url}" rel="noreferrer">\u2190 HealthArchive.ca</a>
-      <span class="ha-replay-pill">Raw HTML</span>
+      <a class="ha-replay-back-btn" href="{back_url}" rel="noreferrer">\u2190 HealthArchive.ca</a>
     </div>
-    <div class="ha-replay-center">
-      <div class="ha-replay-meta">{summary_html}</div>
-      <div class="ha-replay-disclaimer">Independent archive \u00b7 Not an official government website \u00b7 Content may be outdated</div>
+    <div class="ha-replay-center" aria-label="Snapshot summary">
+      <div class="ha-replay-title">{title_html}</div>
+      <div class="ha-replay-meta">
+        <span class="ha-replay-meta-item">{date_html}</span>
+        <a class="ha-replay-meta-item ha-replay-meta-link" href="{url_href_html}" target="_blank" rel="noreferrer noopener">{url_text_html}</a>
+      </div>
+      <div class="ha-replay-disclaimer-inline">Independent archive \u00b7 Not an official government website \u00b7 Archived content may be outdated</div>
     </div>
     <div class="ha-replay-right">
       {action_links_html}
       <span class="ha-replay-divider" aria-hidden="true"></span>
-      <button type="button" class="ha-replay-link" id="ha-replay-hide" aria-label="Hide this banner">Hide</button>
+      <button type="button" class="ha-replay-hide" id="ha-replay-hide" aria-label="Hide this banner">Hide</button>
     </div>
   </div>
 </div>
