@@ -303,6 +303,13 @@ Notes:
   the correct “back to snapshot” and compare links. Ensure the backend CORS
   allowlist includes `https://replay.healtharchive.ca` when the banner is
   enabled.
+- The banner uses `XMLHttpRequest` with pywb’s wombat opt-out (`xhr._no_rewrite = true`)
+  so API requests are not replay-rewritten. Ensure CORS allows the
+  `X-Pywb-Requested-With` header from `https://replay.healtharchive.ca`.
+- Production expects the public API to be reachable at `https://api.<apex>` (for
+  example, `https://api.healtharchive.ca`). If your deployment instead proxies
+  `/api` on the frontend origin, ensure the banner’s API base candidates are
+  still valid for your hostnames.
 - If you deploy the backend using `./scripts/vps-deploy.sh --apply --restart-replay`,
   the deploy helper will also install `custom_banner.html` and restart the replay
   service as part of that run (single-VPS setup).

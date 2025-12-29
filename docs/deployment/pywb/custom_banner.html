@@ -17,6 +17,10 @@ Implementation note:
   To keep "Back to HealthArchive" and related links working (including
   right-click / middle-click open-in-new-tab), this banner generates a `blob:`
   URL that immediately redirects the browser to the real HealthArchive URL.
+- pywb's wombat layer rewrites `fetch()` and `XMLHttpRequest` by default to load
+  archived resources. For live HealthArchive API calls, this banner uses
+  `XMLHttpRequest` with `xhr._no_rewrite = true` and relies on backend CORS
+  allowing `https://replay.healtharchive.ca` (including `X-Pywb-Requested-With`).
 -->
 
 	<style id="ha-replay-banner-css">
