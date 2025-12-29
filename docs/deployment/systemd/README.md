@@ -73,6 +73,11 @@ Assumptions (adjust paths/user if your VPS differs):
   - Intended as a deeper “synthetic check” than external uptime monitors.
 - `healtharchive-public-surface-verify.timer`
   - Daily timer for `healtharchive-public-surface-verify.service`.
+- `healtharchive-tiering-metrics.service` + `.timer`
+  - Writes a small set of tiering health metrics to the node_exporter textfile collector.
+  - Used to alert on Storage Box / tiering failures without needing a systemd collector.
+  - Prereq: node_exporter must run with `--collector.textfile.directory=/var/lib/node_exporter/textfile_collector`
+    (configured by `scripts/vps-install-observability-exporters.sh`).
 - `healtharchive-storagebox-sshfs.service`
   - Mounts a Hetzner Storage Box at `/srv/healtharchive/storagebox` via `sshfs`.
   - Reads configuration from `/etc/healtharchive/storagebox.env`.
@@ -81,6 +86,9 @@ Assumptions (adjust paths/user if your VPS differs):
   - Applies bind mounts from `/etc/healtharchive/warc-tiering.binds` so canonical
     archive paths under `/srv/healtharchive/jobs/**` resolve to Storage Box data.
   - Runs before the API/worker/replay services start.
+- `healtharchive-annual-output-tiering.service`
+  - After annual jobs are enqueued, bind-mounts each annual job output_dir onto the Storage Box tier.
+  - Triggered via `OnSuccess=` in `healtharchive-schedule-annual.service` (template).
 
 ---
 

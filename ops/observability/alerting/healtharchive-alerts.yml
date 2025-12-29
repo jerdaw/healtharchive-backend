@@ -62,3 +62,27 @@ groups:
           summary: "Job failures increased"
           description: "The number of jobs in failed/index_failed increased in the last 30m. Check admin jobs list for the most recent failures and error messages."
           runbook_url: "https://github.com/jerdaw/healtharchive-backend/blob/main/docs/operations/playbooks/incident-response.md"
+
+  - name: healtharchive.tiering
+    rules:
+      - alert: HealthArchiveStorageBoxMountDown
+        expr: healtharchive_storagebox_mount_ok == 0
+        for: 2m
+        labels:
+          severity: critical
+          service: healtharchive
+        annotations:
+          summary: "Storage Box mount is down (cold WARC tier unavailable)"
+          description: "The Storage Box mount is missing or unreadable. Replay and/or crawls that rely on cold WARCs may fail. Check healtharchive-storagebox-sshfs.service and the sshfs mount."
+          runbook_url: "https://github.com/jerdaw/healtharchive-backend/blob/main/docs/operations/playbooks/warc-storage-tiering.md"
+
+      - alert: HealthArchiveWarcTieringFailed
+        expr: healtharchive_systemd_unit_failed{unit="healtharchive-warc-tiering.service"} == 1
+        for: 1m
+        labels:
+          severity: warning
+          service: healtharchive
+        annotations:
+          summary: "WARC tiering bind mounts failed"
+          description: "The tiering bind-mount service is in a failed state. Canonical WARC paths may not resolve after reboot. Check healtharchive-warc-tiering.service logs and /etc/healtharchive/warc-tiering.binds."
+          runbook_url: "https://github.com/jerdaw/healtharchive-backend/blob/main/docs/operations/playbooks/warc-storage-tiering.md"
