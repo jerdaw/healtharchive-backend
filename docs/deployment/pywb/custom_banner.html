@@ -8,7 +8,7 @@ Then restart the replay service:
   sudo systemctl restart healtharchive-replay.service
 
 Note: When replay is embedded inside HealthArchive (iframe), this template:
-- collapses to a minimal UI (Compare + Hide), and
+- collapses to a minimal UI (Diff + Details + Hide), and
 - sends lightweight postMessage events so the wrapper UI can track the current
   archived URL for edition switching.
 
@@ -23,230 +23,325 @@ Implementation note:
   allowing `https://replay.healtharchive.ca` (including `X-Pywb-Requested-With`).
 -->
 
-	<style id="ha-replay-banner-css">
+		<style id="ha-replay-banner-css">
   #ha-replay-banner {
 	    position: sticky;
 	    top: 0;
 	    z-index: 2147483647;
-    border-bottom: 1px solid rgba(148, 163, 184, 0.35);
-    background-color: rgba(255, 255, 255, 0.9);
+    overflow: visible;
+    border-bottom: 1px solid rgba(148, 163, 184, 0.32);
+    background-color: rgba(255, 255, 255, 0.86);
     background-color: color-mix(in srgb, rgba(255, 255, 255, 0.9) 82%, transparent);
     font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI",
       sans-serif;
-    font-size: 1.125rem;
-    line-height: 1.2;
+    font-size: 14px;
+    line-height: 1.35;
     -webkit-font-smoothing: antialiased;
     backdrop-filter: blur(10px) saturate(1.1);
-    box-shadow: 0 8px 16px rgba(15, 23, 42, 0.04);
-  }
-
-  #ha-replay-banner::after {
-    content: "";
-    position: absolute;
-    left: 0;
-    right: 0;
-    bottom: -16px;
-    height: 20px;
-    pointer-events: none;
-    background: linear-gradient(
-      to bottom,
-      rgba(15, 23, 42, 0.02) 0%,
-      rgba(15, 23, 42, 0) 100%
-    );
+    box-shadow: 0 8px 18px rgba(15, 23, 42, 0.06);
   }
 
   #ha-replay-banner * {
     box-sizing: border-box;
   }
 
+  #ha-replay-banner a {
+    color: inherit;
+    text-decoration: none;
+  }
+
   #ha-replay-banner .ha-replay-inner {
-    display: flex;
-    flex-direction: column;
-    gap: 0;
-    padding: 0.25rem 0.9rem;
+    padding: 0;
   }
 
-  #ha-replay-banner .ha-replay-row {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    min-width: 0;
-    width: 100%;
-  }
-
-  #ha-replay-banner .ha-replay-row--top {
+  #ha-replay-banner .ha-replay-bar {
     display: grid;
     grid-template-columns: max-content minmax(0, 1fr) max-content;
     align-items: center;
-    column-gap: 0.65rem;
-    padding: 0.35rem 0;
-  }
-
-  #ha-replay-banner .ha-replay-row--bottom {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) max-content;
-    align-items: center;
-    column-gap: 0.65rem;
-    padding: 0.35rem 0.6rem;
-    margin-top: 0.15rem;
-    border-radius: 0.65rem;
-    background: linear-gradient(
-      to bottom,
-      rgba(15, 23, 42, 0.02),
-      rgba(15, 23, 42, 0.055)
-    );
+    column-gap: 0.75rem;
+    padding: 0.55rem 0.9rem;
+    min-height: 56px;
   }
 
   #ha-replay-banner .ha-replay-left,
   #ha-replay-banner .ha-replay-right {
     display: flex;
     align-items: center;
-    gap: 0.35rem;
-    flex-shrink: 0;
+    gap: 0.4rem;
+    min-width: 0;
   }
 
   #ha-replay-banner .ha-replay-right {
-    flex-wrap: wrap;
     justify-content: flex-end;
-    row-gap: 0.2rem;
-  }
-
-  #ha-replay-banner .ha-replay-top-meta {
-    min-width: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 0.65rem;
-    overflow: hidden;
-    white-space: nowrap;
-    text-align: center;
-    font-weight: 600;
-    color: rgba(15, 23, 42, 0.72);
-  }
-
-  #ha-replay-banner .ha-replay-top-meta-item {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  #ha-replay-banner .ha-replay-top-meta-item + .ha-replay-top-meta-item::before {
-    content: "\u00b7";
-    display: inline-block;
-    margin-right: 0.65rem;
-    color: rgba(148, 163, 184, 0.95);
-    font-weight: 650;
-  }
-
-  #ha-replay-banner .ha-replay-top-title {
-    flex: 2 1 0;
-    color: rgba(15, 23, 42, 0.92);
-    font-weight: 650;
-  }
-
-  #ha-replay-banner .ha-replay-top-date {
-    flex: 0 0 auto;
-    color: rgba(15, 23, 42, 0.72);
-    font-weight: 600;
-  }
-
-  #ha-replay-banner .ha-replay-top-url {
-    flex: 1 1 0;
-    color: rgba(37, 99, 235, 0.95);
-    text-decoration: none;
-  }
-
-  #ha-replay-banner .ha-replay-top-url:hover {
-    text-decoration: underline;
-  }
-
-  #ha-replay-banner .ha-replay-bottom-left {
-    min-width: 0;
-  }
-
-  #ha-replay-banner .ha-replay-bottom-disclaimer {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    color: #92400e;
-    font-weight: 500;
-    font-size: 0.85rem;
-  }
-
-  #ha-replay-banner .ha-replay-bottom-right {
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    gap: 0.35rem;
-  }
-
-  #ha-replay-banner:not(.ha-replay-embedded) #ha-replay-hide-top {
-    display: none;
-  }
-
-  #ha-replay-banner.ha-replay-embedded #ha-replay-hide-bottom {
-    display: none;
-  }
-
-  #ha-replay-banner .ha-replay-pill {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.35rem;
-    padding: 0.12rem 0.5rem;
-    border-radius: 999px;
-    background: rgba(37, 99, 235, 0.1);
-    border: 1px solid rgba(37, 99, 235, 0.25);
-    color: #2563eb;
-    font-weight: 650;
-    white-space: nowrap;
+    flex-wrap: nowrap;
   }
 
   #ha-replay-banner .ha-replay-center {
-    flex: 1;
     min-width: 0;
     display: flex;
     flex-direction: column;
-    align-items: flex-start;
-    gap: 0.2rem;
+    gap: 0.15rem;
     overflow: hidden;
   }
 
-  /* Keep link styling consistent inside the banner. */
-  #ha-replay-banner a {
-    text-decoration: none;
-  }
-
-  #ha-replay-banner a:hover {
-    text-decoration: underline;
-  }
-
-  #ha-replay-banner .ha-replay-meta {
-    color: rgba(15, 23, 42, 0.7);
+  #ha-replay-banner .ha-replay-title {
+    min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    max-width: 100%;
+    color: rgba(15, 23, 42, 0.92);
+    font-weight: 700;
+    letter-spacing: -0.01em;
   }
 
-  /* Kept for backwards compatibility (JS updates the same id). */
-  #ha-replay-banner .ha-replay-disclaimer {
-    color: inherit;
+  #ha-replay-banner .ha-replay-meta {
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    overflow: hidden;
+    white-space: nowrap;
+    font-size: 0.85rem;
+    color: rgba(15, 23, 42, 0.72);
+    font-weight: 650;
   }
 
-  #ha-replay-banner .ha-replay-history-panel {
+  #ha-replay-banner .ha-replay-meta-item {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  #ha-replay-banner .ha-replay-meta-item + .ha-replay-meta-item {
+    position: relative;
+    padding-left: 0.65rem;
+  }
+
+  #ha-replay-banner .ha-replay-meta-item + .ha-replay-meta-item::before {
+    content: "";
+    position: absolute;
+    left: 0.22rem;
+    top: 50%;
+    width: 4px;
+    height: 4px;
+    border-radius: 999px;
+    background: rgba(148, 163, 184, 0.95);
+    transform: translateY(-50%);
+  }
+
+  #ha-replay-banner .ha-replay-meta-link {
+    color: rgba(37, 99, 235, 0.95);
+  }
+
+  #ha-replay-banner .ha-replay-meta-link:hover {
+    text-decoration: underline;
+  }
+
+  #ha-replay-banner .ha-replay-btn,
+  #ha-replay-banner .ha-replay-status,
+  #ha-replay-banner .ha-replay-icon-btn {
+    appearance: none;
+    border: 1px solid transparent;
+    background: transparent;
+    color: rgba(15, 23, 42, 0.78);
+    border-radius: 999px;
+    padding: 0.35rem 0.75rem;
+    font: inherit;
+    font-weight: 650;
+    cursor: pointer;
+    line-height: 1;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.35rem;
+    white-space: nowrap;
+    user-select: none;
+  }
+
+  #ha-replay-banner .ha-replay-btn:hover,
+  #ha-replay-banner .ha-replay-status:hover,
+  #ha-replay-banner .ha-replay-icon-btn:hover {
+    color: rgba(15, 23, 42, 0.95);
+    background: rgba(148, 163, 184, 0.16);
+  }
+
+  #ha-replay-banner .ha-replay-btn:focus-visible,
+  #ha-replay-banner .ha-replay-status:focus-visible,
+  #ha-replay-banner .ha-replay-icon-btn:focus-visible,
+  #ha-replay-banner .ha-replay-menu-item:focus-visible,
+  #ha-replay-banner .ha-replay-history-item-actions a:focus-visible {
+    outline: 3px solid rgba(37, 99, 235, 0.45);
+    outline-offset: 2px;
+  }
+
+  #ha-replay-banner .ha-replay-btn-primary {
+    background-color: #2563eb;
+    border-color: rgba(37, 99, 235, 0.6);
+    color: #ffffff;
+    box-shadow: 0 8px 18px rgba(37, 99, 235, 0.2);
+  }
+
+  #ha-replay-banner .ha-replay-btn-primary:hover {
+    background-color: #1d4ed8;
+    color: #ffffff;
+  }
+
+  #ha-replay-banner .ha-replay-btn-secondary {
+    background: rgba(255, 255, 255, 0.7);
+    border-color: rgba(148, 163, 184, 0.45);
+    color: rgba(15, 23, 42, 0.85);
+  }
+
+  #ha-replay-banner .ha-replay-status {
+    background: rgba(37, 99, 235, 0.08);
+    border-color: rgba(37, 99, 235, 0.22);
+    color: #1d4ed8;
+    padding: 0.28rem 0.6rem;
+    font-weight: 700;
+  }
+
+  #ha-replay-banner .ha-replay-status-dot {
+    width: 0.55rem;
+    height: 0.55rem;
+    border-radius: 999px;
+    background: #2563eb;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+  }
+
+  #ha-replay-banner .ha-replay-icon-btn {
+    padding: 0.35rem 0.55rem;
+    border-color: rgba(148, 163, 184, 0.28);
+    background: rgba(255, 255, 255, 0.72);
+  }
+
+  #ha-replay-banner .ha-replay-icon {
+    font-size: 1.05em;
+    line-height: 1;
+  }
+
+  #ha-replay-banner [aria-disabled="true"] {
+    opacity: 0.48;
+    cursor: not-allowed;
+  }
+
+  #ha-replay-banner .ha-replay-popover {
+    position: absolute;
+    top: 100%;
+    margin-top: 0.65rem;
+    z-index: 2;
     display: none;
-    border-top: 1px solid rgba(148, 163, 184, 0.28);
-    background: rgba(255, 255, 255, 0.96);
+    max-height: calc(100vh - 92px);
+    overflow: auto;
+    background: rgba(255, 255, 255, 0.98);
+    border: 1px solid rgba(148, 163, 184, 0.32);
+    border-radius: 16px;
+    box-shadow: 0 18px 44px rgba(15, 23, 42, 0.16);
   }
 
-  #ha-replay-banner .ha-replay-history-panel.is-open {
+  #ha-replay-banner .ha-replay-popover.is-open {
     display: block;
   }
 
+  #ha-replay-banner .ha-replay-popover-inner {
+    padding: 0.75rem 0.9rem 0.85rem;
+  }
+
+  #ha-replay-banner .ha-replay-popover-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+  }
+
+  #ha-replay-banner .ha-replay-popover-title {
+    font-weight: 700;
+    color: rgba(15, 23, 42, 0.92);
+  }
+
+  #ha-replay-banner .ha-replay-disclaimer {
+    margin-top: 0.65rem;
+    padding: 0.55rem 0.7rem;
+    border-radius: 12px;
+    background: rgba(255, 247, 237, 0.9);
+    border: 1px solid rgba(254, 215, 170, 0.9);
+    color: #92400e;
+    font-weight: 600;
+    font-size: 0.9rem;
+    line-height: 1.35;
+  }
+
+  #ha-replay-banner .ha-replay-info-grid {
+    margin-top: 0.7rem;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.65rem;
+  }
+
+  #ha-replay-banner .ha-replay-info-label {
+    font-size: 0.85rem;
+    color: rgba(15, 23, 42, 0.62);
+    font-weight: 650;
+  }
+
+  #ha-replay-banner .ha-replay-info-value {
+    margin-top: 0.15rem;
+    color: rgba(15, 23, 42, 0.9);
+    font-weight: 550;
+    word-break: break-word;
+  }
+
+  #ha-replay-banner .ha-replay-info-link {
+    color: rgba(37, 99, 235, 0.95);
+  }
+
+  #ha-replay-banner .ha-replay-info-link:hover {
+    text-decoration: underline;
+  }
+
+  #ha-replay-banner .ha-replay-info-panel {
+    left: 0.9rem;
+    right: auto;
+    width: min(760px, calc(100vw - 1.8rem));
+  }
+
+  #ha-replay-banner .ha-replay-menu {
+    right: 0.9rem;
+    left: auto;
+    width: min(280px, calc(100vw - 1.8rem));
+  }
+
+  #ha-replay-banner .ha-replay-menu-inner {
+    padding: 0.45rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+  }
+
+  #ha-replay-banner .ha-replay-menu-item {
+    padding: 0.55rem 0.65rem;
+    border-radius: 12px;
+    border: 1px solid transparent;
+    color: rgba(15, 23, 42, 0.82);
+    font-weight: 650;
+  }
+
+  #ha-replay-banner .ha-replay-menu-item:hover {
+    background: rgba(148, 163, 184, 0.16);
+    border-color: rgba(148, 163, 184, 0.18);
+    text-decoration: none;
+    color: rgba(15, 23, 42, 0.95);
+  }
+
+  #ha-replay-banner .ha-replay-history-panel {
+    right: 0.9rem;
+    left: auto;
+    width: min(680px, calc(100vw - 1.8rem));
+  }
+
   #ha-replay-banner .ha-replay-history-inner {
-    padding: 0.6rem 1.25rem 0.85rem;
+    padding: 0.75rem 0.9rem 0.85rem;
     display: flex;
     flex-direction: column;
     gap: 0.6rem;
@@ -260,13 +355,13 @@ Implementation note:
   }
 
   #ha-replay-banner .ha-replay-history-title {
-    font-weight: 650;
+    font-weight: 700;
     color: rgba(15, 23, 42, 0.92);
   }
 
   #ha-replay-banner .ha-replay-history-body {
     font-size: 0.95rem;
-    color: rgba(15, 23, 42, 0.8);
+    color: rgba(15, 23, 42, 0.82);
   }
 
   #ha-replay-banner .ha-replay-history-list {
@@ -283,14 +378,14 @@ Implementation note:
     align-items: center;
     justify-content: space-between;
     gap: 0.75rem;
-    padding: 0.4rem 0.55rem;
-    border-radius: 12px;
-    border: 1px solid rgba(148, 163, 184, 0.26);
-    background: rgba(248, 250, 252, 0.9);
+    padding: 0.45rem 0.6rem;
+    border-radius: 14px;
+    border: 1px solid rgba(148, 163, 184, 0.22);
+    background: rgba(248, 250, 252, 0.92);
   }
 
   #ha-replay-banner .ha-replay-history-item-title {
-    font-weight: 650;
+    font-weight: 700;
     color: rgba(15, 23, 42, 0.92);
   }
 
@@ -309,200 +404,63 @@ Implementation note:
   }
 
   #ha-replay-banner .ha-replay-history-item-actions a {
-    padding: 0.2rem 0.55rem;
+    padding: 0.25rem 0.6rem;
     border-radius: 999px;
     border: 1px solid rgba(148, 163, 184, 0.26);
-    background: rgba(255, 255, 255, 0.8);
-    color: rgba(15, 23, 42, 0.72);
-    font-weight: 650;
+    background: rgba(255, 255, 255, 0.82);
+    color: rgba(15, 23, 42, 0.75);
+    font-weight: 700;
   }
 
   #ha-replay-banner .ha-replay-history-item-actions a:hover {
     background: rgba(148, 163, 184, 0.14);
     transform: none;
     text-decoration: none;
-  }
-
-  #ha-replay-banner a,
-  #ha-replay-banner button {
-    appearance: none;
-    border: 1px solid transparent;
-    background: transparent;
-    color: rgba(15, 23, 42, 0.72);
-    border-radius: 999px;
-    padding: 0.3rem 0.85rem;
-    font: inherit;
-    font-weight: 550;
-    cursor: pointer;
-    line-height: 1;
-    text-decoration: none;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-  }
-
-  #ha-replay-banner a,
-  #ha-replay-banner button {
-    transition: background 120ms ease, border-color 120ms ease, transform 120ms ease;
-  }
-
-  #ha-replay-banner a:hover,
-  #ha-replay-banner button:hover {
     color: rgba(15, 23, 42, 0.95);
-    transform: translateY(-1px);
-    background: rgba(148, 163, 184, 0.16);
-    text-decoration: none;
   }
 
-  #ha-replay-banner .ha-replay-brand {
-    appearance: none;
-    border: none;
-    background: transparent;
-    padding: 0.3rem 0.85rem;
-    margin: 0;
-    font: inherit;
-    font-weight: 600;
-    color: rgba(15, 23, 42, 0.95);
-    cursor: pointer;
-  }
-
-  #ha-replay-banner .ha-replay-brand:hover {
-    background: rgba(148, 163, 184, 0.16);
-    text-decoration: none;
-  }
-
-  #ha-replay-banner .ha-replay-action-link {
-    appearance: none;
-    border: 1px solid transparent;
-    background-color: #2563eb;
-    color: #ffffff;
-    border-radius: 999px;
-    padding: 0.22rem 0.7rem;
-    font: inherit;
-    font-weight: 550;
-    cursor: pointer;
-    box-shadow: 0 7.5px 18px rgba(37, 99, 235, 0.26);
-  }
-
-  #ha-replay-banner .ha-replay-action-link:hover {
-    background-color: #1d4ed8;
-    color: #ffffff;
-    text-decoration: none;
-  }
-
-  #ha-replay-banner .ha-replay-link {
-    padding: 0.2rem 0.6rem;
-    font-weight: 550;
-    color: rgba(15, 23, 42, 0.72);
-  }
-
-  #ha-replay-banner .ha-replay-link:hover {
-    color: rgba(15, 23, 42, 0.95);
-    background: rgba(148, 163, 184, 0.16);
-  }
-
-  #ha-replay-banner .ha-replay-navlink {
-    padding: 0.12rem 0.3rem;
-    border: none;
-    border-radius: 6px;
-    background: transparent;
-    color: rgba(15, 23, 42, 0.72);
-    font-weight: 600;
-  }
-
-  #ha-replay-banner .ha-replay-navlink:hover {
-    color: rgba(15, 23, 42, 0.95);
-    background: rgba(148, 163, 184, 0.12);
-    transform: none;
-    text-decoration: underline;
-  }
-
-	  #ha-replay-banner.ha-replay-embedded .ha-replay-center,
-	  #ha-replay-banner.ha-replay-embedded .ha-replay-row--bottom,
-	  #ha-replay-banner.ha-replay-embedded .ha-replay-top-meta,
 	  #ha-replay-banner.ha-replay-embedded .ha-replay-left,
-	  #ha-replay-banner.ha-replay-embedded .ha-replay-pill,
-	  #ha-replay-banner.ha-replay-embedded [data-ha-action="browse"],
-	  #ha-replay-banner.ha-replay-embedded [data-ha-action="details"],
+	  #ha-replay-banner.ha-replay-embedded .ha-replay-center,
 	  #ha-replay-banner.ha-replay-embedded #ha-replay-history-toggle,
+	  #ha-replay-banner.ha-replay-embedded #ha-replay-more-toggle,
+	  #ha-replay-banner.ha-replay-embedded #ha-replay-info-panel,
 	  #ha-replay-banner.ha-replay-embedded #ha-replay-history-panel,
-	  #ha-replay-banner.ha-replay-embedded [data-ha-action="raw"],
-	  #ha-replay-banner.ha-replay-embedded [data-ha-action="json"],
-	  #ha-replay-banner.ha-replay-embedded [data-ha-action="cite"],
-	  #ha-replay-banner.ha-replay-embedded [data-ha-action="report"] {
+	  #ha-replay-banner.ha-replay-embedded #ha-replay-more-menu {
 	    display: none !important;
 	  }
 
-	  #ha-replay-banner.ha-replay-embedded .ha-replay-inner {
-	    padding: 0.4rem 0.6rem;
-	  }
-
-	  #ha-replay-banner.ha-replay-embedded .ha-replay-row--top {
+	  #ha-replay-banner.ha-replay-embedded .ha-replay-bar {
 	    display: flex;
 	    justify-content: flex-end;
-	    column-gap: 0;
+	    padding: 0.45rem 0.6rem;
+	    min-height: 44px;
 	  }
 
-	  #ha-replay-banner.ha-replay-embedded .ha-replay-right {
-	    gap: 0.35rem;
-	  }
-
-  @media (max-width: 640px) {
-    #ha-replay-banner:not(.ha-replay-embedded) .ha-replay-inner {
-      padding-inline: 0.85rem;
-    }
-  }
-
-  /* Mobile: keep the snapshot summary visible, but stack it tightly and make
-     action links horizontally scrollable instead of wrapping into a tall block. */
   @media (max-width: 780px) {
-    #ha-replay-banner:not(.ha-replay-embedded) .ha-replay-inner {
-      gap: 0;
-      padding: 0.25rem 0.85rem;
+    #ha-replay-banner .ha-replay-bar {
+      padding: 0.45rem 0.65rem;
+      column-gap: 0.55rem;
+      min-height: 48px;
     }
 
-    #ha-replay-banner:not(.ha-replay-embedded) .ha-replay-row--top {
-      align-items: flex-start;
-    }
-
-    #ha-replay-banner:not(.ha-replay-embedded) .ha-replay-left {
-      flex-wrap: wrap;
-      row-gap: 0.2rem;
-    }
-
-    #ha-replay-banner:not(.ha-replay-embedded) .ha-replay-row--bottom {
-      align-items: flex-start;
-      gap: 0.55rem;
-      padding: 0.35rem 0.55rem;
-    }
-
-    #ha-replay-banner:not(.ha-replay-embedded) .ha-replay-top-meta {
-      overflow-x: auto;
-      -webkit-overflow-scrolling: touch;
-      scrollbar-width: thin;
-    }
-
-    #ha-replay-banner:not(.ha-replay-embedded) .ha-replay-right {
-      flex-wrap: nowrap;
-      overflow-x: auto;
-      -webkit-overflow-scrolling: touch;
-      max-width: 60vw;
-      scrollbar-width: thin;
-    }
-
-    #ha-replay-banner:not(.ha-replay-embedded) .ha-replay-right > * {
-      flex: 0 0 auto;
-    }
-
-    #ha-replay-banner:not(.ha-replay-embedded) .ha-replay-navlink,
-    #ha-replay-banner:not(.ha-replay-embedded) .ha-replay-link {
-      white-space: nowrap;
-    }
-  }
-
-  @media (max-width: 420px) {
-    #ha-replay-banner:not(.ha-replay-embedded) .ha-replay-bottom-disclaimer {
+    #ha-replay-banner .ha-replay-meta {
       display: none;
+    }
+
+    #ha-replay-banner .ha-replay-hide-sm {
+      display: none !important;
+    }
+
+    #ha-replay-banner .ha-replay-info-grid {
+      grid-template-columns: 1fr;
+    }
+
+    #ha-replay-banner .ha-replay-info-panel,
+    #ha-replay-banner .ha-replay-history-panel,
+    #ha-replay-banner .ha-replay-menu {
+      left: 0.6rem;
+      right: 0.6rem;
+      width: auto;
     }
   }
 </style>
@@ -715,12 +673,15 @@ Implementation note:
         jsonLabel: "Metadata JSON",
         jsonAria: "View metadata JSON for this snapshot",
         citeLabel: "Cite",
-        citeAria: "How to cite HealthArchive snapshots",
-        reportLabel: "Report issue",
-        reportAria: "Report an issue with this snapshot",
-        historyLabel: "Other snapshots",
-        historyAria: "Toggle other snapshots for this page",
-        historyTitle: "Other snapshots",
+	        citeAria: "How to cite HealthArchive snapshots",
+	        reportLabel: "Report issue",
+	        reportAria: "Report an issue with this snapshot",
+	        moreLabel: "More",
+	        moreAria: "More actions",
+	        closeAria: "Close",
+	        historyLabel: "Other snapshots",
+	        historyAria: "Toggle other snapshots for this page",
+	        historyTitle: "Other snapshots",
         historyAllLabel: "All snapshots",
         historyLoading: "Loading other snapshots\u2026",
         historyUnavailable: "History is not available for this snapshot.",
@@ -756,12 +717,15 @@ Implementation note:
         jsonLabel: "Métadonnées JSON",
         jsonAria: "Voir les métadonnées JSON de cette capture",
         citeLabel: "Citer",
-        citeAria: "Comment citer les captures HealthArchive",
-        reportLabel: "Signaler un problème",
-        reportAria: "Signaler un problème avec cette capture",
-        historyLabel: "Autres captures",
-        historyAria: "Afficher ou masquer les autres captures de cette page",
-        historyTitle: "Autres captures",
+	        citeAria: "Comment citer les captures HealthArchive",
+	        reportLabel: "Signaler un problème",
+	        reportAria: "Signaler un problème avec cette capture",
+	        moreLabel: "Plus",
+	        moreAria: "Plus d’actions",
+	        closeAria: "Fermer",
+	        historyLabel: "Autres captures",
+	        historyAria: "Afficher ou masquer les autres captures de cette page",
+	        historyTitle: "Autres captures",
         historyAllLabel: "Toutes les captures",
         historyLoading: "Chargement des autres captures\u2026",
         historyUnavailable: "L’historique n’est pas disponible pour cette capture.",
@@ -974,95 +938,131 @@ Implementation note:
 	        banner.className = "ha-replay-embedded";
 	      }
 
-	        banner.innerHTML =
-	        '<div class="ha-replay-inner">' +
-	        '  <div class="ha-replay-row ha-replay-row--top">' +
-	        '    <div class="ha-replay-left">' +
-	        '      <a class="ha-replay-action-link" data-ha-action="browse" href="#" target="_top" rel="noreferrer noopener" aria-label="' +
-	        t("backAria") +
-	        '">\u2190 HealthArchive.ca</a>' +
-	        '      <span class="ha-replay-pill" aria-label="' +
-	        t("archivedReplay") +
-	        '">' +
-	        t("archivedReplay") +
-	        "</span>" +
-	        "    </div>" +
-	        '    <div class="ha-replay-top-meta" id="ha-replay-top-meta" aria-label="' +
-	        (UI_LOCALE === "fr" ? "Résumé de la capture" : "Snapshot summary") +
-	        '">' +
-	        '      <span class="ha-replay-top-meta-item ha-replay-top-title" id="ha-replay-top-title"></span>' +
-	        '      <span class="ha-replay-top-meta-item ha-replay-top-date" id="ha-replay-top-date"></span>' +
-	        '      <a class="ha-replay-top-meta-item ha-replay-top-url" data-ha-action="origin" id="ha-replay-top-url" href="#" target="_blank" rel="noreferrer noopener"></a>' +
-	        "    </div>" +
-	        '    <div class="ha-replay-right" id="ha-replay-actions">' +
-	        '      <a class="ha-replay-navlink" data-ha-action="details" href="#" target="_top" rel="noreferrer noopener" aria-label="' +
-	        t("detailsAria") +
-	        '">' +
-	        t("detailsLabel") +
-	        "</a>" +
-	        '      <a class="ha-replay-navlink" data-ha-action="compare" href="#" target="_top" rel="noreferrer noopener" aria-label="' +
-	        t("compareAria") +
-	        '">' +
-	        t("compareLabel") +
-	        "</a>" +
-	        '      <a class="ha-replay-navlink" data-ha-action="raw" href="#" target="_blank" rel="noreferrer noopener" aria-label="' +
-	        t("rawAria") +
-	        '">' +
-	        t("rawLabel") +
-	        "</a>" +
-	        '      <a class="ha-replay-navlink" data-ha-action="json" href="#" target="_blank" rel="noreferrer noopener" aria-label="' +
-	        t("jsonAria") +
-	        '">' +
-	        t("jsonLabel") +
-	        "</a>" +
-	        '      <a class="ha-replay-navlink" data-ha-action="cite" href="#" target="_top" rel="noreferrer noopener" aria-label="' +
-	        t("citeAria") +
-	        '">' +
-	        t("citeLabel") +
-	        "</a>" +
-	        '      <a class="ha-replay-navlink" data-ha-action="report" href="#" target="_top" rel="noreferrer noopener" aria-label="' +
-	        t("reportAria") +
-	        '">' +
-	        t("reportLabel") +
-	        "</a>" +
-	        '      <button type="button" id="ha-replay-hide-top" class="ha-replay-link" aria-label="' +
-	        t("hideAria") +
-	        '">' +
-	        t("hideLabel") +
-	        "</button>" +
-	        "    </div>" +
-	        "  </div>" +
-	        '  <div class="ha-replay-row ha-replay-row--bottom">' +
-	        '    <div class="ha-replay-bottom-left">' +
-	        '      <div class="ha-replay-bottom-disclaimer" id="ha-replay-disclaimer"></div>' +
-	        "    </div>" +
-	        '    <div class="ha-replay-bottom-right">' +
-	        '      <button type="button" class="ha-replay-navlink" id="ha-replay-history-toggle" aria-label="' +
-	        t("historyAria") +
-	        '" aria-expanded="false">' +
-	        t("historyLabel") +
-	        "</button>" +
-	        '      <button type="button" id="ha-replay-hide-bottom" class="ha-replay-link" aria-label="' +
-	        t("hideAria") +
-	        '">' +
-	        t("hideLabel") +
-	        "</button>" +
-	        "    </div>" +
-	        "  </div>" +
-	        "</div>" +
-	        '<div class="ha-replay-history-panel" id="ha-replay-history-panel" aria-hidden="true">' +
-	        '  <div class="ha-replay-history-inner">' +
-	        '    <div class="ha-replay-history-heading">' +
-	        '      <div class="ha-replay-history-title">' +
-	        t("historyTitle") +
-	        "</div>" +
-	        '      <a class="ha-replay-navlink" data-ha-action="historyPage" href="#" target="_top" rel="noreferrer noopener">' +
-	        t("historyAllLabel") +
-	        "</a>" +
-	        "    </div>" +
-	        '    <div class="ha-replay-history-body" id="ha-replay-history-body"></div>' +
-	        "  </div>" +
-	        "</div>";
+		        banner.innerHTML =
+		        '<div class="ha-replay-inner">' +
+		        '  <div class="ha-replay-bar">' +
+		        '    <div class="ha-replay-left">' +
+		        '      <a class="ha-replay-btn" data-ha-action="browse" href="#" target="_top" rel="noreferrer noopener" aria-label="' +
+		        t("backAria") +
+		        '">' +
+		        '        <span class="ha-replay-icon" aria-hidden="true">\u2190</span>' +
+		        '        <span class="ha-replay-hide-sm">HealthArchive.ca</span>' +
+		        "      </a>" +
+		        '      <button type="button" class="ha-replay-status" id="ha-replay-info-toggle" aria-expanded="false" aria-controls="ha-replay-info-panel">' +
+		        '        <span class="ha-replay-status-dot" aria-hidden="true"></span>' +
+		        '        <span class="ha-replay-status-label">' +
+		        t("archivedReplay") +
+		        "</span>" +
+		        '        <span class="ha-replay-hide-sm" aria-hidden="true">\u25BE</span>' +
+		        "      </button>" +
+		        "    </div>" +
+		        '    <div class="ha-replay-center" id="ha-replay-summary" aria-label="' +
+		        (UI_LOCALE === "fr" ? "Résumé de la capture" : "Snapshot summary") +
+		        '">' +
+		        '      <div class="ha-replay-title" id="ha-replay-top-title"></div>' +
+		        '      <div class="ha-replay-meta" id="ha-replay-top-meta">' +
+		        '        <span class="ha-replay-meta-item" id="ha-replay-top-date"></span>' +
+		        '        <a class="ha-replay-meta-item ha-replay-meta-link" data-ha-action="origin" id="ha-replay-top-url" href="#" target="_blank" rel="noreferrer noopener"></a>' +
+		        "      </div>" +
+		        "    </div>" +
+		        '    <div class="ha-replay-right" id="ha-replay-actions">' +
+		        '      <a class="ha-replay-btn ha-replay-btn-primary" data-ha-action="compare" href="#" target="_top" rel="noreferrer noopener" aria-label="' +
+		        t("compareAria") +
+		        '">' +
+		        t("compareLabel") +
+		        "</a>" +
+		        '      <a class="ha-replay-btn ha-replay-btn-secondary" data-ha-action="details" href="#" target="_top" rel="noreferrer noopener" aria-label="' +
+		        t("detailsAria") +
+		        '">' +
+		        t("detailsLabel") +
+		        "</a>" +
+		        '      <button type="button" class="ha-replay-btn" id="ha-replay-history-toggle" aria-label="' +
+		        t("historyAria") +
+		        '" aria-expanded="false" aria-controls="ha-replay-history-panel">' +
+		        '        <span class="ha-replay-icon" aria-hidden="true">\u23F1</span>' +
+		        '        <span class="ha-replay-hide-sm" id="ha-replay-history-toggle-label">' +
+		        t("historyLabel") +
+		        "</span>" +
+		        "      </button>" +
+		        '      <button type="button" class="ha-replay-btn" id="ha-replay-more-toggle" aria-label="' +
+		        t("moreAria") +
+		        '" aria-haspopup="true" aria-expanded="false" aria-controls="ha-replay-more-menu">' +
+		        '        <span class="ha-replay-icon" aria-hidden="true">\u22EF</span>' +
+		        '        <span class="ha-replay-hide-sm">' +
+		        t("moreLabel") +
+		        "</span>" +
+		        "      </button>" +
+		        '      <button type="button" class="ha-replay-icon-btn" id="ha-replay-hide" aria-label="' +
+		        t("hideAria") +
+		        '">' +
+		        '        <span class="ha-replay-icon" aria-hidden="true">\u2715</span>' +
+		        '        <span class="ha-replay-hide-sm">' +
+		        t("hideLabel") +
+		        "</span>" +
+		        "      </button>" +
+		        "    </div>" +
+		        "  </div>" +
+		        "</div>" +
+		        '<div class="ha-replay-popover ha-replay-info-panel" id="ha-replay-info-panel" aria-hidden="true">' +
+		        '  <div class="ha-replay-popover-inner">' +
+		        '    <div class="ha-replay-popover-heading">' +
+		        '      <div class="ha-replay-popover-title">' +
+		        t("archivedReplay") +
+		        "</div>" +
+		        '      <button type="button" class="ha-replay-icon-btn" id="ha-replay-info-close" aria-label="' +
+		        t("closeAria") +
+		        '">' +
+		        '        <span class="ha-replay-icon" aria-hidden="true">\u2715</span>' +
+		        "      </button>" +
+		        "    </div>" +
+		        '    <div class="ha-replay-disclaimer" id="ha-replay-disclaimer"></div>' +
+		        '    <div class="ha-replay-info-grid">' +
+		        '      <div class="ha-replay-info-item">' +
+		        '        <div class="ha-replay-info-label">' +
+		        t("snapshotDateLabel") +
+		        "</div>" +
+		        '        <div class="ha-replay-info-value" id="ha-replay-info-date"></div>' +
+		        "      </div>" +
+		        '      <div class="ha-replay-info-item">' +
+		        '        <div class="ha-replay-info-label">' +
+		        t("originalUrlLabel") +
+		        "</div>" +
+		        '        <a class="ha-replay-info-value ha-replay-info-link" data-ha-action="origin" id="ha-replay-info-url" href="#" target="_blank" rel="noreferrer noopener"></a>' +
+		        "      </div>" +
+		        "    </div>" +
+		        "  </div>" +
+		        "</div>" +
+		        '<div class="ha-replay-popover ha-replay-menu" id="ha-replay-more-menu" aria-hidden="true" aria-label="' +
+		        t("moreAria") +
+		        '">' +
+		        '  <div class="ha-replay-menu-inner">' +
+		        '    <a class="ha-replay-menu-item" data-ha-action="raw" href="#" target="_blank" rel="noreferrer noopener">' +
+		        t("rawLabel") +
+		        "</a>" +
+		        '    <a class="ha-replay-menu-item" data-ha-action="json" href="#" target="_blank" rel="noreferrer noopener">' +
+		        t("jsonLabel") +
+		        "</a>" +
+		        '    <a class="ha-replay-menu-item" data-ha-action="cite" href="#" target="_top" rel="noreferrer noopener">' +
+		        t("citeLabel") +
+		        "</a>" +
+		        '    <a class="ha-replay-menu-item" data-ha-action="report" href="#" target="_top" rel="noreferrer noopener">' +
+		        t("reportLabel") +
+		        "</a>" +
+		        "  </div>" +
+		        "</div>" +
+		        '<div class="ha-replay-popover ha-replay-history-panel" id="ha-replay-history-panel" aria-hidden="true">' +
+		        '  <div class="ha-replay-history-inner">' +
+		        '    <div class="ha-replay-history-heading">' +
+		        '      <div class="ha-replay-history-title">' +
+		        t("historyTitle") +
+		        "</div>" +
+		        '      <a class="ha-replay-btn" data-ha-action="historyPage" href="#" target="_top" rel="noreferrer noopener">' +
+		        t("historyAllLabel") +
+		        "</a>" +
+		        "    </div>" +
+		        '    <div class="ha-replay-history-body" id="ha-replay-history-body"></div>' +
+		        "  </div>" +
+		        "</div>";
 
 	      document.body.insertBefore(banner, document.body.firstChild);
 
@@ -1077,14 +1077,20 @@ Implementation note:
       var disclaimerEl = document.getElementById("ha-replay-disclaimer");
       if (disclaimerEl) disclaimerEl.textContent = t("disclaimerPrefix");
 
-      var urlEl = document.getElementById("ha-replay-top-url");
-      try {
-        var wbUrl = getWbInfo().url;
-        if (urlEl && wbUrl) {
-          urlEl.textContent = String(wbUrl).replace(/^https?:\/\//i, "");
-          urlEl.setAttribute("title", wbUrl);
-        }
-      } catch (e) {}
+	      var urlEl = document.getElementById("ha-replay-top-url");
+	      try {
+	        var wbUrl = getWbInfo().url;
+	        if (urlEl && wbUrl) {
+	          urlEl.textContent = String(wbUrl).replace(/^https?:\/\//i, "");
+	          urlEl.setAttribute("title", wbUrl);
+	        }
+
+	        var infoUrlEl = document.getElementById("ha-replay-info-url");
+	        if (infoUrlEl && wbUrl) {
+	          infoUrlEl.textContent = String(wbUrl);
+	          infoUrlEl.setAttribute("title", wbUrl);
+	        }
+	      } catch (e) {}
 
       function bindHideButton(id) {
         var btn = document.getElementById(id);
@@ -1098,8 +1104,7 @@ Implementation note:
         });
       }
 
-      bindHideButton("ha-replay-hide-top");
-      bindHideButton("ha-replay-hide-bottom");
+	      bindHideButton("ha-replay-hide");
 
 	      // Avoid pywb rewriting our "escape hatch" navigation by:
 	      //  - not embedding HealthArchive URLs directly in HTML attributes, and
@@ -1359,8 +1364,9 @@ Implementation note:
 	              titleEl.setAttribute("title", titleText);
 	            }
 
-	            var dateLabel = buildSnapshotDateLabel(detail);
-	            setValueText("ha-replay-top-date", dateLabel, "");
+		            var dateLabel = buildSnapshotDateLabel(detail);
+		            setValueText("ha-replay-top-date", dateLabel, "");
+		            setValueText("ha-replay-info-date", dateLabel, "");
 
 	            var originalUrlValue =
 	              (detail && detail.originalUrl ? String(detail.originalUrl) : "") ||
@@ -1371,12 +1377,18 @@ Implementation note:
 	                  return "";
 	                }
 	              })();
-	            var urlEl = document.getElementById("ha-replay-top-url");
-	            if (urlEl) {
-	              var compact = compactUrl(originalUrlValue) || originalUrlValue;
-	              urlEl.textContent = compact;
-	              urlEl.setAttribute("title", originalUrlValue);
-	            }
+		            var urlEl = document.getElementById("ha-replay-top-url");
+		            if (urlEl) {
+		              var compact = compactUrl(originalUrlValue) || originalUrlValue;
+		              urlEl.textContent = compact;
+		              urlEl.setAttribute("title", originalUrlValue);
+		            }
+
+		            var infoUrlEl = document.getElementById("ha-replay-info-url");
+		            if (infoUrlEl) {
+		              infoUrlEl.textContent = originalUrlValue;
+		              infoUrlEl.setAttribute("title", originalUrlValue);
+		            }
 
 	            var disclaimerEl = document.getElementById("ha-replay-disclaimer");
 	            if (disclaimerEl) {
@@ -1756,12 +1768,23 @@ Implementation note:
 	        // show a best-effort snapshot date) even if API calls fail.
 	        updateSnapshotDetailUi();
 
-	        var historyOpen = false;
-	        var historyPanel = document.getElementById("ha-replay-history-panel");
-	        var historyBody = document.getElementById("ha-replay-history-body");
-	        var historyToggle = document.getElementById("ha-replay-history-toggle");
-	        var timelineCache = {};
-	        var timelinePendingId = null;
+		        var historyOpen = false;
+		        var historyPanel = document.getElementById("ha-replay-history-panel");
+		        var historyBody = document.getElementById("ha-replay-history-body");
+		        var historyToggle = document.getElementById("ha-replay-history-toggle");
+		        var historyToggleLabel = document.getElementById("ha-replay-history-toggle-label");
+
+		        var infoOpen = false;
+		        var infoPanel = document.getElementById("ha-replay-info-panel");
+		        var infoToggle = document.getElementById("ha-replay-info-toggle");
+		        var infoClose = document.getElementById("ha-replay-info-close");
+
+		        var moreOpen = false;
+		        var moreMenu = document.getElementById("ha-replay-more-menu");
+		        var moreToggle = document.getElementById("ha-replay-more-toggle");
+
+		        var timelineCache = {};
+		        var timelinePendingId = null;
 
 	        function formatCaptureDate(value) {
 	          if (!value || typeof value !== "string") return null;
@@ -1786,41 +1809,104 @@ Implementation note:
 	          return otherCount + " other snapshot" + plural;
 	        }
 
-	        function setHistoryToggleLabel() {
-	          if (!historyToggle) return;
-	          try {
-	            var cached = snapshotId && timelineCache[snapshotId] ? timelineCache[snapshotId] : null;
-	            var otherCount = null;
-	            if (cached && cached.snapshots && snapshotId) {
-	              otherCount = cached.snapshots.filter(function (it) {
-	                return String(it.snapshotId) !== String(snapshotId);
-	              }).length;
-	            }
-	            if (otherCount == null) {
-	              historyToggle.textContent = t("historyLabel");
-	              historyToggle.disabled = false;
-	              return;
-	            }
-	            if (otherCount < 1) {
-	              historyToggle.textContent = buildOtherSnapshotsButtonLabel(otherCount);
-	              historyToggle.disabled = true;
-	              if (historyOpen) setHistoryOpen(false);
-	              return;
-	            }
-	            historyToggle.disabled = false;
-	            var baseLabel = buildOtherSnapshotsButtonLabel(otherCount);
-	            if (historyOpen) {
-	              historyToggle.textContent = UI_LOCALE === "fr" ? "Masquer " + baseLabel : "Hide " + baseLabel;
-	            } else {
-	              historyToggle.textContent = UI_LOCALE === "fr" ? "Afficher " + baseLabel : "Show " + baseLabel;
-	            }
-	          } catch (e) {
-	            historyToggle.textContent = t("historyLabel");
-	          }
-	        }
+		        function setHistoryToggleText(value) {
+		          if (!historyToggle) return;
+		          var next = value == null ? "" : String(value);
+		          try {
+		            if (historyToggleLabel) {
+		              historyToggleLabel.textContent = next;
+		            } else {
+		              historyToggle.textContent = next;
+		            }
+		            historyToggle.setAttribute("title", next);
+		          } catch (e) {}
+		        }
 
-	        function renderTimeline(timeline) {
-	          if (!historyBody) return;
+		        function setHistoryToggleLabel() {
+		          if (!historyToggle) return;
+		          try {
+		            var cached = snapshotId && timelineCache[snapshotId] ? timelineCache[snapshotId] : null;
+		            var otherCount = null;
+		            if (cached && cached.snapshots && snapshotId) {
+		              otherCount = cached.snapshots.filter(function (it) {
+		                return String(it.snapshotId) !== String(snapshotId);
+		              }).length;
+		            }
+		            if (otherCount == null) {
+		              setHistoryToggleText(t("historyLabel"));
+		              historyToggle.disabled = false;
+		              return;
+		            }
+		            if (otherCount < 1) {
+		              setHistoryToggleText(buildOtherSnapshotsButtonLabel(otherCount));
+		              historyToggle.disabled = true;
+		              if (historyOpen) setHistoryOpen(false);
+		              return;
+		            }
+		            historyToggle.disabled = false;
+		            var baseLabel = buildOtherSnapshotsButtonLabel(otherCount);
+		            if (historyOpen) {
+		              setHistoryToggleText(UI_LOCALE === "fr" ? "Masquer " + baseLabel : "Hide " + baseLabel);
+		            } else {
+		              setHistoryToggleText(UI_LOCALE === "fr" ? "Afficher " + baseLabel : "Show " + baseLabel);
+		            }
+		          } catch (e) {
+		            historyToggle.disabled = false;
+		            setHistoryToggleText(t("historyLabel"));
+		          }
+		        }
+
+		        function setInfoOpen(nextOpen) {
+		          infoOpen = Boolean(nextOpen);
+		          if (infoPanel) {
+		            infoPanel.classList.toggle("is-open", infoOpen);
+		            infoPanel.setAttribute("aria-hidden", infoOpen ? "false" : "true");
+		          }
+		          if (infoToggle) infoToggle.setAttribute("aria-expanded", infoOpen ? "true" : "false");
+		          if (infoOpen) {
+		            setMoreOpen(false);
+		            setHistoryOpen(false);
+		            try {
+		              if (infoClose && typeof infoClose.focus === "function") infoClose.focus();
+		            } catch (e) {}
+		          }
+		        }
+
+		        function setMoreOpen(nextOpen) {
+		          moreOpen = Boolean(nextOpen);
+		          if (moreMenu) {
+		            moreMenu.classList.toggle("is-open", moreOpen);
+		            moreMenu.setAttribute("aria-hidden", moreOpen ? "false" : "true");
+		          }
+		          if (moreToggle) moreToggle.setAttribute("aria-expanded", moreOpen ? "true" : "false");
+		          if (moreOpen) {
+		            setInfoOpen(false);
+		            setHistoryOpen(false);
+		            try {
+		              var first = moreMenu ? moreMenu.querySelector(".ha-replay-menu-item") : null;
+		              if (first && typeof first.focus === "function") first.focus();
+		            } catch (e) {}
+		          }
+		        }
+
+		        function closeAllPopovers() {
+		          setMoreOpen(false);
+		          setInfoOpen(false);
+		          setHistoryOpen(false);
+		        }
+
+		        function containsEl(container, target) {
+		          if (!container || !target) return false;
+		          if (container === target) return true;
+		          try {
+		            return container.contains(target);
+		          } catch (e) {
+		            return false;
+		          }
+		        }
+
+		        function renderTimeline(timeline) {
+		          if (!historyBody) return;
 	          if (!timeline || !timeline.snapshots || !snapshotId) {
 	            historyBody.textContent = t("historyUnavailable");
 	            return;
@@ -1916,26 +2002,129 @@ Implementation note:
 	            });
 	        }
 
-	        function setHistoryOpen(nextOpen) {
-	          historyOpen = Boolean(nextOpen);
-	          if (historyPanel) {
-	            historyPanel.classList.toggle("is-open", historyOpen);
-	            historyPanel.setAttribute("aria-hidden", historyOpen ? "false" : "true");
-	          }
+		        function setHistoryOpen(nextOpen) {
+		          historyOpen = Boolean(nextOpen);
+		          if (historyOpen) {
+		            setInfoOpen(false);
+		            setMoreOpen(false);
+		          }
+		          if (historyPanel) {
+		            historyPanel.classList.toggle("is-open", historyOpen);
+		            historyPanel.setAttribute("aria-hidden", historyOpen ? "false" : "true");
+		          }
 	          if (historyToggle) historyToggle.setAttribute("aria-expanded", historyOpen ? "true" : "false");
 	          setHistoryToggleLabel();
 	          if (historyOpen) fetchTimelineIfNeeded();
 	        }
 
-	        if (historyToggle) {
-	          historyToggle.addEventListener("click", function () {
-	            setHistoryOpen(!historyOpen);
-	          });
-	          setHistoryToggleLabel();
-	        }
+		        if (historyToggle) {
+		          historyToggle.addEventListener("click", function () {
+		            setHistoryOpen(!historyOpen);
+		          });
+		          setHistoryToggleLabel();
+		        }
 
-	        var refreshTimer = null;
-	        refreshCompareLink = function () {
+		        if (infoToggle) {
+		          infoToggle.addEventListener("click", function () {
+		            setInfoOpen(!infoOpen);
+		          });
+		        }
+
+		        if (infoClose) {
+		          infoClose.addEventListener("click", function () {
+		            setInfoOpen(false);
+		            try {
+		              if (infoToggle && typeof infoToggle.focus === "function") infoToggle.focus();
+		            } catch (e) {}
+		          });
+		        }
+
+		        if (moreToggle) {
+		          moreToggle.addEventListener("click", function () {
+		            setMoreOpen(!moreOpen);
+		          });
+		        }
+
+		        if (moreMenu) {
+		          moreMenu.addEventListener(
+		            "click",
+		            function (event) {
+		              try {
+		                if (
+		                  event &&
+		                  event.button === 0 &&
+		                  !event.metaKey &&
+		                  !event.ctrlKey &&
+		                  !event.shiftKey &&
+		                  !event.altKey
+		                ) {
+		                  setMoreOpen(false);
+		                }
+		              } catch (e) {}
+		            },
+		            true
+		          );
+		        }
+
+		        document.addEventListener(
+		          "click",
+		          function (event) {
+		            var target = event ? event.target : null;
+		            try {
+		              if (
+		                infoOpen &&
+		                !containsEl(infoPanel, target) &&
+		                !containsEl(infoToggle, target)
+		              ) {
+		                setInfoOpen(false);
+		              }
+		            } catch (e) {}
+
+		            try {
+		              if (
+		                moreOpen &&
+		                !containsEl(moreMenu, target) &&
+		                !containsEl(moreToggle, target)
+		              ) {
+		                setMoreOpen(false);
+		              }
+		            } catch (e) {}
+
+		            try {
+		              if (
+		                historyOpen &&
+		                !containsEl(historyPanel, target) &&
+		                !containsEl(historyToggle, target)
+		              ) {
+		                setHistoryOpen(false);
+		              }
+		            } catch (e) {}
+		          },
+		          true
+		        );
+
+		        document.addEventListener(
+		          "keydown",
+		          function (event) {
+		            try {
+		              if (!event || event.key !== "Escape") return;
+		              if (!infoOpen && !moreOpen && !historyOpen) return;
+		              event.preventDefault();
+		              event.stopPropagation();
+		              closeAllPopovers();
+		              try {
+		                if (moreToggle && typeof moreToggle.focus === "function") moreToggle.focus();
+		                else if (infoToggle && typeof infoToggle.focus === "function") infoToggle.focus();
+		                else if (historyToggle && typeof historyToggle.focus === "function")
+		                  historyToggle.focus();
+		              } catch (e) {}
+		            } catch (e) {}
+		          },
+		          true
+		        );
+
+		        var refreshTimer = null;
+		        refreshCompareLink = function () {
 	          if (refreshTimer) clearTimeout(refreshTimer);
 	          refreshTimer = setTimeout(function () {
 	            resolveSnapshotAndLatest()
