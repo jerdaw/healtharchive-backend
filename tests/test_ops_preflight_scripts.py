@@ -402,3 +402,40 @@ def test_vps_annual_output_tiering_plan_selects_annual_jobs(tmp_path, monkeypatc
     assert plan[0].cold_dir == Path(
         "/srv/healtharchive/storagebox/jobs/hc/20260101T000000Z__hc-annual-2026"
     )
+
+
+def test_vps_annual_output_tiering_plan_window_override_includes_recent_jobs(
+    tmp_path, monkeypatch
+) -> None:
+    mod = _load_script_module(
+        "vps-annual-output-tiering.py",
+        module_name="ha_test_vps_annual_output_tiering_window_override",
+    )
+    _init_test_db(tmp_path, monkeypatch, "annual_tiering_window.db")
+
+    monkeypatch.setattr(mod, "_is_mountpoint", lambda _p: False)
+
+    with get_session() as session:
+        seed_sources(session)
+        session.flush()
+        hc = session.query(Source).filter_by(code="hc").one()
+        session.add(
+            ArchiveJob(
+                source=hc,
+                name="hc-annual-2026-created-in-dec",
+                output_dir="/srv/healtharchive/jobs/hc/20251229T000000Z__hc-annual-2026-created-in-dec",
+                status="queued",
+                created_at=datetime(2025, 12, 29, 0, 5, tzinfo=timezone.utc),
+                config={"campaign_kind": "annual", "campaign_year": 2026},
+            )
+        )
+
+    plan = mod._plan(
+        year=2026,
+        sources=["hc"],
+        archive_root=Path("/srv/healtharchive/jobs"),
+        campaign_archive_root=Path("/srv/healtharchive/storagebox/jobs"),
+        created_after=datetime(2025, 12, 28, tzinfo=timezone.utc),
+        created_before=datetime(2025, 12, 30, tzinfo=timezone.utc),
+    )
+    assert [p.job_name for p in plan] == ["hc-annual-2026-created-in-dec"]

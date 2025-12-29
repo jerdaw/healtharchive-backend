@@ -6,7 +6,7 @@ import os
 import subprocess
 import sys
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from ha_backend.db import get_session
@@ -71,9 +71,15 @@ def _plan(
     sources: list[str],
     archive_root: Path,
     campaign_archive_root: Path,
+    created_after: datetime | None = None,
+    created_before: datetime | None = None,
 ) -> list[TierPlanItem]:
-    start = datetime(year, 1, 1, tzinfo=timezone.utc)
-    end = datetime(year, 1, 3, tzinfo=timezone.utc)
+    if created_after is not None or created_before is not None:
+        start = created_after or datetime(year, 1, 1, tzinfo=timezone.utc)
+        end = created_before or datetime.now(timezone.utc) + timedelta(minutes=5)
+    else:
+        start = datetime(year, 1, 1, tzinfo=timezone.utc)
+        end = datetime(year, 1, 3, tzinfo=timezone.utc)
 
     with get_session() as session:
         src_rows = session.query(Source).filter(Source.code.in_(sources)).all()
@@ -125,6 +131,16 @@ def _mount_bind(cold_dir: Path, output_dir: Path) -> None:
         )
 
 
+def _parse_dt(s: str) -> datetime:
+    v = s.strip()
+    if v.endswith("Z"):
+        v = v[:-1] + "+00:00"
+    dt = datetime.fromisoformat(v)
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
+
+
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(
         description=(
@@ -160,6 +176,20 @@ def main(argv: list[str] | None = None) -> int:
         help="Storage Box mountpoint on the VPS (default: /srv/healtharchive/storagebox).",
     )
     p.add_argument(
+        "--created-after",
+        help=(
+            "Override the default selection window; include annual jobs created at/after this UTC timestamp "
+            "(ISO 8601, e.g. 2026-01-01T00:00:00Z). Useful for rehearsals before Jan 01."
+        ),
+    )
+    p.add_argument(
+        "--created-before",
+        help=(
+            "Override the default selection window; include annual jobs created before this UTC timestamp "
+            "(ISO 8601, e.g. 2026-01-03T00:00:00Z). Useful for rehearsals."
+        ),
+    )
+    p.add_argument(
         "--apply", action="store_true", help="Actually perform bind mounts (default: dry-run)."
     )
     args = p.parse_args(argv)
@@ -173,6 +203,11 @@ def main(argv: list[str] | None = None) -> int:
     archive_root = Path(str(args.archive_root))
     campaign_archive_root = Path(str(args.campaign_archive_root))
     storagebox_mount = Path(str(args.storagebox_mount))
+    created_after = _parse_dt(str(args.created_after)) if args.created_after else None
+    created_before = _parse_dt(str(args.created_before)) if args.created_before else None
+    if created_after is not None and created_before is not None and created_before < created_after:
+        print("ERROR: --created-before must be >= --created-after", file=sys.stderr)
+        return 2
 
     if year < 1970 or year > 2100:
         print(f"ERROR: invalid year: {year}", file=sys.stderr)
@@ -189,6 +224,8 @@ def main(argv: list[str] | None = None) -> int:
         sources=sources,
         archive_root=archive_root,
         campaign_archive_root=campaign_archive_root,
+        created_after=created_after,
+        created_before=created_before,
     )
 
     print("HealthArchive annual output tiering")
@@ -196,6 +233,11 @@ def main(argv: list[str] | None = None) -> int:
     print(f"mode={'APPLY' if args.apply else 'DRY-RUN'} year={year} sources={', '.join(sources)}")
     print(f"archive_root={archive_root}")
     print(f"campaign_archive_root={campaign_archive_root}")
+    if created_after is not None or created_before is not None:
+        print(
+            f"created_window_utc=[{created_after.isoformat() if created_after else '-inf'}, "
+            f"{created_before.isoformat() if created_before else '+inf'}]"
+        )
     print("")
 
     if not plan:
