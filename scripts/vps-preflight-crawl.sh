@@ -63,6 +63,19 @@ SKIP_SECURITY_ADMIN="false"
 SKIP_OBSERVABILITY="false"
 SKIP_REHEARSAL_EVIDENCE="false"
 
+have_cmd() {
+  command -v "$1" >/dev/null 2>&1
+}
+
+is_mounted() {
+  local path="$1"
+  if have_cmd mountpoint; then
+    mountpoint -q "${path}"
+    return $?
+  fi
+  mount | grep -q " on ${path} " 2>/dev/null
+}
+
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --year)
@@ -181,19 +194,6 @@ failures=0
 fail() {
   printf "FAIL %s\n" "$1" >&2
   failures=$((failures + 1))
-}
-
-have_cmd() {
-  command -v "$1" >/dev/null 2>&1
-}
-
-is_mounted() {
-  local path="$1"
-  if have_cmd mountpoint; then
-    mountpoint -q "${path}"
-    return $?
-  fi
-  mount | grep -q " on ${path} " 2>/dev/null
 }
 
 require_venv() {
