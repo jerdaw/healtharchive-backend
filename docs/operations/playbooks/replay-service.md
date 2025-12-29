@@ -18,6 +18,8 @@ Follow `../../deployment/replay-service-pywb.md`.
    - `curl -I https://replay.healtharchive.ca/ | head`
 2. Verify the public surface script can resolve a replay `browseUrl` for a known snapshot:
    - `cd /opt/healtharchive-backend && ./scripts/verify_public_surface.py`
+3. Verify the replay banner works on a direct replay page:
+   - Open a known `browseUrl` on `https://replay.healtharchive.ca/` and confirm the banner loads quickly and shows `title · snapshot date · original URL`, and that the action links (Details, View diff, Raw HTML, Metadata JSON, Cite, Report issue, Other snapshots) behave as expected.
 
 ## Retention warning
 
