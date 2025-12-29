@@ -243,6 +243,44 @@ sudo ./scripts/vps-install-systemd-units.sh --apply
 sudo systemctl daemon-reload
 ```
 
+### Rehearsal before Jan 01 (optional)
+
+The tiering script selects annual jobs using the Jan 01–Jan 03 UTC window by default.
+If you want to rehearse the end-to-end scheduling + tiering workflow **before** Jan 01,
+you can override the selection window:
+
+1) Stop the worker (prevents any queued jobs from running):
+
+```bash
+sudo systemctl stop healtharchive-worker.service
+```
+
+2) Enqueue annual jobs (this affects the production DB; delete them afterwards if you do not want them queued):
+
+```bash
+/opt/healtharchive-backend/.venv/bin/ha-backend schedule-annual --apply --year 2026 --sources hc phac cihr
+```
+
+3) Apply tiering for the jobs you just created (use a short window around “now”):
+
+```bash
+sudo /opt/healtharchive-backend/.venv/bin/python3 /opt/healtharchive-backend/scripts/vps-annual-output-tiering.py \
+  --apply \
+  --year 2026 \
+  --created-after "$(date -u -d '2 hours ago' +%Y-%m-%dT%H:%M:%SZ)"
+```
+
+4) Validate the expected output dirs are mounted (and that storagebox is still mounted):
+
+```bash
+mount | rg '/srv/healtharchive/storagebox|/srv/healtharchive/jobs/(hc|phac|cihr)/' || true
+```
+
+5) Decide what to do with the queued annual jobs:
+
+- If you want to keep them queued for Jan 01, leave the worker stopped until you are ready.
+- If you do not want them queued yet, delete them via the admin UI or CLI before restarting the worker.
+
 ## Alerting for tiering (recommended)
 
 If you use Prometheus alerting, enable the tiering metrics writer:
