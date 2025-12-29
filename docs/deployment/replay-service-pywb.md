@@ -307,6 +307,10 @@ Notes:
   original URL, an always-visible disclaimer line, and action links (View diff,
   Details, All snapshots, Raw HTML, Metadata JSON, Cite, Report issue, Hide).
   “All snapshots” opens a right-aligned popover list.
+- The “← HealthArchive.ca” button returns to the HealthArchive page the user came
+  from when possible (the frontend passes an explicit return path in the replay
+  URL fragment). If no return path is available, it falls back to the archive
+  search page for the current original URL.
 - The banner uses `XMLHttpRequest` with pywb’s wombat opt-out (`xhr._no_rewrite = true`)
   so API requests are not replay-rewritten. Ensure CORS allows the
   `X-Pywb-Requested-With` header from `https://replay.healtharchive.ca`.
