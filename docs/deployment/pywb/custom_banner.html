@@ -1432,11 +1432,70 @@ Implementation note:
 
 	        var snapshotDetailCache = {};
 	        var snapshotDetailPendingId = null;
+	        var snapshotDetailBaseById = {};
+
+	        function normalizeBase(value) {
+	          if (!value) return null;
+	          var s = String(value).trim();
+	          if (!s) return null;
+	          return s.replace(/\/+$/, "");
+	        }
+
+	        function uniqueBases(values) {
+	          var out = [];
+	          var seen = {};
+	          (values || []).forEach(function (v) {
+	            var base = normalizeBase(v);
+	            if (!base) return;
+	            if (seen[base]) return;
+	            seen[base] = true;
+	            out.push(base);
+	          });
+	          return out;
+	        }
+
+	        function buildSnapshotJsonUrl(base, snapshotIdValue) {
+	          return (
+	            normalizeBase(base) +
+	            "/api/snapshot/" +
+	            encodeURIComponent(String(snapshotIdValue))
+	          );
+	        }
+
+	        function fetchSnapshotDetailWithFallback(snapshotIdValue) {
+	          var baseFromRoutes = null;
+	          try {
+	            if (routes && routes.json) {
+	              var parts = String(routes.json).split("/api/snapshot/");
+	              if (parts.length > 1) baseFromRoutes = parts[0];
+	            }
+	          } catch (e) {
+	            baseFromRoutes = null;
+	          }
+
+	          var preferred = snapshotDetailBaseById[snapshotIdValue] || null;
+	          var candidates = uniqueBases([baseFromRoutes, preferred].concat(apiCandidates || []));
+
+	          function tryAt(idx) {
+	            if (idx >= candidates.length) return Promise.reject(new Error("no_api_base"));
+	            var base = candidates[idx];
+	            var url = buildSnapshotJsonUrl(base, snapshotIdValue);
+	            return safeJson(url, 3500)
+	              .then(function (detail) {
+	                return { detail: detail, base: base };
+	              })
+	              .catch(function () {
+	                return tryAt(idx + 1);
+	              });
+	          }
+
+	          return tryAt(0);
+	        }
 
 	        function updateSnapshotDetailUi() {
 	          try {
 	            if (embedded) return;
-	            if (!snapshotId || !routes.json) {
+	            if (!snapshotId) {
 	              applySnapshotDetail(null);
 	              return;
 	            }
@@ -1449,15 +1508,21 @@ Implementation note:
 
 	            if (snapshotDetailPendingId === snapshotId) return;
 	            var nextSnapshotId = snapshotId;
-	            var nextJsonUrl = routes.json;
 	            snapshotDetailPendingId = nextSnapshotId;
 
-	            safeJson(nextJsonUrl, 3500)
-	              .then(function (detail) {
-	                if (!detail) return;
-	                snapshotDetailCache[nextSnapshotId] = detail;
+	            fetchSnapshotDetailWithFallback(nextSnapshotId)
+	              .then(function (result) {
+	                if (!result || !result.detail) return;
+	                snapshotDetailCache[nextSnapshotId] = result.detail;
+	                snapshotDetailBaseById[nextSnapshotId] = result.base;
+	                if (routes && result.base) {
+	                  routes.raw = result.base + "/api/snapshots/raw/" + nextSnapshotId;
+	                  routes.json = result.base + "/api/snapshot/" + nextSnapshotId;
+	                  routes.timeline =
+	                    result.base + "/api/snapshots/" + nextSnapshotId + "/timeline";
+	                }
 	                if (snapshotId !== nextSnapshotId) return;
-	                applySnapshotDetail(detail);
+	                applySnapshotDetail(result.detail);
 	              })
 	              .catch(function () {
 	                if (snapshotId === nextSnapshotId) applySnapshotDetail(null);
