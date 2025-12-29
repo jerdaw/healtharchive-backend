@@ -3690,19 +3690,12 @@ def get_snapshot_raw(
     back_url = snapshot_details_url if snap.id else f"{site_base}/"
     snapshot_history_url = f"{snapshot_details_url}?view=details"
     snapshot_json_url = f"/api/snapshot/{snap.id}"
-    snapshot_raw_url = f"/api/snapshots/raw/{snap.id}"
 
     capture_date = (
         snap.capture_timestamp.date().isoformat()
         if isinstance(snap.capture_timestamp, datetime)
         else str(snap.capture_timestamp)
     )
-    summary_parts = [
-        snap.title or "",
-        snap.source.name if snap.source else "",
-        capture_date or "",
-        snap.language or "",
-    ]
 
     def _compact_url(value: str) -> str:
         cleaned = value.strip()
@@ -3720,12 +3713,6 @@ def get_snapshot_raw(
         except Exception:
             return re.sub(r"^https?://", "", cleaned, flags=re.IGNORECASE)
         return re.sub(r"^https?://", "", cleaned, flags=re.IGNORECASE)
-
-    compact_url = _compact_url(snap.url)
-    if compact_url:
-        summary_parts.append(compact_url)
-    summary_text = " \u00b7 ".join(part for part in summary_parts if part)
-    summary_html = html.escape(summary_text or "Raw HTML debug view")
 
     compare_snapshot_id: Optional[int] = None
     if is_html_mime_type(snap.mime_type):
