@@ -60,6 +60,7 @@ This writes a timestamped report under:
 ## If it fails (common fixes)
 
 - **Campaign storage forecast fails** (even if you’re below 80% *today*): the annual campaign is projected to exceed disk headroom or the 80% review threshold. Follow the report output to free space or expand disk *before* Jan 01 UTC.
+- **Campaign storage forecast fails but you are using tiered storage (Storage Box)**: run preflight with the campaign tier root so the forecast uses the correct filesystem, e.g. `./scripts/vps-preflight-crawl.sh --year <YYYY> --campaign-archive-root /srv/healtharchive/storagebox/jobs`.
 - **Rehearsal evidence (active crawl headroom) fails**: you don’t have a recent `--apply` rehearsal (or it recorded low MemAvailable / high swap). Run `./scripts/vps-smoke-crawl-rehearsal.sh --apply ...` to generate evidence, or upgrade the VPS / reduce crawl concurrency.
 - **CPU/RAM headroom fails**: the VPS is already under sustained load / memory pressure (or swap usage). Stop other heavy work (indexing, other crawls), then re-run preflight; if it persists, reduce crawl concurrency or upgrade the VPS.
 - **Time sync (NTP) fails**: fix time sync before crawling (TLS, scheduling, and log correlation all assume correct UTC).
@@ -75,6 +76,7 @@ This writes a timestamped report under:
   - Active jobs blocking scheduling → finish/index them (or decide not to run annual yet).
 - **Temp cleanup candidates**: the report lists indexed jobs that still have `.tmp*` dirs; use `ha-backend cleanup-job --mode temp-nonwarc` (safe) to reclaim space.
 - **Baseline drift failures**: reconcile production with `docs/operations/production-baseline-policy.toml`, then re-run drift checks.
+- **Ops automation posture fails**: enable required timers and sentinels (at minimum baseline drift), e.g. `sudo systemctl enable --now healtharchive-baseline-drift-check.timer && sudo touch /etc/healtharchive/baseline-drift-enabled`.
 - **Admin/metrics auth check fails**: ensure a real `HEALTHARCHIVE_ADMIN_TOKEN` is set in production and routing is correct.
 
 ## Optional deep checks

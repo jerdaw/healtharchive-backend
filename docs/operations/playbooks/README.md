@@ -33,6 +33,7 @@ Other playbooks:
 - Restore test (quarterly): `restore-test.md`
 - Dataset release integrity (quarterly): `dataset-release.md`
 - Adoption signals entry (quarterly): `adoption-signals.md`
+- WARC storage tiering (SSD + Storage Box): `warc-storage-tiering.md`
 - Replay service (if enabled): `replay-service.md`
 - Annual campaign operations (seasonal): `annual-campaign.md`
 - Incident response (when something breaks): `incident-response.md`

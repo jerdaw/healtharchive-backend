@@ -123,11 +123,17 @@ check_timer() {
 
   if [[ "${required}" == "true" && "${enabled}" != "enabled" ]]; then
     fail "timer not enabled (required): ${timer} (got: ${enabled:-unknown})"
+    if [[ -n "${sentinel}" ]]; then
+      echo "     Hint: sudo systemctl enable --now ${timer} && sudo touch ${sentinel}" >&2
+    else
+      echo "     Hint: sudo systemctl enable --now ${timer}" >&2
+    fi
     failures=$((failures + 1))
   fi
 
   if [[ "${enabled}" == "enabled" && -n "${sentinel}" && ! -e "${sentinel}" ]]; then
     fail "timer enabled but sentinel missing: ${sentinel} (required for ${timer} to run)"
+    echo "     Hint: sudo touch ${sentinel}" >&2
     failures=$((failures + 1))
   fi
 }
