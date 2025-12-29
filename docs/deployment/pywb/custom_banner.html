@@ -54,15 +54,20 @@ Implementation note:
     padding: 0;
   }
 
-  #ha-replay-banner .ha-replay-bar {
-    display: grid;
-    grid-template-columns: max-content minmax(0, 1fr) max-content;
-    align-items: center;
-    position: relative;
-    column-gap: 1.15rem;
-    padding: 0.55rem 0.9rem;
-    min-height: 56px;
-  }
+	  #ha-replay-banner .ha-replay-bar {
+	    display: grid;
+	    grid-template-columns: max-content minmax(0, 1fr) max-content;
+	    align-items: center;
+	    position: relative;
+	    column-gap: 1.15rem;
+	    padding: 0.55rem 0.9rem;
+	    min-height: 56px;
+	    transition:
+	      padding 180ms ease,
+	      min-height 180ms ease,
+	      row-gap 180ms ease,
+	      column-gap 180ms ease;
+	  }
 
   #ha-replay-banner .ha-replay-left,
   #ha-replay-banner .ha-replay-right {
@@ -81,13 +86,13 @@ Implementation note:
     flex-wrap: nowrap;
   }
 
-  #ha-replay-banner .ha-replay-center {
-    min-width: 0;
-    display: flex;
-    flex-direction: column;
-    gap: 0.15rem;
-    overflow: hidden;
-  }
+	  #ha-replay-banner .ha-replay-center {
+	    min-width: 0;
+	    display: flex;
+	    flex-direction: column;
+	    gap: 0.15rem;
+	    overflow: hidden;
+	  }
 
   #ha-replay-banner .ha-replay-title {
     min-width: 0;
@@ -99,28 +104,60 @@ Implementation note:
     letter-spacing: -0.01em;
   }
 
-  #ha-replay-banner .ha-replay-meta {
-    min-width: 0;
-    display: flex;
-    align-items: center;
-    gap: 0.55rem;
-    overflow: hidden;
-    white-space: nowrap;
-    font-size: 1.05rem;
-    color: rgba(15, 23, 42, 0.72);
-    font-weight: 650;
-  }
+	  #ha-replay-banner .ha-replay-meta {
+	    min-width: 0;
+	    display: flex;
+	    align-items: center;
+	    gap: 0.55rem;
+	    overflow: hidden;
+	    white-space: nowrap;
+	    font-size: 1.05rem;
+	    color: rgba(15, 23, 42, 0.72);
+	    font-weight: 650;
+	    max-height: 2.4rem;
+	    transform: translateY(0);
+	    opacity: 1;
+	    transition:
+	      opacity 160ms ease,
+	      max-height 160ms ease,
+	      transform 160ms ease;
+	  }
 
-  #ha-replay-banner .ha-replay-disclaimer-inline {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    color: #92400e;
-    font-weight: 600;
-    font-size: 1rem;
-    line-height: 1.35;
-  }
+	  #ha-replay-banner .ha-replay-disclaimer-inline {
+	    min-width: 0;
+	    overflow: hidden;
+	    text-overflow: ellipsis;
+	    white-space: nowrap;
+	    color: #92400e;
+	    font-weight: 600;
+	    font-size: 1rem;
+	    line-height: 1.35;
+	    max-height: 3.2rem;
+	    transform: translateY(0);
+	    opacity: 1;
+	    transition:
+	      opacity 160ms ease,
+	      max-height 160ms ease,
+	      transform 160ms ease;
+	  }
+
+	  #ha-replay-banner.ha-replay-compact .ha-replay-bar {
+	    padding-top: 0.4rem;
+	    padding-bottom: 0.4rem;
+	    min-height: 48px;
+	  }
+
+	  #ha-replay-banner.ha-replay-compact .ha-replay-center {
+	    gap: 0;
+	  }
+
+	  #ha-replay-banner.ha-replay-compact .ha-replay-meta,
+	  #ha-replay-banner.ha-replay-compact .ha-replay-disclaimer-inline {
+	    opacity: 0;
+	    max-height: 0;
+	    transform: translateY(-6px);
+	    pointer-events: none;
+	  }
 
   #ha-replay-banner .ha-replay-meta-item {
     min-width: 0;
@@ -414,8 +451,8 @@ Implementation note:
 
 		  @media (max-width: 780px) {
 		    #ha-replay-banner .ha-replay-bar {
-		      grid-template-columns: minmax(0, 1fr) max-content;
-		      grid-template-rows: auto auto;
+		      grid-template-columns: minmax(0, 1fr);
+		      grid-template-rows: auto auto auto;
 		      align-items: start;
 		      row-gap: 0.45rem;
 		      padding: 0.55rem 0.65rem;
@@ -430,15 +467,18 @@ Implementation note:
 		    }
 
 		    #ha-replay-banner .ha-replay-right {
-		      grid-column: 2;
-		      grid-row: 1;
-		      max-width: min(66vw, 420px);
+		      grid-column: 1;
+		      grid-row: 2;
+		      max-width: 100%;
+		      overflow-x: auto;
+		      -webkit-overflow-scrolling: touch;
 		      gap: 0.25rem;
+		      justify-content: flex-start;
 		    }
 
 		    #ha-replay-banner .ha-replay-center {
-		      grid-column: 1 / -1;
-		      grid-row: 2;
+		      grid-column: 1;
+		      grid-row: 3;
 		    }
 
 		    #ha-replay-banner .ha-replay-meta {
@@ -480,6 +520,30 @@ Implementation note:
 		      left: 0.6rem;
 		      right: 0.6rem;
 		      width: auto;
+		    }
+
+		    #ha-replay-banner.ha-replay-compact .ha-replay-bar {
+		      grid-template-columns: max-content minmax(0, 1fr);
+		      grid-template-rows: auto;
+		      align-items: center;
+		      row-gap: 0;
+		    }
+
+		    #ha-replay-banner.ha-replay-compact .ha-replay-left {
+		      grid-column: 1;
+		      grid-row: 1;
+		    }
+
+		    #ha-replay-banner.ha-replay-compact .ha-replay-right {
+		      grid-column: 2;
+		      grid-row: 1;
+		      overflow-x: auto;
+		      max-width: none;
+		      justify-content: flex-end;
+		    }
+
+		    #ha-replay-banner.ha-replay-compact .ha-replay-center {
+		      display: none;
 		    }
 		  }
 	</style>
@@ -923,17 +987,73 @@ Implementation note:
       return d.toLocaleDateString(UI_LOCALE_TAG, { year: "numeric", month: "short", day: "numeric" });
     }
 
-    function buildMeta() {
-      var wb = window.wbinfo || {};
-      var parts = [];
-      if (wb.coll) parts.push(t("backupLabel") + " " + wb.coll);
-      var capture = formatTimestamp(wb.timestamp);
-      if (capture) parts.push(t("capturedLabel") + " " + capture);
-      return parts.join(" \u00b7 ");
-    }
+	    function buildMeta() {
+	      var wb = window.wbinfo || {};
+	      var parts = [];
+	      if (wb.coll) parts.push(t("backupLabel") + " " + wb.coll);
+	      var capture = formatTimestamp(wb.timestamp);
+	      if (capture) parts.push(t("capturedLabel") + " " + capture);
+	      return parts.join(" \u00b7 ");
+	    }
 
-	    function inject() {
-	      if (!document.body) return;
+		    function setupCompactBehavior(bannerEl) {
+		      if (!bannerEl) return;
+		      try {
+		        if (bannerEl.classList && bannerEl.classList.contains("ha-replay-embedded")) return;
+		      } catch (e) {}
+
+		      var lastCompact = null;
+		      var ticking = false;
+
+		      function computeCompact() {
+		        var y = 0;
+		        try {
+		          y = window.scrollY != null ? window.scrollY : window.pageYOffset != null ? window.pageYOffset : 0;
+		        } catch (e) {
+		          y = 0;
+		        }
+		        return y > 24;
+		      }
+
+		      function apply() {
+		        ticking = false;
+		        var compact = computeCompact();
+		        if (lastCompact === compact) return;
+		        lastCompact = compact;
+		        try {
+		          bannerEl.classList.toggle("ha-replay-compact", compact);
+		        } catch (e) {}
+		        scheduleReplayHeight();
+		      }
+
+		      function onScroll() {
+		        if (ticking) return;
+		        ticking = true;
+		        try {
+		          if (typeof window.requestAnimationFrame === "function") {
+		            window.requestAnimationFrame(apply);
+		          } else {
+		            setTimeout(apply, 50);
+		          }
+		        } catch (e) {
+		          ticking = false;
+		          apply();
+		        }
+		      }
+
+		      try {
+		        window.addEventListener("scroll", onScroll, { passive: true });
+		      } catch (e) {
+		        try {
+		          window.addEventListener("scroll", onScroll);
+		        } catch (e2) {}
+		      }
+
+		      apply();
+		    }
+
+		    function inject() {
+		      if (!document.body) return;
 
       var banner = document.getElementById("ha-replay-banner");
       if (banner) return;
@@ -1038,7 +1158,8 @@ Implementation note:
 			        "  </div>" +
 			        "</div>";
 
-	      document.body.insertBefore(banner, document.body.firstChild);
+		      document.body.insertBefore(banner, document.body.firstChild);
+		      setupCompactBehavior(banner);
 
       var titleEl = document.getElementById("ha-replay-top-title");
       if (titleEl) {
