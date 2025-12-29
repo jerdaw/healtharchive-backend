@@ -54,15 +54,15 @@ Implementation note:
     padding: 0;
   }
 
-	  #ha-replay-banner .ha-replay-bar {
-	    display: grid;
-	    grid-template-columns: max-content minmax(0, 1fr) max-content;
-	    align-items: center;
-	    position: relative;
-	    column-gap: 0.75rem;
-	    padding: 0.55rem 0.9rem;
-	    min-height: 56px;
-	  }
+  #ha-replay-banner .ha-replay-bar {
+    display: grid;
+    grid-template-columns: max-content minmax(0, 1fr) max-content;
+    align-items: center;
+    position: relative;
+    column-gap: 1.15rem;
+    padding: 0.55rem 0.9rem;
+    min-height: 56px;
+  }
 
   #ha-replay-banner .ha-replay-left,
   #ha-replay-banner .ha-replay-right {
@@ -95,17 +95,28 @@ Implementation note:
     letter-spacing: -0.01em;
   }
 
-	  #ha-replay-banner .ha-replay-meta {
-	    min-width: 0;
-	    display: flex;
-	    align-items: center;
-	    gap: 0.55rem;
-	    overflow: hidden;
-	    white-space: nowrap;
-	    font-size: 0.95rem;
-	    color: rgba(15, 23, 42, 0.72);
-	    font-weight: 650;
-	  }
+  #ha-replay-banner .ha-replay-meta {
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    overflow: hidden;
+    white-space: nowrap;
+    font-size: 0.95rem;
+    color: rgba(15, 23, 42, 0.72);
+    font-weight: 650;
+  }
+
+  #ha-replay-banner .ha-replay-disclaimer-inline {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: #92400e;
+    font-weight: 600;
+    font-size: 0.9rem;
+    line-height: 1.35;
+  }
 
   #ha-replay-banner .ha-replay-meta-item {
     min-width: 0;
@@ -217,7 +228,7 @@ Implementation note:
     border-radius: 10px;
     padding: 0.45rem 0.55rem;
     font: inherit;
-    font-weight: 650;
+    font-weight: 550;
     cursor: pointer;
     line-height: 1.1;
     text-decoration: none;
@@ -238,7 +249,7 @@ Implementation note:
 
   #ha-replay-banner .ha-replay-navlink--primary {
     color: rgba(37, 99, 235, 0.98);
-    font-weight: 750;
+    font-weight: 550;
   }
 
   #ha-replay-banner [aria-disabled="true"] {
@@ -278,22 +289,6 @@ Implementation note:
   #ha-replay-banner .ha-replay-popover-title {
     font-weight: 700;
     color: rgba(15, 23, 42, 0.92);
-  }
-
-  #ha-replay-banner .ha-replay-disclaimer-row {
-    padding: 0.35rem 0.9rem 0.45rem;
-    background: rgba(255, 247, 237, 0.92);
-    border-bottom: 1px solid rgba(254, 215, 170, 0.55);
-  }
-
-  #ha-replay-banner .ha-replay-disclaimer-text {
-    color: #92400e;
-    font-weight: 600;
-    font-size: 0.95rem;
-    line-height: 1.35;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
   }
 
 	  #ha-replay-banner .ha-replay-history-panel {
@@ -383,7 +378,6 @@ Implementation note:
 
 	  #ha-replay-banner.ha-replay-embedded .ha-replay-left,
 	  #ha-replay-banner.ha-replay-embedded .ha-replay-center,
-	  #ha-replay-banner.ha-replay-embedded .ha-replay-disclaimer-row,
 	  #ha-replay-banner.ha-replay-embedded #ha-replay-history-toggle,
 		  #ha-replay-banner.ha-replay-embedded #ha-replay-history-panel,
 		  #ha-replay-banner.ha-replay-embedded [data-ha-action="raw"],
@@ -907,9 +901,6 @@ Implementation note:
 
 			        banner.innerHTML =
 			        '<div class="ha-replay-inner">' +
-			        '  <div class="ha-replay-disclaimer-row">' +
-			        '    <div class="ha-replay-disclaimer-text" id="ha-replay-disclaimer"></div>' +
-			        "  </div>" +
 			        '  <div class="ha-replay-bar">' +
 			        '    <div class="ha-replay-left">' +
 			        '      <a class="ha-replay-btn ha-replay-btn-primary" data-ha-action="browse" href="#" target="_top" rel="noreferrer noopener" aria-label="' +
@@ -926,6 +917,7 @@ Implementation note:
 			        '        <span class="ha-replay-meta-item" id="ha-replay-top-date"></span>' +
 			        '        <a class="ha-replay-meta-item ha-replay-meta-link" data-ha-action="origin" id="ha-replay-top-url" href="#" target="_blank" rel="noreferrer noopener"></a>' +
 			        "      </div>" +
+			        '      <div class="ha-replay-disclaimer-inline" id="ha-replay-disclaimer"></div>' +
 			        "    </div>" +
 			        '    <div class="ha-replay-right" id="ha-replay-actions">' +
 			        '      <a class="ha-replay-navlink ha-replay-navlink--primary" data-ha-action="compare" href="#" target="_top" rel="noreferrer noopener" aria-label="' +
