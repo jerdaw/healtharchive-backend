@@ -78,11 +78,19 @@ Implementation note:
     padding: 0.35rem 0;
   }
 
-  #ha-replay-banner .ha-replay-row--details {
+  #ha-replay-banner .ha-replay-row--bottom {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) max-content;
     align-items: center;
-    gap: 0.75rem;
-    padding: 0.35rem 0;
-    border-top: 1px solid rgba(148, 163, 184, 0.24);
+    column-gap: 0.65rem;
+    padding: 0.35rem 0.6rem;
+    margin-top: 0.15rem;
+    border-radius: 0.65rem;
+    background: linear-gradient(
+      to bottom,
+      rgba(15, 23, 42, 0.02),
+      rgba(15, 23, 42, 0.055)
+    );
   }
 
   #ha-replay-banner .ha-replay-left,
@@ -99,23 +107,83 @@ Implementation note:
     row-gap: 0.2rem;
   }
 
-  #ha-replay-banner .ha-replay-top-disclaimer {
-    flex: 1 1 auto;
+  #ha-replay-banner .ha-replay-top-meta {
     min-width: 0;
-    color: rgba(15, 23, 42, 0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.65rem;
+    overflow: hidden;
+    white-space: nowrap;
+    text-align: center;
     font-weight: 600;
+    color: rgba(15, 23, 42, 0.72);
+  }
+
+  #ha-replay-banner .ha-replay-top-meta-item {
+    min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    text-align: center;
   }
 
-  #ha-replay-banner .ha-replay-summaryline {
+  #ha-replay-banner .ha-replay-top-meta-item + .ha-replay-top-meta-item::before {
+    content: "\u00b7";
+    display: inline-block;
+    margin-right: 0.65rem;
+    color: rgba(148, 163, 184, 0.95);
+    font-weight: 650;
+  }
+
+  #ha-replay-banner .ha-replay-top-title {
+    flex: 2 1 0;
+    color: rgba(15, 23, 42, 0.92);
+    font-weight: 650;
+  }
+
+  #ha-replay-banner .ha-replay-top-date {
+    flex: 0 0 auto;
+    color: rgba(15, 23, 42, 0.72);
+    font-weight: 600;
+  }
+
+  #ha-replay-banner .ha-replay-top-url {
+    flex: 1 1 0;
+    color: rgba(37, 99, 235, 0.95);
+    text-decoration: none;
+  }
+
+  #ha-replay-banner .ha-replay-top-url:hover {
+    text-decoration: underline;
+  }
+
+  #ha-replay-banner .ha-replay-bottom-left {
+    min-width: 0;
+  }
+
+  #ha-replay-banner .ha-replay-bottom-disclaimer {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: #92400e;
+    font-weight: 500;
+    font-size: 0.85rem;
+  }
+
+  #ha-replay-banner .ha-replay-bottom-right {
     display: flex;
     align-items: center;
-    gap: 0;
-    flex: 1 1 auto;
-    min-width: 0;
+    justify-content: flex-end;
+    gap: 0.35rem;
+  }
+
+  #ha-replay-banner:not(.ha-replay-embedded) #ha-replay-hide-top {
+    display: none;
+  }
+
+  #ha-replay-banner.ha-replay-embedded #ha-replay-hide-bottom {
+    display: none;
   }
 
   #ha-replay-banner .ha-replay-pill {
@@ -141,66 +209,12 @@ Implementation note:
     overflow: hidden;
   }
 
-  #ha-replay-banner .ha-replay-title {
-    font-weight: 500;
-    color: rgba(15, 23, 42, 0.95);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    max-width: 100%;
-    min-width: 0;
-  }
-
-  #ha-replay-banner .ha-replay-summary-item {
-    display: flex;
-    align-items: baseline;
-    justify-content: center;
-    gap: 0.35rem;
-    flex: 1 1 0;
-    padding: 0 0.6rem;
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    color: rgba(15, 23, 42, 0.92);
-    font-weight: 500;
-  }
-
-  #ha-replay-banner .ha-replay-summary-label {
-    flex: 0 0 auto;
-    color: rgba(15, 23, 42, 0.55);
-    font-weight: 500;
-  }
-
-  #ha-replay-banner .ha-replay-summary-value {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  #ha-replay-banner .ha-replay-summary-item + .ha-replay-summary-item {
-    position: relative;
-  }
-
-  #ha-replay-banner .ha-replay-summary-item + .ha-replay-summary-item::before {
-    content: "|";
-    position: absolute;
-    left: -0.2rem;
-    top: 0;
-    bottom: 0;
-    display: flex;
-    align-items: center;
-    color: rgba(148, 163, 184, 0.9);
-    font-weight: 650;
-  }
-
-  #ha-replay-banner .ha-replay-summary-item a {
-    color: rgba(37, 99, 235, 0.95);
+  /* Keep link styling consistent inside the banner. */
+  #ha-replay-banner a {
     text-decoration: none;
   }
 
-  #ha-replay-banner .ha-replay-summary-item a:hover {
+  #ha-replay-banner a:hover {
     text-decoration: underline;
   }
 
@@ -399,15 +413,9 @@ Implementation note:
     text-decoration: underline;
   }
 
-	  #ha-replay-banner .ha-replay-divider {
-	    width: 1px;
-	    height: 20px;
-	    background: rgba(148, 163, 184, 0.35);
-	  }
-
 	  #ha-replay-banner.ha-replay-embedded .ha-replay-center,
-	  #ha-replay-banner.ha-replay-embedded .ha-replay-row--details,
-	  #ha-replay-banner.ha-replay-embedded .ha-replay-top-disclaimer,
+	  #ha-replay-banner.ha-replay-embedded .ha-replay-row--bottom,
+	  #ha-replay-banner.ha-replay-embedded .ha-replay-top-meta,
 	  #ha-replay-banner.ha-replay-embedded .ha-replay-left,
 	  #ha-replay-banner.ha-replay-embedded .ha-replay-pill,
 	  #ha-replay-banner.ha-replay-embedded [data-ha-action="browse"],
@@ -417,8 +425,7 @@ Implementation note:
 	  #ha-replay-banner.ha-replay-embedded [data-ha-action="raw"],
 	  #ha-replay-banner.ha-replay-embedded [data-ha-action="json"],
 	  #ha-replay-banner.ha-replay-embedded [data-ha-action="cite"],
-	  #ha-replay-banner.ha-replay-embedded [data-ha-action="report"],
-	  #ha-replay-banner.ha-replay-embedded .ha-replay-divider {
+	  #ha-replay-banner.ha-replay-embedded [data-ha-action="report"] {
 	    display: none !important;
 	  }
 
@@ -459,21 +466,16 @@ Implementation note:
       row-gap: 0.2rem;
     }
 
-    #ha-replay-banner:not(.ha-replay-embedded) .ha-replay-row--details {
+    #ha-replay-banner:not(.ha-replay-embedded) .ha-replay-row--bottom {
       align-items: flex-start;
       gap: 0.55rem;
-      padding: 0.35rem 0;
+      padding: 0.35rem 0.55rem;
     }
 
-    #ha-replay-banner:not(.ha-replay-embedded) .ha-replay-summaryline {
+    #ha-replay-banner:not(.ha-replay-embedded) .ha-replay-top-meta {
       overflow-x: auto;
       -webkit-overflow-scrolling: touch;
       scrollbar-width: thin;
-    }
-
-    #ha-replay-banner:not(.ha-replay-embedded) .ha-replay-summary-item {
-      flex: 0 0 auto;
-      max-width: 82vw;
     }
 
     #ha-replay-banner:not(.ha-replay-embedded) .ha-replay-right {
@@ -495,7 +497,7 @@ Implementation note:
   }
 
   @media (max-width: 420px) {
-    #ha-replay-banner:not(.ha-replay-embedded) .ha-replay-top-disclaimer {
+    #ha-replay-banner:not(.ha-replay-embedded) .ha-replay-bottom-disclaimer {
       display: none;
     }
   }
@@ -509,6 +511,7 @@ Implementation note:
 	    var COMPARE_LATEST_STORAGE_KEY = "haReplayLatestSnapshotId";
 	    var refreshCompareLink = null;
 	    var heightTimer = null;
+	    var snapshotIdExplicit = false;
 
 	    function isEmbedded() {
 	      try {
@@ -812,6 +815,7 @@ Implementation note:
 	        } catch (e) {
 	          snapshotId = null;
 	        }
+	        if (snapshotId) snapshotIdExplicit = true;
 
 	        var hrefCandidates = [];
 	        try {
@@ -831,6 +835,7 @@ Implementation note:
 	      } catch (e) {
 	        snapshotId = null;
 	      }
+	      if (snapshotId && !snapshotIdExplicit) snapshotIdExplicit = true;
 
 	      if (!snapshotId) {
 	        try {
@@ -965,7 +970,7 @@ Implementation note:
 	        banner.className = "ha-replay-embedded";
 	      }
 
-	      banner.innerHTML =
+	        banner.innerHTML =
 	        '<div class="ha-replay-inner">' +
 	        '  <div class="ha-replay-row ha-replay-row--top">' +
 	        '    <div class="ha-replay-left">' +
@@ -978,7 +983,13 @@ Implementation note:
 	        t("archivedReplay") +
 	        "</span>" +
 	        "    </div>" +
-	        '    <div class="ha-replay-top-disclaimer" id="ha-replay-disclaimer"></div>' +
+	        '    <div class="ha-replay-top-meta" id="ha-replay-top-meta" aria-label="' +
+	        (UI_LOCALE === "fr" ? "Résumé de la capture" : "Snapshot summary") +
+	        '">' +
+	        '      <span class="ha-replay-top-meta-item ha-replay-top-title" id="ha-replay-top-title"></span>' +
+	        '      <span class="ha-replay-top-meta-item ha-replay-top-date" id="ha-replay-top-date"></span>' +
+	        '      <a class="ha-replay-top-meta-item ha-replay-top-url" data-ha-action="origin" id="ha-replay-top-url" href="#" target="_blank" rel="noreferrer noopener"></a>' +
+	        "    </div>" +
 	        '    <div class="ha-replay-right" id="ha-replay-actions">' +
 	        '      <a class="ha-replay-navlink" data-ha-action="details" href="#" target="_top" rel="noreferrer noopener" aria-label="' +
 	        t("detailsAria") +
@@ -1010,61 +1021,28 @@ Implementation note:
 	        '">' +
 	        t("reportLabel") +
 	        "</a>" +
-	        '      <button type="button" class="ha-replay-navlink" id="ha-replay-history-toggle" aria-label="' +
-	        t("historyAria") +
-	        '" aria-expanded="false">' +
-	        t("historyLabel") +
-	        "</button>" +
-	        '      <span class="ha-replay-divider" aria-hidden="true"></span>' +
-	        '      <button type="button" id="ha-replay-hide" class="ha-replay-link" aria-label="' +
+	        '      <button type="button" id="ha-replay-hide-top" class="ha-replay-link" aria-label="' +
 	        t("hideAria") +
 	        '">' +
 	        t("hideLabel") +
 	        "</button>" +
 	        "    </div>" +
 	        "  </div>" +
-	        '  <div class="ha-replay-row ha-replay-row--details">' +
-	        '    <div class="ha-replay-summaryline" aria-label="' +
-	        (UI_LOCALE === "fr" ? "Résumé de la capture" : "Snapshot summary") +
+	        '  <div class="ha-replay-row ha-replay-row--bottom">' +
+	        '    <div class="ha-replay-bottom-left">' +
+	        '      <div class="ha-replay-bottom-disclaimer" id="ha-replay-disclaimer"></div>' +
+	        "    </div>" +
+	        '    <div class="ha-replay-bottom-right">' +
+	        '      <button type="button" class="ha-replay-navlink" id="ha-replay-history-toggle" aria-label="' +
+	        t("historyAria") +
+	        '" aria-expanded="false">' +
+	        t("historyLabel") +
+	        "</button>" +
+	        '      <button type="button" id="ha-replay-hide-bottom" class="ha-replay-link" aria-label="' +
+	        t("hideAria") +
 	        '">' +
-	        '      <span class="ha-replay-summary-item" id="ha-replay-summary-title">' +
-	        '        <span class="ha-replay-summary-label">' +
-	        t("pageTitleLabel") +
-	        ':</span> ' +
-	        '        <span class="ha-replay-title ha-replay-summary-value" id="ha-replay-title"></span>' +
-	        "      </span>" +
-	        '      <span class="ha-replay-summary-item" id="ha-replay-summary-source" aria-label="' +
-	        t("sourceLabel") +
-	        '">' +
-	        '        <span class="ha-replay-summary-label">' +
-	        t("sourceLabel") +
-	        ':</span> ' +
-	        '        <span class="ha-replay-summary-value" id="ha-replay-value-source"></span>' +
-	        "      </span>" +
-	        '      <span class="ha-replay-summary-item" id="ha-replay-summary-date" aria-label="' +
-	        t("snapshotDateLabel") +
-	        '">' +
-	        '        <span class="ha-replay-summary-label">' +
-	        t("snapshotDateLabel") +
-	        ':</span> ' +
-	        '        <span class="ha-replay-summary-value" id="ha-replay-value-date"></span>' +
-	        "      </span>" +
-	        '      <span class="ha-replay-summary-item" id="ha-replay-summary-language" aria-label="' +
-	        t("languageLabel") +
-	        '">' +
-	        '        <span class="ha-replay-summary-label">' +
-	        t("languageLabel") +
-	        ':</span> ' +
-	        '        <span class="ha-replay-summary-value" id="ha-replay-value-language"></span>' +
-	        "      </span>" +
-	        '      <span class="ha-replay-summary-item" id="ha-replay-summary-url" aria-label="' +
-	        t("originalUrlLabel") +
-	        '">' +
-	        '        <span class="ha-replay-summary-label">' +
-	        t("originalUrlLabel") +
-	        ':</span> ' +
-	        '        <a class="ha-replay-summary-value" data-ha-action="origin" id="ha-replay-value-url" href="#" target="_blank" rel="noreferrer noopener"></a>' +
-	        "      </span>" +
+	        t("hideLabel") +
+	        "</button>" +
 	        "    </div>" +
 	        "  </div>" +
 	        "</div>" +
@@ -1082,9 +1060,9 @@ Implementation note:
 	        "  </div>" +
 	        "</div>";
 
-      document.body.insertBefore(banner, document.body.firstChild);
+	      document.body.insertBefore(banner, document.body.firstChild);
 
-      var titleEl = document.getElementById("ha-replay-title");
+      var titleEl = document.getElementById("ha-replay-top-title");
       if (titleEl) {
         try {
           titleEl.textContent = document.title || "";
@@ -1095,7 +1073,7 @@ Implementation note:
       var disclaimerEl = document.getElementById("ha-replay-disclaimer");
       if (disclaimerEl) disclaimerEl.textContent = t("disclaimerPrefix");
 
-      var urlEl = document.getElementById("ha-replay-value-url");
+      var urlEl = document.getElementById("ha-replay-top-url");
       try {
         var wbUrl = getWbInfo().url;
         if (urlEl && wbUrl) {
@@ -1104,9 +1082,10 @@ Implementation note:
         }
       } catch (e) {}
 
-      var hideBtn = document.getElementById("ha-replay-hide");
-      if (hideBtn) {
-        hideBtn.addEventListener("click", function () {
+      function bindHideButton(id) {
+        var btn = document.getElementById(id);
+        if (!btn) return;
+        btn.addEventListener("click", function () {
           try {
             localStorage.setItem(STORAGE_KEY, "1");
           } catch (e) {}
@@ -1114,6 +1093,9 @@ Implementation note:
           if (el && el.parentNode) el.parentNode.removeChild(el);
         });
       }
+
+      bindHideButton("ha-replay-hide-top");
+      bindHideButton("ha-replay-hide-bottom");
 
 	      // Avoid pywb rewriting our "escape hatch" navigation by:
 	      //  - not embedding HealthArchive URLs directly in HTML attributes, and
@@ -1326,9 +1308,9 @@ Implementation note:
 	        function buildSnapshotDateLabel(detail) {
 	          var wb = getWbInfo();
 	          var captureLabel =
-	            formatTimestamp(wb.timestamp) ||
 	            (detail ? formatIsoDate(detail.captureTimestamp) : null) ||
-	            (detail ? formatIsoDateYmd(detail.captureDate) : null);
+	            (detail ? formatIsoDateYmd(detail.captureDate) : null) ||
+	            formatTimestamp(wb.timestamp);
 	          var jobId = null;
 	          if (detail && detail.jobId != null) jobId = detail.jobId;
 	          if (jobId == null) jobId = parseJobIdFromColl(wb.coll);
@@ -1358,7 +1340,6 @@ Implementation note:
 	        function applySnapshotDetail(detail) {
 	          if (embedded) return;
 	          try {
-	            var hasDetail = Boolean(detail && detail.id);
 	            var titleText =
 	              (detail && detail.title ? String(detail.title) : "") ||
 	              (function () {
@@ -1368,26 +1349,14 @@ Implementation note:
 	                  return "";
 	                }
 	              })();
-	            var titleEl = document.getElementById("ha-replay-title");
+	            var titleEl = document.getElementById("ha-replay-top-title");
 	            if (titleEl) {
 	              titleEl.textContent = titleText;
 	              titleEl.setAttribute("title", titleText);
 	            }
 
-	            setValueText(
-	              "ha-replay-value-source",
-	              detail && detail.sourceName ? detail.sourceName : null,
-	              t("unknownLabel")
-	            );
-
 	            var dateLabel = buildSnapshotDateLabel(detail);
-	            setValueText("ha-replay-value-date", dateLabel, t("unknownLabel"));
-
-	            setValueText(
-	              "ha-replay-value-language",
-	              detail && detail.language ? detail.language : null,
-	              t("unknownLabel")
-	            );
+	            setValueText("ha-replay-top-date", dateLabel, "");
 
 	            var originalUrlValue =
 	              (detail && detail.originalUrl ? String(detail.originalUrl) : "") ||
@@ -1398,7 +1367,7 @@ Implementation note:
 	                  return "";
 	                }
 	              })();
-	            var urlEl = document.getElementById("ha-replay-value-url");
+	            var urlEl = document.getElementById("ha-replay-top-url");
 	            if (urlEl) {
 	              var compact = compactUrl(originalUrlValue) || originalUrlValue;
 	              urlEl.textContent = compact;
@@ -1408,9 +1377,9 @@ Implementation note:
 	            var disclaimerEl = document.getElementById("ha-replay-disclaimer");
 	            if (disclaimerEl) {
 	              var captureForDisclaimer =
-	                formatTimestamp(getWbInfo().timestamp) ||
 	                (detail ? formatIsoDate(detail.captureTimestamp) : null) ||
-	                (detail ? formatIsoDateYmd(detail.captureDate) : null);
+	                (detail ? formatIsoDateYmd(detail.captureDate) : null) ||
+	                formatTimestamp(getWbInfo().timestamp);
 	              if (captureForDisclaimer) {
 	                disclaimerEl.textContent =
 	                  t("disclaimerPrefix") +
@@ -1457,6 +1426,28 @@ Implementation note:
 	        }
 
 	        function resolveSnapshotAndLatest() {
+	          if (snapshotId && snapshotIdExplicit) {
+	            // The user is viewing a specific snapshot; do not override it by resolving
+	            // based on timestamp/original URL. We only need the "latest snapshot"
+	            // info for the View diff link.
+	            var base = apiCandidates && apiCandidates.length ? apiCandidates[0] : null;
+	            if (base) {
+	              routes.raw = base + "/api/snapshots/raw/" + snapshotId;
+	              routes.json = base + "/api/snapshot/" + snapshotId;
+	              routes.timeline = base + "/api/snapshots/" + snapshotId + "/timeline";
+	              return safeJson(buildLatestUrl(base, snapshotId), 3500)
+	                .then(function (latest) {
+	                  if (latest && latest.found && latest.snapshotId) {
+	                    setCompareRoute(String(latest.snapshotId));
+	                  } else {
+	                    setCompareRoute(snapshotId);
+	                  }
+	                })
+	                .catch(function () {});
+	            }
+	            return Promise.resolve();
+	          }
+
 	          var wb = getWbInfo();
 	          var jobId = parseJobIdFromColl(wb.coll);
 	          var originalUrl = wb.url;
