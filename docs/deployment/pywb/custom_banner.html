@@ -58,8 +58,8 @@ Implementation note:
   #ha-replay-banner .ha-replay-inner {
     display: flex;
     flex-direction: column;
-    gap: 0.4rem;
-    padding: 0.45rem 0.9rem 0.55rem;
+    gap: 0;
+    padding: 0.25rem 0.9rem;
   }
 
   #ha-replay-banner .ha-replay-row {
@@ -75,12 +75,13 @@ Implementation note:
     grid-template-columns: max-content minmax(0, 1fr) max-content;
     align-items: center;
     column-gap: 0.65rem;
+    padding: 0.35rem 0;
   }
 
   #ha-replay-banner .ha-replay-row--details {
-    align-items: baseline;
+    align-items: center;
     gap: 0.75rem;
-    padding-top: 0.45rem;
+    padding: 0.35rem 0;
     border-top: 1px solid rgba(148, 163, 184, 0.24);
   }
 
@@ -142,7 +143,7 @@ Implementation note:
   }
 
   #ha-replay-banner .ha-replay-title {
-    font-weight: 650;
+    font-weight: 500;
     color: rgba(15, 23, 42, 0.95);
     overflow: hidden;
     text-overflow: ellipsis;
@@ -163,14 +164,14 @@ Implementation note:
     text-overflow: ellipsis;
     white-space: nowrap;
     color: rgba(15, 23, 42, 0.92);
-    font-weight: 650;
+    font-weight: 500;
     font-size: 1.05rem;
   }
 
   #ha-replay-banner .ha-replay-summary-label {
     flex: 0 0 auto;
     color: rgba(15, 23, 42, 0.55);
-    font-weight: 650;
+    font-weight: 500;
     font-size: 0.95em;
   }
 
@@ -448,8 +449,8 @@ Implementation note:
      action links horizontally scrollable instead of wrapping into a tall block. */
   @media (max-width: 780px) {
     #ha-replay-banner:not(.ha-replay-embedded) .ha-replay-inner {
-      gap: 0.45rem;
-      padding: 0.5rem 0.85rem 0.6rem;
+      gap: 0;
+      padding: 0.25rem 0.85rem;
     }
 
     #ha-replay-banner:not(.ha-replay-embedded) .ha-replay-row--top {
@@ -464,7 +465,7 @@ Implementation note:
     #ha-replay-banner:not(.ha-replay-embedded) .ha-replay-row--details {
       align-items: flex-start;
       gap: 0.55rem;
-      padding-top: 0.4rem;
+      padding: 0.35rem 0;
     }
 
     #ha-replay-banner:not(.ha-replay-embedded) .ha-replay-summaryline {
@@ -809,7 +810,27 @@ Implementation note:
 
 	      var snapshotId = null;
 	      try {
-	        snapshotId = extractSnapshotId(window.location.href);
+	        try {
+	          snapshotId = extractSnapshotId(window.location.hash || "");
+	        } catch (e) {
+	          snapshotId = null;
+	        }
+
+	        var hrefCandidates = [];
+	        try {
+	          if (window.WB_wombat_location && window.WB_wombat_location._orig_loc) {
+	            hrefCandidates.push(window.WB_wombat_location._orig_loc.href);
+	          }
+	        } catch (e) {}
+	        try {
+	          if (window.location && window.location._orig_loc) {
+	            hrefCandidates.push(window.location._orig_loc.href);
+	          }
+	        } catch (e) {}
+	        hrefCandidates.push(window.location.href);
+	        for (var i = 0; i < hrefCandidates.length && !snapshotId; i++) {
+	          snapshotId = extractSnapshotId(hrefCandidates[i] || "");
+	        }
 	      } catch (e) {
 	        snapshotId = null;
 	      }
@@ -1180,31 +1201,171 @@ Implementation note:
 	        }
 
 	        function safeJson(url, timeoutMs) {
+	          // NOTE: pywb's wombat overrides fetch/XHR to replay archived resources. For
+	          // live HealthArchive APIs, we use a tiny hidden iframe loaded from a
+	          // blob: URL (no wombat) to perform the network request and postMessage
+	          // results back to this banner.
+	          var LIVE_MARKER = "__haLiveJsonBridge";
+	          var LIVE_REQ_TYPE = "request";
+	          var LIVE_RES_TYPE = "response";
+	          var LIVE_READY_TYPE = "ready";
+
+	          var liveBridge = safeJson._haLiveBridge || null;
+	          var liveSeq = safeJson._haLiveSeq || 0;
+
+	          function ensureBridge() {
+	            if (safeJson._haLiveBridge) return safeJson._haLiveBridge;
+	            var bridge = {
+	              iframe: null,
+	              ready: false,
+	              queue: [],
+	              pending: {},
+	            };
+
+	            function handleMessage(event) {
+	              try {
+	                if (!bridge.iframe) return;
+	                if (event.source !== bridge.iframe.contentWindow) return;
+	                var msg = event.data;
+	                if (!msg || msg[LIVE_MARKER] !== true) return;
+
+	                if (msg.type === LIVE_READY_TYPE) {
+	                  bridge.ready = true;
+	                  try {
+	                    var q = bridge.queue.slice();
+	                    bridge.queue.length = 0;
+	                    q.forEach(function (fn) {
+	                      try {
+	                        fn();
+	                      } catch (e) {}
+	                    });
+	                  } catch (e) {}
+	                  return;
+	                }
+
+	                if (msg.type !== LIVE_RES_TYPE || !msg.id) return;
+	                var entry = bridge.pending[msg.id];
+	                if (!entry) return;
+	                delete bridge.pending[msg.id];
+	                if (entry.timer) clearTimeout(entry.timer);
+	                if (msg.ok) entry.resolve(msg.data);
+	                else entry.reject(new Error(msg.error || "request_failed"));
+	              } catch (e) {}
+	            }
+
+	            try {
+	              window.addEventListener("message", handleMessage);
+	            } catch (e) {}
+
+	            var iframe = document.createElement("iframe");
+	            iframe.style.display = "none";
+	            iframe.setAttribute("aria-hidden", "true");
+	            iframe.setAttribute("tabindex", "-1");
+	            iframe.title = "HealthArchive live JSON bridge";
+
+	            var html =
+	              "<!doctype html><meta charset=utf-8>" +
+	              "<meta name=referrer content=no-referrer>" +
+	              "<title>HealthArchive bridge</title>" +
+	              "<script>(function(){\\n" +
+	              "function post(m){try{parent.postMessage(m,'*')}catch(e){}}\\n" +
+	              "window.addEventListener('message', async function(ev){\\n" +
+	              "  var msg = ev.data;\\n" +
+	              "  if(!msg || msg." +
+	              LIVE_MARKER +
+	              " !== true || msg.type !== '" +
+	              LIVE_REQ_TYPE +
+	              "') return;\\n" +
+	              "  var id = msg.id;\\n" +
+	              "  var url = msg.url;\\n" +
+	              "  try {\\n" +
+	              "    var res = await fetch(url,{method:'GET',cache:'no-store',credentials:'omit',headers:{Accept:'application/json'}});\\n" +
+	              "    if(!res.ok) throw new Error('status ' + res.status);\\n" +
+	              "    var data = await res.json();\\n" +
+	              "    post({" +
+	              LIVE_MARKER +
+	              ":true,type:'" +
+	              LIVE_RES_TYPE +
+	              "',id:id,ok:true,data:data});\\n" +
+	              "  } catch(err) {\\n" +
+	              "    post({" +
+	              LIVE_MARKER +
+	              ":true,type:'" +
+	              LIVE_RES_TYPE +
+	              "',id:id,ok:false,error:String(err)});\\n" +
+	              "  }\\n" +
+	              "});\\n" +
+	              "post({" +
+	              LIVE_MARKER +
+	              ":true,type:'" +
+	              LIVE_READY_TYPE +
+	              "'});\\n" +
+	              "})();<\\/script>";
+
+	            try {
+	              var blob = new Blob([html], { type: "text/html" });
+	              var blobUrl = URL.createObjectURL(blob);
+	              iframe.src = blobUrl;
+	            } catch (e) {}
+
+	            bridge.iframe = iframe;
+	            try {
+	              document.body.appendChild(iframe);
+	            } catch (e) {}
+
+	            safeJson._haLiveBridge = bridge;
+	            safeJson._haLiveSeq = 0;
+	            return bridge;
+	          }
+
+	          function nextReqId() {
+	            liveSeq = liveSeq + 1;
+	            safeJson._haLiveSeq = liveSeq;
+	            return "ha_live_" + String(Date.now()) + "_" + String(liveSeq);
+	          }
+
 	          return new Promise(function (resolve, reject) {
+	            var bridge = liveBridge || ensureBridge();
+	            if (!bridge || !bridge.iframe || !bridge.iframe.contentWindow) {
+	              reject(new Error("bridge_unavailable"));
+	              return;
+	            }
+
+	            var requestId = nextReqId();
 	            var timer = null;
 	            try {
 	              timer = setTimeout(function () {
-	                reject(new Error("timeout"));
+	                var entry = bridge.pending[requestId];
+	                if (!entry) return;
+	                delete bridge.pending[requestId];
+	                entry.reject(new Error("timeout"));
 	              }, timeoutMs || 3500);
 	            } catch (e) {}
 
-	            fetch(url, {
-	              method: "GET",
-	              cache: "no-store",
-	              credentials: "omit",
-	              headers: { Accept: "application/json" },
-	            })
-	              .then(function (res) {
-	                if (!res.ok) throw new Error("status " + res.status);
-	                return res.json();
-	              })
-	              .then(function (data) {
-	                resolve(data);
-	              })
-	              .catch(reject)
-	              .finally(function () {
-	                if (timer) clearTimeout(timer);
-	              });
+	            bridge.pending[requestId] = { resolve: resolve, reject: reject, timer: timer };
+
+	            function send() {
+	              try {
+	                bridge.iframe.contentWindow.postMessage(
+	                  {
+	                    __haLiveJsonBridge: true,
+	                    type: "request",
+	                    id: requestId,
+	                    url: String(url || ""),
+	                  },
+	                  "*"
+	                );
+	              } catch (e) {
+	                var entry = bridge.pending[requestId];
+	                if (!entry) return;
+	                delete bridge.pending[requestId];
+	                if (entry.timer) clearTimeout(entry.timer);
+	                entry.reject(e);
+	              }
+	            }
+
+	            if (bridge.ready) send();
+	            else bridge.queue.push(send);
 	          });
 	        }
 
