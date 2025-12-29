@@ -90,7 +90,11 @@ groups:
   - name: healtharchive.campaign
     rules:
       - alert: HealthArchiveAnnualCampaignSentinelFailed
-        expr: healtharchive_annual_campaign_sentinel_ok == 0
+        expr: |
+          healtharchive_annual_campaign_sentinel_ok == 0
+          and (time() - healtharchive_annual_campaign_sentinel_last_run_timestamp_seconds) < 7200
+          and on() month() == 1
+          and on() day_of_month() == 1
         for: 2m
         labels:
           severity: critical
@@ -98,4 +102,18 @@ groups:
         annotations:
           summary: "Annual campaign sentinel failed (preflight/scheduling/tiering)"
           description: "The annual campaign sentinel reported failure. This usually means campaign preflight failed, annual jobs were not scheduled, or annual output dirs were not tiered onto the Storage Box."
+          runbook_url: "https://github.com/jerdaw/healtharchive-backend/blob/main/docs/operations/playbooks/annual-campaign.md"
+
+      - alert: HealthArchiveAnnualCampaignSentinelMissing
+        expr: |
+          absent(healtharchive_annual_campaign_sentinel_last_run_timestamp_seconds)
+          and on() month() == 1
+          and on() day_of_month() == 1
+        for: 1h
+        labels:
+          severity: critical
+          service: healtharchive
+        annotations:
+          summary: "Annual campaign sentinel did not run"
+          description: "No annual campaign sentinel metrics were observed on Jan 01. Check that healtharchive-annual-campaign-sentinel.timer is enabled and node_exporter textfile collector is working."
           runbook_url: "https://github.com/jerdaw/healtharchive-backend/blob/main/docs/operations/playbooks/annual-campaign.md"
