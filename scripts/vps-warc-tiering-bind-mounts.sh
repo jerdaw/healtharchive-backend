@@ -129,7 +129,14 @@ while IFS= read -r line || [[ -n "${line}" ]]; do
   planned=$((planned + 1))
 
   if [[ ! -e "${cold}" ]]; then
-    echo "ERROR: cold path does not exist: ${cold}" >&2
+    err="$(ls -ld "${cold}" 2>&1 || true)"
+    if echo "${err}" | grep -qi "permission denied"; then
+      echo "ERROR: cannot access cold path (permission denied): ${cold}" >&2
+      echo "  ${err}" >&2
+    else
+      echo "ERROR: cold path does not exist: ${cold}" >&2
+      echo "  ${err}" >&2
+    fi
     exit 1
   fi
 

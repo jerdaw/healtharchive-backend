@@ -9,7 +9,8 @@ Type=simple
 
 # Defaults (can be overridden in /etc/healtharchive/storagebox.env):
 Environment=STORAGEBOX_PORT=23
-Environment=STORAGEBOX_REMOTE_PATH=/home
+# Empty means "remote home directory" (recommended default for Storage Boxes).
+Environment=STORAGEBOX_REMOTE_PATH=
 Environment=STORAGEBOX_MOUNT=/srv/healtharchive/storagebox
 
 # You must set these variables in /etc/healtharchive/storagebox.env:
