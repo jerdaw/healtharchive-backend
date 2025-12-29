@@ -3778,9 +3778,7 @@ def get_snapshot_raw(
     action_links.append(
         f'<a class="ha-replay-navlink" href="{snapshot_json_url}" rel="noreferrer" target="_blank">Metadata JSON</a>'
     )
-    action_links.append(
-        f'<a class="ha-replay-navlink" href="{cite_url}" rel="noreferrer">Cite</a>'
-    )
+    action_links.append(f'<a class="ha-replay-navlink" href="{cite_url}" rel="noreferrer">Cite</a>')
     action_links.append(
         f'<a class="ha-replay-navlink" href="{report_url}" rel="noreferrer">Report issue</a>'
     )
