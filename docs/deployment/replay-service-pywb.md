@@ -307,6 +307,9 @@ Notes:
   original URL, an always-visible disclaimer line, and action links (View diff,
   Details, All snapshots, Raw HTML, Metadata JSON, Cite, Report issue, Hide).
   “All snapshots” opens a right-aligned popover list.
+- On small screens, the banner stacks the action links below the “← HealthArchive.ca”
+  button to avoid overlap; when you scroll, it transitions into a more compact
+  mode that hides the metadata/disclaimer line.
 - The “← HealthArchive.ca” button returns to the HealthArchive page the user came
   from when possible (the frontend passes an explicit return path in the replay
   URL fragment). If no return path is available, it falls back to the archive
