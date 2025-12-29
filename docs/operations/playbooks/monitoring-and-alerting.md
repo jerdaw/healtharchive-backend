@@ -34,3 +34,5 @@ If you want alerts when systemd timers stop running:
 - If enabled, Healthchecks pings are configured without committing URLs to git.
 - If you use internal Prometheus-based alerts, Alertmanager is configured and test alerts deliver:
   - `observability-alerting.md`
+- If you use WARC tiering to a Storage Box, tiering metrics are enabled so you get high-signal alerts:
+  - `sudo systemctl enable --now healtharchive-tiering-metrics.timer`

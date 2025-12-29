@@ -36,6 +36,9 @@ Canonical boundary doc (read first):
 What this does:
 
 - Installs packages (`prometheus-node-exporter`, `prometheus-postgres-exporter`).
+- Enables the node_exporter textfile collector at:
+  - `/var/lib/node_exporter/textfile_collector`
+  (used by HealthArchive ops scripts to emit small, high-signal health metrics).
 - Creates a DB role `postgres_exporter` with `pg_monitor`.
 - Writes exporter credentials (root-owned) to:
   - `/etc/healtharchive/observability/postgres_exporter.env`

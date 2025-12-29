@@ -30,6 +30,16 @@ Canonical references:
    - baseline drift verification
    - public surface verification
 
+   If your change updates systemd unit templates or Prometheus alert rules, you can
+   apply those as part of the deploy:
+
+   - `./scripts/vps-deploy.sh --apply --baseline-mode live --install-systemd-units --apply-alerting`
+
+   Notes:
+
+   - `--apply-alerting` requires alerting to be configured on the VPS (webhook secret present at
+     `/etc/healtharchive/observability/alertmanager_webhook_url`).
+
    If you are updating the replay banner/template or replay service config on a
    single-VPS deployment, include replay restart + banner install:
 

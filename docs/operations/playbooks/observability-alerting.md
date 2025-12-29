@@ -24,6 +24,9 @@ Why this approach:
   - `curl -s http://127.0.0.1:9090/-/ready`
 - Node exporter is installed (disk metrics):
   - `curl -s http://127.0.0.1:9100/metrics | head`
+- If you use WARC tiering to a Storage Box, enable the tiering metrics writer timer so
+  Prometheus can alert on mount/tiering failures:
+  - `sudo systemctl enable --now healtharchive-tiering-metrics.timer`
 
 ## Choose your operator channel (webhook)
 
@@ -114,6 +117,8 @@ Installed rules (minimal, high-signal):
 - Disk usage >80% (warning) and >90% (critical) on the selected filesystem
 - Sustained `/api/search` errors (traffic-gated)
 - Job failures increased (failed/index_failed count delta > 0 over 30m)
+- Storage Box mount down (if tiering is enabled and metrics are present)
+- WARC tiering bind-mount service failed (if tiering is enabled and metrics are present)
 
 ## Rollback
 
