@@ -96,42 +96,42 @@ If the Storage Box isn’t mounted (e.g., after reboot), tiered paths may fall
 back to empty local directories and replay will break. Add a small systemd unit
 to mount it on boot.
 
-Use `docs/deployment/systemd/README.md` as the canonical systemd reference.
+Use the repo templates under `docs/deployment/systemd/` (installed via
+`scripts/vps-install-systemd-units.sh`).
 
-Example (VPS): `/etc/systemd/system/healtharchive-storagebox-sshfs.service`
-
-```ini
-[Unit]
-Description=HealthArchive Storage Box mount (sshfs)
-After=network-online.target
-Wants=network-online.target
-
-[Service]
-Type=forking
-User=root
-Group=root
-ExecStart=/usr/bin/sshfs -p 23 -o IdentityFile=/home/haadmin/.ssh/hetzner_storagebox -o allow_other,default_permissions -o uid=1000,gid=999,umask=0027 -o reconnect,ServerAliveInterval=15,ServerAliveCountMax=3,kernel_cache uNNNNNN@uNNNNNN.your-storagebox.de:/ /srv/healtharchive/storagebox
-ExecStop=/bin/fusermount3 -u /srv/healtharchive/storagebox
-Restart=on-failure
-RestartSec=5
-
-[Install]
-WantedBy=multi-user.target
-```
-
-Notes:
-
-- Replace `uid=1000` with `id -u haadmin` and `gid=999` with the `healtharchive`
-  group GID from `getent group healtharchive`.
-- Keep `allow_other` only if you have enabled `user_allow_other` in
-  `/etc/fuse.conf` and you need non-root services to read the mount.
-
-Enable it:
+1) Create `/etc/healtharchive/storagebox.env` (VPS):
 
 ```bash
-sudo systemctl daemon-reload
+sudo install -d -m 0755 /etc/healtharchive
+sudo tee /etc/healtharchive/storagebox.env >/dev/null <<'EOF'
+STORAGEBOX_HOST=uNNNNNN.your-storagebox.de
+STORAGEBOX_USER=uNNNNNN
+STORAGEBOX_IDENTITY=/home/haadmin/.ssh/hetzner_storagebox
+STORAGEBOX_UID=1000
+STORAGEBOX_GID=999
+EOF
+```
+
+Replace:
+
+- `uNNNNNN` values with your Storage Box username/host.
+- `STORAGEBOX_UID` with `id -u haadmin`.
+- `STORAGEBOX_GID` with `getent group healtharchive | cut -d: -f3`.
+
+2) Install templates + enable the mount (VPS):
+
+```bash
+cd /opt/healtharchive-backend
+sudo ./scripts/vps-install-systemd-units.sh --apply
 sudo systemctl enable --now healtharchive-storagebox-sshfs.service
 systemctl status healtharchive-storagebox-sshfs.service --no-pager
+mount | rg /srv/healtharchive/storagebox || true
+```
+
+If it fails due to host key prompts, prime root’s known_hosts once:
+
+```bash
+sudo ssh -p 23 -i /home/haadmin/.ssh/hetzner_storagebox uNNNNNN@uNNNNNN.your-storagebox.de exit
 ```
 
 ## Move a job directory from SSD → Storage Box (safe swap)
@@ -190,6 +190,37 @@ Rollback (if needed):
 sudo umount "$HOT"
 sudo rm -rf "$HOT"
 sudo mv "${HOT}.hot-backup" "$HOT"
+```
+
+## Make tiered job mounts persistent (recommended)
+
+Bind mounts created manually will not survive a reboot. Use the repo’s unit
+template + manifest so tiered jobs come back automatically.
+
+1) Create the manifest `/etc/healtharchive/warc-tiering.binds` (VPS):
+
+```bash
+sudo tee /etc/healtharchive/warc-tiering.binds >/dev/null <<'EOF'
+# cold_path hot_path
+/srv/healtharchive/storagebox/jobs/imports/legacy-hc-2025-04-21 /srv/healtharchive/jobs/imports/legacy-hc-2025-04-21
+/srv/healtharchive/storagebox/jobs/imports/legacy-cihr-2025-04 /srv/healtharchive/jobs/imports/legacy-cihr-2025-04
+EOF
+```
+
+2) Enable the service (VPS):
+
+```bash
+cd /opt/healtharchive-backend
+sudo ./scripts/vps-install-systemd-units.sh --apply
+sudo systemctl enable --now healtharchive-warc-tiering.service
+systemctl status healtharchive-warc-tiering.service --no-pager
+mount | rg /srv/healtharchive/jobs/imports/legacy- || true
+```
+
+Manual validation (safe):
+
+```bash
+sudo /opt/healtharchive-backend/scripts/vps-warc-tiering-bind-mounts.sh
 ```
 
 ## Promote (cold → hot) later (optional)
