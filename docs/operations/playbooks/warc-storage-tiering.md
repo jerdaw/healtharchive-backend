@@ -109,6 +109,10 @@ STORAGEBOX_USER=uNNNNNN
 STORAGEBOX_IDENTITY=/home/haadmin/.ssh/hetzner_storagebox
 STORAGEBOX_UID=1000
 STORAGEBOX_GID=999
+# Optional (defaults are fine for most setups):
+# STORAGEBOX_REMOTE_PATH=/home
+# STORAGEBOX_PORT=23
+# STORAGEBOX_MOUNT=/srv/healtharchive/storagebox
 EOF
 ```
 

@@ -6,16 +6,18 @@ ConditionPathExists=/etc/healtharchive/storagebox.env
 
 [Service]
 Type=simple
-EnvironmentFile=/etc/healtharchive/storagebox.env
+
+# Defaults (can be overridden in /etc/healtharchive/storagebox.env):
+Environment=STORAGEBOX_PORT=23
+Environment=STORAGEBOX_REMOTE_PATH=/home
+Environment=STORAGEBOX_MOUNT=/srv/healtharchive/storagebox
 
 # You must set these variables in /etc/healtharchive/storagebox.env:
 #   STORAGEBOX_HOST, STORAGEBOX_USER, STORAGEBOX_IDENTITY, STORAGEBOX_UID, STORAGEBOX_GID
 #
-# Optional:
-#   STORAGEBOX_PORT (default 23), STORAGEBOX_REMOTE_PATH (default "/"), STORAGEBOX_MOUNT (default "/srv/healtharchive/storagebox")
-Environment=STORAGEBOX_PORT=23
-Environment=STORAGEBOX_REMOTE_PATH=/
-Environment=STORAGEBOX_MOUNT=/srv/healtharchive/storagebox
+# Optional (overrides defaults above):
+#   STORAGEBOX_PORT, STORAGEBOX_REMOTE_PATH, STORAGEBOX_MOUNT
+EnvironmentFile=/etc/healtharchive/storagebox.env
 
 ExecStartPre=/usr/bin/install -d -m 0755 -o root -g root ${STORAGEBOX_MOUNT}
 ExecStartPre=/usr/bin/install -d -m 0700 -o root -g root /root/.ssh
