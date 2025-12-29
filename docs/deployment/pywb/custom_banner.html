@@ -80,7 +80,8 @@ Implementation note:
   #ha-replay-banner .ha-replay-row--details {
     align-items: baseline;
     gap: 0.75rem;
-    padding-top: 0.1rem;
+    padding-top: 0.45rem;
+    border-top: 1px solid rgba(148, 163, 184, 0.24);
   }
 
   #ha-replay-banner .ha-replay-left,
@@ -151,6 +152,10 @@ Implementation note:
   }
 
   #ha-replay-banner .ha-replay-summary-item {
+    display: flex;
+    align-items: baseline;
+    justify-content: center;
+    gap: 0.35rem;
     flex: 1 1 0;
     padding: 0 0.6rem;
     min-width: 0;
@@ -160,7 +165,20 @@ Implementation note:
     color: rgba(15, 23, 42, 0.92);
     font-weight: 650;
     font-size: 1.05rem;
-    text-align: center;
+  }
+
+  #ha-replay-banner .ha-replay-summary-label {
+    flex: 0 0 auto;
+    color: rgba(15, 23, 42, 0.55);
+    font-weight: 650;
+    font-size: 0.95em;
+  }
+
+  #ha-replay-banner .ha-replay-summary-value {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   #ha-replay-banner .ha-replay-summary-item + .ha-replay-summary-item {
@@ -180,12 +198,8 @@ Implementation note:
   }
 
   #ha-replay-banner .ha-replay-summary-item a {
-    display: block;
     color: rgba(37, 99, 235, 0.95);
     text-decoration: none;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
   }
 
   #ha-replay-banner .ha-replay-summary-item a:hover {
@@ -870,8 +884,7 @@ Implementation note:
 	      var apiBase = scheme + "api." + apex;
 	      var siteBase = scheme + "www." + apex;
 	      var apexBase = scheme + apex;
-	      // Most deployments serve /api on the public origin; prefer that first.
-	      return [siteBase, apiBase, apexBase];
+	      return [apiBase, siteBase, apexBase];
 	    }
 
 	    function getSiteBase(hostname) {
@@ -997,27 +1010,42 @@ Implementation note:
 	        (UI_LOCALE === "fr" ? "Résumé de la capture" : "Snapshot summary") +
 	        '">' +
 	        '      <span class="ha-replay-summary-item" id="ha-replay-summary-title">' +
-	        '        <span class="ha-replay-title" id="ha-replay-title"></span>' +
+	        '        <span class="ha-replay-summary-label">' +
+	        t("pageTitleLabel") +
+	        ':</span> ' +
+	        '        <span class="ha-replay-title ha-replay-summary-value" id="ha-replay-title"></span>' +
 	        "      </span>" +
 	        '      <span class="ha-replay-summary-item" id="ha-replay-summary-source" aria-label="' +
 	        t("sourceLabel") +
 	        '">' +
-	        '        <span id="ha-replay-value-source"></span>' +
+	        '        <span class="ha-replay-summary-label">' +
+	        t("sourceLabel") +
+	        ':</span> ' +
+	        '        <span class="ha-replay-summary-value" id="ha-replay-value-source"></span>' +
 	        "      </span>" +
 	        '      <span class="ha-replay-summary-item" id="ha-replay-summary-date" aria-label="' +
 	        t("snapshotDateLabel") +
 	        '">' +
-	        '        <span id="ha-replay-value-date"></span>' +
+	        '        <span class="ha-replay-summary-label">' +
+	        t("snapshotDateLabel") +
+	        ':</span> ' +
+	        '        <span class="ha-replay-summary-value" id="ha-replay-value-date"></span>' +
 	        "      </span>" +
 	        '      <span class="ha-replay-summary-item" id="ha-replay-summary-language" aria-label="' +
 	        t("languageLabel") +
 	        '">' +
-	        '        <span id="ha-replay-value-language"></span>' +
+	        '        <span class="ha-replay-summary-label">' +
+	        t("languageLabel") +
+	        ':</span> ' +
+	        '        <span class="ha-replay-summary-value" id="ha-replay-value-language"></span>' +
 	        "      </span>" +
 	        '      <span class="ha-replay-summary-item" id="ha-replay-summary-url" aria-label="' +
 	        t("originalUrlLabel") +
 	        '">' +
-	        '        <a data-ha-action="origin" id="ha-replay-value-url" href="#" target="_blank" rel="noreferrer noopener"></a>' +
+	        '        <span class="ha-replay-summary-label">' +
+	        t("originalUrlLabel") +
+	        ':</span> ' +
+	        '        <a class="ha-replay-summary-value" data-ha-action="origin" id="ha-replay-value-url" href="#" target="_blank" rel="noreferrer noopener"></a>' +
 	        "      </span>" +
 	        "    </div>" +
 	        "  </div>" +
