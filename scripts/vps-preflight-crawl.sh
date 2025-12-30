@@ -79,34 +79,74 @@ is_mounted() {
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --year)
+      if [[ $# -lt 2 ]]; then
+        echo "ERROR: --year requires a 4-digit year argument (e.g. --year 2026)" >&2
+        usage >&2
+        exit 2
+      fi
       YEAR="$2"
       shift 2
       ;;
     --campaign-archive-root)
+      if [[ $# -lt 2 ]]; then
+        echo "ERROR: --campaign-archive-root requires a directory path argument (e.g. --campaign-archive-root /srv/healtharchive/storagebox/jobs)" >&2
+        usage >&2
+        exit 2
+      fi
       CAMPAIGN_ARCHIVE_ROOT="$2"
       shift 2
       ;;
     --env-file)
+      if [[ $# -lt 2 ]]; then
+        echo "ERROR: --env-file requires a file path argument (e.g. --env-file /etc/healtharchive/backend.env)" >&2
+        usage >&2
+        exit 2
+      fi
       ENV_FILE="$2"
       shift 2
       ;;
     --api-base)
+      if [[ $# -lt 2 ]]; then
+        echo "ERROR: --api-base requires a URL argument (e.g. --api-base http://127.0.0.1:8001)" >&2
+        usage >&2
+        exit 2
+      fi
       API_BASE="$2"
       shift 2
       ;;
     --public-api-base)
+      if [[ $# -lt 2 ]]; then
+        echo "ERROR: --public-api-base requires a URL argument" >&2
+        usage >&2
+        exit 2
+      fi
       PUBLIC_API_BASE="$2"
       shift 2
       ;;
     --public-frontend-base)
+      if [[ $# -lt 2 ]]; then
+        echo "ERROR: --public-frontend-base requires a URL argument" >&2
+        usage >&2
+        exit 2
+      fi
       PUBLIC_FRONTEND_BASE="$2"
       shift 2
       ;;
     --baseline-mode)
+      if [[ $# -lt 2 ]]; then
+        echo "ERROR: --baseline-mode requires an argument: local|live" >&2
+        usage >&2
+        exit 2
+      fi
       BASELINE_MODE="$2"
       shift 2
       ;;
     --out-root)
+      if [[ $# -lt 2 ]]; then
+        echo "ERROR: --out-root requires a directory path argument" >&2
+        usage >&2
+        exit 2
+      fi
       OUT_ROOT="$2"
       shift 2
       ;;
