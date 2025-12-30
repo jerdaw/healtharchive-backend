@@ -54,7 +54,7 @@ def test_baseline_drift_warns_on_unexpected_non_loopback_ports() -> None:
         "network": {
             "tcp_listeners": [
                 {"address": "127.0.0.1", "port": 3000, "local": "127.0.0.1:3000"},
-                {"address": "100.65.87.34", "port": 46226, "local": "100.65.87.34:46226"},
+                {"address": "203.0.113.10", "port": 46226, "local": "203.0.113.10:46226"},
             ]
         },
     }
@@ -79,6 +79,35 @@ def test_baseline_drift_does_not_warn_when_only_loopback_listeners_exist() -> No
             "tcp_listeners": [
                 {"address": "127.0.0.1", "port": 3000, "local": "127.0.0.1:3000"},
                 {"address": "::1", "port": 9090, "local": "[::1]:9090"},
+            ]
+        },
+    }
+
+    _required, warned = check_baseline_drift.evaluate(policy, observed)
+    warn_keys = {f.key for f in warned}
+    assert "network:tcp:unexpected_non_loopback_ports" not in warn_keys
+
+
+def test_baseline_drift_does_not_warn_on_tailscale_only_listeners() -> None:
+    _add_scripts_to_path()
+    import check_baseline_drift
+
+    policy: dict[str, Any] = {
+        "network": {
+            "allowed_non_loopback_tcp_ports": [],
+        }
+    }
+    observed: dict[str, Any] = {
+        "inputs": {"mode": "local"},
+        "network": {
+            "tcp_listeners": [
+                {"address": "127.0.0.1", "port": 3000, "local": "127.0.0.1:3000"},
+                {"address": "100.65.87.34", "port": 46226, "local": "100.65.87.34:46226"},
+                {
+                    "address": "fd7a:115c:a1e0::f01:5724",
+                    "port": 40039,
+                    "local": "[fd7a:115c:a1e0::f01:5724]:40039",
+                },
             ]
         },
     }
