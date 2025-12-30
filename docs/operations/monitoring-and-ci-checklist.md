@@ -161,6 +161,9 @@ Implementation approach (VPS):
 1. Create a check in your Healthchecks provider for each timer you care about.
 2. Store ping URLs only on the VPS in a root-owned env file:
    - `/etc/healtharchive/healthchecks.env` (mode 0600, root:root)
+   - Note: this file may be shared across multiple automations; it is OK to keep both:
+     - legacy `HC_*` variables (DB backup + disk check)
+     - newer `HEALTHARCHIVE_HC_PING_*` variables (systemd unit templates)
 3. Ensure the installed systemd units source that env file:
    - `EnvironmentFile=-/etc/healtharchive/healthchecks.env`
 4. Ensure the unit uses the wrapper so ping URLs never appear in unit files:

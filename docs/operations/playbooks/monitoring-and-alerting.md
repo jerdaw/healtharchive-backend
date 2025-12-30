@@ -25,6 +25,9 @@ If you want alerts when systemd timers stop running:
 1. Create checks in your Healthchecks provider.
 2. Store ping URLs only on the VPS:
    - `/etc/healtharchive/healthchecks.env` (root-owned)
+   - This file may be shared across multiple automations; it is OK to keep both:
+     - legacy `HC_*` variables (DB backup + disk check)
+     - newer `HEALTHARCHIVE_HC_PING_*` variables (systemd unit templates)
 3. Keep the unit templates installed/updated on the VPS:
    - `sudo ./scripts/vps-install-systemd-units.sh --apply --restart-worker`
 

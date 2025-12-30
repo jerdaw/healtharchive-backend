@@ -25,6 +25,8 @@ This file is intentionally brief; it points to canonical docs when you need deta
 - If you enable Healthchecks pings:
   - keep ping URLs only in the root-owned VPS env file (never in git):
     - `/etc/healtharchive/healthchecks.env`
+  - Note: this file may contain both legacy `HC_*` variables (DB backup + disk)
+    and newer `HEALTHARCHIVE_HC_PING_*` variables (systemd unit templates).
   - Canonical: `../monitoring-and-ci-checklist.md`
 
 ## Quarterly ops cadence (sustainability loop)
