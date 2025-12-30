@@ -252,12 +252,12 @@ sudo install -m 0600 -o root -g root /dev/null /etc/healtharchive/healthchecks.e
 Edit `/etc/healtharchive/healthchecks.env` and set (examples):
 
 ```bash
-HEALTHARCHIVE_HC_PING_REPLAY_RECONCILE=https://hc-ping.com/<uuid>
-HEALTHARCHIVE_HC_PING_SCHEDULE_ANNUAL=https://hc-ping.com/<uuid>
-HEALTHARCHIVE_HC_PING_ANNUAL_SENTINEL=https://hc-ping.com/<uuid>
-HEALTHARCHIVE_HC_PING_CHANGE_TRACKING=https://hc-ping.com/<uuid>
-HEALTHARCHIVE_HC_PING_BASELINE_DRIFT=https://hc-ping.com/<uuid>
-HEALTHARCHIVE_HC_PING_PUBLIC_VERIFY=https://hc-ping.com/<uuid>
+HEALTHARCHIVE_HC_PING_REPLAY_RECONCILE=https://hc-ping.com/UUID_HERE
+HEALTHARCHIVE_HC_PING_SCHEDULE_ANNUAL=https://hc-ping.com/UUID_HERE
+HEALTHARCHIVE_HC_PING_ANNUAL_SENTINEL=https://hc-ping.com/UUID_HERE
+HEALTHARCHIVE_HC_PING_CHANGE_TRACKING=https://hc-ping.com/UUID_HERE
+HEALTHARCHIVE_HC_PING_BASELINE_DRIFT=https://hc-ping.com/UUID_HERE
+HEALTHARCHIVE_HC_PING_PUBLIC_VERIFY=https://hc-ping.com/UUID_HERE
 ```
 
 Notes:

@@ -21,7 +21,7 @@ Canonical references:
 - Enable the annual campaign sentinel (recommended; sends notification on failure):
   - `sudo systemctl enable --now healtharchive-annual-campaign-sentinel.timer`
   - Optional: configure Healthchecks ping URL at `/etc/healtharchive/healthchecks.env`:
-    - `HEALTHARCHIVE_HC_PING_ANNUAL_SENTINEL=https://hc-ping.com/<uuid>`
+    - `HEALTHARCHIVE_HC_PING_ANNUAL_SENTINEL=https://hc-ping.com/UUID_HERE`
 
 ## During/after the campaign (high level)
 
