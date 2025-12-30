@@ -35,8 +35,9 @@ Canonical references:
 - If a crawl is stalled, check the job logs under its `output_dir` (look for `archive_*_attempt_*_*.combined.log`) and the worker journal:
   - `sudo journalctl -u healtharchive-worker -n 200 --no-pager`
 - If the VPS reboots (or the worker/service is killed) mid-crawl, a job can be left in `status=running`. Recover safely:
-  - Dry-run: `ha-backend recover-stale-jobs --older-than-minutes 180`
-  - Apply: `ha-backend recover-stale-jobs --older-than-minutes 180 --apply`
+  - Load env: `set -a; source /etc/healtharchive/backend.env; set +a`
+  - Dry-run: `/opt/healtharchive-backend/.venv/bin/ha-backend recover-stale-jobs --older-than-minutes 180`
+  - Apply: `/opt/healtharchive-backend/.venv/bin/ha-backend recover-stale-jobs --older-than-minutes 180 --apply`
 
 ## Manual trigger (day-of)
 
