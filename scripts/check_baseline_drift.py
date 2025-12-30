@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import ipaddress
 import json
 import os
 import re
@@ -125,6 +126,50 @@ def _is_loopback_addr(addr: str) -> bool:
     if addr in {"::1", "0:0:0:0:0:0:0:1"}:
         return True
     return False
+
+
+def _is_public_listener_addr(addr: str) -> bool:
+    """
+    Return True if an address likely represents a "publicly reachable" listener.
+
+    This is intentionally different from "non-loopback":
+    - Tailscale listeners (100.64.0.0/10) and private/ULA addresses are not treated
+      as public exposure in the single-VPS baseline drift checks.
+    - Wildcard listeners (0.0.0.0, ::, *) are treated as public.
+    """
+    addr = (addr or "").strip()
+    if not addr:
+        return True
+
+    if addr in {"*", "0.0.0.0", "::"}:
+        return True
+
+    try:
+        ip = ipaddress.ip_address(addr)
+    except ValueError:
+        # If we can't parse it, treat it as public to be conservative.
+        return True
+
+    if ip.is_unspecified:
+        return True
+
+    if ip.version == 4:
+        safe_v4 = [
+            ipaddress.ip_network("127.0.0.0/8"),  # loopback
+            ipaddress.ip_network("10.0.0.0/8"),  # RFC1918
+            ipaddress.ip_network("172.16.0.0/12"),  # RFC1918
+            ipaddress.ip_network("192.168.0.0/16"),  # RFC1918
+            ipaddress.ip_network("169.254.0.0/16"),  # link-local
+            ipaddress.ip_network("100.64.0.0/10"),  # Tailscale CGNAT
+        ]
+        return not any(ip in net for net in safe_v4)
+
+    safe_v6 = [
+        ipaddress.ip_network("::1/128"),  # loopback
+        ipaddress.ip_network("fe80::/10"),  # link-local
+        ipaddress.ip_network("fc00::/7"),  # unique local (includes Tailscale ULA)
+    ]
+    return not any(ip in net for net in safe_v6)
 
 
 def _expect_path(
@@ -468,15 +513,15 @@ def evaluate(
         allowed_non_loopback = net_policy.get("allowed_non_loopback_tcp_ports")
         if isinstance(allowed_non_loopback, list):
             allowed_set = {p for p in allowed_non_loopback if isinstance(p, int)}
-            non_loopback_ports: set[int] = set()
+            public_listener_ports: set[int] = set()
             for port, addrs in port_to_addrs.items():
-                if any(not _is_loopback_addr(a) for a in addrs):
-                    non_loopback_ports.add(port)
-            unexpected = sorted(p for p in non_loopback_ports if p not in allowed_set)
+                if any(_is_public_listener_addr(a) for a in addrs):
+                    public_listener_ports.add(port)
+            unexpected = sorted(p for p in public_listener_ports if p not in allowed_set)
             if unexpected:
                 detail = {
                     port: sorted(
-                        a for a in port_to_addrs.get(port, set()) if not _is_loopback_addr(a)
+                        a for a in port_to_addrs.get(port, set()) if _is_public_listener_addr(a)
                     )
                     for port in unexpected
                 }
