@@ -28,6 +28,15 @@ Canonical references:
 
 - Use the automation plan (`../automation-implementation-plan.md`) to decide what is enabled and what is manual.
 - Prefer safe, idempotent entrypoints (systemd services/timers or the provided scripts).
+- Annual jobs are scheduled with crawler monitoring enabled so stalls / error storms can trigger adaptive worker reduction.
+
+## If a crawl stalls or is interrupted
+
+- If a crawl is stalled, check the job logs under its `output_dir` (look for `archive_*_attempt_*_*.combined.log`) and the worker journal:
+  - `sudo journalctl -u healtharchive-worker -n 200 --no-pager`
+- If the VPS reboots (or the worker/service is killed) mid-crawl, a job can be left in `status=running`. Recover safely:
+  - Dry-run: `ha-backend recover-stale-jobs --older-than-minutes 180`
+  - Apply: `ha-backend recover-stale-jobs --older-than-minutes 180 --apply`
 
 ## Manual trigger (day-of)
 

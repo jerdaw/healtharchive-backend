@@ -89,6 +89,9 @@ def test_schedule_annual_apply_creates_jobs_ordered_and_labeled(tmp_path, monkey
             assert cfg.get("seeds")
             assert cfg.get("zimit_passthrough_args") is not None
             assert cfg.get("tool_options") is not None
+            tool_opts = cfg.get("tool_options") or {}
+            assert tool_opts.get("enable_monitoring") is True
+            assert tool_opts.get("enable_adaptive_workers") is True
 
 
 def test_schedule_annual_apply_is_idempotent(tmp_path, monkeypatch) -> None:

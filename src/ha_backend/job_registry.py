@@ -81,8 +81,8 @@ SOURCE_JOB_CONFIGS: Dict[str, SourceJobConfig] = {
         default_tool_options={
             "cleanup": False,
             "overwrite": False,
-            "enable_monitoring": False,
-            "enable_adaptive_workers": False,
+            "enable_monitoring": True,
+            "enable_adaptive_workers": True,
             "enable_vpn_rotation": False,
             "initial_workers": 1,
             "log_level": "INFO",
@@ -106,8 +106,8 @@ SOURCE_JOB_CONFIGS: Dict[str, SourceJobConfig] = {
         default_tool_options={
             "cleanup": False,
             "overwrite": False,
-            "enable_monitoring": False,
-            "enable_adaptive_workers": False,
+            "enable_monitoring": True,
+            "enable_adaptive_workers": True,
             "enable_vpn_rotation": False,
             "initial_workers": 1,
             "log_level": "INFO",
@@ -129,8 +129,8 @@ SOURCE_JOB_CONFIGS: Dict[str, SourceJobConfig] = {
         default_tool_options={
             "cleanup": False,
             "overwrite": False,
-            "enable_monitoring": False,
-            "enable_adaptive_workers": False,
+            "enable_monitoring": True,
+            "enable_adaptive_workers": True,
             "enable_vpn_rotation": False,
             "initial_workers": 1,
             "log_level": "INFO",

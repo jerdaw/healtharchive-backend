@@ -20,6 +20,19 @@ Canonical references:
 4. Check baseline drift (production correctness):
    - `./scripts/check_baseline_drift.py --mode live`
 
+## When jobs are stuck (crawl/indexing pipeline)
+
+If the worker is running but jobs never advance, check for a job stuck in
+`status=running` after a reboot or unexpected termination.
+
+1. Inspect recent jobs:
+   - `ha-backend list-jobs --limit 50`
+2. Recover stale running jobs (safe dry-run first):
+   - `ha-backend recover-stale-jobs --older-than-minutes 180`
+   - Apply (sets `status=retryable`): `ha-backend recover-stale-jobs --older-than-minutes 180 --apply`
+3. Verify the worker picks them up:
+   - `sudo journalctl -u healtharchive-worker -n 200 --no-pager`
+
 ## If you need to deploy a fix
 
 - Follow `deploy-and-verify.md` (don’t skip the deploy gate).

@@ -12,7 +12,7 @@ import time
 import traceback  # Import traceback for detailed exception logging
 from pathlib import Path
 from queue import Empty, Queue
-from typing import Any, Dict, List, Optional, Tuple
+from typing import IO, Any, Dict, List, Optional, Tuple
 
 # Use absolute imports within the package
 from archive_tool import cli, constants, docker_runner, monitor, state, strategies, utils
@@ -84,6 +84,78 @@ def format_duration(seconds: float) -> str:
             return f"{mins}:{secs:02d}"
     except Exception:  # Catch potential errors with input
         return "??:??"
+
+
+def _start_stage_log_drain(
+    *,
+    stage_name_with_attempt: str,
+    host_output_dir: Path,
+    stream: IO[str] | None,
+    tee_to_stdout: bool,
+) -> tuple[threading.Thread | None, Path | None]:
+    """
+    Drain docker-run stdout so the subprocess cannot block on a full pipe.
+
+    This also writes crawl-stage logs under the job output directory so other
+    components (stats parsing, temp-dir discovery) have stable artifacts.
+    """
+    if stream is None:
+        return None, None
+
+    timestamp = datetime.datetime.now().strftime(constants.TIMESTAMP_FORMAT)
+    slug = stage_name_with_attempt.replace(" ", "_").lower()
+    log_base = host_output_dir / f"archive_{slug}_{timestamp}"
+    stdout_log_path = log_base.with_suffix(".stdout.log")
+    combined_log_path = log_base.with_suffix(".combined.log")
+
+    def _drain() -> None:
+        try:
+            host_output_dir.mkdir(parents=True, exist_ok=True)
+        except Exception:
+            pass
+
+        stdout_file = None
+        combined_file = None
+        try:
+            stdout_file = open(stdout_log_path, "a", encoding="utf-8")
+            combined_file = open(combined_log_path, "a", encoding="utf-8")
+
+            for line in stream:
+                if tee_to_stdout:
+                    try:
+                        sys.stdout.write(line)
+                        sys.stdout.flush()
+                    except Exception:
+                        pass
+                try:
+                    stdout_file.write(line)
+                    stdout_file.flush()
+                except Exception:
+                    pass
+                try:
+                    combined_file.write(line)
+                    combined_file.flush()
+                except Exception:
+                    pass
+        finally:
+            try:
+                if stdout_file is not None:
+                    stdout_file.close()
+            except Exception:
+                pass
+            try:
+                if combined_file is not None:
+                    combined_file.close()
+            except Exception:
+                pass
+
+    t = threading.Thread(
+        target=_drain,
+        name=f"StageLogDrain[{slug}]",
+        daemon=True,
+    )
+    t.start()
+    return t, combined_log_path
 
 
 # Define synchronous runner here for final build stage
@@ -367,6 +439,15 @@ def main():
     warc_files: List[Path] = []  # Initialize
 
     existing_temp_dirs = crawl_state.get_temp_dir_paths()  # Get validated paths from state
+    discovered_temp_dirs = utils.discover_temp_dirs(host_output_dir)
+    if discovered_temp_dirs:
+        known = {p.resolve() for p in existing_temp_dirs}
+        missing = [p for p in discovered_temp_dirs if p.resolve() not in known]
+        for p in missing:
+            crawl_state.add_temp_dir(p)
+        if missing:
+            existing_temp_dirs = crawl_state.get_temp_dir_paths()
+
     logger.debug(f"Temp directories managed by state: {existing_temp_dirs}")
     latest_temp_dir = existing_temp_dirs[-1] if existing_temp_dirs else None
     logger.debug(f"Latest temp directory from state (if any): {latest_temp_dir}")
@@ -502,6 +583,8 @@ def main():
         crawl_state.current_stage = stage_name_with_attempt
         crawl_state.stage_start_time = time.monotonic()  # Record stage start time
         extra_run_args = []  # Arguments specific to this run (e.g., --config)
+        stage_log_drain_thread: threading.Thread | None = None
+        stage_combined_log_path: Path | None = None
 
         # --- Prepare arguments for this stage attempt ---
         logger.debug(f"Preparing arguments for stage '{stage_name_with_attempt}'")
@@ -575,6 +658,15 @@ def main():
             )
             final_status = "docker_start_failed"
             break  # Exit outer loop
+
+        stage_log_drain_thread, stage_combined_log_path = _start_stage_log_drain(
+            stage_name_with_attempt=stage_name_with_attempt,
+            host_output_dir=host_output_dir,
+            stream=docker_process.stdout,
+            tee_to_stdout=not script_args.enable_monitoring,
+        )
+        if stage_combined_log_path is not None:
+            logger.info("Crawl stage logs: %s", stage_combined_log_path)
 
         logger.info(
             f"Docker process started (PID: {docker_process.pid}). Waiting for container ID..."
@@ -874,6 +966,9 @@ def main():
         print()  # Ensure newline after final progress print or if loop breaks suddenly
         logger.info(f"Processing end of stage '{stage_name_with_attempt}'...")
 
+        if stage_log_drain_thread is not None:
+            stage_log_drain_thread.join(timeout=5.0)
+
         # --- Stop Monitor Thread Gracefully ---
         if active_monitor and active_monitor.is_alive():
             logger.info("Stopping CrawlMonitor thread...")
@@ -917,19 +1012,27 @@ def main():
         logger.debug("Attempting to find and record temp directory for this stage...")
         # Try finding from logs first, then fallback scan
         temp_dir_host_path = None
-        log_files = sorted(
-            host_output_dir.glob(
-                f"archive_{current_stage_name.replace(' ', '_').lower()}_*.combined.log"
-            ),
-            key=lambda p: p.stat().st_mtime,
-            reverse=True,
-        )
-        if log_files:
-            latest_stage_log = log_files[0]
-            logger.debug(f"Trying to parse temp dir from latest log: {latest_stage_log}")
-            temp_dir_host_path = utils.parse_temp_dir_from_log_file(
-                latest_stage_log, host_output_dir
+        if stage_combined_log_path is not None and stage_combined_log_path.is_file():
+            logger.debug(
+                "Trying to parse temp dir from stage combined log: %s", stage_combined_log_path
             )
+            temp_dir_host_path = utils.parse_temp_dir_from_log_file(
+                stage_combined_log_path, host_output_dir
+            )
+        else:
+            log_files = sorted(
+                host_output_dir.glob(
+                    f"archive_{current_stage_name.replace(' ', '_').lower()}_*.combined.log"
+                ),
+                key=lambda p: p.stat().st_mtime,
+                reverse=True,
+            )
+            if log_files:
+                latest_stage_log = log_files[0]
+                logger.debug(f"Trying to parse temp dir from latest log: {latest_stage_log}")
+                temp_dir_host_path = utils.parse_temp_dir_from_log_file(
+                    latest_stage_log, host_output_dir
+                )
 
         if not temp_dir_host_path:
             logger.warning("Could not parse temp dir from logs, falling back to directory scan.")
