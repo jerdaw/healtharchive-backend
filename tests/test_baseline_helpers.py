@@ -31,6 +31,7 @@ def test_is_loopback_addr_covers_ipv4_and_ipv6() -> None:
 
     assert check_baseline_drift._is_loopback_addr("127.0.0.1") is True
     assert check_baseline_drift._is_loopback_addr("127.255.255.255") is True
+    assert check_baseline_drift._is_loopback_addr("127.0.0.53%lo") is True
     assert check_baseline_drift._is_loopback_addr("::1") is True
     assert check_baseline_drift._is_loopback_addr("0:0:0:0:0:0:0:1") is True
 
