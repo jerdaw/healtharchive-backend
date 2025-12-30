@@ -441,8 +441,8 @@ Notes:
   ever `source` it from bash; the `<`/`>` characters can break shell parsing.
 
 ```
-HC_DB_BACKUP_URL=<healthchecks_db_ping>
-HC_DISK_URL=<healthchecks_disk_ping>
+HC_DB_BACKUP_URL=https://hc-ping.com/UUID_HERE
+HC_DISK_URL=https://hc-ping.com/UUID_HERE
 HC_DISK_THRESHOLD=80
 ```
 
