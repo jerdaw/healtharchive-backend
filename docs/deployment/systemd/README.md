@@ -264,6 +264,9 @@ Notes:
 
 - The unit templates use `EnvironmentFile=-/etc/healtharchive/healthchecks.env`
   so the file is optional.
+- If you also use the legacy Healthchecks-based scripts described in
+  `../production-single-vps.md` (DB backup + disk check), keep their variables
+  in the same file too (`HC_DB_BACKUP_URL`, `HC_DISK_URL`, `HC_DISK_THRESHOLD`).
 - If set, services will best-effort ping:
   - `<url>/start` at the beginning
   - `<url>` on success

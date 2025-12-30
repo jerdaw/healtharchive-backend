@@ -432,6 +432,14 @@ rsync -av --delete ha-vps:/srv/healtharchive/backups/ /volume1/nobak/healtharchi
 
 Secrets file: `/etc/healtharchive/healthchecks.env` (mode 600)
 
+Notes:
+
+- This env file may also be used by the newer systemd unit templates under
+  `docs/deployment/systemd/` (which use `HEALTHARCHIVE_HC_PING_*` variable names).
+  It is OK to keep both sets of variables in the same file.
+- Avoid placeholder values like `https://hc-ping.com/<uuid>` in this file if you
+  ever `source` it from bash; the `<`/`>` characters can break shell parsing.
+
 ```
 HC_DB_BACKUP_URL=<healthchecks_db_ping>
 HC_DISK_URL=<healthchecks_disk_ping>
