@@ -1567,7 +1567,26 @@ def cmd_recover_stale_jobs(args: argparse.Namespace) -> None:
         if limit is not None:
             query = query.limit(limit)
 
-        jobs = query.all()
+        try:
+            jobs = query.all()
+        except Exception as exc:
+            msg = str(exc)
+            if "no such table" in msg and "archive_jobs" in msg:
+                print(
+                    "ERROR: database schema is missing required tables (archive_jobs).",
+                    file=sys.stderr,
+                )
+                print(
+                    "Hint: on production, load the backend env first so HEALTHARCHIVE_DATABASE_URL points at Postgres:",
+                    file=sys.stderr,
+                )
+                print(
+                    "  set -a; source /etc/healtharchive/backend.env; set +a",
+                    file=sys.stderr,
+                )
+                print("Then re-run the command.", file=sys.stderr)
+                sys.exit(1)
+            raise
         if not jobs:
             print("No stale running jobs found.")
             return

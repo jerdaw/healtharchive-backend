@@ -25,11 +25,13 @@ Canonical references:
 If the worker is running but jobs never advance, check for a job stuck in
 `status=running` after a reboot or unexpected termination.
 
+0. Load production environment (so the CLI targets Postgres):
+   - `set -a; source /etc/healtharchive/backend.env; set +a`
 1. Inspect recent jobs:
-   - `ha-backend list-jobs --limit 50`
+   - `/opt/healtharchive-backend/.venv/bin/ha-backend list-jobs --limit 50`
 2. Recover stale running jobs (safe dry-run first):
-   - `ha-backend recover-stale-jobs --older-than-minutes 180`
-   - Apply (sets `status=retryable`): `ha-backend recover-stale-jobs --older-than-minutes 180 --apply`
+   - `/opt/healtharchive-backend/.venv/bin/ha-backend recover-stale-jobs --older-than-minutes 180`
+   - Apply (sets `status=retryable`): `/opt/healtharchive-backend/.venv/bin/ha-backend recover-stale-jobs --older-than-minutes 180 --apply`
 3. Verify the worker picks them up:
    - `sudo journalctl -u healtharchive-worker -n 200 --no-pager`
 
