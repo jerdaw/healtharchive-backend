@@ -22,6 +22,7 @@ Canonical references:
   - `sudo systemctl enable --now healtharchive-annual-campaign-sentinel.timer`
   - Optional: configure Healthchecks ping URL at `/etc/healtharchive/healthchecks.env`:
     - `HEALTHARCHIVE_HC_PING_ANNUAL_SENTINEL=https://hc-ping.com/UUID_HERE`
+    - Note: this env file may also contain legacy `HC_*` variables (DB backup + disk check).
 
 ## During/after the campaign (high level)
 
