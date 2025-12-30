@@ -165,6 +165,26 @@ def find_latest_temp_dir_fallback(host_output_dir: Path) -> Optional[Path]:
         return None
 
 
+def discover_temp_dirs(host_output_dir: Path) -> List[Path]:
+    """
+    Discover `.tmp*` directories directly under a job's output directory.
+
+    This is a fallback mechanism for resume/consolidation when the crawl state
+    file is missing or did not record a temp dir before an interruption.
+    """
+    found: List[Path] = []
+    try:
+        for item in host_output_dir.glob(f"{constants.TEMP_DIR_PREFIX}*"):
+            if item.is_dir():
+                found.append(item.resolve())
+    except Exception as exc:
+        logger.warning(f"discover_temp_dirs: failed scanning {host_output_dir}: {exc}")
+        return []
+
+    found.sort(key=lambda p: p.stat().st_mtime)
+    return found
+
+
 def find_latest_config_yaml(temp_dir_path: Path) -> Optional[Path]:
     """Finds the most recently modified 'crawl-*.yaml' file in the temp directory's expected location."""
     latest_mod_time: float = 0.0  # Correct type

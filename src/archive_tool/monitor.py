@@ -276,12 +276,17 @@ class CrawlMonitor(threading.Thread):
         if not self.args.enable_monitoring:
             return False
         signaled = False
-        # Stall Check - require valid pending count
+        # Stall Check
+        #
+        # Prefer the "pending > 0" signal when present, but treat negative
+        # values as "unknown" so we still detect stalls if Zimit log schema
+        # changes or omits pending counts.
+        pending = self.state.last_pending_count
+        pending_unknown = pending is None or pending < 0
         if (
             self.state.last_progress_timestamp is not None
             and self.state.last_crawled_count >= 0
-            and self.state.last_pending_count is not None
-            and self.state.last_pending_count > 0
+            and (pending_unknown or pending > 0)
         ):
             time_since_progress = now - self.state.last_progress_timestamp
             if time_since_progress > self.args.stall_timeout_minutes * 60:

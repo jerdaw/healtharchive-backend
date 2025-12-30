@@ -1506,6 +1506,103 @@ def cmd_retry_job(args: argparse.Namespace) -> None:
             )
 
 
+def cmd_recover_stale_jobs(args: argparse.Namespace) -> None:
+    """
+    Recover jobs that appear stuck in status='running'.
+
+    This is safe-by-default: it prints a recovery plan unless --apply is passed.
+    """
+    from datetime import datetime, timedelta, timezone
+
+    from sqlalchemy import or_
+
+    from .models import ArchiveJob as ORMArchiveJob
+    from .models import Source
+
+    apply_mode = bool(getattr(args, "apply", False))
+    older_than_minutes = int(getattr(args, "older_than_minutes", 0) or 0)
+    if older_than_minutes <= 0:
+        print("ERROR: --older-than-minutes must be > 0.", file=sys.stderr)
+        sys.exit(2)
+
+    include_missing_started_at = bool(getattr(args, "include_missing_started_at", False))
+    source_filter = (getattr(args, "source", None) or "").strip().lower() or None
+    limit = getattr(args, "limit", None)
+    if limit is not None:
+        limit = int(limit)
+        if limit <= 0:
+            print("ERROR: --limit must be > 0.", file=sys.stderr)
+            sys.exit(2)
+
+    now = datetime.now(timezone.utc)
+    cutoff = now - timedelta(minutes=older_than_minutes)
+
+    print("HealthArchive Backend – Recover Stale Jobs")
+    print("------------------------------------------")
+    print(f"Mode:            {'APPLY' if apply_mode else 'DRY-RUN'}")
+    print(f"Older than:      {older_than_minutes} minute(s)")
+    print(f"Cutoff (UTC):    {cutoff.replace(microsecond=0).isoformat()}")
+    print(f"Source filter:   {source_filter or '(none)'}")
+    print(f"Limit:           {limit or '(none)'}")
+    print("")
+
+    with get_session() as session:
+        query = session.query(ORMArchiveJob).filter(ORMArchiveJob.status == "running")
+        if include_missing_started_at:
+            query = query.filter(
+                or_(
+                    ORMArchiveJob.started_at.is_(None),
+                    ORMArchiveJob.started_at < cutoff,
+                )
+            )
+        else:
+            query = query.filter(ORMArchiveJob.started_at.is_not(None)).filter(
+                ORMArchiveJob.started_at < cutoff
+            )
+
+        if source_filter:
+            query = query.join(Source).filter(Source.code == source_filter)
+
+        query = query.order_by(ORMArchiveJob.started_at.asc().nullsfirst(), ORMArchiveJob.id.asc())
+        if limit is not None:
+            query = query.limit(limit)
+
+        jobs = query.all()
+        if not jobs:
+            print("No stale running jobs found.")
+            return
+
+        for job in jobs:
+            started_at = job.started_at
+            if started_at is not None and started_at.tzinfo is None:
+                started_at = started_at.replace(tzinfo=timezone.utc)
+            started_str = (
+                started_at.astimezone(timezone.utc).replace(microsecond=0).isoformat()
+                if started_at
+                else None
+            )
+            age_min = None
+            if started_at is not None:
+                age_min = int((now - started_at).total_seconds() // 60)
+            source_code = job.source.code if job.source else "?"
+            print(
+                f"job_id={job.id} source={source_code} status={job.status} "
+                f"started_at={started_str} age_min={age_min} name={job.name}"
+            )
+
+        if not apply_mode:
+            print("")
+            print("Dry-run only; re-run with --apply to mark these jobs as retryable.")
+            return
+
+        for job in jobs:
+            job.status = "retryable"
+            job.crawler_stage = "recovered_stale_running"
+
+        print("")
+        print(f"Recovered {len(jobs)} job(s) (set status=retryable).")
+
+
 def cmd_validate_job_config(args: argparse.Namespace) -> None:
     """
     Validate a job's configuration by running archive_tool in dry-run mode.
@@ -3529,6 +3626,40 @@ def build_parser() -> argparse.ArgumentParser:
         help="ArchiveJob ID to retry.",
     )
     p_retry.set_defaults(func=cmd_retry_job)
+
+    # recover-stale-jobs
+    p_recover = subparsers.add_parser(
+        "recover-stale-jobs",
+        help="Recover jobs stuck in status=running by marking them retryable (safe-by-default).",
+    )
+    p_recover.add_argument(
+        "--older-than-minutes",
+        type=int,
+        required=True,
+        help="Mark jobs as stale if started more than this many minutes ago.",
+    )
+    p_recover.add_argument(
+        "--include-missing-started-at",
+        action="store_true",
+        default=False,
+        help="Also recover running jobs missing started_at (unusual).",
+    )
+    p_recover.add_argument(
+        "--source",
+        help="Optional source code filter (e.g. hc).",
+    )
+    p_recover.add_argument(
+        "--limit",
+        type=int,
+        help="Optional maximum number of jobs to recover.",
+    )
+    p_recover.add_argument(
+        "--apply",
+        action="store_true",
+        default=False,
+        help="Apply changes (default is dry-run).",
+    )
+    p_recover.set_defaults(func=cmd_recover_stale_jobs)
 
     # validate-job-config
     p_validate = subparsers.add_parser(
