@@ -51,16 +51,14 @@ Notes:
    - `./scripts/vps-smoke-crawl-rehearsal.sh --apply --source cihr --page-limit 25 --depth 1`
 3. Run the preflight audit:
    - `cd /opt/healtharchive-backend`
-   - `./scripts/vps-preflight-crawl.sh --year <YYYY>`
+   - `YEAR=2026; ./scripts/vps-preflight-crawl.sh --year "$YEAR"`
 
-This writes a timestamped report under:
-
-- `/srv/healtharchive/ops/preflight/<timestamp>/`
+This writes a timestamped report directory under `/srv/healtharchive/ops/preflight/`.
 
 ## If it fails (common fixes)
 
 - **Campaign storage forecast fails** (even if you’re below 80% *today*): the annual campaign is projected to exceed disk headroom or the 80% review threshold. Follow the report output to free space or expand disk *before* Jan 01 UTC.
-- **Campaign storage forecast fails but you are using tiered storage (Storage Box)**: run preflight with the campaign tier root so the forecast uses the correct filesystem, e.g. `./scripts/vps-preflight-crawl.sh --year <YYYY> --campaign-archive-root /srv/healtharchive/storagebox/jobs`.
+- **Campaign storage forecast fails but you are using tiered storage (Storage Box)**: run preflight with the campaign tier root so the forecast uses the correct filesystem, e.g. `YEAR=2026; ./scripts/vps-preflight-crawl.sh --year "$YEAR" --campaign-archive-root /srv/healtharchive/storagebox/jobs`.
 - **Rehearsal evidence (active crawl headroom) fails**: you don’t have a recent `--apply` rehearsal (or it recorded low MemAvailable / high swap). Run `./scripts/vps-smoke-crawl-rehearsal.sh --apply ...` to generate evidence, or upgrade the VPS / reduce crawl concurrency.
 - **CPU/RAM headroom fails**: the VPS is already under sustained load / memory pressure (or swap usage). Stop other heavy work (indexing, other crawls), then re-run preflight; if it persists, reduce crawl concurrency or upgrade the VPS.
 - **Time sync (NTP) fails**: fix time sync before crawling (TLS, scheduling, and log correlation all assume correct UTC).
@@ -91,9 +89,26 @@ This writes a timestamped report under:
   - `sudo systemctl start healtharchive-schedule-annual-dry-run.service`
   - `sudo journalctl -u healtharchive-schedule-annual-dry-run.service -n 200 --no-pager`
 - Capture a redacted “baseline inventory” snapshot:
-  - `./scripts/capture-baseline-inventory.sh --env-file /etc/healtharchive/backend.env --out /srv/healtharchive/ops/preflight/<timestamp>/baseline-inventory.txt`
+  - `OUT_DIR="/srv/healtharchive/ops/preflight/$(date -u +%Y%m%dT%H%M%SZ)"; ./scripts/capture-baseline-inventory.sh --env-file /etc/healtharchive/backend.env --out "$OUT_DIR/baseline-inventory.txt"`
+
+## Optional cleanup (disk hygiene)
+
+If you ran multiple rehearsals or preflight runs, keep only the most recent few
+directories as evidence and reclaim space.
+
+Keep the latest 3 rehearsal runs (removes older ones):
+
+```bash
+ls -1dt /srv/healtharchive/ops/rehearsal/* | tail -n +4 | sudo xargs -r rm -rf --
+```
+
+Keep the latest 10 preflight reports (removes older ones):
+
+```bash
+ls -1dt /srv/healtharchive/ops/preflight/* | tail -n +11 | sudo xargs -r rm -rf --
+```
 
 ## What “done” means
 
-- `./scripts/vps-preflight-crawl.sh --year <YYYY>` exits `0`.
+- `YEAR=2026; ./scripts/vps-preflight-crawl.sh --year "$YEAR"` exits `0`.
 - The report directory exists and is retained as operator evidence for that crawl run.

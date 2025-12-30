@@ -312,7 +312,7 @@ This is the inverse of the “safe swap” above.
 
 - If you intend the upcoming annual campaign outputs to land on the Storage Box,
   run preflight with:
-  - `./scripts/vps-preflight-crawl.sh --year <YYYY> --campaign-archive-root /srv/healtharchive/storagebox/jobs`
+  - `YEAR=2026; ./scripts/vps-preflight-crawl.sh --year "$YEAR" --campaign-archive-root /srv/healtharchive/storagebox/jobs`
 - Ensure the Storage Box mount is active before preflight and before the annual
   campaign runs.
 
@@ -329,7 +329,8 @@ Sketch:
 
 ```bash
 # After jobs exist (queued), get the job output dir:
-/opt/healtharchive-backend/.venv/bin/ha-backend show-job --id <JOB_ID> | rg output_dir
+JOB_ID=123
+/opt/healtharchive-backend/.venv/bin/ha-backend show-job --id "$JOB_ID" | rg output_dir
 
 # Suppose output_dir is:
 HOT=/srv/healtharchive/jobs/hc/20260101T000000Z__hc-2026
