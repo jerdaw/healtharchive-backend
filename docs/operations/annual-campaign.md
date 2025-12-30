@@ -200,9 +200,10 @@ Once **all** annual jobs are `indexed`, capture “search readiness” evidence 
 timestamped artifact directory:
 
 ```bash
+YEAR=2026
 set -a; source /etc/healtharchive/backend.env; set +a
-ha-backend annual-status --year <YYYY>
-./scripts/annual-search-verify.sh --year <YYYY> --out-root /srv/healtharchive/ops/search-eval --base-url http://127.0.0.1:8001
+/opt/healtharchive-backend/.venv/bin/ha-backend annual-status --year "$YEAR"
+./scripts/annual-search-verify.sh --year "$YEAR" --out-root /srv/healtharchive/ops/search-eval --base-url http://127.0.0.1:8001
 ```
 
 This produces:
