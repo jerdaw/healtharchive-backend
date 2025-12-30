@@ -119,6 +119,9 @@ def _mode_from_policy_mode(policy_mode: str | None) -> str | None:
 
 def _is_loopback_addr(addr: str) -> bool:
     addr = (addr or "").strip()
+    # Some `ss` outputs include an interface suffix, e.g. "127.0.0.53%lo".
+    # Strip it so we can classify the IP address correctly.
+    addr = addr.split("%", 1)[0]
     if not addr:
         return False
     if addr.startswith("127."):
@@ -138,6 +141,9 @@ def _is_public_listener_addr(addr: str) -> bool:
     - Wildcard listeners (0.0.0.0, ::, *) are treated as public.
     """
     addr = (addr or "").strip()
+    # Some `ss` outputs include an interface suffix, e.g. "127.0.0.53%lo".
+    # Strip it so we can parse/classify the IP address correctly.
+    addr = addr.split("%", 1)[0]
     if not addr:
         return True
 
