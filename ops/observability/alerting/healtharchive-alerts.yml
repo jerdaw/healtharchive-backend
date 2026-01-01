@@ -87,6 +87,19 @@ groups:
           description: "The tiering bind-mount service is in a failed state. Canonical WARC paths may not resolve after reboot. Check healtharchive-warc-tiering.service logs and /etc/healtharchive/warc-tiering.binds."
           runbook_url: "https://github.com/jerdaw/healtharchive-backend/blob/main/docs/operations/playbooks/warc-storage-tiering.md"
 
+  - name: healtharchive.crawl
+    rules:
+      - alert: HealthArchiveCrawlStalled
+        expr: healtharchive_crawl_running_job_stalled == 1
+        for: 15m
+        labels:
+          severity: warning
+          service: healtharchive
+        annotations:
+          summary: "Crawl progress stalled (no crawled-count increase)"
+          description: "A running crawl job appears stalled: source={{ $labels.source }} job_id={{ $labels.job_id }}. Check healtharchive-worker.service logs and the job's archive_*.combined.log; consider recovering the job if it remains stalled."
+          runbook_url: "https://github.com/jerdaw/healtharchive-backend/blob/main/docs/operations/playbooks/crawl-stalls.md"
+
   - name: healtharchive.campaign
     rules:
       - alert: HealthArchiveAnnualCampaignSentinelFailed
