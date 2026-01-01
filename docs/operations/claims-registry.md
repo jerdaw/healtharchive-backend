@@ -28,6 +28,30 @@ Use this to back any reliability/automation/privacy/reproducibility claims with 
     - logs: `journalctl -u healtharchive-replay-reconcile.service`
   - Cadence: daily
   - Recorded in: journald (+ optional Healthchecks ping)
+- **Claim:** Annual search verification artifacts are captured (when enabled).
+  - Evidence:
+    - systemd timer: `healtharchive-annual-search-verify.timer` (plus sentinel `/etc/healtharchive/automation-enabled`)
+    - artifacts: `/srv/healtharchive/ops/search-eval/<year>/final/`
+  - Cadence: daily timer, captures once per year when ready
+  - Recorded in: ops artifacts (+ optional Healthchecks ping)
+- **Claim:** Coverage guardrails run for annual editions (when enabled).
+  - Evidence:
+    - systemd timer: `healtharchive-coverage-guardrails.timer` (plus sentinel `/etc/healtharchive/coverage-guardrails-enabled`)
+    - metrics: `healtharchive_coverage_*` in node_exporter textfile collector
+  - Cadence: daily
+  - Recorded in: metrics (+ optional Healthchecks ping)
+- **Claim:** Replay smoke tests run for latest indexed jobs (when enabled).
+  - Evidence:
+    - systemd timer: `healtharchive-replay-smoke.timer` (plus sentinel `/etc/healtharchive/replay-smoke-enabled`)
+    - metrics: `healtharchive_replay_smoke_*` in node_exporter textfile collector
+  - Cadence: daily
+  - Recorded in: metrics (+ optional Healthchecks ping)
+- **Claim:** Cleanup automation runs safely on indexed jobs (when enabled).
+  - Evidence:
+    - systemd timer: `healtharchive-cleanup-automation.timer` (plus sentinel `/etc/healtharchive/cleanup-automation-enabled`)
+    - logs: `journalctl -u healtharchive-cleanup-automation.service`
+  - Cadence: weekly
+  - Recorded in: journald (+ optional Healthchecks ping)
 - **Claim:** Annual campaign scheduling is automated and gated.
   - Evidence:
     - systemd timer: `healtharchive-schedule-annual.timer` (plus sentinel `/etc/healtharchive/automation-enabled`)

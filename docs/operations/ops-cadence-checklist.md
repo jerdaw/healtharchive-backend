@@ -43,6 +43,7 @@ Related docs:
 - Treat sentinel files under `/etc/healtharchive/` as the explicit on/off controls for automation.
 - If you enable Healthchecks pings, keep ping URLs only in the root-owned VPS env file:
   - `/etc/healtharchive/healthchecks.env` (never commit ping URLs)
+- If you enable optional automations (coverage guardrails, replay smoke, cleanup), confirm their timers + sentinels are intentional.
 
 See: `../deployment/systemd/README.md`
 

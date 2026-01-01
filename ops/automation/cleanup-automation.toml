@@ -1,0 +1,3 @@
+min_age_days = 14
+keep_latest_per_source = 2
+max_jobs_per_run = 1
