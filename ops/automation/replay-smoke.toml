@@ -1,0 +1,7 @@
+sources = ["hc", "phac", "cihr"]
+
+# Request timeout for replay smoke checks.
+timeout_seconds = 20
+
+# Minimum bytes required to treat the response body as "real content".
+min_body_bytes = 2048

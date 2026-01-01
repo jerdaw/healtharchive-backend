@@ -137,3 +137,73 @@ groups:
           summary: "Annual campaign sentinel did not run"
           description: "No annual campaign sentinel metrics were observed on Jan 01. Check that healtharchive-annual-campaign-sentinel.timer is enabled and node_exporter textfile collector is working."
           runbook_url: "https://github.com/jerdaw/healtharchive-backend/blob/main/docs/operations/playbooks/annual-campaign.md"
+
+  - name: healtharchive.automation
+    rules:
+      - alert: HealthArchiveCoverageRegression
+        expr: healtharchive_coverage_regression == 1
+        for: 6h
+        labels:
+          severity: warning
+          service: healtharchive
+        annotations:
+          summary: "Annual coverage regression detected"
+          description: "Coverage ratio dropped below the configured threshold for source={{ $labels.source }} year={{ $labels.year }}. Review annual job logs and compare with prior year."
+          runbook_url: "https://github.com/jerdaw/healtharchive-backend/blob/main/docs/operations/playbooks/coverage-guardrails.md"
+
+      - alert: HealthArchiveCoverageMetricsMissing
+        expr: healtharchive_coverage_metrics_ok == 0
+        for: 15m
+        labels:
+          severity: warning
+          service: healtharchive
+        annotations:
+          summary: "Coverage guardrails metrics missing"
+          description: "Coverage guardrails metrics script failed. Check healtharchive-coverage-guardrails.service logs and configuration."
+          runbook_url: "https://github.com/jerdaw/healtharchive-backend/blob/main/docs/operations/playbooks/coverage-guardrails.md"
+
+      - alert: HealthArchiveReplaySmokeFailed
+        expr: |
+          healtharchive_replay_smoke_ok == 0
+          and on() healtharchive_replay_smoke_enabled == 1
+        for: 15m
+        labels:
+          severity: warning
+          service: healtharchive
+        annotations:
+          summary: "Replay smoke test failed"
+          description: "Replay smoke check failed for source={{ $labels.source }} job_id={{ $labels.job_id }}. Check replay health and replay-reconcile."
+          runbook_url: "https://github.com/jerdaw/healtharchive-backend/blob/main/docs/operations/playbooks/replay-smoke-tests.md"
+
+      - alert: HealthArchiveReplaySmokeMetricsMissing
+        expr: healtharchive_replay_smoke_metrics_ok == 0
+        for: 15m
+        labels:
+          severity: warning
+          service: healtharchive
+        annotations:
+          summary: "Replay smoke metrics missing"
+          description: "Replay smoke metrics script failed. Check healtharchive-replay-smoke.service logs and configuration."
+          runbook_url: "https://github.com/jerdaw/healtharchive-backend/blob/main/docs/operations/playbooks/replay-smoke-tests.md"
+
+      - alert: HealthArchiveCleanupAutomationErrors
+        expr: healtharchive_cleanup_apply_errors_total > 0
+        for: 10m
+        labels:
+          severity: warning
+          service: healtharchive
+        annotations:
+          summary: "Cleanup automation encountered errors"
+          description: "One or more cleanup-job runs failed. Check healtharchive-cleanup-automation.service logs and inspect the affected job IDs."
+          runbook_url: "https://github.com/jerdaw/healtharchive-backend/blob/main/docs/operations/playbooks/cleanup-automation.md"
+
+      - alert: HealthArchiveCleanupMetricsMissing
+        expr: healtharchive_cleanup_metrics_ok == 0
+        for: 15m
+        labels:
+          severity: warning
+          service: healtharchive
+        annotations:
+          summary: "Cleanup automation metrics missing"
+          description: "Cleanup automation metrics script failed. Check healtharchive-cleanup-automation.service logs and configuration."
+          runbook_url: "https://github.com/jerdaw/healtharchive-backend/blob/main/docs/operations/playbooks/cleanup-automation.md"

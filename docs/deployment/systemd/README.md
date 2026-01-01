@@ -62,6 +62,15 @@ Assumptions (adjust paths/user if your VPS differs):
   - Runs `scripts/annual-search-verify.sh` daily, but captures **once per year** (idempotent).
 - `healtharchive-annual-search-verify.timer`
   - Daily timer for `healtharchive-annual-search-verify.service`.
+- `healtharchive-coverage-guardrails.service` + `.timer`
+  - Writes coverage regression guardrails to the node_exporter textfile collector.
+  - Gated by `ConditionPathExists=/etc/healtharchive/coverage-guardrails-enabled`.
+- `healtharchive-replay-smoke.service` + `.timer`
+  - Runs replay smoke tests against the latest indexed job per source (node_exporter textfile).
+  - Gated by `ConditionPathExists=/etc/healtharchive/replay-smoke-enabled`.
+- `healtharchive-cleanup-automation.service` + `.timer`
+  - Cleans indexed jobs using safe `temp-nonwarc` mode (keeps WARCs).
+  - Gated by `ConditionPathExists=/etc/healtharchive/cleanup-automation-enabled`.
 - `healtharchive-baseline-drift-check.service`
   - Runs `scripts/check_baseline_drift.py` (policy vs observed; writes artifacts under `/srv/healtharchive/ops/baseline/`).
   - Gated by `ConditionPathExists=/etc/healtharchive/baseline-drift-enabled`.
@@ -118,6 +127,12 @@ matches your operational readiness.
   - Enable only if replay is enabled and stable.
 - **Annual search verification** (`healtharchive-annual-search-verify.timer`)
   - Optional; safe to enable if you want a yearly search QA artifact.
+- **Coverage guardrails** (`healtharchive-coverage-guardrails.timer`)
+  - Recommended once you have at least two annual editions indexed.
+- **Replay smoke tests** (`healtharchive-replay-smoke.timer`)
+  - Enable only if replay is enabled and stable.
+- **Cleanup automation** (`healtharchive-cleanup-automation.timer`)
+  - Optional; keep caps conservative and review first dry-run.
 - **Baseline drift check** (`healtharchive-baseline-drift-check.timer`)
   - Recommended; low-risk and catches “silent” ops drift.
 
@@ -266,6 +281,10 @@ HEALTHARCHIVE_HC_PING_ANNUAL_SENTINEL=https://hc-ping.com/UUID_HERE
 HEALTHARCHIVE_HC_PING_CHANGE_TRACKING=https://hc-ping.com/UUID_HERE
 HEALTHARCHIVE_HC_PING_BASELINE_DRIFT=https://hc-ping.com/UUID_HERE
 HEALTHARCHIVE_HC_PING_PUBLIC_VERIFY=https://hc-ping.com/UUID_HERE
+HEALTHARCHIVE_HC_PING_ANNUAL_SEARCH_VERIFY=https://hc-ping.com/UUID_HERE
+HEALTHARCHIVE_HC_PING_COVERAGE_GUARDRAILS=https://hc-ping.com/UUID_HERE
+HEALTHARCHIVE_HC_PING_REPLAY_SMOKE=https://hc-ping.com/UUID_HERE
+HEALTHARCHIVE_HC_PING_CLEANUP_AUTOMATION=https://hc-ping.com/UUID_HERE
 ```
 
 Notes:
@@ -411,6 +430,64 @@ Artifacts default to:
 
 To force a re-run for the current year, delete that directory and run the
 service once.
+
+---
+
+## Enable coverage guardrails (optional)
+
+This emits daily metrics comparing the latest indexed annual job to the prior
+year per source.
+
+Create the sentinel file:
+
+```bash
+sudo install -m 0644 -o root -g root /dev/null /etc/healtharchive/coverage-guardrails-enabled
+```
+
+Enable the timer:
+
+```bash
+sudo systemctl enable --now healtharchive-coverage-guardrails.timer
+systemctl list-timers | rg healtharchive-coverage-guardrails || systemctl list-timers | grep healtharchive-coverage-guardrails
+```
+
+---
+
+## Enable replay smoke tests (optional)
+
+This runs lightweight replay checks against the latest indexed job per source.
+
+Create the sentinel file:
+
+```bash
+sudo install -m 0644 -o root -g root /dev/null /etc/healtharchive/replay-smoke-enabled
+```
+
+Enable the timer:
+
+```bash
+sudo systemctl enable --now healtharchive-replay-smoke.timer
+systemctl list-timers | rg healtharchive-replay-smoke || systemctl list-timers | grep healtharchive-replay-smoke
+```
+
+---
+
+## Enable cleanup automation (optional)
+
+This runs safe `temp-nonwarc` cleanup for older indexed jobs (keeps WARCs).
+
+Create the sentinel file:
+
+```bash
+sudo install -m 0644 -o root -g root /dev/null /etc/healtharchive/cleanup-automation-enabled
+```
+
+Enable the timer:
+
+```bash
+sudo systemctl enable --now healtharchive-cleanup-automation.timer
+systemctl list-timers | rg healtharchive-cleanup-automation || systemctl list-timers | grep healtharchive-cleanup-automation
+```
 
 ---
 

@@ -1,0 +1,8 @@
+sources = ["hc", "phac", "cihr"]
+
+# Minimum prior-year pages to consider a regression meaningful.
+min_prev_pages = 1000
+
+# Ratio thresholds: current / previous.
+critical_ratio = 0.70
+warning_ratio = 0.80

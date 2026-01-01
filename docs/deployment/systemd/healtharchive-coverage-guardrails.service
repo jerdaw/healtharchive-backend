@@ -1,0 +1,20 @@
+[Unit]
+Description=HealthArchive coverage regression guardrails (node_exporter textfile)
+Wants=network-online.target
+After=network-online.target
+ConditionPathExists=/etc/healtharchive/backend.env
+ConditionPathExists=/etc/healtharchive/coverage-guardrails-enabled
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+EnvironmentFile=/etc/healtharchive/backend.env
+EnvironmentFile=-/etc/healtharchive/healthchecks.env
+
+# Keep impact low on the single VPS.
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=6
+
+ExecStart=/opt/healtharchive-backend/scripts/systemd-healthchecks-wrapper.sh --ping-var HEALTHARCHIVE_HC_PING_COVERAGE_GUARDRAILS -- /opt/healtharchive-backend/.venv/bin/python3 /opt/healtharchive-backend/scripts/vps-coverage-guardrails-textfile.py --config /opt/healtharchive-backend/ops/automation/coverage-guardrails.toml

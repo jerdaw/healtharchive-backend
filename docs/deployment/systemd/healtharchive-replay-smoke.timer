@@ -1,0 +1,9 @@
+[Unit]
+Description=Run HealthArchive replay smoke tests (daily)
+
+[Timer]
+OnCalendar=*-*-* 04:20:00 UTC
+Persistent=true
+
+[Install]
+WantedBy=timers.target

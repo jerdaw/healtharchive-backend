@@ -1,0 +1,9 @@
+[Unit]
+Description=Run HealthArchive cleanup automation (weekly)
+
+[Timer]
+OnCalendar=Sun *-*-* 04:45:00 UTC
+Persistent=true
+
+[Install]
+WantedBy=timers.target
