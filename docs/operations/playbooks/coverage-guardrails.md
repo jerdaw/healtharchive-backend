@@ -11,8 +11,9 @@ Canonical refs:
 
 - Compares the latest indexed **annual** job for each source to the prior year.
 - Emits node_exporter textfile metrics:
-  - `healtharchive_coverage_ratio{source="hc"}`
-  - `healtharchive_coverage_regression{source="hc"}`
+  - `healtharchive_coverage_ratio{source="hc",year="2026"}`
+  - `healtharchive_coverage_regression{source="hc",year="2026"}`
+  - `healtharchive_coverage_warning{source="hc",year="2026"}`
 
 ## Enablement (VPS)
 
