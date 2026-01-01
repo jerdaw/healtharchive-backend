@@ -13,6 +13,7 @@ from urllib.request import Request, urlopen
 
 from ha_backend.archive_contract import ArchiveJobConfig
 from ha_backend.db import get_session
+from ha_backend.job_registry import get_config_for_source
 from ha_backend.models import ArchiveJob, Source
 
 
@@ -71,13 +72,18 @@ def _pick_latest_indexed_jobs(session, sources: list[str]) -> list[ReplayTarget]
         if source_code in seen:
             continue
         cfg = ArchiveJobConfig.from_dict(raw_config or {})
-        if not cfg.seeds:
+        seed_url = str(cfg.seeds[0]) if cfg.seeds else ""
+        if not seed_url:
+            registry_cfg = get_config_for_source(source_code)
+            if registry_cfg and registry_cfg.default_seeds:
+                seed_url = str(registry_cfg.default_seeds[0])
+        if not seed_url:
             continue
         targets.append(
             ReplayTarget(
                 source_code=source_code,
                 job_id=int(job_id),
-                seed_url=str(cfg.seeds[0]),
+                seed_url=seed_url,
             )
         )
         seen.add(source_code)
