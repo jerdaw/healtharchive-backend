@@ -12,6 +12,7 @@ This project is an **orchestrator around Zimit** (the `ghcr.io/openzim/zimit` Do
 3. **Applies adaptive strategies**:
 
    * Reduce `--workers` if things are unstable.
+   * Restart the container on stalls (last-resort), if configured.
    * Rotate VPN / IP without stopping the container, if configured.
 4. **Tracks temporary output directories** and **WARCs** across runs.
 5. **Builds the final ZIM from WARCs** as a separate, synchronous stage.
@@ -109,6 +110,10 @@ When called from the HealthArchive backend, the following expectations apply:
       - Optional:
         - `min_workers` → `--min-workers`.
         - `max_worker_reductions` → `--max-worker-reductions`.
+      - `--enable-adaptive-restart` when `enable_adaptive_restart=True` and
+        monitoring is enabled.
+      - Optional:
+        - `max_container_restarts` → `--max-container-restarts`.
 
     - VPN/backoff flags:
 
@@ -132,7 +137,7 @@ When called from the HealthArchive backend, the following expectations apply:
 
   - ``CrawlState`` persists to `<output-dir>/.archive_state.json` and tracks:
     host temp dir paths (`.tmp*`), current/initial workers, and adaptation
-    counters.
+    counters (worker reductions, VPN rotations, container restarts).
   - Temporary crawl dirs live directly under `<output-dir>/.tmp*`.
   - WARC discovery uses:
 
@@ -270,6 +275,14 @@ These control `CrawlMonitor` behaviour:
 
   * Maximum number of successful worker reductions per run (tracked in `CrawlState`).
 
+* `--enable-adaptive-restart`
+
+  * Allows automatic container restarts on monitor-detected stalls when other strategies are not applicable.
+
+* `--max-container-restarts` (default `2`)
+
+  * Maximum number of successful container restarts per run (tracked in `CrawlState`).
+
 * `--enable-vpn-rotation`
 
   * Allows network/IP rotation using a command like `nordvpn connect us`.
@@ -300,9 +313,10 @@ These control `CrawlMonitor` behaviour:
 
 #### 3.1.5 Validation rules
 
-* If `--enable-adaptive-workers` or `--enable-vpn-rotation` is set but `--enable-monitoring` is not, parsing fails.
+* If `--enable-adaptive-workers`, `--enable-adaptive-restart`, or `--enable-vpn-rotation` is set but `--enable-monitoring` is not, parsing fails.
 * If `--enable-vpn-rotation` without `--vpn-connect-command`, parsing fails.
 * `--min-workers` must be ≥ 1.
+* `--max-container-restarts` cannot be negative.
 * `--vpn-rotation-frequency-minutes` cannot be negative.
 
 ---
@@ -344,6 +358,10 @@ These control `CrawlMonitor` behaviour:
 
   * How many times workers have been reduced via `attempt_worker_reduction`.
 
+* `container_restarts_done: int`
+
+  * How many times the container has been restarted via `attempt_container_restart`.
+
 These fields are written as:
 
 ```json
@@ -352,7 +370,8 @@ These fields are written as:
   "initial_workers": 4,
   "temp_dirs_host_paths": ["/some/output/.tmp123", ...],
   "vpn_rotations_done": 1,
-  "worker_reductions_done": 1
+  "worker_reductions_done": 1,
+  "container_restarts_done": 1
 }
 ```
 
@@ -501,6 +520,11 @@ Looks for:
 
 ```text
 collections/crawl-*/crawls/crawl-*.yaml
+collections/crawl-*/crawls/crawl-*.yml
+collections/crawl-*/crawls/*.yaml
+collections/crawl-*/crawls/*.yml
+collections/crawl-*/crawl-*.yaml
+collections/crawl-*/crawl-*.yml
 ```
 
 under a temp dir and returns the newest file. This is the config YAML used to **resume** a previous crawl queue.
@@ -773,7 +797,39 @@ Steps:
    * Marks stage as `stopped_for_adaptation`.
    * Goes into a resume stage in the next outer loop iteration with new worker count.
 
-### 7.3 VPN rotation (live, without stopping container)
+### 7.3 Adaptive restart (container restart)
+
+**Function:** `attempt_container_restart(state: CrawlState, args: argparse.Namespace) -> bool`
+
+Triggered when:
+
+* main sees a `stalled` event, and
+* `--enable-adaptive-restart` is set, and
+* no other strategy was applicable.
+
+Steps:
+
+1. Check:
+
+   * `enable_adaptive_restart` is True.
+   * `container_restarts_done < max_container_restarts`.
+
+2. Stop the container:
+
+   * Calls `stop_docker_container(current_container_id)`.
+
+3. Adjust state:
+
+   * `state.container_restarts_done += 1`.
+   * `state.reset_runtime_errors()`.
+   * `state.save_persistent_state()`.
+
+4. Return `True` to main loop, which then:
+
+   * Marks stage as `stopped_for_adaptation`.
+   * Starts a resume/new-crawl stage on the next outer loop iteration.
+
+### 7.4 VPN rotation (live, without stopping container)
 
 **Function:** `attempt_vpn_rotation(state: CrawlState, args: argparse.Namespace, stop_event) -> bool`
 

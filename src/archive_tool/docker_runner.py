@@ -200,12 +200,45 @@ def stop_docker_container(container_id: Optional[str]):
             logger.warning(f"Container {target_id} not found. Assumed stopped.")
         else:
             logger.error(f"Failed to stop container {target_id}: {stderr_str}")
+            _force_kill_container(target_id)
     except subprocess.TimeoutExpired:
         logger.error(f"Timed out waiting for container {target_id} to stop command to complete.")
+        _force_kill_container(target_id)
     except FileNotFoundError:
         logger.error("Docker command not found.")
     except Exception as e:
         logger.error(f"Error stopping container {target_id}: {e}")
+        _force_kill_container(target_id)
     finally:
         if target_id == current_container_id:
             current_container_id = None
+
+
+def _force_kill_container(container_id: str) -> None:
+    """
+    Best-effort fallback when `docker stop` fails or hangs.
+
+    Note: `docker run --rm` sets AutoRemove; once killed/stopped, the daemon
+    will remove the container automatically.
+    """
+    try:
+        logger.warning(f"Attempting to force-kill container {container_id}...")
+        subprocess.run(
+            ["docker", "kill", container_id],
+            check=True,
+            capture_output=True,
+            timeout=15,
+        )
+        logger.warning(f"Force-killed container {container_id}.")
+    except subprocess.CalledProcessError as e:
+        stderr_str = e.stderr.decode(errors="replace")
+        if "No such container" in stderr_str:
+            logger.warning(f"Container {container_id} not found during kill. Assumed stopped.")
+        else:
+            logger.error(f"Failed to kill container {container_id}: {stderr_str}")
+    except subprocess.TimeoutExpired:
+        logger.error(f"Timed out waiting for container {container_id} to be killed.")
+    except FileNotFoundError:
+        logger.error("Docker command not found while attempting docker kill.")
+    except Exception as exc:
+        logger.error(f"Unexpected error force-killing container {container_id}: {exc}")

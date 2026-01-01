@@ -18,6 +18,7 @@ class ArchiveToolOptions:
     overwrite: bool = False
     enable_monitoring: bool = False
     enable_adaptive_workers: bool = False
+    enable_adaptive_restart: bool = False
     enable_vpn_rotation: bool = False
     initial_workers: int = 1
     log_level: str = "INFO"
@@ -29,6 +30,7 @@ class ArchiveToolOptions:
     error_threshold_http: Optional[int] = None
     min_workers: Optional[int] = None
     max_worker_reductions: Optional[int] = None
+    max_container_restarts: Optional[int] = None
 
     # VPN and backoff fields.
     vpn_connect_command: Optional[str] = None
@@ -49,6 +51,7 @@ class ArchiveToolOptions:
             "overwrite": self.overwrite,
             "enable_monitoring": self.enable_monitoring,
             "enable_adaptive_workers": self.enable_adaptive_workers,
+            "enable_adaptive_restart": self.enable_adaptive_restart,
             "enable_vpn_rotation": self.enable_vpn_rotation,
             "initial_workers": self.initial_workers,
             "log_level": self.log_level,
@@ -69,6 +72,8 @@ class ArchiveToolOptions:
             data["min_workers"] = self.min_workers
         if self.max_worker_reductions is not None:
             data["max_worker_reductions"] = self.max_worker_reductions
+        if self.max_container_restarts is not None:
+            data["max_container_restarts"] = self.max_container_restarts
         if self.vpn_connect_command is not None:
             data["vpn_connect_command"] = self.vpn_connect_command
         if self.max_vpn_rotations is not None:
@@ -92,6 +97,7 @@ class ArchiveToolOptions:
             overwrite=bool(data.get("overwrite", False)),
             enable_monitoring=bool(data.get("enable_monitoring", False)),
             enable_adaptive_workers=bool(data.get("enable_adaptive_workers", False)),
+            enable_adaptive_restart=bool(data.get("enable_adaptive_restart", False)),
             enable_vpn_rotation=bool(data.get("enable_vpn_rotation", False)),
             initial_workers=int(data.get("initial_workers", 1)),
             log_level=str(data.get("log_level", "INFO")),
@@ -101,6 +107,7 @@ class ArchiveToolOptions:
             error_threshold_http=data.get("error_threshold_http"),
             min_workers=data.get("min_workers"),
             max_worker_reductions=data.get("max_worker_reductions"),
+            max_container_restarts=data.get("max_container_restarts"),
             vpn_connect_command=data.get("vpn_connect_command"),
             max_vpn_rotations=data.get("max_vpn_rotations"),
             vpn_rotation_frequency_minutes=data.get("vpn_rotation_frequency_minutes"),
@@ -151,6 +158,9 @@ def validate_tool_options(opts: ArchiveToolOptions) -> None:
     """
     if opts.enable_adaptive_workers and not opts.enable_monitoring:
         raise ValueError("tool_options.enable_adaptive_workers requires enable_monitoring=True")
+
+    if opts.enable_adaptive_restart and not opts.enable_monitoring:
+        raise ValueError("tool_options.enable_adaptive_restart requires enable_monitoring=True")
 
     if opts.enable_vpn_rotation and not opts.enable_monitoring:
         raise ValueError("tool_options.enable_vpn_rotation requires enable_monitoring=True")

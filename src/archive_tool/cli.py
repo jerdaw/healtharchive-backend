@@ -98,6 +98,17 @@ def parse_arguments() -> Tuple[argparse.Namespace, List[str]]:
         default=2,
         help="Max worker reduction attempts per run.",
     )
+    adapt_group.add_argument(
+        "--enable-adaptive-restart",
+        action="store_true",
+        help="Allow automatic container restart on stall when other strategies are not applicable.",
+    )
+    adapt_group.add_argument(
+        "--max-container-restarts",
+        type=int,
+        default=2,
+        help="Max container restart attempts per run.",
+    )
     # ... (VPN args remain the same) ...
     adapt_group.add_argument(
         "--enable-vpn-rotation",
@@ -154,10 +165,14 @@ def parse_arguments() -> Tuple[argparse.Namespace, List[str]]:
         parser.error(
             "--enable-adaptive-workers and --enable-vpn-rotation require --enable-monitoring."
         )
+    if script_args.enable_adaptive_restart and not script_args.enable_monitoring:
+        parser.error("--enable-adaptive-restart requires --enable-monitoring.")
     if script_args.enable_vpn_rotation and not script_args.vpn_connect_command:
         parser.error("--enable-vpn-rotation requires --vpn-connect-command to be set.")
     if script_args.min_workers < 1:
         parser.error("--min-workers must be 1 or greater.")
+    if script_args.max_container_restarts < 0:
+        parser.error("--max-container-restarts cannot be negative.")
     if script_args.vpn_rotation_frequency_minutes < 0:
         parser.error("--vpn-rotation-frequency-minutes cannot be negative.")
 

@@ -72,6 +72,47 @@ signal.signal(signal.SIGINT, signal_handler)
 signal.signal(signal.SIGTERM, signal_handler)
 
 
+def _ensure_docker_process_exits(process: subprocess.Popen, *, reason: str) -> None:
+    """
+    Best-effort guard to avoid overlapping `docker run` processes when an
+    adaptive strategy requests a restart.
+    """
+    if process.poll() is not None:
+        return
+
+    wait_seconds = 15
+    logger.info(
+        "Waiting up to %ss for docker process to exit (%s)...",
+        wait_seconds,
+        reason,
+    )
+    try:
+        process.wait(timeout=wait_seconds)
+        logger.info("Docker process exited.")
+        return
+    except subprocess.TimeoutExpired:
+        logger.warning(
+            "Docker process did not exit within %ss (%s); terminating...",
+            wait_seconds,
+            reason,
+        )
+
+    try:
+        process.terminate()
+        process.wait(timeout=10)
+        logger.info("Docker process terminated.")
+    except subprocess.TimeoutExpired:
+        logger.warning("Docker process did not terminate gracefully; attempting kill...")
+        try:
+            process.kill()
+            process.wait(timeout=5)
+            logger.info("Docker process killed.")
+        except Exception as e:
+            logger.error(f"Failed to kill Docker process: {e}", exc_info=True)
+    except Exception as e:
+        logger.error(f"Error during Docker process termination: {e}", exc_info=True)
+
+
 def format_duration(seconds: float) -> str:
     """Formats duration in seconds into H:MM:SS or M:SS format."""
     try:
@@ -805,6 +846,9 @@ def main():
                                 )
                                 adaptation_performed_type = "worker_reduction"  # Mark which one
                                 stage_status = "stopped_for_adaptation"
+                                _ensure_docker_process_exits(
+                                    docker_process, reason="worker reduction"
+                                )
                                 # Break inner loop ONLY for adaptations requiring restart
                                 break  # EXIT INNER LOOP
                             else:
@@ -839,6 +883,37 @@ def main():
                         except Exception as e_adapt:
                             logger.error(
                                 f"Error during VPN rotation (Live) strategy: {e_adapt}",
+                                exc_info=True,
+                            )
+
+                    # 3. Container Restart (Requires Container Restart)
+                    #
+                    # Only apply when explicitly enabled, and prefer using the
+                    # monitor's stall detection rather than reacting to transient error storms.
+                    if (
+                        adaptation_performed_type is None
+                        and getattr(script_args, "enable_adaptive_restart", False)
+                        and event_status == "stalled"
+                    ):
+                        logger.info("Attempting strategy: Container Restart")
+                        try:
+                            if strategies.attempt_container_restart(crawl_state, script_args):
+                                logger.info(
+                                    "Container restart strategy SUCCESSFUL. Stopping current container to restart."
+                                )
+                                adaptation_performed_type = "container_restart"
+                                stage_status = "stopped_for_adaptation"
+                                _ensure_docker_process_exits(
+                                    docker_process, reason="container restart"
+                                )
+                                break  # EXIT INNER LOOP
+                            else:
+                                logger.info(
+                                    "Container restart strategy skipped or not applicable (e.g., max restarts reached)."
+                                )
+                        except Exception as e_adapt:
+                            logger.error(
+                                f"Error during container restart strategy: {e_adapt}",
                                 exc_info=True,
                             )
 
