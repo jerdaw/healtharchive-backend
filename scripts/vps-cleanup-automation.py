@@ -49,7 +49,7 @@ def _emit(lines: list[str], line: str) -> None:
 
 
 def _load_config(path: Path) -> CleanupConfig:
-    raw = tomllib.loads(path.read_bytes())
+    raw = tomllib.loads(path.read_text(encoding="utf-8"))
     min_age_days = int(raw.get("min_age_days", 14))
     keep_latest = int(raw.get("keep_latest_per_source", 2))
     max_jobs = int(raw.get("max_jobs_per_run", 1))

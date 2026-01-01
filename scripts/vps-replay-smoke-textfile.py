@@ -39,7 +39,7 @@ def _emit(lines: list[str], line: str) -> None:
 
 
 def _load_config(path: Path) -> ReplaySmokeConfig:
-    raw = tomllib.loads(path.read_bytes())
+    raw = tomllib.loads(path.read_text(encoding="utf-8"))
     sources = [str(s).strip() for s in raw.get("sources", []) if str(s).strip()]
     timeout_seconds = int(raw.get("timeout_seconds", 20))
     min_body_bytes = int(raw.get("min_body_bytes", 2048))

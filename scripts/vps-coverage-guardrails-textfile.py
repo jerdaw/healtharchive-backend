@@ -55,7 +55,7 @@ def _emit(lines: list[str], line: str) -> None:
 
 
 def _load_config(path: Path) -> CoverageConfig:
-    raw = tomllib.loads(path.read_bytes())
+    raw = tomllib.loads(path.read_text(encoding="utf-8"))
     sources = [str(s).strip() for s in raw.get("sources", []) if str(s).strip()]
     min_prev_pages = int(raw.get("min_prev_pages", 1000))
     critical_ratio = float(raw.get("critical_ratio", 0.7))
