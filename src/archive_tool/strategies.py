@@ -60,6 +60,50 @@ def attempt_worker_reduction(state: CrawlState, args: argparse.Namespace) -> boo
     return True
 
 
+def attempt_container_restart(state: CrawlState, args: argparse.Namespace) -> bool:
+    """
+    Attempts to restart the current container without changing worker count.
+
+    Intended as a last-resort self-healing strategy when a crawl appears stalled and
+    worker reduction / VPN rotation are not applicable.
+
+    Returns True if a restart requiring the main loop to re-run the stage was initiated.
+    """
+    from archive_tool.docker_runner import current_container_id, stop_docker_container
+
+    if not getattr(args, "enable_adaptive_restart", False):
+        logger.debug("Adaptive restart strategy disabled.")
+        return False
+
+    max_restarts = int(getattr(args, "max_container_restarts", 0) or 0)
+    if max_restarts <= 0:
+        logger.info("Adaptive restart: max container restarts is 0; restart skipped.")
+        return False
+
+    if state.container_restarts_done >= max_restarts:
+        logger.warning(
+            f"Adaptive restart: Max restarts ({max_restarts}) already performed for this run."
+        )
+        return False
+
+    logger.warning("Attempting adaptive container restart...")
+    logger.info("Stopping Docker container for restart...")
+    stop_docker_container(current_container_id)
+    logger.info("Waiting briefly after container stop...")
+    time.sleep(5)
+
+    state.container_restarts_done += 1
+    state.reset_runtime_errors()
+    state.save_persistent_state()
+
+    logger.info(
+        "Container restart requested (Count: %s/%s). Main loop will handle restart.",
+        state.container_restarts_done,
+        max_restarts,
+    )
+    return True
+
+
 def attempt_vpn_rotation(
     state: CrawlState, args: argparse.Namespace, stop_event: threading.Event
 ) -> bool:

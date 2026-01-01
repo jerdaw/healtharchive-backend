@@ -237,6 +237,14 @@ def _build_tool_extra_args(tool_options: ArchiveToolOptions) -> list[str]:
                 ]
             )
 
+    enable_adaptive_restart = bool(tool_options.enable_adaptive_restart)
+    if enable_monitoring and enable_adaptive_restart:
+        extra_tool_args.append("--enable-adaptive-restart")
+        if tool_options.max_container_restarts is not None:
+            extra_tool_args.extend(
+                ["--max-container-restarts", str(tool_options.max_container_restarts)]
+            )
+
     if enable_monitoring and tool_options.backoff_delay_minutes is not None:
         extra_tool_args.extend(["--backoff-delay-minutes", str(tool_options.backoff_delay_minutes)])
 

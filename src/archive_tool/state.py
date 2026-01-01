@@ -41,6 +41,7 @@ class CrawlState:
         self.temp_dirs_host_paths: List[str] = []
         self.vpn_rotations_done: int = 0
         self.worker_reductions_done: int = 0
+        self.container_restarts_done: int = 0
 
         self.load_persistent_state()
         # --- ADD THIS LINE ---
@@ -59,10 +60,12 @@ class CrawlState:
                 self.temp_dirs_host_paths = data.get("temp_dirs_host_paths", [])
                 self.vpn_rotations_done = data.get("vpn_rotations_done", 0)
                 self.worker_reductions_done = data.get("worker_reductions_done", 0)
+                self.container_restarts_done = data.get("container_restarts_done", 0)
                 logger.info(
                     f"Loaded persistent state from {self.state_file_path}: "
                     f"Workers={self.current_workers}, Rotations={self.vpn_rotations_done}, "
-                    f"Reductions={self.worker_reductions_done}, TempDirs={len(self.temp_dirs_host_paths)}"
+                    f"Reductions={self.worker_reductions_done}, Restarts={self.container_restarts_done}, "
+                    f"TempDirs={len(self.temp_dirs_host_paths)}"
                 )
                 self.temp_dirs_host_paths = [
                     p for p in self.temp_dirs_host_paths if Path(p).is_dir()
@@ -93,6 +96,7 @@ class CrawlState:
             "temp_dirs_host_paths": self.temp_dirs_host_paths,
             "vpn_rotations_done": self.vpn_rotations_done,
             "worker_reductions_done": self.worker_reductions_done,
+            "container_restarts_done": self.container_restarts_done,
         }
         try:
             with open(self.state_file_path, "w") as f:
@@ -139,12 +143,14 @@ class CrawlState:
         self.temp_dirs_host_paths = []
         self.vpn_rotations_done = 0
         self.worker_reductions_done = 0
+        self.container_restarts_done = 0
         self.last_vpn_rotation_timestamp = None
 
     def reset_adaptation_counts(self):
         """Resets counts for a fresh run if needed, keeping temp dirs."""
         self.vpn_rotations_done = 0
         self.worker_reductions_done = 0
+        self.container_restarts_done = 0
         self.last_vpn_rotation_timestamp = None
         self.save_persistent_state()  # Save reset counts
 

@@ -303,7 +303,6 @@ class CrawlMonitor(threading.Thread):
             logger.warning(f"Error Condition Met: {self.state.error_counts['timeout']} timeouts.")
             self.output_queue.put({"status": "error", "reason": "timeout_threshold"})
             self.state.reset_runtime_errors()
-            self.state.last_progress_timestamp = now
             signaled = True
         if not signaled and self.state.error_counts["http"] >= self.args.error_threshold_http:
             logger.warning(
@@ -311,6 +310,5 @@ class CrawlMonitor(threading.Thread):
             )
             self.output_queue.put({"status": "error", "reason": "http_threshold"})
             self.state.reset_runtime_errors()
-            self.state.last_progress_timestamp = now
             signaled = True
         return signaled

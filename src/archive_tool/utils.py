@@ -186,21 +186,42 @@ def discover_temp_dirs(host_output_dir: Path) -> List[Path]:
 
 
 def find_latest_config_yaml(temp_dir_path: Path) -> Optional[Path]:
-    """Finds the most recently modified 'crawl-*.yaml' file in the temp directory's expected location."""
-    latest_mod_time: float = 0.0  # Correct type
-    latest_yaml = None
-    search_pattern_str = "collections/crawl-*/crawls/crawl-*.yaml"
-    logger.debug(f"Searching for pattern '{search_pattern_str}' in directory: {temp_dir_path}")
+    """
+    Find the most recently modified crawl config YAML produced by zimit.
+
+    Zimit's on-disk layout can vary slightly across versions, so we probe a
+    small set of known patterns in preference order.
+    """
+    latest_mod_time: float = 0.0
+    latest_yaml: Optional[Path] = None
+    patterns = [
+        # Preferred (documented) zimit layout.
+        "collections/crawl-*/crawls/crawl-*.yaml",
+        "collections/crawl-*/crawls/crawl-*.yml",
+        # Some versions may use different filenames under crawls/.
+        "collections/crawl-*/crawls/*.yaml",
+        "collections/crawl-*/crawls/*.yml",
+        # Fallback: config stored directly under the crawl collection.
+        "collections/crawl-*/crawl-*.yaml",
+        "collections/crawl-*/crawl-*.yml",
+    ]
     if not temp_dir_path or not temp_dir_path.is_dir():
         logger.warning(f"Cannot search for YAML, invalid temp dir: {temp_dir_path}")
         return None
     try:
-        config_files = list(temp_dir_path.glob(search_pattern_str))
-        if not config_files:
-            logger.info(f"No config YAML files found in subdirs of {temp_dir_path}.")
-            return None
-        for yaml_file in config_files:
-            if yaml_file.is_file():
+        for search_pattern_str in patterns:
+            logger.debug(
+                "Searching for resume config YAML pattern '%s' in directory: %s",
+                search_pattern_str,
+                temp_dir_path,
+            )
+            config_files = list(temp_dir_path.glob(search_pattern_str))
+            if not config_files:
+                continue
+
+            for yaml_file in config_files:
+                if not yaml_file.is_file():
+                    continue
                 try:
                     mod_time = yaml_file.stat().st_mtime
                     if mod_time > latest_mod_time:
@@ -208,15 +229,20 @@ def find_latest_config_yaml(temp_dir_path: Path) -> Optional[Path]:
                         latest_yaml = yaml_file
                 except OSError as stat_e:
                     logger.warning(f"Could not stat config file {yaml_file}: {stat_e}")
+
+            if latest_yaml is not None:
+                logger.info(
+                    "Found latest config YAML (pattern '%s'): %s",
+                    search_pattern_str,
+                    latest_yaml.resolve(),
+                )
+                return latest_yaml.resolve()
     except Exception as e:
         logger.error(f"Error searching config YAML in {temp_dir_path}: {e}")
         return None
-    if latest_yaml:
-        logger.info(f"Found latest config YAML: {latest_yaml.resolve()}")
-        return latest_yaml.resolve()
-    else:
-        logger.warning(f"Found files matching pattern but none were valid in {temp_dir_path}.")
-        return None
+
+    logger.info(f"No config YAML files found in subdirs of {temp_dir_path}.")
+    return None
 
 
 def find_all_warc_files(temp_dir_paths: List[Path]) -> List[Path]:
