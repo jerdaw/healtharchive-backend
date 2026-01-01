@@ -269,7 +269,10 @@ root-owned env file on the VPS:
 
 ```bash
 sudo install -d -m 0755 -o root -g root /etc/healtharchive
-sudo install -m 0600 -o root -g root /dev/null /etc/healtharchive/healthchecks.env
+# Only create the file if missing (don't clobber existing values like HC_DB_BACKUP_URL).
+sudo test -f /etc/healtharchive/healthchecks.env || sudo install -m 0600 -o root -g root /dev/null /etc/healtharchive/healthchecks.env
+sudo chown root:root /etc/healtharchive/healthchecks.env
+sudo chmod 0600 /etc/healtharchive/healthchecks.env
 ```
 
 Edit `/etc/healtharchive/healthchecks.env` and set (examples):
