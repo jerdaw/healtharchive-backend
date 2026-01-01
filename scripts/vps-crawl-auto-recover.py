@@ -88,6 +88,46 @@ def _run(cmd: list[str]) -> None:
     subprocess.run(cmd, check=True)  # nosec: B603
 
 
+def _ensure_recovery_tool_options(job: ArchiveJob) -> bool:
+    """
+    Ensure self-healing crawl options are present on a job before a recovery retry.
+
+    This is intentionally conservative:
+    - enables monitoring (required for adaptive restart)
+    - enables adaptive restart (container restart on stall)
+    - sets a small max restart cap if missing/zero
+    - preserves any existing explicit operator overrides
+
+    Returns True if the job config was modified.
+    """
+    cfg = dict(job.config or {})
+    tool = dict(cfg.get("tool_options") or {})
+
+    changed = False
+
+    # Required for any monitor-driven recovery strategies.
+    if not bool(tool.get("enable_monitoring", False)):
+        tool["enable_monitoring"] = True
+        changed = True
+
+    if not bool(tool.get("enable_adaptive_restart", False)):
+        tool["enable_adaptive_restart"] = True
+        changed = True
+
+    try:
+        max_restarts = int(tool.get("max_container_restarts") or 0)
+    except (TypeError, ValueError):
+        max_restarts = 0
+    if max_restarts <= 0:
+        tool["max_container_restarts"] = 2
+        changed = True
+
+    if changed:
+        cfg["tool_options"] = tool
+        job.config = cfg
+    return changed
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description=(
@@ -110,7 +150,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--max-recoveries-per-job-per-day",
         type=int,
-        default=2,
+        default=3,
         help="Safety cap to avoid restart loops.",
     )
     parser.add_argument(
@@ -132,30 +172,39 @@ def main(argv: list[str] | None = None) -> int:
     recent_cutoff = now - timedelta(days=1)
 
     running_jobs: list[RunningJob] = []
-    with get_session() as session:
-        rows = (
-            session.query(
-                ArchiveJob.id,
-                Source.code,
-                ArchiveJob.started_at,
-                ArchiveJob.output_dir,
-                ArchiveJob.combined_log_path,
+    try:
+        with get_session() as session:
+            rows = (
+                session.query(
+                    ArchiveJob.id,
+                    Source.code,
+                    ArchiveJob.started_at,
+                    ArchiveJob.output_dir,
+                    ArchiveJob.combined_log_path,
+                )
+                .join(Source, ArchiveJob.source_id == Source.id)
+                .filter(ArchiveJob.status == "running")
+                .order_by(ArchiveJob.id.asc())
+                .all()
             )
-            .join(Source, ArchiveJob.source_id == Source.id)
-            .filter(ArchiveJob.status == "running")
-            .order_by(ArchiveJob.id.asc())
-            .all()
-        )
-        running_jobs = [
-            RunningJob(
-                job_id=int(job_id),
-                source_code=str(source_code),
-                started_at=started_at,
-                output_dir=str(output_dir) if output_dir is not None else None,
-                combined_log_path=str(combined_log_path) if combined_log_path else None,
-            )
-            for job_id, source_code, started_at, output_dir, combined_log_path in rows
-        ]
+            running_jobs = [
+                RunningJob(
+                    job_id=int(job_id),
+                    source_code=str(source_code),
+                    started_at=started_at,
+                    output_dir=str(output_dir) if output_dir is not None else None,
+                    combined_log_path=str(combined_log_path) if combined_log_path else None,
+                )
+                for job_id, source_code, started_at, output_dir, combined_log_path in rows
+            ]
+    except Exception as exc:
+        msg = str(exc)
+        if "no such table" in msg and "archive_jobs" in msg:
+            print("ERROR: database schema is missing required tables (archive_jobs).")
+            print("Hint: load the backend env so HEALTHARCHIVE_DATABASE_URL points at the real DB:")
+            print("  sudo bash -lc 'set -a; source /etc/healtharchive/backend.env; set +a; ...'")
+            return 2
+        raise
 
     stalled: list[tuple[RunningJob, float]] = []
     for job in running_jobs:
@@ -188,6 +237,26 @@ def main(argv: list[str] | None = None) -> int:
     )
     if not args.apply:
         return 0
+
+    # Before restarting the worker, ensure the retried job has the key self-healing options.
+    try:
+        with get_session() as session:
+            orm_job = session.get(ArchiveJob, job.job_id)
+            if orm_job is not None:
+                if _ensure_recovery_tool_options(orm_job):
+                    session.commit()
+                    tool_opts = (orm_job.config or {}).get("tool_options") or {}
+                    try:
+                        max_restarts = int(tool_opts.get("max_container_restarts") or 0)
+                    except (TypeError, ValueError):
+                        max_restarts = 0
+                    print(
+                        "Updated job config before recovery: "
+                        f"enable_adaptive_restart={bool(tool_opts.get('enable_adaptive_restart'))} "
+                        f"max_container_restarts={max_restarts}"
+                    )
+    except Exception as exc:
+        print(f"WARNING: failed to update job config before recovery: {exc}")
 
     _run(["systemctl", "stop", "healtharchive-worker.service"])
     _run(
