@@ -21,6 +21,9 @@ Options:
   --require-annual-schedule      Fail if annual schedule timer isn't enabled
   --require-annual-sentinel      Fail if annual campaign sentinel timer isn't enabled
   --require-annual-search-verify Fail if annual search verify timer isn't enabled
+  --require-coverage-guardrails  Fail if coverage guardrails timer isn't enabled
+  --require-replay-smoke         Fail if replay smoke timer isn't enabled
+  --require-cleanup-automation   Fail if cleanup automation timer isn't enabled
   --require-public-verify        Fail if public surface verify timer isn't enabled
   --allow-missing-worker-override Do not fail if worker override isn't present
 
@@ -35,6 +38,9 @@ REQUIRE_REPLAY_RECONCILE="false"
 REQUIRE_ANNUAL_SCHEDULE="false"
 REQUIRE_ANNUAL_SENTINEL="false"
 REQUIRE_ANNUAL_SEARCH_VERIFY="false"
+REQUIRE_COVERAGE_GUARDRAILS="false"
+REQUIRE_REPLAY_SMOKE="false"
+REQUIRE_CLEANUP_AUTOMATION="false"
 REQUIRE_PUBLIC_VERIFY="false"
 ALLOW_MISSING_WORKER_OVERRIDE="false"
 
@@ -58,6 +64,18 @@ while [[ $# -gt 0 ]]; do
       ;;
     --require-annual-search-verify)
       REQUIRE_ANNUAL_SEARCH_VERIFY="true"
+      shift 1
+      ;;
+    --require-coverage-guardrails)
+      REQUIRE_COVERAGE_GUARDRAILS="true"
+      shift 1
+      ;;
+    --require-replay-smoke)
+      REQUIRE_REPLAY_SMOKE="true"
+      shift 1
+      ;;
+    --require-cleanup-automation)
+      REQUIRE_CLEANUP_AUTOMATION="true"
       shift 1
       ;;
     --require-public-verify)
@@ -155,6 +173,9 @@ check_timer "healtharchive-replay-reconcile.timer" "/etc/healtharchive/replay-au
 check_timer "healtharchive-schedule-annual.timer" "/etc/healtharchive/automation-enabled" "${REQUIRE_ANNUAL_SCHEDULE}"
 check_timer "healtharchive-annual-campaign-sentinel.timer" "/etc/healtharchive/automation-enabled" "${REQUIRE_ANNUAL_SENTINEL}"
 check_timer "healtharchive-annual-search-verify.timer" "/etc/healtharchive/automation-enabled" "${REQUIRE_ANNUAL_SEARCH_VERIFY}"
+check_timer "healtharchive-coverage-guardrails.timer" "/etc/healtharchive/coverage-guardrails-enabled" "${REQUIRE_COVERAGE_GUARDRAILS}"
+check_timer "healtharchive-replay-smoke.timer" "/etc/healtharchive/replay-smoke-enabled" "${REQUIRE_REPLAY_SMOKE}"
+check_timer "healtharchive-cleanup-automation.timer" "/etc/healtharchive/cleanup-automation-enabled" "${REQUIRE_CLEANUP_AUTOMATION}"
 check_timer "healtharchive-public-surface-verify.timer" "/etc/healtharchive/public-verify-enabled" "${REQUIRE_PUBLIC_VERIFY}"
 
 echo ""

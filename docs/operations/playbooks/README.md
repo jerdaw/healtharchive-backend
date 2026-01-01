@@ -31,6 +31,9 @@ Recommended starting points:
 
 Other playbooks:
 
+- Coverage guardrails (annual regression checks): `coverage-guardrails.md`
+- Replay smoke tests (daily replay validation): `replay-smoke-tests.md`
+- Cleanup automation (safe temp cleanup): `cleanup-automation.md`
 - Restore test (quarterly): `restore-test.md`
 - Dataset release integrity (quarterly): `dataset-release.md`
 - Adoption signals entry (quarterly): `adoption-signals.md`

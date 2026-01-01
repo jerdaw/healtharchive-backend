@@ -155,6 +155,20 @@ Recommended checks to monitor:
 - Annual scheduler (yearly):
   - `healtharchive-schedule-annual.timer`
   - Ping variable: `HEALTHARCHIVE_HC_PING_SCHEDULE_ANNUAL`
+- Annual search verify (daily, idempotent once per year):
+  - `healtharchive-annual-search-verify.timer`
+  - Ping variable: `HEALTHARCHIVE_HC_PING_ANNUAL_SEARCH_VERIFY`
+- Coverage guardrails (daily):
+  - `healtharchive-coverage-guardrails.timer`
+  - Ping variable: `HEALTHARCHIVE_HC_PING_COVERAGE_GUARDRAILS`
+- Replay smoke tests (daily):
+  - `healtharchive-replay-smoke.timer`
+  - Ping variable: `HEALTHARCHIVE_HC_PING_REPLAY_SMOKE`
+- Cleanup automation (weekly):
+  - `healtharchive-cleanup-automation.timer`
+  - Ping variable: `HEALTHARCHIVE_HC_PING_CLEANUP_AUTOMATION`
+
+Note: avoid pinging high-frequency timers (e.g., crawl metrics, crawl auto-recover) to reduce noise.
 
 Implementation approach (VPS):
 

@@ -1,0 +1,20 @@
+[Unit]
+Description=HealthArchive cleanup automation (indexed jobs, temp-nonwarc only)
+Wants=network-online.target
+After=network-online.target
+ConditionPathExists=/etc/healtharchive/backend.env
+ConditionPathExists=/etc/healtharchive/cleanup-automation-enabled
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+EnvironmentFile=/etc/healtharchive/backend.env
+EnvironmentFile=-/etc/healtharchive/healthchecks.env
+
+# Keep impact low on the single VPS.
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=6
+
+ExecStart=/opt/healtharchive-backend/scripts/systemd-healthchecks-wrapper.sh --ping-var HEALTHARCHIVE_HC_PING_CLEANUP_AUTOMATION -- /opt/healtharchive-backend/.venv/bin/python3 /opt/healtharchive-backend/scripts/vps-cleanup-automation.py --config /opt/healtharchive-backend/ops/automation/cleanup-automation.toml --apply
