@@ -15,7 +15,7 @@ This folder contains the canonical documentation for the **HealthArchive backend
    - `development/testing-guidelines.md` (backend test expectations)
 4. Deployment (how to run it on a server)
    - `deployment/production-single-vps.md` (current production runbook)
-   - `deployment/systemd/README.md` (systemd units: baseline drift + public verify, annual scheduler, change tracking, replay reconcile, annual search verify, worker priority)
+   - `deployment/systemd/README.md` (systemd units: annual scheduler, crawl monitoring + auto-recovery, baseline drift, replay reconcile + smoke tests, change tracking, annual search verify, coverage guardrails, cleanup automation, worker priority)
    - `deployment/replay-service-pywb.md` (pywb replay service for full-fidelity browsing)
    - `deployment/search-rollout.md` (enable v2 search + rollback)
    - `deployment/pages-table-rollout.md` (pages table backfill + browse fast path)

@@ -10,10 +10,11 @@ Canonical refs:
 ## What this does
 
 - Picks the latest indexed job per source.
-- Uses the first seed URL as a replay target:
+- Uses the first seed URL as a replay target (or falls back to the source registry defaults for legacy jobs that lack seeds in `ArchiveJob.config`):
   - `https://replay.healtharchive.ca/job-<id>/<seed>`
 - Emits node_exporter textfile metrics:
-  - `healtharchive_replay_smoke_ok{source="hc"}`
+  - `healtharchive_replay_smoke_target_present{source="hc"}`
+  - `healtharchive_replay_smoke_ok{source="hc",job_id="123"}`
 
 ## Enablement (VPS)
 

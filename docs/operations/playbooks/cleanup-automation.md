@@ -25,10 +25,12 @@ sudo systemctl enable --now healtharchive-cleanup-automation.timer
 
 ## Manual dry-run
 
+Warning: starting `healtharchive-cleanup-automation.service` will **apply** cleanup (it is the automation entrypoint).
+Use the script directly for a dry-run preview.
+
 ```bash
-sudo systemctl start healtharchive-cleanup-automation.service
-sudo journalctl -u healtharchive-cleanup-automation.service -n 200 --no-pager
-curl -s http://127.0.0.1:9100/metrics | rg '^healtharchive_cleanup_'
+sudo bash -lc 'set -a; source /etc/healtharchive/backend.env; set +a; /opt/healtharchive-backend/.venv/bin/python3 /opt/healtharchive-backend/scripts/vps-cleanup-automation.py --config /opt/healtharchive-backend/ops/automation/cleanup-automation.toml --out-dir /tmp --out-file healtharchive_cleanup_dryrun.prom'
+cat /tmp/healtharchive_cleanup_dryrun.prom
 ```
 
 ## If cleanup fails
