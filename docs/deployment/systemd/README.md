@@ -78,6 +78,14 @@ Assumptions (adjust paths/user if your VPS differs):
   - Used to alert on Storage Box / tiering failures without needing a systemd collector.
   - Prereq: node_exporter must run with `--collector.textfile.directory=/var/lib/node_exporter/textfile_collector`
     (configured by `scripts/vps-install-observability-exporters.sh`).
+- `healtharchive-crawl-metrics.service` + `.timer`
+  - Writes per-job crawl progress/stall metrics (based on crawlStatus logs) to the node_exporter textfile collector.
+  - Used to alert on stalled crawls without manual log tailing.
+  - Prereq: node_exporter textfile collector is enabled (same as tiering metrics).
+- `healtharchive-crawl-auto-recover.service` + `.timer`
+  - Optional automation to recover stalled crawl jobs by restarting the worker and marking stale running jobs as retryable.
+  - Gated by `ConditionPathExists=/etc/healtharchive/crawl-auto-recover-enabled`.
+  - Disabled by default; enable only after you’re comfortable with the thresholds/caps in `scripts/vps-crawl-auto-recover.py`.
 - `healtharchive-storagebox-sshfs.service`
   - Mounts a Hetzner Storage Box at `/srv/healtharchive/storagebox` via `sshfs`.
   - Reads configuration from `/etc/healtharchive/storagebox.env`.
