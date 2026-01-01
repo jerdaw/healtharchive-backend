@@ -19,6 +19,8 @@ These items are intentionally “external” and require ongoing human follow-th
 - Secure at least 1 distribution partner (permission to name them publicly).
 - Secure at least 1 verifier (permission to name them publicly).
 - Maintain a public-safe mentions/citations log with real entries (links only; no private contact data).
+- Healthchecks.io alignment: create missing checks for new automation timers and keep `/etc/healtharchive/healthchecks.env` in sync with what exists in Healthchecks.
+  - See: `../deployment/systemd/README.md` and `../deployment/production-single-vps.md`
 
 Track the current status and next actions in:
 
