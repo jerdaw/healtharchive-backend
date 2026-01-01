@@ -278,6 +278,12 @@ sudo chmod 0600 /etc/healtharchive/healthchecks.env
 Edit `/etc/healtharchive/healthchecks.env` and set (examples):
 
 ```bash
+# You do NOT need to set every variable listed here.
+# Only set the variables for Healthchecks checks you have actually created.
+# If a variable is missing/empty, the service still runs; it just won't ping.
+#
+# Note: the Healthchecks "Name" can be anything; it does not need to match the
+# env var name. The env var is just how systemd finds the ping URL.
 HEALTHARCHIVE_HC_PING_REPLAY_RECONCILE=https://hc-ping.com/UUID_HERE
 HEALTHARCHIVE_HC_PING_SCHEDULE_ANNUAL=https://hc-ping.com/UUID_HERE
 HEALTHARCHIVE_HC_PING_ANNUAL_SENTINEL=https://hc-ping.com/UUID_HERE
