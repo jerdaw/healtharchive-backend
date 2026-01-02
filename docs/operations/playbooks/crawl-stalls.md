@@ -2,6 +2,13 @@
 
 Use this playbook when a crawl job is **running** but appears **stalled** (no progress for an extended period), or when you receive the `HealthArchiveCrawlStalled` alert.
 
+Quick triage (recommended first):
+
+```bash
+cd /opt/healtharchive-backend
+./scripts/vps-crawl-status.sh --year 2026
+```
+
 ## 1) Identify the stalled job
 
 On the VPS:
