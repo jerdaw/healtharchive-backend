@@ -22,6 +22,7 @@ Options:
   --year YYYY       Annual campaign year for annual-status (default: current UTC year)
   --job-id ID       Inspect a specific job id (default: first running job)
   --env-file FILE   Env file to source (default: /etc/healtharchive/backend.env)
+  --recent-lines N  Only scan last N log lines for timeout warnings (default: 5000)
   -h, --help        Show this help
 
 Exit codes:
@@ -34,6 +35,7 @@ EOF
 YEAR="$(date -u '+%Y')"
 JOB_ID=""
 ENV_FILE="/etc/healtharchive/backend.env"
+RECENT_LINES="5000"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -64,6 +66,15 @@ while [[ $# -gt 0 ]]; do
       ENV_FILE="$2"
       shift 2
       ;;
+    --recent-lines)
+      if [[ $# -lt 2 ]]; then
+        echo "ERROR: --recent-lines requires an integer (e.g. --recent-lines 5000)" >&2
+        usage >&2
+        exit 2
+      fi
+      RECENT_LINES="$2"
+      shift 2
+      ;;
     -h|--help)
       usage
       exit 0
@@ -78,6 +89,10 @@ done
 
 if ! [[ "${YEAR}" =~ ^[0-9]{4}$ ]]; then
   echo "ERROR: --year must be a 4-digit year (got: ${YEAR})" >&2
+  exit 2
+fi
+if ! [[ "${RECENT_LINES}" =~ ^[0-9]+$ ]] || [[ "${RECENT_LINES}" -le 0 ]]; then
+  echo "ERROR: --recent-lines must be a positive integer (got: ${RECENT_LINES})" >&2
   exit 2
 fi
 
@@ -173,8 +188,9 @@ if [[ -x "${HA_BIN}" ]]; then
           echo "[crawlStatus tail]"
           rg -n '"context":"crawlStatus"' "${LOG}" | tail -n 3 || true
           echo ""
-          echo "[navigation timeout tail]"
-          rg -n "Navigation timeout" "${LOG}" | tail -n 5 || true
+          echo "[recent timeouts (last ${RECENT_LINES} log lines)]"
+          # Keep this "recent" to avoid confusing operators with old matches in large logs.
+          tail -n "${RECENT_LINES}" "${LOG}" | rg -n "Navigation timeout|Page load timed out" | tail -n 10 || true
         else
           warn "rg not available; skipping crawlStatus/timeouts grep"
         fi
