@@ -112,3 +112,13 @@ ls -1dt /srv/healtharchive/ops/preflight/* | tail -n +11 | sudo xargs -r rm -rf 
 
 - `YEAR=2026; ./scripts/vps-preflight-crawl.sh --year "$YEAR"` exits `0`.
 - The report directory exists and is retained as operator evidence for that crawl run.
+
+## During the crawl (ongoing monitoring)
+
+Once a large crawl is running, use the read-only status snapshot script for a
+quick “all the basics” check:
+
+```bash
+cd /opt/healtharchive-backend
+./scripts/vps-crawl-status.sh --year 2026
+```
