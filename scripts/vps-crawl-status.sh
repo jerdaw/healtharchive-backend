@@ -190,7 +190,12 @@ if [[ -x "${HA_BIN}" ]]; then
           echo ""
           echo "[recent timeouts (last ${RECENT_LINES} log lines)]"
           # Keep this "recent" to avoid confusing operators with old matches in large logs.
-          tail -n "${RECENT_LINES}" "${LOG}" | rg -n "Navigation timeout|Page load timed out" | tail -n 10 || true
+          recent_timeouts="$(tail -n "${RECENT_LINES}" "${LOG}" | rg -n "Navigation timeout|Page load timed out" | tail -n 10 || true)"
+          if [[ -n "${recent_timeouts}" ]]; then
+            echo "${recent_timeouts}"
+          else
+            echo "OK   no recent timeouts found"
+          fi
         else
           warn "rg not available; skipping crawlStatus/timeouts grep"
         fi
