@@ -71,6 +71,7 @@ See: `../deployment/systemd/README.md`
 - **Automation posture check**
   - On the VPS run: `cd /opt/healtharchive-backend && ./scripts/verify_ops_automation.sh`
   - Optional (diff-friendly): `./scripts/verify_ops_automation.sh --json | python3 -m json.tool`
+  - Optional (JSON-only artifact): `./scripts/verify_ops_automation.sh --json-only > /srv/healtharchive/ops/automation/posture.json`
   - Spot-check logs: `journalctl -u <service> -n 200`
 - **Growth constraints review**
   - Revisit `growth-constraints.md` (storage, source caps, performance budgets).
