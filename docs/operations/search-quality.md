@@ -47,25 +47,25 @@ if you want it versioned.
 Local dev (backend running on `http://127.0.0.1:8001`):
 
 ```bash
-curl -s "http://127.0.0.1:8001/api/search?q=covid&page=1&pageSize=10&sort=relevance" | python -m json.tool
+curl -s "http://127.0.0.1:8001/api/search?q=covid&page=1&pageSize=10&sort=relevance" | python3 -m json.tool
 ```
 
 Production:
 
 ```bash
-curl -s "https://api.healtharchive.ca/api/search?q=covid&page=1&pageSize=10&sort=relevance" | python -m json.tool
+curl -s "https://api.healtharchive.ca/api/search?q=covid&page=1&pageSize=10&sort=relevance" | python3 -m json.tool
 ```
 
 To de-duplicate repeated captures of the same URL (show latest snapshot per page):
 
 ```bash
-curl -s "https://api.healtharchive.ca/api/search?q=covid&page=1&pageSize=10&sort=relevance&view=pages" | python -m json.tool
+curl -s "https://api.healtharchive.ca/api/search?q=covid&page=1&pageSize=10&sort=relevance&view=pages" | python3 -m json.tool
 ```
 
 To include non‑2xx captures for research/debugging:
 
 ```bash
-curl -s "https://api.healtharchive.ca/api/search?q=covid&page=1&pageSize=10&sort=relevance&includeNon2xx=true" | python -m json.tool
+curl -s "https://api.healtharchive.ca/api/search?q=covid&page=1&pageSize=10&sort=relevance&includeNon2xx=true" | python3 -m json.tool
 ```
 
 To inspect *why* a result ranks where it does (admin-only score breakdown):
@@ -73,7 +73,7 @@ To inspect *why* a result ranks where it does (admin-only score breakdown):
 ```bash
 curl -s "https://api.healtharchive.ca/api/admin/search-debug?q=covid&view=pages&sort=relevance&ranking=v2&pageSize=10" \
   -H "X-Admin-Token: ${HEALTHARCHIVE_ADMIN_TOKEN}" \
-  | python -m json.tool
+  | python3 -m json.tool
 ```
 
 ### 3.2 Capture “before/after” snapshots (recommended)

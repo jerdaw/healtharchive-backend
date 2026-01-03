@@ -144,20 +144,20 @@ Prefer capturing API responses (fast + deterministic).
 Production examples:
 
 ```bash
-curl -s "https://api.healtharchive.ca/api/search?q=covid&page=1&pageSize=20&sort=relevance&view=pages" | python -m json.tool
-curl -s "https://api.healtharchive.ca/api/search?q=long%20covid&page=1&pageSize=20&sort=relevance&view=pages" | python -m json.tool
+curl -s "https://api.healtharchive.ca/api/search?q=covid&page=1&pageSize=20&sort=relevance&view=pages" | python3 -m json.tool
+curl -s "https://api.healtharchive.ca/api/search?q=long%20covid&page=1&pageSize=20&sort=relevance&view=pages" | python3 -m json.tool
 ```
 
 To force a specific ranking version (useful for comparisons):
 
 ```bash
-curl -s "https://api.healtharchive.ca/api/search?q=covid&page=1&pageSize=20&sort=relevance&view=pages&ranking=v2" | python -m json.tool
+curl -s "https://api.healtharchive.ca/api/search?q=covid&page=1&pageSize=20&sort=relevance&view=pages&ranking=v2" | python3 -m json.tool
 ```
 
 Local examples (backend on `127.0.0.1:8001`):
 
 ```bash
-curl -s "http://127.0.0.1:8001/api/search?q=covid&page=1&pageSize=20&sort=relevance&view=pages" | python -m json.tool
+curl -s "http://127.0.0.1:8001/api/search?q=covid&page=1&pageSize=20&sort=relevance&view=pages" | python3 -m json.tool
 ```
 
 For a repeatable “before/after” capture directory, use the script:

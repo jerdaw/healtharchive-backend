@@ -38,14 +38,14 @@ Notes:
 ## 2) Verification checklist (production)
 
 1) Health:
-   - `curl -s https://api.healtharchive.ca/api/health | python -m json.tool`
+   - `curl -s https://api.healtharchive.ca/api/health | python3 -m json.tool`
 2) Search v2 is active by default:
-   - `curl -s "https://api.healtharchive.ca/api/search?q=covid&view=pages&sort=relevance&pageSize=20" | python -m json.tool | head`
+   - `curl -s "https://api.healtharchive.ca/api/search?q=covid&view=pages&sort=relevance&pageSize=20" | python3 -m json.tool | head`
 3) Compare explicitly:
-   - `curl -s "https://api.healtharchive.ca/api/search?q=covid&view=pages&sort=relevance&pageSize=20&ranking=v1" | python -m json.tool | head`
-   - `curl -s "https://api.healtharchive.ca/api/search?q=covid&view=pages&sort=relevance&pageSize=20&ranking=v2" | python -m json.tool | head`
+   - `curl -s "https://api.healtharchive.ca/api/search?q=covid&view=pages&sort=relevance&pageSize=20&ranking=v1" | python3 -m json.tool | head`
+   - `curl -s "https://api.healtharchive.ca/api/search?q=covid&view=pages&sort=relevance&pageSize=20&ranking=v2" | python3 -m json.tool | head`
 4) Debug a ranking decision (admin token required):
-   - `curl -s "https://api.healtharchive.ca/api/admin/search-debug?q=covid&view=pages&sort=relevance&ranking=v2&pageSize=10" -H "X-Admin-Token: $HEALTHARCHIVE_ADMIN_TOKEN" | python -m json.tool`
+   - `curl -s "https://api.healtharchive.ca/api/admin/search-debug?q=covid&view=pages&sort=relevance&ranking=v2&pageSize=10" -H "X-Admin-Token: $HEALTHARCHIVE_ADMIN_TOKEN" | python3 -m json.tool`
 
 ## 3) Capture + diff (recommended “smoke eval”)
 
