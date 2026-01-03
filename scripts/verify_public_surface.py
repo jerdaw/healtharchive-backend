@@ -355,22 +355,35 @@ def main(argv: list[str] | None = None) -> int:
                 failures += 1
 
     if not args.skip_frontend:
-        pages: list[tuple[str, str]] = [
-            ("archive", f"{frontend_base}/archive"),
-            ("browse-by-source", f"{frontend_base}/archive/browse-by-source"),
-            ("changes", f"{frontend_base}/changes"),
-            ("digest", f"{frontend_base}/digest"),
-            ("exports", f"{frontend_base}/exports"),
-            ("researchers", f"{frontend_base}/researchers"),
-            ("brief", f"{frontend_base}/brief"),
-            ("cite", f"{frontend_base}/cite"),
-            ("methods", f"{frontend_base}/methods"),
-            ("governance", f"{frontend_base}/governance"),
-            ("status", f"{frontend_base}/status"),
-            ("impact", f"{frontend_base}/impact"),
-        ]
-        if first_snapshot_id is not None:
-            pages.append(("snapshot", f"{frontend_base}/snapshot/{first_snapshot_id}"))
+        pages: list[tuple[str, str]] = []
+        for locale_slug, label in (("", "en"), ("/fr", "fr")):
+            pages.extend(
+                [
+                    (f"archive-{label}", f"{frontend_base}{locale_slug}/archive"),
+                    (
+                        f"browse-by-source-{label}",
+                        f"{frontend_base}{locale_slug}/archive/browse-by-source",
+                    ),
+                    (f"changes-{label}", f"{frontend_base}{locale_slug}/changes"),
+                    (f"digest-{label}", f"{frontend_base}{locale_slug}/digest"),
+                    (f"exports-{label}", f"{frontend_base}{locale_slug}/exports"),
+                    (f"researchers-{label}", f"{frontend_base}{locale_slug}/researchers"),
+                    (f"brief-{label}", f"{frontend_base}{locale_slug}/brief"),
+                    (f"cite-{label}", f"{frontend_base}{locale_slug}/cite"),
+                    (f"methods-{label}", f"{frontend_base}{locale_slug}/methods"),
+                    (f"governance-{label}", f"{frontend_base}{locale_slug}/governance"),
+                    (f"status-{label}", f"{frontend_base}{locale_slug}/status"),
+                    (f"impact-{label}", f"{frontend_base}{locale_slug}/impact"),
+                ]
+            )
+
+            if first_snapshot_id is not None:
+                pages.append(
+                    (
+                        f"snapshot-{label}",
+                        f"{frontend_base}{locale_slug}/snapshot/{first_snapshot_id}",
+                    )
+                )
 
         for name, url in pages:
             resp = _http_request(url, timeout_s=timeout_s, method="GET", read_limit_bytes=64 * 1024)

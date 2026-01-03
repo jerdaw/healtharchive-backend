@@ -14,6 +14,13 @@ From the repo root:
 
 This is the canonical “everything should be green” command.
 
+## End-to-end smoke (public surface)
+
+CI also runs a fast end-to-end smoke check that starts the backend + frontend
+locally and verifies user-critical routes (no browser automation):
+
+- `./scripts/ci-e2e-smoke.sh --frontend-dir ../healtharchive-frontend`
+
 ## Running subsets
 
 - Unit tests: `pytest`
