@@ -74,6 +74,45 @@ def _ok(msg: str) -> None:
     print(f"OK   {msg}")
 
 
+def _decode_text(body: bytes) -> str:
+    try:
+        return body.decode("utf-8", errors="replace")
+    except Exception:  # noqa: BLE001
+        return ""
+
+
+def _build_frontend_pages(
+    frontend_base: str, *, first_snapshot_id: int | None
+) -> list[tuple[str, str]]:
+    pages: list[tuple[str, str]] = []
+    for locale_slug, label in (("", "en"), ("/fr", "fr")):
+        pages.extend(
+            [
+                (f"archive-{label}", f"{frontend_base}{locale_slug}/archive"),
+                (
+                    f"browse-by-source-{label}",
+                    f"{frontend_base}{locale_slug}/archive/browse-by-source",
+                ),
+                (f"changes-{label}", f"{frontend_base}{locale_slug}/changes"),
+                (f"digest-{label}", f"{frontend_base}{locale_slug}/digest"),
+                (f"exports-{label}", f"{frontend_base}{locale_slug}/exports"),
+                (f"researchers-{label}", f"{frontend_base}{locale_slug}/researchers"),
+                (f"brief-{label}", f"{frontend_base}{locale_slug}/brief"),
+                (f"cite-{label}", f"{frontend_base}{locale_slug}/cite"),
+                (f"methods-{label}", f"{frontend_base}{locale_slug}/methods"),
+                (f"governance-{label}", f"{frontend_base}{locale_slug}/governance"),
+                (f"status-{label}", f"{frontend_base}{locale_slug}/status"),
+                (f"impact-{label}", f"{frontend_base}{locale_slug}/impact"),
+            ]
+        )
+
+        if first_snapshot_id is not None:
+            pages.append(
+                (f"snapshot-{label}", f"{frontend_base}{locale_slug}/snapshot/{first_snapshot_id}")
+            )
+    return pages
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description="Verify HealthArchive public surface (frontend + public API + replay + usage metrics)."
@@ -166,7 +205,12 @@ def main(argv: list[str] | None = None) -> int:
         _fail(f"api stats status={stats.status} url={api_base}/api/stats")
         failures += 1
     else:
-        _ok(f"api stats status=200 snapshotsTotal={stats_json.get('snapshotsTotal')!r}")
+        snapshots_total = stats_json.get("snapshotsTotal")
+        if not isinstance(snapshots_total, int):
+            _fail("api stats missing snapshotsTotal (expected int)")
+            failures += 1
+        else:
+            _ok(f"api stats status=200 snapshotsTotal={snapshots_total!r}")
 
     sources, sources_json = _http_json(f"{api_base}/api/sources", timeout_s=timeout_s)
     if sources.status != 200 or not isinstance(sources_json, list) or not sources_json:
@@ -175,6 +219,16 @@ def main(argv: list[str] | None = None) -> int:
         sources_json = []
     else:
         _ok(f"api sources status=200 count={len(sources_json)}")
+        bad_rows = [
+            row
+            for row in sources_json
+            if not isinstance(row, dict)
+            or not isinstance(row.get("sourceCode"), str)
+            or not row.get("sourceCode", "").strip()
+        ]
+        if bad_rows:
+            _fail("api sources contains invalid rows (expected dict with non-empty sourceCode)")
+            failures += 1
         required_sources = [s.strip().lower() for s in args.require_source if str(s).strip()]
         if required_sources:
             present = {
@@ -234,10 +288,24 @@ def main(argv: list[str] | None = None) -> int:
     first_snapshot_id: int | None = None
     browse_url: str | None = None
     raw_snapshot_path: str | None = None
+    snapshot_title: str | None = None
     if search.status != 200 or not isinstance(search_json, dict):
         _fail(f"api search status={search.status} url={search_url}")
         failures += 1
     else:
+        if not isinstance(search_json.get("results"), list):
+            _fail("api search missing results (expected list)")
+            failures += 1
+        if not isinstance(search_json.get("total"), int):
+            _fail("api search missing total (expected int)")
+            failures += 1
+        if not isinstance(search_json.get("page"), int):
+            _fail("api search missing page (expected int)")
+            failures += 1
+        if not isinstance(search_json.get("pageSize"), int):
+            _fail("api search missing pageSize (expected int)")
+            failures += 1
+
         results = search_json.get("results")
         if not isinstance(results, list) or not results:
             _fail(f"api search returned no results url={search_url}")
@@ -254,6 +322,9 @@ def main(argv: list[str] | None = None) -> int:
                 + (f"snapshot_id={first_snapshot_id} " if first_snapshot_id else "")
                 + (f"browseUrl={'yes' if bool(browse_url) else 'no'}" if first_snapshot_id else "")
             )
+            if not raw_snapshot_path:
+                _fail("api search result missing rawSnapshotUrl (expected non-empty string)")
+                failures += 1
 
     if first_snapshot_id is not None:
         detail_url = f"{api_base}/api/snapshot/{first_snapshot_id}"
@@ -262,7 +333,13 @@ def main(argv: list[str] | None = None) -> int:
             _fail(f"api snapshot detail status={detail.status} url={detail_url}")
             failures += 1
         else:
-            _ok(f"api snapshot detail status=200 id={detail_json.get('id')!r}")
+            if detail_json.get("id") != first_snapshot_id:
+                _fail("api snapshot detail id mismatch")
+                failures += 1
+            else:
+                _ok(f"api snapshot detail status=200 id={detail_json.get('id')!r}")
+            title_raw = detail_json.get("title")
+            snapshot_title = title_raw.strip() if isinstance(title_raw, str) else None
 
         if raw_snapshot_path:
             raw_url = (
@@ -355,43 +432,26 @@ def main(argv: list[str] | None = None) -> int:
                 failures += 1
 
     if not args.skip_frontend:
-        pages: list[tuple[str, str]] = []
-        for locale_slug, label in (("", "en"), ("/fr", "fr")):
-            pages.extend(
-                [
-                    (f"archive-{label}", f"{frontend_base}{locale_slug}/archive"),
-                    (
-                        f"browse-by-source-{label}",
-                        f"{frontend_base}{locale_slug}/archive/browse-by-source",
-                    ),
-                    (f"changes-{label}", f"{frontend_base}{locale_slug}/changes"),
-                    (f"digest-{label}", f"{frontend_base}{locale_slug}/digest"),
-                    (f"exports-{label}", f"{frontend_base}{locale_slug}/exports"),
-                    (f"researchers-{label}", f"{frontend_base}{locale_slug}/researchers"),
-                    (f"brief-{label}", f"{frontend_base}{locale_slug}/brief"),
-                    (f"cite-{label}", f"{frontend_base}{locale_slug}/cite"),
-                    (f"methods-{label}", f"{frontend_base}{locale_slug}/methods"),
-                    (f"governance-{label}", f"{frontend_base}{locale_slug}/governance"),
-                    (f"status-{label}", f"{frontend_base}{locale_slug}/status"),
-                    (f"impact-{label}", f"{frontend_base}{locale_slug}/impact"),
-                ]
-            )
-
-            if first_snapshot_id is not None:
-                pages.append(
-                    (
-                        f"snapshot-{label}",
-                        f"{frontend_base}{locale_slug}/snapshot/{first_snapshot_id}",
-                    )
-                )
+        pages = _build_frontend_pages(frontend_base, first_snapshot_id=first_snapshot_id)
 
         for name, url in pages:
-            resp = _http_request(url, timeout_s=timeout_s, method="GET", read_limit_bytes=64 * 1024)
+            resp = _http_request(
+                url, timeout_s=timeout_s, method="GET", read_limit_bytes=256 * 1024
+            )
             if resp.status != 200:
                 _fail(f"frontend {name} status={resp.status} url={url}")
                 failures += 1
             else:
                 _ok(f"frontend {name} status=200 url={url}")
+                html = _decode_text(resp.body)
+                if name.startswith("archive-"):
+                    if "/_next/static/" not in html:
+                        _fail(f"frontend {name} missing expected Next.js marker")
+                        failures += 1
+                if name.startswith("snapshot-") and snapshot_title:
+                    if snapshot_title not in html:
+                        _fail(f"frontend {name} does not include snapshot title from API")
+                        failures += 1
 
         # Report forwarder (safe: includes a honeypot field so the backend won't persist it)
         report_payload = {

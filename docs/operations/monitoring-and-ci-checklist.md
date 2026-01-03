@@ -75,6 +75,9 @@ What the smoke does:
   - Frontend: `/archive`, `/fr/archive`, `/snapshot/{id}`, `/fr/snapshot/{id}`, and other key pages
   - API: `/api/health`, `/api/sources`, `/api/search`, `/api/snapshot/{id}`, `/api/usage`, `/api/exports`, `/api/changes`
 - Replay (pywb) is intentionally skipped in CI (`--skip-replay`).
+- The verifier includes minimal “not just 200” assertions:
+  - `/archive` pages must include a stable `<title>` marker.
+  - `/snapshot/{id}` pages must include the snapshot title returned by the API.
 
 Where it runs:
 

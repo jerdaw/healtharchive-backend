@@ -9,6 +9,7 @@ Implemented plans:
 - `2025-12-24-ops-observability-and-private-usage.md`
 - `2025-12-25-compare-live.md`
 - `2026-01-03-ci-e2e-smoke.md`
+- `2026-01-03-ci-e2e-smoke-hardening.md`
 - `2026-01-03-ops-automation-verification-json.md`
 - `2026-01-03-ops-automation-verifier-improvements.md`
 
