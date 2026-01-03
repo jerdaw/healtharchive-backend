@@ -9,6 +9,7 @@ This is a one-time (or idempotent) helper so ops scripts can write artifacts to:
   - /srv/healtharchive/ops/baseline
   - /srv/healtharchive/ops/restore-tests
   - /srv/healtharchive/ops/adoption
+  - /srv/healtharchive/ops/automation
   - /srv/healtharchive/ops/search-eval
 
 Usage (on the VPS):
@@ -71,6 +72,7 @@ subdirs=(
   baseline
   restore-tests
   adoption
+  automation
   search-eval
 )
 
