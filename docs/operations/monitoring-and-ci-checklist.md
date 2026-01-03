@@ -76,7 +76,7 @@ What the smoke does:
   - API: `/api/health`, `/api/sources`, `/api/search`, `/api/snapshot/{id}`, `/api/usage`, `/api/exports`, `/api/changes`
 - Replay (pywb) is intentionally skipped in CI (`--skip-replay`).
 - The verifier includes minimal “not just 200” assertions:
-  - `/archive` pages must include a stable `<title>` marker.
+  - `/archive` pages must include a stable Next.js marker (`/_next/static/`).
   - `/snapshot/{id}` pages must include the snapshot title returned by the API.
 
 Where it runs:
@@ -100,6 +100,11 @@ make venv
 On failure, the script prints the tail of the backend/frontend logs that it writes under:
 
 - `healtharchive-backend/.tmp/ci-e2e-smoke/`
+
+CI also uploads the smoke logs as a GitHub Actions artifact on failure:
+
+- Backend repo: `backend-e2e-smoke-artifacts`
+- Frontend repo: `frontend-e2e-smoke-artifacts`
 
 ### Step 2 — Solo-fast deploy gate (operator; recommended)
 
