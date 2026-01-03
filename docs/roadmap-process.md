@@ -14,4 +14,3 @@ Canonical guidance:
 - Roadmaps index: `roadmaps/README.md`
 - Backlog: `roadmaps/future-roadmap.md`
 - Implemented plans archive: `roadmaps/implemented/README.md`
-
