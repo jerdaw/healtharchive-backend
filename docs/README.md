@@ -27,6 +27,7 @@ This folder contains the canonical documentation for the **HealthArchive backend
    - `operations/README.md` (index of ops docs)
 6. Roadmaps and implementation plans
    - `roadmaps/README.md`
+   - `roadmap-process.md` (short pointer)
 
 ## Notes
 
