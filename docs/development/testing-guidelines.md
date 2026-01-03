@@ -20,6 +20,7 @@ CI also runs a fast end-to-end smoke check that starts the backend + frontend
 locally and verifies user-critical routes (no browser automation):
 
 - `./scripts/ci-e2e-smoke.sh --frontend-dir ../healtharchive-frontend`
+  - If the frontend is already built (CI artifact), add: `--skip-frontend-build`
 
 ## Running subsets
 

@@ -74,3 +74,11 @@ jobs:
 
       - name: E2E smoke (backend + frontend)
         run: ./scripts/ci-e2e-smoke.sh --frontend-dir healtharchive-frontend
+
+      - name: Upload e2e smoke artifacts (on failure)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-e2e-smoke-artifacts
+          path: .tmp/ci-e2e-smoke/
+          if-no-files-found: ignore

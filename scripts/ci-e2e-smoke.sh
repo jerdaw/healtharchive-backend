@@ -2,21 +2,26 @@
 set -euo pipefail
 
 BACKEND_HOST="127.0.0.1"
-BACKEND_PORT="8001"
-FRONTEND_PORT="3000"
+BACKEND_PORT=""
+FRONTEND_PORT=""
 FRONTEND_DIR=""
 TMP_DIR=""
 PYTHON_BIN=""
+SKIP_FRONTEND_BUILD="0"
+USE_SETSID="0"
 
 usage() {
   cat <<EOF
 Usage: $(basename "$0") [--frontend-dir PATH] [--tmp-dir PATH] [--python PATH]
 
 Runs a local end-to-end smoke check by starting:
-- backend (uvicorn) on :${BACKEND_PORT}
-- frontend (next start) on :${FRONTEND_PORT}
+- backend (uvicorn) on a free local port
+- frontend (next start) on a free local port
 
 Then executes: scripts/verify_public_surface.py against both.
+
+Options:
+  --skip-frontend-build   Assume frontend is already built (.next exists); do not run 'npm run build'.
 EOF
 }
 
@@ -33,6 +38,10 @@ while [[ $# -gt 0 ]]; do
     --python)
       PYTHON_BIN="${2:-}"
       shift 2
+      ;;
+    --skip-frontend-build)
+      SKIP_FRONTEND_BUILD="1"
+      shift 1
       ;;
     -h|--help)
       usage
@@ -64,6 +73,10 @@ if [[ -z "${PYTHON_BIN}" ]]; then
   fi
 fi
 
+if command -v setsid >/dev/null 2>&1; then
+  USE_SETSID="1"
+fi
+
 if [[ -z "${FRONTEND_DIR}" ]]; then
   FRONTEND_DIR="${BACKEND_DIR}/../healtharchive-frontend"
 fi
@@ -73,6 +86,19 @@ if [[ -z "${TMP_DIR}" ]]; then
   TMP_DIR="${BACKEND_DIR}/.tmp/ci-e2e-smoke"
 fi
 mkdir -p "${TMP_DIR}"
+
+pick_free_port() {
+  "${PYTHON_BIN}" - <<'PY'
+import socket
+s = socket.socket()
+s.bind(("127.0.0.1", 0))
+print(s.getsockname()[1])
+s.close()
+PY
+}
+
+BACKEND_PORT="${BACKEND_PORT:-$(pick_free_port)}"
+FRONTEND_PORT="${FRONTEND_PORT:-$(pick_free_port)}"
 
 DB_PATH="${TMP_DIR}/ci-e2e.db"
 WARC_PATH="${TMP_DIR}/ci-e2e.warc.gz"
@@ -98,19 +124,58 @@ FRONTEND_LOG="${TMP_DIR}/frontend.log"
 backend_pid=""
 frontend_pid=""
 
+tail_logs() {
+  set +e
+  if [[ -f "${BACKEND_LOG}" ]]; then
+    echo "" >&2
+    echo "== backend.log (tail) ==" >&2
+    tail -n 250 "${BACKEND_LOG}" >&2 || true
+  fi
+  if [[ -f "${FRONTEND_BUILD_LOG}" ]]; then
+    echo "" >&2
+    echo "== frontend-build.log (tail) ==" >&2
+    tail -n 250 "${FRONTEND_BUILD_LOG}" >&2 || true
+  fi
+  if [[ -f "${FRONTEND_LOG}" ]]; then
+    echo "" >&2
+    echo "== frontend.log (tail) ==" >&2
+    tail -n 250 "${FRONTEND_LOG}" >&2 || true
+  fi
+}
+
 cleanup() {
   set +e
   if [[ -n "${frontend_pid}" ]]; then
-    kill "${frontend_pid}" >/dev/null 2>&1 || true
+    if [[ "${USE_SETSID}" == "1" ]]; then
+      kill -TERM -- "-${frontend_pid}" >/dev/null 2>&1 || true
+    fi
+    kill -TERM "${frontend_pid}" >/dev/null 2>&1 || true
   fi
   if [[ -n "${backend_pid}" ]]; then
-    kill "${backend_pid}" >/dev/null 2>&1 || true
+    if [[ "${USE_SETSID}" == "1" ]]; then
+      kill -TERM -- "-${backend_pid}" >/dev/null 2>&1 || true
+    fi
+    kill -TERM "${backend_pid}" >/dev/null 2>&1 || true
   fi
 }
-trap cleanup EXIT
 
-"${PYTHON_BIN}" -m uvicorn ha_backend.api:app --host "${BACKEND_HOST}" --port "${BACKEND_PORT}" \
-  --log-level warning >"${BACKEND_LOG}" 2>&1 &
+on_exit() {
+  code="$?"
+  cleanup
+  if [[ "${code}" -ne 0 ]]; then
+    tail_logs
+  fi
+  exit "${code}"
+}
+trap on_exit EXIT
+
+if [[ "${USE_SETSID}" == "1" ]]; then
+  setsid "${PYTHON_BIN}" -m uvicorn ha_backend.api:app --host "${BACKEND_HOST}" --port "${BACKEND_PORT}" \
+    --log-level warning >"${BACKEND_LOG}" 2>&1 &
+else
+  "${PYTHON_BIN}" -m uvicorn ha_backend.api:app --host "${BACKEND_HOST}" --port "${BACKEND_PORT}" \
+    --log-level warning >"${BACKEND_LOG}" 2>&1 &
+fi
 backend_pid="$!"
 
 wait_for_url() {
@@ -128,23 +193,30 @@ wait_for_url() {
 }
 
 if ! wait_for_url "http://${BACKEND_HOST}:${BACKEND_PORT}/api/health" 30; then
-  echo "Backend failed to start; log follows:" >&2
-  tail -n 200 "${BACKEND_LOG}" >&2 || true
+  echo "Backend failed to start." >&2
   exit 1
 fi
 
 pushd "${FRONTEND_DIR}" >/dev/null
-npm run build >"${FRONTEND_BUILD_LOG}" 2>&1
-npm run start -- -p "${FRONTEND_PORT}" >"${FRONTEND_LOG}" 2>&1 &
+if [[ "${SKIP_FRONTEND_BUILD}" != "1" ]]; then
+  npm run build >"${FRONTEND_BUILD_LOG}" 2>&1
+else
+  : >"${FRONTEND_BUILD_LOG}"
+fi
+if [[ "${USE_SETSID}" == "1" ]]; then
+  setsid npm run start -- -p "${FRONTEND_PORT}" >"${FRONTEND_LOG}" 2>&1 &
+else
+  npm run start -- -p "${FRONTEND_PORT}" >"${FRONTEND_LOG}" 2>&1 &
+fi
 frontend_pid="$!"
 popd >/dev/null
 
-if ! wait_for_url "http://${BACKEND_HOST}:${FRONTEND_PORT}/" 60; then
-  echo "Frontend failed to start; logs follow:" >&2
-  tail -n 200 "${FRONTEND_BUILD_LOG}" >&2 || true
-  tail -n 200 "${FRONTEND_LOG}" >&2 || true
+if ! wait_for_url "http://${BACKEND_HOST}:${FRONTEND_PORT}/archive" 60; then
+  echo "Frontend failed to start (archive route not ready)." >&2
   exit 1
 fi
+
+"${PYTHON_BIN}" -c "import urllib.request; urllib.request.urlopen('http://${BACKEND_HOST}:${FRONTEND_PORT}/fr/archive', timeout=10).read(1)" >/dev/null 2>&1 || true
 
 "${PYTHON_BIN}" "${SCRIPT_DIR}/verify_public_surface.py" \
   --api-base "http://${BACKEND_HOST}:${BACKEND_PORT}" \
