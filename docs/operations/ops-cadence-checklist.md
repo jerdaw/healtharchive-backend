@@ -70,6 +70,7 @@ See: `../deployment/systemd/README.md`
   - Add a dated entry under `/srv/healtharchive/ops/adoption/` (links + aggregates only).
 - **Automation posture check**
   - On the VPS run: `cd /opt/healtharchive-backend && ./scripts/verify_ops_automation.sh`
+  - Optional (diff-friendly): `./scripts/verify_ops_automation.sh --json | python3 -m json.tool`
   - Spot-check logs: `journalctl -u <service> -n 200`
 - **Growth constraints review**
   - Revisit `growth-constraints.md` (storage, source caps, performance budgets).

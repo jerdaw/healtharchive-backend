@@ -5,6 +5,7 @@ Use these checks before claiming automation is “on”.
 ## systemd timers
 
 - One-command posture check (recommended): `./scripts/verify_ops_automation.sh`
+- Diff-friendly JSON summary (optional): `./scripts/verify_ops_automation.sh --json | python3 -m json.tool`
 - `systemctl is-enabled <timer>` (should be `enabled`)
 - sentinel file exists under `/etc/healtharchive/*enabled`
 - `systemctl list-timers --all | grep healtharchive-` (shows next/last run)
