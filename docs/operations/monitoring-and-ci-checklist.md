@@ -63,6 +63,41 @@ Verification:
 
 - GitHub Actions shows the backend CI workflow completing successfully on `main`.
 
+### Step 1b — End-to-end smoke checks (CI)
+
+Objective: catch regressions where the apps “build” but user‑critical paths fail at runtime.
+
+What the smoke does:
+
+- Starts the backend locally (uvicorn) with a tiny seeded SQLite + WARC dataset.
+- Builds and starts the frontend locally (`next start`) pointing at that backend.
+- Runs `healtharchive-backend/scripts/verify_public_surface.py` against:
+  - Frontend: `/archive`, `/fr/archive`, `/snapshot/{id}`, `/fr/snapshot/{id}`, and other key pages
+  - API: `/api/health`, `/api/sources`, `/api/search`, `/api/snapshot/{id}`, `/api/usage`, `/api/exports`, `/api/changes`
+- Replay (pywb) is intentionally skipped in CI (`--skip-replay`).
+
+Where it runs:
+
+- Backend repo CI: `.github/workflows/backend-ci.yml` job `e2e-smoke`
+  - Tests backend changes against latest frontend `main`.
+- Frontend repo CI: `.github/workflows/frontend-ci.yml` job `e2e-smoke`
+  - Tests frontend changes against latest backend `main`.
+- If cross-repo checkout fails (private repo), set a repo secret:
+  - `HEALTHARCHIVE_CI_READ_TOKEN` (PAT with read access)
+
+Local reproduction (from the mono‑repo workspace where the repos are siblings):
+
+```bash
+cd healtharchive-frontend && npm ci
+cd ../healtharchive-backend
+make venv
+./scripts/ci-e2e-smoke.sh --frontend-dir ../healtharchive-frontend
+```
+
+On failure, the script prints the tail of the backend/frontend logs that it writes under:
+
+- `healtharchive-backend/.tmp/ci-e2e-smoke/`
+
 ### Step 2 — Solo-fast deploy gate (operator; recommended)
 
 Objective: prevent broken deploys by only deploying when `main` is green.

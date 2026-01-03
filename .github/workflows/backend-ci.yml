@@ -33,3 +33,44 @@ jobs:
 
       - name: Check
         run: make check
+
+  e2e-smoke:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout backend repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Checkout frontend repository
+        uses: actions/checkout@v6
+        with:
+          repository: jerdaw/healtharchive-frontend
+          path: healtharchive-frontend
+          fetch-depth: 0
+          token: ${{ secrets.HEALTHARCHIVE_CI_READ_TOKEN || github.token }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "20.19.0"
+          cache: "npm"
+          cache-dependency-path: healtharchive-frontend/package-lock.json
+
+      - name: Install backend dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev]"
+
+      - name: Install frontend dependencies
+        working-directory: healtharchive-frontend
+        run: npm ci
+
+      - name: E2E smoke (backend + frontend)
+        run: ./scripts/ci-e2e-smoke.sh --frontend-dir healtharchive-frontend

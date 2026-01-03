@@ -42,6 +42,7 @@ tmp-test.warc.gz
 .dev-*.db
 .dev-*-root/
 tmp-*.warc.gz
+.tmp/
 .pytest_cache/
 .coverage
 .mypy_cache/

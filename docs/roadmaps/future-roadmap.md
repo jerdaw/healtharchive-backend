@@ -59,10 +59,6 @@ Keep this list short; prefer linking to the canonical doc that explains the item
 
 ### Reliability & CI (backend + frontend)
 
-- End-to-end smoke coverage in CI for public-critical flows.
-  - Target: `/archive`, `/snapshot/[id]`, plus API smoke calls (`/api/search`, `/api/sources`, `/api/snapshot/{id}`)
-  - See: `../operations/monitoring-and-ci-checklist.md`
-
 ### Ops surface / environments (optional)
 
 - Consider whether a separate staging backend is worth it (increases ops surface; only do if it buys real safety).
