@@ -47,7 +47,7 @@ Notes:
 1) Confirm pages browse includes capture counts:
 
 ```bash
-curl -s "https://api.healtharchive.ca/api/search?view=pages&pageSize=1" | python -m json.tool | head
+curl -s "https://api.healtharchive.ca/api/search?view=pages&pageSize=1" | python3 -m json.tool | head
 ```
 
 You should see `pageSnapshotsCount` as an integer (not `null`) on results.
