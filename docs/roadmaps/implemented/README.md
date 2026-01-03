@@ -8,6 +8,7 @@ Implemented plans:
 - `2025-12-24-sequential-implementation-plan.md`
 - `2025-12-24-ops-observability-and-private-usage.md`
 - `2025-12-25-compare-live.md`
+- `2026-01-03-ops-automation-verification-json.md`
 
 Rules:
 

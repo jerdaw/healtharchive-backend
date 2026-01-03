@@ -36,11 +36,49 @@ Supporting materials:
 
 Keep this list short; prefer linking to the canonical doc that explains the item.
 
-- Tighten GitHub merge discipline when there are multiple committers (PR-only + required checks).
-  - See: `../operations/monitoring-and-ci-checklist.md`
-- Storage optimization (only if provenance is preserved): consider pruning same-day duplicates if identical HTML can be proven safely.
-  - See: `../operations/search-quality.md`
-- Consider whether a separate staging backend is worth it (optional; increases ops surface).
-  - See: `../deployment/environments-and-configuration.md`
+### Search & relevance (backend)
+
+- Search ranking + snippet quality iteration, with repeatable “golden query” regression captures.
+  - Harness + scripts: `../operations/search-quality.md`, `../../scripts/search-eval-run.sh`
+- Authority signals for relevance (optional): outlinks / page signals feeding into ranking and/or tie-breakers.
+  - See: `../operations/search-quality.md` (“Backfill outlinks + authority signals”)
+
+### Archive UX (frontend)
+
+- “Power controls” for archive/search views (discoverable + shareable via URL params).
+  - Params to expose: `view=pages|snapshots`, `includeNon2xx=true`, `includeDuplicates=true`
+  - See: `../../../healtharchive-frontend/docs/implementation-guide.md`
+
+### Storage & retention (backend)
+
+- Same-day dedupe path (storage-only optimization; provenance-preserving).
+  - Requirements: dry-run mode, reversible/auditable log, and strict invariants (e.g., “same URL, same day, identical `Snapshot.content_hash`”).
+  - See: `../operations/search-quality.md`, `../operations/growth-constraints.md`
 - Storage/retention upgrades (only with a designed replay retention policy).
   - See: `../operations/growth-constraints.md`, `../deployment/replay-service-pywb.md`
+
+### Reliability & CI (backend + frontend)
+
+- End-to-end smoke coverage in CI for public-critical flows.
+  - Target: `/archive`, `/snapshot/[id]`, plus API smoke calls (`/api/search`, `/api/sources`, `/api/snapshot/{id}`)
+  - See: `../operations/monitoring-and-ci-checklist.md`
+
+### Ops surface / environments (optional)
+
+- Consider whether a separate staging backend is worth it (increases ops surface; only do if it buys real safety).
+  - See: `../deployment/environments-and-configuration.md`
+
+### Repo governance (future)
+
+- Tighten GitHub merge discipline when there are multiple committers (PR-only + required checks).
+  - See: `../operations/monitoring-and-ci-checklist.md`
+
+### Dataset releases (healtharchive-datasets)
+
+- Release pipeline hardening (more reproducible, less flaky).
+  - Add retries/backoff, manifest validation, and checksum verification as required pre-publish steps.
+  - See: `../../../healtharchive-datasets/README.md`, `../../../healtharchive-datasets/.github/workflows/publish-dataset-release.yml`
+
+## Adjacent / optional (in this monorepo, not core HA)
+
+- `rcdc/CDC_zim_mirror`: add startup DB sanity checks and clearer failure modes (empty/invalid LevelDB, missing prefixes, etc.).
