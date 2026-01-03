@@ -30,6 +30,7 @@ Keep documentation accurate, minimal, and easy to maintain across repos.
 
 This project separates **backlog** vs **implementation plans** vs **canonical docs** to reduce drift.
 
+- Short pointer (for new contributors): `roadmap-process.md`
 - `docs/roadmaps/future-roadmap.md` is the single backlog of not-yet-implemented items.
 - When you start work, create a focused implementation plan under `docs/roadmaps/`.
 - When the work is done, update canonical docs (deployment/ops/dev) so the result is maintainable.
