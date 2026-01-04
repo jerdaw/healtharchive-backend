@@ -16,11 +16,14 @@ It is intentionally **not** an implementation plan.
 
 These items are intentionally “external” and require ongoing human follow-through.
 
+- External outreach + verification execution (operator-only):
+  - Playbook: `../operations/playbooks/outreach-and-verification.md`
 - Secure at least 1 distribution partner (permission to name them publicly).
 - Secure at least 1 verifier (permission to name them publicly).
-- Maintain a public-safe mentions/citations log with real entries (links only; no private contact data).
-- Healthchecks.io alignment: create missing checks for new automation timers and keep `/etc/healtharchive/healthchecks.env` in sync with what exists in Healthchecks.
-  - See: `../deployment/systemd/README.md` and `../deployment/production-single-vps.md`
+- Maintain a public-safe mentions/citations log with real entries:
+  - `../operations/mentions-log.md` (links only; no private contact data)
+- Healthchecks.io alignment: keep systemd timers, `/etc/healtharchive/healthchecks.env`, and the Healthchecks UI in sync.
+  - See: `../operations/playbooks/healthchecks-parity.md` and `../deployment/production-single-vps.md`
 
 Track the current status and next actions in:
 
@@ -38,16 +41,11 @@ Keep this list short; prefer linking to the canonical doc that explains the item
 
 ### Search & relevance (backend)
 
-- Search ranking + snippet quality iteration, with repeatable “golden query” regression captures.
-  - Harness + scripts: `../operations/search-quality.md`, `../../scripts/search-eval-run.sh`
+- Search ranking + snippet quality iteration (active plan):
+  - `2026-01-03-search-ranking-and-snippets-v3.md`
+  - Supporting docs/scripts: `../operations/search-quality.md`, `../operations/search-golden-queries.md`, `../../scripts/search-eval-run.sh`
 - Authority signals for relevance (optional): outlinks / page signals feeding into ranking and/or tie-breakers.
   - See: `../operations/search-quality.md` (“Backfill outlinks + authority signals”)
-
-### Archive UX (frontend)
-
-- “Power controls” for archive/search views (discoverable + shareable via URL params).
-  - Params to expose: `view=pages|snapshots`, `includeNon2xx=true`, `includeDuplicates=true`
-  - See: `../../../healtharchive-frontend/docs/implementation-guide.md`
 
 ### Storage & retention (backend)
 
@@ -56,8 +54,6 @@ Keep this list short; prefer linking to the canonical doc that explains the item
   - See: `../operations/search-quality.md`, `../operations/growth-constraints.md`
 - Storage/retention upgrades (only with a designed replay retention policy).
   - See: `../operations/growth-constraints.md`, `../deployment/replay-service-pywb.md`
-
-### Reliability & CI (backend + frontend)
 
 ### Ops surface / environments (optional)
 
@@ -68,12 +64,6 @@ Keep this list short; prefer linking to the canonical doc that explains the item
 
 - Tighten GitHub merge discipline when there are multiple committers (PR-only + required checks).
   - See: `../operations/monitoring-and-ci-checklist.md`
-
-### Dataset releases (healtharchive-datasets)
-
-- Release pipeline hardening (more reproducible, less flaky).
-  - Add retries/backoff, manifest validation, and checksum verification as required pre-publish steps.
-  - See: `../../../healtharchive-datasets/README.md`, `../../../healtharchive-datasets/.github/workflows/publish-dataset-release.yml`
 
 ## Adjacent / optional (in this monorepo, not core HA)
 
