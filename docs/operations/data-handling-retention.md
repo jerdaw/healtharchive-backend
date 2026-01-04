@@ -37,4 +37,4 @@ Policy:
 
 - Restore tests: `/srv/healtharchive/ops/restore-tests/` (public-safe Markdown entries only).
 - Adoption signals: `/srv/healtharchive/ops/adoption/` (public-safe; quarterly; links + aggregates only).
-- Mentions log: keep public-safe; do not store private contact details.
+- Mentions log: `mentions-log.md` (public-safe, link-only; no private contact details).
