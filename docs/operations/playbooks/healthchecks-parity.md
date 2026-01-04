@@ -185,4 +185,3 @@ sudo journalctl -u healtharchive-cleanup-automation.service -n 200 --no-pager
 ```
 
 If you decide “no, don’t enable cleanup”, keep it disabled and do not create the Healthchecks check or env var.
-
