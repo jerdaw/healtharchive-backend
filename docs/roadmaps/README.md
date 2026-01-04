@@ -9,7 +9,7 @@
 Implementation plans live directly under `docs/roadmaps/` while they are active.
 When complete, move them to `docs/roadmaps/implemented/` and date them.
 
-None currently.
+- Search ranking + snippet quality iteration (v3): `2026-01-03-search-ranking-and-snippets-v3.md`
 
 ## Implemented plans (history)
 
