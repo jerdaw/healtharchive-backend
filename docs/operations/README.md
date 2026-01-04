@@ -24,6 +24,7 @@
 - Citation handout (pointer to frontend public asset): `citation-handout.md`
 - Outreach templates (email copy): `outreach-templates.md`
 - Verification packet (verifier handoff): `verification-packet.md`
+- Mentions log (public-safe, link-only): `mentions-log.md`
 - Mentions log template (public-safe): `mentions-log-template.md`
 - Exports data dictionary (pointer to public asset): `exports-data-dictionary.md`
 - Methods note outline (poster/preprint scaffold): `methods-note-outline.md`

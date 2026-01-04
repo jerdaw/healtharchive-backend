@@ -43,6 +43,8 @@ Related docs:
 - Treat sentinel files under `/etc/healtharchive/` as the explicit on/off controls for automation.
 - If you enable Healthchecks pings, keep ping URLs only in the root-owned VPS env file:
   - `/etc/healtharchive/healthchecks.env` (never commit ping URLs)
+- If you use Healthchecks pings, periodically audit for drift (missing or stale checks):
+  - `cd /opt/healtharchive-backend && sudo -u haadmin python3 ./scripts/verify_healthchecks_alignment.py`
 - If you enable optional automations (coverage guardrails, replay smoke, cleanup), confirm their timers + sentinels are intentional.
 
 See: `../deployment/systemd/README.md`
@@ -68,6 +70,8 @@ See: `../deployment/systemd/README.md`
   - Verify checksums: `sha256sum -c SHA256SUMS` (see `dataset-release-runbook.md`).
 - **Adoption signals entry** (public-safe)
   - Add a dated entry under `/srv/healtharchive/ops/adoption/` (links + aggregates only).
+- **Mentions log refresh** (public-safe)
+  - Update `mentions-log.md` with new public links (permission-aware; link-only).
 - **Automation posture check**
   - On the VPS run: `cd /opt/healtharchive-backend && ./scripts/verify_ops_automation.sh`
   - Optional (diff-friendly): `./scripts/verify_ops_automation.sh --json | python3 -m json.tool`

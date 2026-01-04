@@ -5,6 +5,10 @@ Populate this only with information that is already public and permitted.
 
 Do NOT add private emails or outreach notes.
 
+Canonical log (real entries live here):
+
+- `mentions-log.md`
+
 ---
 
 ## Mentions log
