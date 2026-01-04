@@ -34,9 +34,11 @@ Other playbooks:
 - Coverage guardrails (annual regression checks): `coverage-guardrails.md`
 - Replay smoke tests (daily replay validation): `replay-smoke-tests.md`
 - Cleanup automation (safe temp cleanup): `cleanup-automation.md`
+- Healthchecks parity (env ↔ systemd ↔ Healthchecks): `healthchecks-parity.md`
 - Restore test (quarterly): `restore-test.md`
 - Dataset release integrity (quarterly): `dataset-release.md`
 - Adoption signals entry (quarterly): `adoption-signals.md`
+- Outreach + verification (external, privacy-safe): `outreach-and-verification.md`
 - WARC storage tiering (SSD + Storage Box): `warc-storage-tiering.md`
 - Replay service (if enabled): `replay-service.md`
 - Annual campaign operations (seasonal): `annual-campaign.md`

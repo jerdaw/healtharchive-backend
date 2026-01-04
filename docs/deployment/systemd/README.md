@@ -311,6 +311,31 @@ Notes:
 
 ---
 
+## Audit Healthchecks alignment (safe)
+
+This script compares:
+
+- What ping env vars are set in `/etc/healtharchive/healthchecks.env`
+- What ping vars are referenced by installed systemd unit files (via `--ping-var ...`)
+- Which timers exist (for manual cross-check with Healthchecks “last ping” timestamps)
+
+Run on the VPS:
+
+```bash
+cd /opt/healtharchive-backend
+sudo -u haadmin python3 ./scripts/verify_healthchecks_alignment.py
+```
+
+If it reports “referenced but unset”, you either:
+
+- Intentionally have pings disabled for those timers (OK), or
+- Should create the missing checks in Healthchecks and add the missing env vars.
+
+If it reports “set but unused”, you likely have a stale env var (remove it) or the
+unit that used to reference it was removed/renamed.
+
+---
+
 ## Validate the annual scheduler (safe)
 
 This dry-run service exercises DB connectivity + scheduler output without

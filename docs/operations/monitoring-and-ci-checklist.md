@@ -39,11 +39,13 @@ settings drift”.
    - Which alerts should page you vs. just email (recommended: only “site down”
      pages; everything else emails).
 3. Decide the `main` branch policy:
-   - **Solo-fast (recommended for this project right now): direct pushes to `main`**.
+   - **Mode A — Solo-fast (recommended for this project right now): direct pushes to `main`**.
      - CI still runs on every push to `main`.
      - Deploys are gated by “green main” + VPS verification steps (below).
-   - Future (when there are multiple committers): PR-only merges into `main` with required
-     status checks + code owners (track in `../roadmaps/future-roadmap.md`).
+   - **Mode B — Multi-committer (defer until needed): PR-only merges into `main`** with required
+     status checks + code owner review (track in `../roadmaps/future-roadmap.md`).
+   - Switch to Mode B when there is more than one regular committer, or when you want stricter
+     enforcement than “green main + local hooks”.
 
 Verification:
 
@@ -62,6 +64,17 @@ Objective: ensure CI runs on pushes to `main` so you can treat “green main” 
 Verification:
 
 - GitHub Actions shows the backend CI workflow completing successfully on `main`.
+
+#### Check name inventory (for future branch protection)
+
+If/when you enable branch protection required checks, use the stable workflow/job check names shown
+in GitHub’s UI. Avoid renaming workflow/job IDs after you start requiring them.
+
+As of 2026-01-03, the core checks typically appear as:
+
+- Backend repo: `Backend CI / test`, `Backend CI / e2e-smoke`
+- Frontend repo: `Frontend CI / lint-and-test`, `Frontend CI / e2e-smoke`
+- Datasets repo: `Datasets CI / lint`
 
 ### Step 1b — End-to-end smoke checks (CI)
 
@@ -115,10 +128,14 @@ Workflow (recommended):
 0. Local guardrails (recommended while branch protections are relaxed):
    - Run checks before you push:
      - From the mono-repo root: `make check`
-     - Or per-repo: `healtharchive-backend: make check`, `healtharchive-frontend: npm run check`
+     - Or per-repo:
+       - `healtharchive-backend: make check`
+       - `healtharchive-frontend: npm run check`
+       - `healtharchive-datasets: make check`
    - Optional but recommended: install pre-push hooks so you can't forget:
      - Backend: `healtharchive-backend/scripts/install-pre-push-hook.sh`
      - Frontend: `healtharchive-frontend/scripts/install-pre-push-hook.sh`
+     - Datasets: `healtharchive-datasets/scripts/install-pre-push-hook.sh`
 1. Push to `main`.
 2. Wait for GitHub Actions to go green on that commit.
 3. Deploy on the VPS:
