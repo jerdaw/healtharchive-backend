@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import logging
+import stat
 import subprocess  # nosec: B404 - expected for running archive_tool
 import sys
 from dataclasses import dataclass
@@ -13,7 +15,10 @@ from .archive_contract import ArchiveJobConfig, ArchiveToolOptions
 from .config import get_archive_tool_config
 from .crawl_stats import update_job_stats_from_logs
 from .db import get_session
+from .infra_errors import is_storage_infra_errno, is_storage_infra_error
 from .models import ArchiveJob as ORMArchiveJob
+
+logger = logging.getLogger("healtharchive.jobs")
 
 
 @dataclass
@@ -299,6 +304,11 @@ def run_persistent_job(job_id: int) -> int:
         now = datetime.now(timezone.utc)
         job_row.status = "running"
         job_row.started_at = now
+        job_row.finished_at = None
+        job_row.crawler_exit_code = None
+        job_row.crawler_status = None
+        job_row.crawler_stage = None
+        job_row.combined_log_path = None
 
     # Execute outside of an open Session to keep the database interaction
     # simple and avoid long-lived transactions.
@@ -320,32 +330,72 @@ def run_persistent_job(job_id: int) -> int:
     if zimit_args:
         full_extra_args.extend(zimit_args)
 
-    rc = runtime_job.run(
-        initial_workers=initial_workers,
-        cleanup=cleanup,
-        overwrite=overwrite,
-        log_level=log_level,
-        extra_args=full_extra_args,
-        stream_output=True,
-        output_dir_override=output_dir,
-    )
+    rc: int | None = None
+    run_exc: Exception | None = None
+    try:
+        rc = runtime_job.run(
+            initial_workers=initial_workers,
+            cleanup=cleanup,
+            overwrite=overwrite,
+            log_level=log_level,
+            extra_args=full_extra_args,
+            stream_output=True,
+            output_dir_override=output_dir,
+        )
+    except Exception as exc:  # noqa: BLE001 - intentional boundary around runtime execution
+        run_exc = exc
+        logger.warning("Job %s raised during archive_tool execution: %s", job_id, exc)
 
     # Second session: record final status and exit code.
     finished = datetime.now(timezone.utc)
     with get_session() as session:
         job_row = _load_job_for_update(session, job_id)
-        job_row.crawler_exit_code = rc
         job_row.finished_at = finished
+
+        if run_exc is not None:
+            if is_storage_infra_error(run_exc):
+                job_row.status = "retryable"
+                job_row.crawler_status = "infra_error"
+            else:
+                job_row.status = "failed"
+                job_row.crawler_status = "infra_error_config"
+            job_row.crawler_exit_code = None
+            return 1
+
+        if rc is None:
+            job_row.status = "failed"
+            job_row.crawler_status = "infra_error_config"
+            job_row.crawler_exit_code = None
+            return 1
+        job_row.crawler_exit_code = rc
 
         if rc == 0:
             job_row.status = "completed"
             job_row.crawler_status = "success"
         else:
-            job_row.status = "failed"
-            job_row.crawler_status = "failed"
+            infra = False
+            try:
+                st = Path(job_row.output_dir).stat()
+                if not stat.S_ISDIR(st.st_mode):
+                    # Not a directory (unexpected); treat as a configuration/layout problem
+                    # rather than an sshfs mount outage.
+                    job_row.status = "failed"
+                    job_row.crawler_status = "infra_error_config"
+                    job_row.crawler_exit_code = rc
+                    return rc
+            except OSError as exc:
+                infra = is_storage_infra_errno(exc.errno)
+
+            if infra:
+                job_row.status = "retryable"
+                job_row.crawler_status = "infra_error"
+            else:
+                job_row.status = "failed"
+                job_row.crawler_status = "failed"
 
         # Best-effort stats sync from archive_tool logs; failures are logged
         # inside the helper and should not interfere with status updates.
-        update_job_stats_from_logs(job_row)
+        if job_row.crawler_status not in {"infra_error", "infra_error_config"}:
+            update_job_stats_from_logs(job_row)
 
-    return rc
+    return int(rc)

@@ -1087,7 +1087,17 @@ def main():
         logger.debug("Attempting to find and record temp directory for this stage...")
         # Try finding from logs first, then fallback scan
         temp_dir_host_path = None
-        if stage_combined_log_path is not None and stage_combined_log_path.is_file():
+        stage_log_is_file = False
+        if stage_combined_log_path is not None:
+            try:
+                stage_log_is_file = stage_combined_log_path.is_file()
+            except OSError as exc:
+                logger.warning(
+                    "Failed to stat stage combined log path %s: %s", stage_combined_log_path, exc
+                )
+                stage_log_is_file = False
+
+        if stage_combined_log_path is not None and stage_log_is_file:
             logger.debug(
                 "Trying to parse temp dir from stage combined log: %s", stage_combined_log_path
             )
@@ -1095,13 +1105,23 @@ def main():
                 stage_combined_log_path, host_output_dir
             )
         else:
-            log_files = sorted(
-                host_output_dir.glob(
-                    f"archive_{current_stage_name.replace(' ', '_').lower()}_*.combined.log"
-                ),
-                key=lambda p: p.stat().st_mtime,
-                reverse=True,
-            )
+            log_pattern = f"archive_{current_stage_name.replace(' ', '_').lower()}_*.combined.log"
+            try:
+                log_candidates = list(host_output_dir.glob(log_pattern))
+            except OSError as exc:
+                logger.warning(
+                    "Failed to scan stage logs under %s (%s): %s", host_output_dir, log_pattern, exc
+                )
+                log_candidates = []
+
+            def _safe_log_mtime(path: Path) -> float:
+                try:
+                    return path.stat().st_mtime
+                except OSError as exc:
+                    logger.warning("Failed to stat stage log %s: %s", path, exc)
+                    return 0.0
+
+            log_files = sorted(log_candidates, key=_safe_log_mtime, reverse=True)
             if log_files:
                 latest_stage_log = log_files[0]
                 logger.debug(f"Trying to parse temp dir from latest log: {latest_stage_log}")

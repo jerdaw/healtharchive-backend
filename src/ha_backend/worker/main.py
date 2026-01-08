@@ -65,6 +65,26 @@ def _process_single_job() -> bool:
             logger.error("Job %s vanished from database after crawl.", job_id)
             return True
 
+        if job.crawler_status == "infra_error":
+            if job.status != "retryable":
+                job.status = "retryable"
+            logger.warning(
+                "Crawl for job %s failed due to infra error (RC=%s). Not consuming retry budget (retry_count=%s).",
+                job_id,
+                crawl_rc,
+                job.retry_count,
+            )
+            return True
+
+        if job.crawler_status == "infra_error_config":
+            logger.error(
+                "Crawl for job %s failed due to configuration/runtime error (RC=%s). Leaving status as %s.",
+                job_id,
+                crawl_rc,
+                job.status,
+            )
+            return True
+
         if crawl_rc != 0 or job.status == "failed":
             # Crawl failed; decide whether to mark as retryable.
             if job.retry_count < MAX_CRAWL_RETRIES:

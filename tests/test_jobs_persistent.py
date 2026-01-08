@@ -177,3 +177,40 @@ def test_run_persistent_job_builds_monitoring_and_vpn_args(tmp_path, monkeypatch
     assert captured["run_kwargs"]["cleanup"] is False
     assert captured["run_kwargs"]["overwrite"] is False
     assert captured["run_kwargs"]["log_level"] == "INFO"
+
+
+def test_run_persistent_job_marks_storage_infra_errors_retryable(tmp_path, monkeypatch) -> None:
+    """
+    A storage/mount failure (e.g. Errno 107 from sshfs) should not leave jobs stuck
+    as running, and should be classified as infra_error + retryable.
+    """
+    _init_test_db(tmp_path, monkeypatch)
+
+    with get_session() as session:
+        seed_sources(session)
+
+    with get_session() as session:
+        job_row = create_job_for_source("hc", session=session)
+        job_id = job_row.id
+
+    class FailingRuntime:
+        def __init__(self, name, seeds):
+            self.name = name
+            self.seeds = list(seeds)
+
+        def run(self, **_kwargs):
+            raise OSError(107, "Transport endpoint is not connected")
+
+    monkeypatch.setattr("ha_backend.jobs.RuntimeArchiveJob", FailingRuntime)
+
+    rc = run_persistent_job(job_id)
+    assert rc != 0
+
+    with get_session() as session:
+        stored = session.get(ArchiveJob, job_id)
+        assert stored is not None
+        assert stored.status == "retryable"
+        assert stored.crawler_status == "infra_error"
+        assert stored.crawler_exit_code is None
+        assert stored.started_at is not None
+        assert stored.finished_at is not None

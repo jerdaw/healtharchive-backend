@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import stat
 from pathlib import Path
 
 from sqlalchemy import inspect
@@ -23,6 +24,7 @@ from ha_backend.indexing.text_extraction import (
 )
 from ha_backend.indexing.warc_discovery import discover_temp_warcs_for_job, discover_warcs_for_job
 from ha_backend.indexing.warc_reader import iter_html_records
+from ha_backend.infra_errors import is_storage_infra_errno
 from ha_backend.models import ArchiveJob, Snapshot, SnapshotOutlink
 
 logger = logging.getLogger("healtharchive.indexing")
@@ -62,89 +64,108 @@ def index_job(job_id: int) -> int:
             )
 
         output_dir = Path(job.output_dir)
-        if not output_dir.is_dir():
-            raise ValueError(
-                f"ArchiveJob {job_id} output_dir does not exist or is not a directory: {output_dir}"
+        try:
+            st = output_dir.stat()
+        except OSError as exc:
+            if is_storage_infra_errno(exc.errno):
+                logger.error(
+                    "ArchiveJob %s output_dir is not readable due to storage infra error: %s",
+                    job_id,
+                    exc,
+                )
+            else:
+                logger.error("ArchiveJob %s output_dir stat failed: %s", job_id, exc)
+            job.status = "index_failed"
+            return 1
+        if not stat.S_ISDIR(st.st_mode):
+            logger.error(
+                "ArchiveJob %s output_dir does not exist or is not a directory: %s",
+                job_id,
+                output_dir,
             )
-
-        # Prefer indexing from stable per-job WARCs when possible.
-        #
-        # If the job only has legacy WARCs under `.tmp*`, consolidate them into
-        # `<output_dir>/warcs/` first (via hardlink) so operators can later
-        # safely delete `.tmp*` without breaking replay or snapshot viewing.
-        output_dir = output_dir.resolve()
-        stable_warcs_dir = get_job_warcs_dir(output_dir)
-        stable_present = stable_warcs_dir.is_dir() and (
-            any(stable_warcs_dir.rglob("*.warc.gz")) or any(stable_warcs_dir.rglob("*.warc"))
-        )
-        if not stable_present:
-            temp_warcs = discover_temp_warcs_for_job(job)
-            if temp_warcs:
-                try:
-                    result = consolidate_warcs(
-                        output_dir=output_dir,
-                        source_warc_paths=temp_warcs,
-                        allow_copy_fallback=False,
-                        dry_run=False,
-                    )
-                    logger.info(
-                        "Consolidated %d WARC(s) into %s (created=%d reused=%d).",
-                        len(result.stable_warcs),
-                        result.warcs_dir,
-                        result.created,
-                        result.reused,
-                    )
-                except Exception as exc:
-                    logger.warning(
-                        "WARC consolidation failed for job %s; continuing with legacy `.tmp*` WARCs: %s",
-                        job_id,
-                        exc,
-                    )
-
-        # Discover WARC files for this job.
-        warc_paths = discover_warcs_for_job(job)
-        job.warc_file_count = len(warc_paths)
-
-        if not warc_paths:
-            logger.warning("No WARC files discovered for job %s in %s", job_id, output_dir)
             job.status = "index_failed"
             return 1
 
-        # Mark job as indexing and clear any prior snapshots for this job to
-        # make the operation idempotent.
-        logger.info("Starting indexing for job %s (%d WARC file(s))", job_id, len(warc_paths))
-
-        impacted_groups: set[str] = set()
-        impacted_page_groups: set[str] = set()
-        if has_pages:
-            from ha_backend.pages import discover_job_page_groups
-
-            impacted_page_groups.update(discover_job_page_groups(session, job_id=job.id))
-
-        if has_outlinks:
-            # Capture the set of groups affected by removing the old outlinks,
-            # so PageSignal counts can be kept in sync after re-indexing.
-            existing_groups = (
-                session.query(SnapshotOutlink.to_normalized_url_group)
-                .join(Snapshot, Snapshot.id == SnapshotOutlink.snapshot_id)
-                .filter(Snapshot.job_id == job.id)
-                .distinct()
-                .all()
-            )
-            impacted_groups.update({g for (g,) in existing_groups if g})
-
-            snapshot_ids_subq = session.query(Snapshot.id).filter(Snapshot.job_id == job.id)
-            session.query(SnapshotOutlink).filter(
-                SnapshotOutlink.snapshot_id.in_(snapshot_ids_subq)
-            ).delete(synchronize_session=False)
-
-        session.query(Snapshot).filter(Snapshot.job_id == job.id).delete(synchronize_session=False)
-        job.indexed_page_count = 0
-        job.status = "indexing"
-
-        n_snapshots = 0
-
         try:
+            # Prefer indexing from stable per-job WARCs when possible.
+            #
+            # If the job only has legacy WARCs under `.tmp*`, consolidate them into
+            # `<output_dir>/warcs/` first (via hardlink) so operators can later
+            # safely delete `.tmp*` without breaking replay or snapshot viewing.
+            output_dir = output_dir.resolve()
+            stable_warcs_dir = get_job_warcs_dir(output_dir)
+            stable_present = stable_warcs_dir.is_dir() and (
+                any(stable_warcs_dir.rglob("*.warc.gz")) or any(stable_warcs_dir.rglob("*.warc"))
+            )
+            if not stable_present:
+                temp_warcs = discover_temp_warcs_for_job(job)
+                if temp_warcs:
+                    try:
+                        result = consolidate_warcs(
+                            output_dir=output_dir,
+                            source_warc_paths=temp_warcs,
+                            allow_copy_fallback=False,
+                            dry_run=False,
+                        )
+                        logger.info(
+                            "Consolidated %d WARC(s) into %s (created=%d reused=%d).",
+                            len(result.stable_warcs),
+                            result.warcs_dir,
+                            result.created,
+                            result.reused,
+                        )
+                    except Exception as exc:
+                        logger.warning(
+                            "WARC consolidation failed for job %s; continuing with legacy `.tmp*` WARCs: %s",
+                            job_id,
+                            exc,
+                        )
+
+            # Discover WARC files for this job.
+            warc_paths = discover_warcs_for_job(job)
+            job.warc_file_count = len(warc_paths)
+
+            if not warc_paths:
+                logger.warning("No WARC files discovered for job %s in %s", job_id, output_dir)
+                job.status = "index_failed"
+                return 1
+
+            # Mark job as indexing and clear any prior snapshots for this job to
+            # make the operation idempotent.
+            logger.info("Starting indexing for job %s (%d WARC file(s))", job_id, len(warc_paths))
+
+            impacted_groups: set[str] = set()
+            impacted_page_groups: set[str] = set()
+            if has_pages:
+                from ha_backend.pages import discover_job_page_groups
+
+                impacted_page_groups.update(discover_job_page_groups(session, job_id=job.id))
+
+            if has_outlinks:
+                # Capture the set of groups affected by removing the old outlinks,
+                # so PageSignal counts can be kept in sync after re-indexing.
+                existing_groups = (
+                    session.query(SnapshotOutlink.to_normalized_url_group)
+                    .join(Snapshot, Snapshot.id == SnapshotOutlink.snapshot_id)
+                    .filter(Snapshot.job_id == job.id)
+                    .distinct()
+                    .all()
+                )
+                impacted_groups.update({g for (g,) in existing_groups if g})
+
+                snapshot_ids_subq = session.query(Snapshot.id).filter(Snapshot.job_id == job.id)
+                session.query(SnapshotOutlink).filter(
+                    SnapshotOutlink.snapshot_id.in_(snapshot_ids_subq)
+                ).delete(synchronize_session=False)
+
+            session.query(Snapshot).filter(Snapshot.job_id == job.id).delete(
+                synchronize_session=False
+            )
+            job.indexed_page_count = 0
+            job.status = "indexing"
+
+            n_snapshots = 0
+
             for warc_path in warc_paths:
                 for rec in iter_html_records(warc_path):
                     try:
@@ -258,6 +279,15 @@ def index_job(job_id: int) -> int:
                 n_snapshots,
             )
             return 0
+        except OSError as exc:
+            if is_storage_infra_errno(exc.errno):
+                logger.error(
+                    "Indexing for job %s failed due to storage infra error: %s", job_id, exc
+                )
+            else:
+                logger.error("Indexing for job %s failed due to OS error: %s", job_id, exc)
+            job.status = "index_failed"
+            return 1
         except Exception as exc:
             logger.error("Indexing for job %s failed: %s", job_id, exc)
             job.status = "index_failed"
