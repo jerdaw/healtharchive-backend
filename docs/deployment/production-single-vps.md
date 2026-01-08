@@ -320,6 +320,36 @@ sudo systemctl restart \
 
 ---
 
+## 4.2) Storage Box / `sshfs` stale mount failures (Errno 107)
+
+HealthArchive uses a Storage Box (via `sshfs`) as a cold tier in production (WARC tiering).
+
+Important failure mode:
+
+- A mount can appear “present” but be **stale/unreadable**, causing:
+  - `OSError: [Errno 107] Transport endpoint is not connected`
+
+This can break:
+
+- crawl progress metrics,
+- archive job output dirs under `/srv/healtharchive/jobs/**`,
+- and the worker/job lifecycle.
+
+Fast triage:
+
+```bash
+cd /opt/healtharchive-backend
+./scripts/vps-crawl-status.sh --year "$(date -u +%Y)"
+ls -la /srv/healtharchive/storagebox >/dev/null && echo "OK: storagebox readable" || echo "BAD: storagebox unreadable"
+mount | rg '/srv/healtharchive/jobs/|/srv/healtharchive/storagebox'
+```
+
+Recovery playbook:
+
+- `../operations/playbooks/storagebox-sshfs-stale-mount-recovery.md`
+
+---
+
 ## 5) HTTPS + DNS (Caddy)
 
 1) DNS (Namecheap): `A api.healtharchive.ca -> <VPS_PUBLIC_IP>`

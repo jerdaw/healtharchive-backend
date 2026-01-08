@@ -10,6 +10,7 @@ Implementation plans live directly under `docs/roadmaps/` while they are active.
 When complete, move them to `docs/roadmaps/implemented/` and date them.
 
 - Search ranking + snippet quality iteration (v3): `2026-01-03-search-ranking-and-snippets-v3.md`
+- Storage Box / sshfs stale mount recovery + integrity: `2026-01-08-storagebox-sshfs-stale-mount-recovery-and-integrity.md`
 
 ## Implemented plans (history)
 
