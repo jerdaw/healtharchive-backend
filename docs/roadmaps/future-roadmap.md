@@ -59,6 +59,8 @@ Keep this list short; prefer linking to the canonical doc that explains the item
 
 - Consider whether a separate staging backend is worth it (increases ops surface; only do if it buys real safety).
   - See: `../deployment/environments-and-configuration.md`
+- Storage Box / `sshfs` hot-path health + auto-recovery + data integrity (active plan):
+  - `2026-01-08-storagebox-sshfs-stale-mount-recovery-and-integrity.md`
 
 ### Repo governance (future)
 
