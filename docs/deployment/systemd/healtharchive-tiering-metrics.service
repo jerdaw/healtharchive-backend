@@ -6,4 +6,4 @@ ConditionPathExists=/usr/bin/systemctl
 Type=oneshot
 User=root
 Group=root
-ExecStart=/opt/healtharchive-backend/scripts/vps-tiering-metrics-textfile.sh
+ExecStart=/usr/bin/python3 /opt/healtharchive-backend/scripts/vps-tiering-metrics-textfile.py
