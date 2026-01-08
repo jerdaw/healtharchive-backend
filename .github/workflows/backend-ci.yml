@@ -77,7 +77,7 @@ jobs:
 
       - name: Upload e2e smoke artifacts (on failure)
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: backend-e2e-smoke-artifacts
           path: .tmp/ci-e2e-smoke/
