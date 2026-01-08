@@ -279,6 +279,32 @@ else
 fi
 
 echo ""
+echo "[storage hot-path auto-recover watchdog]"
+if have_cmd systemctl; then
+  hotpath_timer="$(systemctl is-active healtharchive-storage-hotpath-auto-recover.timer 2>/dev/null || true)"
+  if [[ "${hotpath_timer}" == "active" ]]; then
+    ok "healtharchive-storage-hotpath-auto-recover.timer active"
+  else
+    warn "healtharchive-storage-hotpath-auto-recover.timer not active (is-active=${hotpath_timer})"
+  fi
+  if [[ -f /etc/healtharchive/storage-hotpath-auto-recover-enabled ]]; then
+    ok "sentinel present: /etc/healtharchive/storage-hotpath-auto-recover-enabled"
+  else
+    warn "sentinel missing: /etc/healtharchive/storage-hotpath-auto-recover-enabled"
+  fi
+else
+  warn "systemctl not available; skipping watchdog timer check"
+fi
+
+HOTPATH_STATE_FILE="/srv/healtharchive/ops/watchdog/storage-hotpath-auto-recover.json"
+if [[ -f "${HOTPATH_STATE_FILE}" ]]; then
+  ok "state file present: ${HOTPATH_STATE_FILE}"
+  cat "${HOTPATH_STATE_FILE}" || true
+else
+  warn "state file not present (no recoveries yet?): ${HOTPATH_STATE_FILE}"
+fi
+
+echo ""
 echo "[disk]"
 df -h / /srv/healtharchive/jobs /srv/healtharchive/storagebox 2>/dev/null || true
 
