@@ -107,8 +107,15 @@ def parse_temp_dir_from_log_file(log_file_path: Path, host_output_dir: Path) -> 
     temp_dir_regex = re.compile(
         r"Output to tempdir:\s*\"?([/\\]?output[/\\]\.tmp\w+)\"?", re.IGNORECASE
     )
-    if not log_file_path or not log_file_path.is_file():
-        logger.warning(f"Log file not found or invalid for parsing temp dir: {log_file_path}")
+    if not log_file_path:
+        logger.warning("Log file not found or invalid for parsing temp dir: %s", log_file_path)
+        return find_latest_temp_dir_fallback(host_output_dir)
+    try:
+        if not log_file_path.is_file():
+            logger.warning("Log file not found or invalid for parsing temp dir: %s", log_file_path)
+            return find_latest_temp_dir_fallback(host_output_dir)
+    except OSError as exc:
+        logger.warning("Log file unreadable for parsing temp dir: %s (%s)", log_file_path, exc)
         return find_latest_temp_dir_fallback(host_output_dir)
     try:
         with open(log_file_path, "r", encoding="utf-8", errors="replace") as f:
@@ -175,13 +182,23 @@ def discover_temp_dirs(host_output_dir: Path) -> List[Path]:
     found: List[Path] = []
     try:
         for item in host_output_dir.glob(f"{constants.TEMP_DIR_PREFIX}*"):
-            if item.is_dir():
-                found.append(item.resolve())
+            try:
+                if item.is_dir():
+                    found.append(item.resolve())
+            except OSError as exc:
+                logger.warning("discover_temp_dirs: failed to stat %s: %s", item, exc)
     except Exception as exc:
         logger.warning(f"discover_temp_dirs: failed scanning {host_output_dir}: {exc}")
         return []
 
-    found.sort(key=lambda p: p.stat().st_mtime)
+    def _safe_mtime(path: Path) -> float:
+        try:
+            return path.stat().st_mtime
+        except OSError as exc:
+            logger.warning("discover_temp_dirs: failed to stat %s: %s", path, exc)
+            return 0.0
+
+    found.sort(key=_safe_mtime)
     return found
 
 
@@ -205,8 +222,15 @@ def find_latest_config_yaml(temp_dir_path: Path) -> Optional[Path]:
         "collections/crawl-*/crawl-*.yaml",
         "collections/crawl-*/crawl-*.yml",
     ]
-    if not temp_dir_path or not temp_dir_path.is_dir():
-        logger.warning(f"Cannot search for YAML, invalid temp dir: {temp_dir_path}")
+    if not temp_dir_path:
+        logger.warning("Cannot search for YAML, invalid temp dir: %s", temp_dir_path)
+        return None
+    try:
+        if not temp_dir_path.is_dir():
+            logger.warning("Cannot search for YAML, invalid temp dir: %s", temp_dir_path)
+            return None
+    except OSError as exc:
+        logger.warning("Cannot search for YAML, temp dir unreadable: %s (%s)", temp_dir_path, exc)
         return None
     try:
         for search_pattern_str in patterns:

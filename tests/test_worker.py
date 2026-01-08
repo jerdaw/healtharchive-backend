@@ -152,3 +152,105 @@ def test_worker_marks_failed_job_retryable_until_limit(monkeypatch, tmp_path) ->
         # After exceeding the max retries, job should remain failed.
         assert loaded_job.retry_count >= MAX_CRAWL_RETRIES
         assert loaded_job.status == "failed"
+
+
+def test_worker_does_not_consume_retry_budget_on_storage_infra_error(monkeypatch, tmp_path) -> None:
+    _init_test_db(tmp_path, monkeypatch)
+
+    archive_root = tmp_path / "jobs"
+    monkeypatch.setenv("HEALTHARCHIVE_ARCHIVE_ROOT", str(archive_root))
+    monkeypatch.setenv("HEALTHARCHIVE_TOOL_CMD", "echo")
+
+    with get_session() as session:
+        source = Source(
+            code="hc",
+            name="Health Canada",
+            base_url="https://www.canada.ca/en/health-canada.html",
+            description="HC",
+            enabled=True,
+        )
+        session.add(source)
+        session.flush()
+
+        job = ArchiveJob(
+            source_id=source.id,
+            name="worker-infra",
+            output_dir=str(archive_root / "hc" / "jobdir3"),
+            status="queued",
+            retry_count=0,
+        )
+        session.add(job)
+        session.flush()
+        job_id = job.id
+
+    def infra_failing_run_persistent_job(jid: int) -> int:
+        with get_session() as session:
+            j = session.get(ArchiveJob, jid)
+            assert j is not None
+            j.status = "retryable"
+            j.crawler_status = "infra_error"
+            j.crawler_exit_code = None
+        return 1
+
+    monkeypatch.setattr(
+        "ha_backend.worker.main.run_persistent_job", infra_failing_run_persistent_job
+    )
+
+    run_worker_loop(poll_interval=1, run_once=True)
+
+    with get_session() as session:
+        loaded_job = session.get(ArchiveJob, job_id)
+        assert loaded_job is not None
+        assert loaded_job.status == "retryable"
+        assert loaded_job.retry_count == 0
+
+
+def test_worker_does_not_auto_retry_config_errors(monkeypatch, tmp_path) -> None:
+    _init_test_db(tmp_path, monkeypatch)
+
+    archive_root = tmp_path / "jobs"
+    monkeypatch.setenv("HEALTHARCHIVE_ARCHIVE_ROOT", str(archive_root))
+    monkeypatch.setenv("HEALTHARCHIVE_TOOL_CMD", "echo")
+
+    with get_session() as session:
+        source = Source(
+            code="hc",
+            name="Health Canada",
+            base_url="https://www.canada.ca/en/health-canada.html",
+            description="HC",
+            enabled=True,
+        )
+        session.add(source)
+        session.flush()
+
+        job = ArchiveJob(
+            source_id=source.id,
+            name="worker-infra-config",
+            output_dir=str(archive_root / "hc" / "jobdir4"),
+            status="queued",
+            retry_count=0,
+        )
+        session.add(job)
+        session.flush()
+        job_id = job.id
+
+    def config_failing_run_persistent_job(jid: int) -> int:
+        with get_session() as session:
+            j = session.get(ArchiveJob, jid)
+            assert j is not None
+            j.status = "failed"
+            j.crawler_status = "infra_error_config"
+            j.crawler_exit_code = None
+        return 1
+
+    monkeypatch.setattr(
+        "ha_backend.worker.main.run_persistent_job", config_failing_run_persistent_job
+    )
+
+    run_worker_loop(poll_interval=1, run_once=True)
+
+    with get_session() as session:
+        loaded_job = session.get(ArchiveJob, job_id)
+        assert loaded_job is not None
+        assert loaded_job.status == "failed"
+        assert loaded_job.retry_count == 0
