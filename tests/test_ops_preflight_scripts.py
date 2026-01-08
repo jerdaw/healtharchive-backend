@@ -354,7 +354,7 @@ def test_vps_annual_output_tiering_plan_selects_annual_jobs(tmp_path, monkeypatc
     )
     _init_test_db(tmp_path, monkeypatch, "annual_tiering.db")
 
-    monkeypatch.setattr(mod, "_is_mountpoint", lambda _p: False)
+    monkeypatch.setattr(mod, "_is_exact_mountpoint", lambda _p: False)
 
     with get_session() as session:
         seed_sources(session)
@@ -413,7 +413,7 @@ def test_vps_annual_output_tiering_plan_window_override_includes_recent_jobs(
     )
     _init_test_db(tmp_path, monkeypatch, "annual_tiering_window.db")
 
-    monkeypatch.setattr(mod, "_is_mountpoint", lambda _p: False)
+    monkeypatch.setattr(mod, "_is_exact_mountpoint", lambda _p: False)
 
     with get_session() as session:
         seed_sources(session)

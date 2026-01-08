@@ -22,6 +22,15 @@ On the VPS (`/opt/healtharchive-backend`):
 ./scripts/vps-crawl-status.sh --year "$(date -u +%Y)"
 ```
 
+Optional: if Phase 2 automation has been enabled, check whether it is already
+attempting recovery (it is disabled-by-default unless the sentinel exists):
+
+```bash
+systemctl status healtharchive-storage-hotpath-auto-recover.timer --no-pager -l || true
+ls -la /etc/healtharchive/storage-hotpath-auto-recover-enabled 2>/dev/null || true
+cat /srv/healtharchive/ops/watchdog/storage-hotpath-auto-recover.json 2>/dev/null || true
+```
+
 2) Confirm Storage Box base mount health:
 
 ```bash
@@ -104,15 +113,35 @@ Notes:
 sudo ./scripts/vps-warc-tiering-bind-mounts.sh --apply
 ```
 
+If you have confirmed-stale mountpoints and want the script to attempt targeted
+repair automatically (still requires the worker to be stopped first):
+
+```bash
+sudo ./scripts/vps-warc-tiering-bind-mounts.sh --apply --repair-stale-mounts
+```
+
 If this fails with Errno 107 under `/srv/healtharchive/jobs/imports/...`, unmount those stale import mountpoints too and re-run.
 
 2) Re-apply annual output tiering (campaign job output dirs → Storage Box):
 
+Preferred (avoids the systemd unit’s internal worker stop/start):
+
+```bash
+sudo /opt/healtharchive-backend/.venv/bin/python3 /opt/healtharchive-backend/scripts/vps-annual-output-tiering.py --apply --year "$(date -u +%Y)"
+```
+
+If you want the script to attempt targeted repair for stale mountpoints (Errno 107),
+pass:
+
+```bash
+sudo /opt/healtharchive-backend/.venv/bin/python3 /opt/healtharchive-backend/scripts/vps-annual-output-tiering.py --apply --repair-stale-mounts --year "$(date -u +%Y)"
+```
+
+Alternative (uses the systemd unit, which stops/starts the worker internally):
+
 ```bash
 sudo systemctl start healtharchive-annual-output-tiering.service
 ```
-
-This unit stops/starts the worker internally, but we already stopped it. That’s OK.
 
 ---
 
@@ -202,4 +231,3 @@ sudo systemctl restart healtharchive-storagebox-sshfs.service
 If this becomes a recurring pattern, treat it as an infrastructure incident and follow:
 
 - `incident-response.md`
-
