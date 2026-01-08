@@ -28,6 +28,7 @@ Usage (on the VPS):
 
 Options:
   --apply             Actually mount (otherwise print planned actions)
+  --repair-stale-mounts If a mountpoint is stale (Errno 107), attempt a targeted unmount and retry
   --manifest FILE     Manifest path (default: /etc/healtharchive/warc-tiering.binds)
   --storagebox-mount DIR Storage Box mountpoint (default: /srv/healtharchive/storagebox)
   -h, --help          Show this help
@@ -35,6 +36,7 @@ EOF
 }
 
 APPLY="false"
+REPAIR_STALE_MOUNTS="false"
 MANIFEST="/etc/healtharchive/warc-tiering.binds"
 STORAGEBOX_MOUNT="/srv/healtharchive/storagebox"
 
@@ -42,6 +44,10 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     --apply)
       APPLY="true"
+      shift 1
+      ;;
+    --repair-stale-mounts)
+      REPAIR_STALE_MOUNTS="true"
       shift 1
       ;;
     --manifest)
@@ -85,6 +91,65 @@ run() {
   "$@"
 }
 
+is_transport_endpoint_error() {
+  echo "$1" | grep -qi "Transport endpoint is not connected"
+}
+
+is_permission_denied_error() {
+  echo "$1" | grep -qi "permission denied"
+}
+
+probe_readable_dir() {
+  local path="$1"
+  local err=""
+  if ls -la "${path}" >/dev/null 2>&1; then
+    return 0
+  fi
+  err="$(ls -la "${path}" 2>&1 || true)"
+  if is_transport_endpoint_error "${err}"; then
+    echo "ERROR: path is mounted but unreadable (stale mountpoint; Errno 107): ${path}" >&2
+    echo "Hint: follow docs/operations/playbooks/storagebox-sshfs-stale-mount-recovery.md" >&2
+    echo "      or run: sudo umount -l ${path}" >&2
+    return 107
+  fi
+  if is_permission_denied_error "${err}"; then
+    echo "ERROR: cannot read path (permission denied): ${path}" >&2
+    echo "Hint: run with sudo for accurate checks and apply mode." >&2
+    echo "  ${err}" >&2
+    return 13
+  fi
+  echo "ERROR: path is not readable: ${path}" >&2
+  echo "  ${err}" >&2
+  return 1
+}
+
+try_unmount_stale_mountpoint() {
+  local path="$1"
+  if [[ "${REPAIR_STALE_MOUNTS}" != "true" ]]; then
+    echo "ERROR: stale mountpoint detected (Errno 107): ${path}" >&2
+    echo "Hint: run: sudo umount -l ${path}" >&2
+    echo "      then re-run this script." >&2
+    exit 1
+  fi
+
+  echo "REPAIR stale mountpoint: ${path}"
+  if [[ "${APPLY}" != "true" ]]; then
+    echo "+ umount ${path}"
+    echo "+ umount -l ${path}"
+    return 0
+  fi
+
+  if umount "${path}" 2>/dev/null; then
+    return 0
+  fi
+  if umount -l "${path}" 2>/dev/null; then
+    return 0
+  fi
+  echo "ERROR: failed to unmount stale mountpoint: ${path}" >&2
+  echo "Hint: check if it is still mounted: mount | grep \" on ${path} \"" >&2
+  exit 1
+}
+
 if [[ "${APPLY}" == "true" && "${EUID}" -ne 0 ]]; then
   echo "ERROR: --apply requires root (use sudo)." >&2
   exit 1
@@ -99,6 +164,11 @@ fi
 if ! is_mounted "${STORAGEBOX_MOUNT}"; then
   echo "ERROR: Storage Box mount is not active: ${STORAGEBOX_MOUNT}" >&2
   echo "Hint: start healtharchive-storagebox-sshfs.service (or mount manually) before applying bind mounts." >&2
+  exit 1
+fi
+if ! probe_readable_dir "${STORAGEBOX_MOUNT}"; then
+  echo "ERROR: Storage Box mount is not readable: ${STORAGEBOX_MOUNT}" >&2
+  echo "Hint: try: sudo systemctl restart healtharchive-storagebox-sshfs.service" >&2
   exit 1
 fi
 
@@ -130,7 +200,12 @@ while IFS= read -r line || [[ -n "${line}" ]]; do
 
   if [[ ! -e "${cold}" ]]; then
     err="$(ls -ld "${cold}" 2>&1 || true)"
-    if echo "${err}" | grep -qi "permission denied"; then
+    if is_transport_endpoint_error "${err}"; then
+      echo "ERROR: cold path is unreadable (stale mountpoint; Errno 107): ${cold}" >&2
+      echo "Hint: Storage Box mount or the cold path is stale; restart the mount service:" >&2
+      echo "      sudo systemctl restart healtharchive-storagebox-sshfs.service" >&2
+      echo "Then re-run this script." >&2
+    elif is_permission_denied_error "${err}"; then
       echo "ERROR: cannot access cold path (permission denied): ${cold}" >&2
       echo "  ${err}" >&2
     else
@@ -140,9 +215,18 @@ while IFS= read -r line || [[ -n "${line}" ]]; do
     exit 1
   fi
 
-  if [[ -d "${hot}" ]] && is_mounted "${hot}"; then
-    echo "OK   mounted: ${hot}"
-    continue
+  if is_mounted "${hot}"; then
+    if probe_readable_dir "${hot}"; then
+      echo "OK   mounted: ${hot}"
+      continue
+    fi
+    probe_rc=$?
+    if [[ "${probe_rc}" -eq 107 ]]; then
+      # Stale mountpoint: repair (if requested) then proceed to re-mount.
+      try_unmount_stale_mountpoint "${hot}"
+    else
+      exit 1
+    fi
   fi
 
   echo "MOUNT ${hot} <= ${cold}"
