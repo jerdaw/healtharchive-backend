@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+import stat
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -62,7 +63,13 @@ def parse_crawl_status_events_from_log_tail(
 
     Intended for lightweight monitoring/metrics without reading the full log.
     """
-    if not log_path or not log_path.is_file():
+    if not log_path:
+        return []
+    try:
+        if not log_path.is_file():
+            return []
+    except OSError as exc:
+        logger.debug("Failed to stat crawl log path %s: %s", log_path, exc)
         return []
 
     try:
@@ -147,7 +154,14 @@ def _find_latest_combined_log(output_dir: Path) -> Optional[Path]:
     Locate the most recent archive_*.combined.log file under a job's output
     directory.
     """
-    if not output_dir.is_dir():
+    try:
+        st = output_dir.stat()
+    except OSError as exc:
+        logger.debug(
+            "Failed to stat output dir %s while locating combined log: %s", output_dir, exc
+        )
+        return None
+    if not stat.S_ISDIR(st.st_mode):
         return None
 
     candidates = list(output_dir.glob("archive_*.combined.log"))
@@ -155,7 +169,16 @@ def _find_latest_combined_log(output_dir: Path) -> Optional[Path]:
         return None
 
     # Pick the newest by modification time.
-    latest = max(candidates, key=lambda p: p.stat().st_mtime)
+    latest: Path | None = None
+    latest_mtime: float | None = None
+    for p in candidates:
+        try:
+            st = p.stat()
+        except OSError:
+            continue
+        if latest_mtime is None or st.st_mtime > latest_mtime:
+            latest = p
+            latest_mtime = st.st_mtime
     return latest
 
 

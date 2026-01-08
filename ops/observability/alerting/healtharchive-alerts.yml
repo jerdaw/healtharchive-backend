@@ -76,6 +76,17 @@ groups:
           description: "The Storage Box mount is missing or unreadable. Replay and/or crawls that rely on cold WARCs may fail. Check healtharchive-storagebox-sshfs.service and the sshfs mount."
           runbook_url: "https://github.com/jerdaw/healtharchive-backend/blob/main/docs/operations/playbooks/warc-storage-tiering.md"
 
+      - alert: HealthArchiveTieringHotPathUnreadable
+        expr: healtharchive_tiering_hot_path_ok == 0
+        for: 2m
+        labels:
+          severity: critical
+          service: healtharchive
+        annotations:
+          summary: "Tiering hot path unreadable (stale sshfs mount?)"
+          description: "A tiering hot path is unreadable: hot={{ $labels.hot }}. Check healtharchive_tiering_hot_path_errno (Errno 107 usually indicates a stale sshfs mount)."
+          runbook_url: "https://github.com/jerdaw/healtharchive-backend/blob/main/docs/operations/playbooks/storagebox-sshfs-stale-mount-recovery.md"
+
       - alert: HealthArchiveWarcTieringFailed
         expr: healtharchive_systemd_unit_failed{unit="healtharchive-warc-tiering.service"} == 1
         for: 1m
@@ -89,6 +100,28 @@ groups:
 
   - name: healtharchive.crawl
     rules:
+      - alert: HealthArchiveCrawlMetricsMissing
+        expr: healtharchive_crawl_metrics_ok == 0
+        for: 5m
+        labels:
+          severity: warning
+          service: healtharchive
+        annotations:
+          summary: "Crawl metrics writer failing"
+          description: "The crawl metrics writer is reporting failure. Check healtharchive-crawl-metrics.service logs and confirm node_exporter textfile collector is working."
+          runbook_url: "https://github.com/jerdaw/healtharchive-backend/blob/main/docs/operations/playbooks/incident-response.md"
+
+      - alert: HealthArchiveCrawlOutputDirUnreadable
+        expr: healtharchive_crawl_running_job_output_dir_ok == 0
+        for: 2m
+        labels:
+          severity: critical
+          service: healtharchive
+        annotations:
+          summary: "Running job output dir unreadable"
+          description: "A running crawl job has an unreadable output_dir: source={{ $labels.source }} job_id={{ $labels.job_id }}. Check healtharchive_crawl_running_job_output_dir_errno (Errno 107 usually indicates a stale sshfs mount)."
+          runbook_url: "https://github.com/jerdaw/healtharchive-backend/blob/main/docs/operations/playbooks/storagebox-sshfs-stale-mount-recovery.md"
+
       - alert: HealthArchiveCrawlStalled
         expr: healtharchive_crawl_running_job_stalled == 1
         for: 15m
