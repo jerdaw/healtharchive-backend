@@ -95,6 +95,10 @@ Assumptions (adjust paths/user if your VPS differs):
   - Optional automation to recover stalled crawl jobs by restarting the worker and marking stale running jobs as retryable.
   - Gated by `ConditionPathExists=/etc/healtharchive/crawl-auto-recover-enabled`.
   - Disabled by default; enable only after you’re comfortable with the thresholds/caps in `scripts/vps-crawl-auto-recover.py`.
+- `healtharchive-storage-hotpath-auto-recover.service` + `.timer`
+  - Optional automation to recover **stale/unreadable hot paths** caused by `sshfs`/FUSE mount failures (Errno 107).
+  - Gated by `ConditionPathExists=/etc/healtharchive/storage-hotpath-auto-recover-enabled`.
+  - Disabled by default; enable only after dry-run validation and only if you’re comfortable with the safety caps in `scripts/vps-storage-hotpath-auto-recover.py`.
 - `healtharchive-storagebox-sshfs.service`
   - Mounts a Hetzner Storage Box at `/srv/healtharchive/storagebox` via `sshfs`.
   - Reads configuration from `/etc/healtharchive/storagebox.env`.
@@ -135,6 +139,8 @@ matches your operational readiness.
   - Optional; keep caps conservative and review first dry-run.
 - **Baseline drift check** (`healtharchive-baseline-drift-check.timer`)
   - Recommended; low-risk and catches “silent” ops drift.
+- **Storage hot-path auto-recover** (`healtharchive-storage-hotpath-auto-recover.timer`)
+  - Dangerous if misconfigured; only enable after you’ve validated Phase 1 alerts and run the watchdog in dry-run mode.
 
 If a timer is enabled, also ensure its sentinel file exists under
 `/etc/healtharchive/` (see the enablement sections below).
@@ -522,6 +528,49 @@ Enable the timer:
 sudo systemctl enable --now healtharchive-cleanup-automation.timer
 systemctl list-timers | rg healtharchive-cleanup-automation || systemctl list-timers | grep healtharchive-cleanup-automation
 ```
+
+---
+
+## Enable storage hot-path auto-recovery (optional; high impact)
+
+This automation attempts conservative self-healing for the specific failure
+class:
+
+- `OSError: [Errno 107] Transport endpoint is not connected`
+
+It can stop the worker and unmount stale paths, so keep it **disabled by
+default** and enable only after:
+
+- Phase 1 alerting/metrics are working (you have visibility),
+- you have validated the watchdog in dry-run mode first.
+
+Create the sentinel file:
+
+```bash
+sudo install -m 0644 -o root -g root /dev/null /etc/healtharchive/storage-hotpath-auto-recover-enabled
+```
+
+Enable the timer:
+
+```bash
+sudo systemctl enable --now healtharchive-storage-hotpath-auto-recover.timer
+systemctl list-timers | rg healtharchive-storage-hotpath-auto-recover || systemctl list-timers | grep healtharchive-storage-hotpath-auto-recover
+```
+
+Rollback:
+
+```bash
+sudo systemctl disable --now healtharchive-storage-hotpath-auto-recover.timer
+sudo rm -f /etc/healtharchive/storage-hotpath-auto-recover-enabled
+```
+
+The watchdog writes state under:
+
+- `/srv/healtharchive/ops/watchdog/storage-hotpath-auto-recover.json`
+
+and emits node_exporter textfile metrics via:
+
+- `healtharchive_storage_hotpath_auto_recover.prom`
 
 ---
 

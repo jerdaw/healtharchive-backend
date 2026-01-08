@@ -101,6 +101,7 @@ High-frequency timers (recommended NOT to monitor in Healthchecks; too noisy):
 - `healtharchive-crawl-metrics.timer`
 - `healtharchive-tiering-metrics.timer`
 - `healtharchive-crawl-auto-recover.timer`
+- `healtharchive-storage-hotpath-auto-recover.timer`
 
 ### Rule B — If a Healthchecks.io check exists, it must correspond to a real job you run
 
