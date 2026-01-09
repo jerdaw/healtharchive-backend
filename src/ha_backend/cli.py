@@ -2125,6 +2125,277 @@ def cmd_job_storage_report(args: argparse.Namespace) -> None:
             print(f"{k}: {payload[k]}")
 
 
+def cmd_verify_warcs(args: argparse.Namespace) -> None:
+    """
+    Verify integrity of WARC files for a given job (optionally quarantining corrupt ones).
+
+    This is intended for post-incident recovery and for sanity-checking outputs before indexing.
+    """
+    import os
+    from datetime import datetime, timedelta, timezone
+    from pathlib import Path
+
+    from ha_backend.indexing.warc_discovery import discover_warcs_for_job
+    from ha_backend.indexing.warc_verify import (
+        WarcVerificationOptions,
+        filter_warcs_by_mtime,
+        quarantine_warcs,
+        sort_warcs_by_mtime_desc,
+        verify_warcs,
+    )
+    from ha_backend.models import ArchiveJob as ORMArchiveJob
+    from ha_backend.models import Snapshot
+
+    job_id = int(getattr(args, "job_id", None) or 0)
+    if job_id <= 0:
+        print("ERROR: --job-id is required.", file=sys.stderr)
+        sys.exit(2)
+
+    level = int(getattr(args, "level", 1) or 1)
+    if level not in (0, 1, 2):
+        print("ERROR: --level must be one of: 0, 1, 2", file=sys.stderr)
+        sys.exit(2)
+
+    limit_warcs = getattr(args, "limit_warcs", None)
+    if limit_warcs is not None:
+        limit_warcs = int(limit_warcs)
+        if limit_warcs <= 0:
+            print("ERROR: --limit-warcs must be >= 1.", file=sys.stderr)
+            sys.exit(2)
+
+    since_minutes = getattr(args, "since_minutes", None)
+    if since_minutes is not None:
+        since_minutes = int(since_minutes)
+        if since_minutes <= 0:
+            print("ERROR: --since-minutes must be > 0.", file=sys.stderr)
+            sys.exit(2)
+
+    max_decompressed_bytes = getattr(args, "max_decompressed_bytes", None)
+    if max_decompressed_bytes is not None:
+        max_decompressed_bytes = int(max_decompressed_bytes)
+        if max_decompressed_bytes <= 0:
+            print("ERROR: --max-decompressed-bytes must be > 0.", file=sys.stderr)
+            sys.exit(2)
+
+    max_records = getattr(args, "max_records", None)
+    if max_records is not None:
+        max_records = int(max_records)
+        if max_records <= 0:
+            print("ERROR: --max-records must be > 0.", file=sys.stderr)
+            sys.exit(2)
+
+    apply_quarantine = bool(getattr(args, "apply_quarantine", False))
+    json_out_raw = getattr(args, "json_out", None)
+    json_out = Path(json_out_raw).expanduser() if json_out_raw else None
+    metrics_file_raw = getattr(args, "metrics_file", None)
+    metrics_file = Path(metrics_file_raw).expanduser() if metrics_file_raw else None
+
+    job_status: str
+    output_dir: Path
+    source_code: str
+    warc_paths: list[Path]
+    snapshots_present = False
+
+    with get_session() as session:
+        job = session.get(ORMArchiveJob, job_id)
+        if job is None:
+            print(f"ERROR: Job {job_id} not found.", file=sys.stderr)
+            sys.exit(1)
+
+        source_code = job.source.code if job.source else "?"
+        output_dir = Path(job.output_dir).resolve()
+        job_status = str(job.status)
+
+        if apply_quarantine:
+            snapshots_present = bool(
+                session.query(Snapshot.id).filter(Snapshot.job_id == job_id).limit(1).all()
+            )
+
+        try:
+            warc_paths = discover_warcs_for_job(job)
+        except Exception as exc:
+            print(f"ERROR: Failed to discover WARCs for job {job_id}: {exc}", file=sys.stderr)
+            sys.exit(1)
+
+    warc_paths = sort_warcs_by_mtime_desc(warc_paths)
+    if since_minutes is not None:
+        cutoff = datetime.now(timezone.utc) - timedelta(minutes=since_minutes)
+        warc_paths = filter_warcs_by_mtime(warc_paths, since_epoch_seconds=int(cutoff.timestamp()))
+
+    if limit_warcs is not None:
+        warc_paths = warc_paths[:limit_warcs]
+
+    if not warc_paths:
+        print(f"ERROR: No WARCs discovered for job {job_id}.", file=sys.stderr)
+        sys.exit(1)
+
+    options = WarcVerificationOptions(
+        level=level,
+        max_decompressed_bytes=max_decompressed_bytes,
+        max_records=max_records,
+    )
+    report = verify_warcs(warc_paths, options=options)
+
+    now_utc = datetime.now(timezone.utc)
+    ts = now_utc.strftime("%Y%m%dT%H%M%SZ")
+
+    quarantined: list[dict[str, str]] = []
+    if apply_quarantine and report.failures:
+        if job_status == "running":
+            print("ERROR: Refusing to quarantine WARCs while job is running.", file=sys.stderr)
+            sys.exit(2)
+
+        if snapshots_present:
+            print(
+                "ERROR: Refusing to quarantine WARCs for a job that already has Snapshot rows "
+                "(this would break replay integrity).",
+                file=sys.stderr,
+            )
+            sys.exit(2)
+
+        quarantine_root = output_dir / "warcs_quarantine" / ts
+        bad_paths = [Path(f.path) for f in report.failures if f.error_kind != "infra_error"]
+        if bad_paths:
+            output_root = output_dir.resolve()
+            for p in bad_paths:
+                if output_root not in p.resolve().parents:
+                    print(
+                        f"ERROR: Refusing to quarantine WARC outside job output_dir: {p}",
+                        file=sys.stderr,
+                    )
+                    sys.exit(2)
+
+            quarantined = quarantine_warcs(
+                bad_paths,
+                quarantine_root=quarantine_root,
+                relative_to=output_dir,
+            )
+
+            marker_path = output_dir / "WARCS_QUARANTINED.txt"
+            lines: list[str] = []
+            lines.append("HealthArchive WARCs quarantined")
+            lines.append("--------------------------------")
+            lines.append(f"timestamp_utc={now_utc.replace(microsecond=0).isoformat()}")
+            lines.append(f"job_id={job_id}")
+            lines.append(f"source={source_code}")
+            lines.append(f"output_dir={output_dir}")
+            lines.append(f"quarantine_root={quarantine_root}")
+            lines.append("")
+            for entry in quarantined:
+                lines.append(
+                    f"- from={entry['from']} to={entry['to']} sha256={entry['sha256Before']} "
+                    f"size_bytes={entry.get('sizeBytes', '?')} mtime={entry.get('mtimeEpochSeconds', '?')}"
+                )
+            lines.append("")
+            marker_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+            with get_session() as session:
+                job = session.get(ORMArchiveJob, job_id)
+                if job is not None:
+                    job.status = "retryable"
+                    job.retry_count = 0
+
+            if json_out is None:
+                json_out = output_dir / "warc_verify" / f"verify-warcs-{job_id}-{ts}.json"
+
+    if json_out is not None:
+        json_out.parent.mkdir(parents=True, exist_ok=True)
+        json_out.write_text(report.to_json(), encoding="utf-8")
+
+    if metrics_file is not None:
+        # Best-effort: metrics writing should never be the reason a verification fails.
+        def _prom_escape(value: str) -> str:
+            return (
+                value.replace("\\", "\\\\")
+                .replace("\n", "\\n")
+                .replace('"', '\\"')
+                .replace("\r", "\\r")
+            )
+
+        def _write_textfile_metrics(path: Path, *, content: str) -> None:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            tmp = path.with_suffix(f"{path.suffix}.tmp.{os.getpid()}")
+            tmp.write_text(content, encoding="utf-8")
+            os.chmod(tmp, 0o644)
+            tmp.replace(path)
+
+        try:
+            job_label = str(job_id)
+            source_label = _prom_escape(source_code)
+            now_seconds = int(now_utc.timestamp())
+            ok = 1 if report.warcs_failed == 0 else 0
+            lines = [
+                "# HELP healtharchive_warc_verify_metrics_ok 1 if verify-warcs ran successfully.",
+                "# TYPE healtharchive_warc_verify_metrics_ok gauge",
+                "healtharchive_warc_verify_metrics_ok 1",
+                "# HELP healtharchive_warc_verify_last_run_timestamp_seconds Unix timestamp of the last verify-warcs run.",
+                "# TYPE healtharchive_warc_verify_last_run_timestamp_seconds gauge",
+                f"healtharchive_warc_verify_last_run_timestamp_seconds {now_seconds}",
+                "# HELP healtharchive_warc_verify_job_ok 1 if no failures were detected for the job.",
+                "# TYPE healtharchive_warc_verify_job_ok gauge",
+                f'healtharchive_warc_verify_job_ok{{job_id="{job_label}",source="{source_label}"}} {ok}',
+                "# HELP healtharchive_warc_verify_job_level Verification level used for this run.",
+                "# TYPE healtharchive_warc_verify_job_level gauge",
+                f'healtharchive_warc_verify_job_level{{job_id="{job_label}",source="{source_label}"}} {level}',
+                "# HELP healtharchive_warc_verify_job_warcs_total Total WARCs considered for verification.",
+                "# TYPE healtharchive_warc_verify_job_warcs_total gauge",
+                f'healtharchive_warc_verify_job_warcs_total{{job_id="{job_label}",source="{source_label}"}} {report.warcs_total}',
+                "# HELP healtharchive_warc_verify_job_warcs_checked WARCs checked during this run.",
+                "# TYPE healtharchive_warc_verify_job_warcs_checked gauge",
+                f'healtharchive_warc_verify_job_warcs_checked{{job_id="{job_label}",source="{source_label}"}} {report.warcs_checked}',
+                "# HELP healtharchive_warc_verify_job_warcs_failed WARCs that failed verification.",
+                "# TYPE healtharchive_warc_verify_job_warcs_failed gauge",
+                f'healtharchive_warc_verify_job_warcs_failed{{job_id="{job_label}",source="{source_label}"}} {report.warcs_failed}',
+                "# HELP healtharchive_warc_verify_job_quarantined WARCs moved to quarantine during this run.",
+                "# TYPE healtharchive_warc_verify_job_quarantined gauge",
+                f'healtharchive_warc_verify_job_quarantined{{job_id="{job_label}",source="{source_label}"}} {len(quarantined)}',
+            ]
+            _write_textfile_metrics(metrics_file, content="\n".join(lines) + "\n")
+        except Exception as exc:  # pragma: no cover - best-effort
+            print(f"WARN: failed to write metrics file {metrics_file}: {exc}", file=sys.stderr)
+
+    print("WARC verification report")
+    print("-----------------------")
+    print(f"job_id:        {job_id}")
+    print(f"source:        {source_code}")
+    print(f"output_dir:    {output_dir}")
+    print(f"job_status:    {job_status}")
+    print(f"level:         {level}")
+    if since_minutes is not None:
+        print(f"since_minutes: {since_minutes}")
+    if limit_warcs is not None:
+        print(f"limit_warcs:   {limit_warcs}")
+    if max_decompressed_bytes is not None:
+        print(f"max_decompressed_bytes: {max_decompressed_bytes}")
+    if max_records is not None:
+        print(f"max_records:   {max_records}")
+    print("")
+    print(
+        f"Summary: total={report.warcs_total} checked={report.warcs_checked} ok={report.warcs_ok} failed={report.warcs_failed}"
+    )
+
+    if report.failures:
+        print("")
+        print("Failures:")
+        for f in report.failures[:50]:
+            print(f"- path={f.path} kind={f.error_kind} error={f.error}")
+        if len(report.failures) > 50:
+            print(f"... ({len(report.failures) - 50} more)")
+
+    if quarantined:
+        print("")
+        print(f"Quarantined {len(quarantined)} WARC file(s).")
+        print(f"Marker: {output_dir / 'WARCS_QUARANTINED.txt'}")
+
+    if json_out is not None:
+        print("")
+        print(f"JSON report: {json_out}")
+
+    if report.warcs_failed == 0:
+        return
+    sys.exit(1)
+
+
 def cmd_replay_index_job(args: argparse.Namespace) -> None:
     """
     Create or refresh a pywb replay collection for an existing ArchiveJob.
@@ -3791,6 +4062,67 @@ def build_parser() -> argparse.ArgumentParser:
         help="Emit JSON instead of human-readable text.",
     )
     p_storage.set_defaults(func=cmd_job_storage_report)
+
+    # verify-warcs
+    p_verify_warcs = subparsers.add_parser(
+        "verify-warcs",
+        help="Verify integrity of WARC files for a job (optionally quarantine corrupt files).",
+    )
+    p_verify_warcs.add_argument(
+        "--job-id",
+        "--id",
+        dest="job_id",
+        type=int,
+        required=True,
+        help="ArchiveJob ID whose WARCs should be verified.",
+    )
+    p_verify_warcs.add_argument(
+        "--level",
+        type=int,
+        default=1,
+        choices=[0, 1, 2],
+        help="Verification level (0=exist/read, 1=gzip, 2=warc parse) (default: 1).",
+    )
+    p_verify_warcs.add_argument(
+        "--since-minutes",
+        type=int,
+        help="Only verify WARCs modified within the last N minutes (UTC).",
+    )
+    p_verify_warcs.add_argument(
+        "--limit-warcs",
+        type=int,
+        help="Only verify the newest N WARCs (by mtime).",
+    )
+    p_verify_warcs.add_argument(
+        "--max-decompressed-bytes",
+        "--max-bytes",
+        dest="max_decompressed_bytes",
+        type=int,
+        help="For level 1 gzip checks: stop after N decompressed bytes per WARC (bounded CPU).",
+    )
+    p_verify_warcs.add_argument(
+        "--max-records",
+        type=int,
+        help="For level 2 WARC checks: stop after N WARC records per file.",
+    )
+    p_verify_warcs.add_argument(
+        "--json-out",
+        help="Write JSON report to this path (default: <output_dir>/warc_verify/...).",
+    )
+    p_verify_warcs.add_argument(
+        "--metrics-file",
+        help="Optional Prometheus textfile metrics output path (node_exporter textfile_collector).",
+    )
+    p_verify_warcs.add_argument(
+        "--apply-quarantine",
+        action="store_true",
+        default=False,
+        help=(
+            "Move corrupt WARCs into <output_dir>/warcs_quarantine/<timestamp>/ and mark the job retryable. "
+            "Refuses if the job is running or already has Snapshot rows."
+        ),
+    )
+    p_verify_warcs.set_defaults(func=cmd_verify_warcs)
 
     # replay-index-job
     p_replay_index = subparsers.add_parser(
