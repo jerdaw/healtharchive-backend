@@ -2151,7 +2151,9 @@ def cmd_verify_warcs(args: argparse.Namespace) -> None:
         print("ERROR: --job-id is required.", file=sys.stderr)
         sys.exit(2)
 
-    level = int(getattr(args, "level", 1) or 1)
+    # NOTE: `--level` supports 0; do not use `or 1` which would coerce 0 -> 1.
+    level_raw = getattr(args, "level", 1)
+    level = int(level_raw) if level_raw is not None else 1
     if level not in (0, 1, 2):
         print("ERROR: --level must be one of: 0, 1, 2", file=sys.stderr)
         sys.exit(2)
