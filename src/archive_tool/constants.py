@@ -8,6 +8,7 @@ TEMP_DIR_PREFIX = ".tmp"
 LOG_FORMAT = "%(asctime)s - %(levelname)s - [%(threadName)s] %(message)s"
 TIMESTAMP_FORMAT = "%Y%m%d_%H%M%S"
 STATE_FILE_NAME = ".archive_state.json"
+RESUME_CONFIG_FILE_NAME = ".zimit_resume.yaml"
 
 # Args needed for final build
 REQUIRED_FINAL_ARGS_PREFIXES = [

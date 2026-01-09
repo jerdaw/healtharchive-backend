@@ -493,14 +493,26 @@ def main():
     latest_temp_dir = existing_temp_dirs[-1] if existing_temp_dirs else None
     logger.debug(f"Latest temp directory from state (if any): {latest_temp_dir}")
 
-    if latest_temp_dir:
-        logger.debug(f"Searching for latest config YAML in: {latest_temp_dir}")
-        config_yaml_path = utils.find_latest_config_yaml(latest_temp_dir)
+    stable_resume = utils.find_stable_resume_config(host_output_dir)
+    if stable_resume is not None:
+        config_yaml_path = stable_resume
+        logger.info("Found stable resume config YAML: %s", config_yaml_path)
+        can_resume_crawl = True
+    elif existing_temp_dirs:
+        logger.debug(
+            "Searching for newest resume config YAML across %d temp dir(s).",
+            len(existing_temp_dirs),
+        )
+        config_yaml_path = utils.find_latest_config_yaml_in_temp_dirs(existing_temp_dirs)
         if config_yaml_path:
             logger.info(f"Found potential resume config YAML: {config_yaml_path}")
             can_resume_crawl = True
+            persisted = utils.persist_resume_config(config_yaml_path, host_output_dir)
+            if persisted is not None:
+                config_yaml_path = persisted
+                logger.info("Persisted resume config YAML to stable path: %s", persisted)
         else:
-            logger.info("No resume config YAML found in latest temp dir.")
+            logger.info("No resume config YAML found in tracked temp dirs.")
     else:
         logger.info("No existing temp directories tracked, cannot resume from YAML.")
 
@@ -633,32 +645,36 @@ def main():
             logger.debug("This is a Resume attempt. Need to find config YAML.")
             # Re-check for the latest YAML file path right before the attempt
             current_temp_dirs = crawl_state.get_temp_dir_paths()
-            current_latest_temp_dir = current_temp_dirs[-1] if current_temp_dirs else None
-            if current_latest_temp_dir:
-                config_yaml_path = utils.find_latest_config_yaml(current_latest_temp_dir)
-                if config_yaml_path:
-                    logger.info(f"Found resume config YAML for this attempt: {config_yaml_path}")
-                    container_yaml = utils.host_to_container_path(config_yaml_path, host_output_dir)
-                    if container_yaml:
-                        extra_run_args = ["--config", container_yaml]
-                        logger.info(f"Will use container config path: {container_yaml}")
-                    else:
-                        logger.critical(
-                            f"Failed to convert host YAML path '{config_yaml_path}' to container path. Cannot resume. Exiting loop."
-                        )
-                        final_status = "failed_state_error"
-                        break  # Exit outer loop
+            stable_resume = utils.find_stable_resume_config(host_output_dir)
+            if stable_resume is not None:
+                config_yaml_path = stable_resume
+                logger.info("Using stable resume config YAML: %s", config_yaml_path)
+            else:
+                config_yaml_path = utils.find_latest_config_yaml_in_temp_dirs(current_temp_dirs)
+                if config_yaml_path is not None:
+                    logger.info("Found resume config YAML for this attempt: %s", config_yaml_path)
+                    persisted = utils.persist_resume_config(config_yaml_path, host_output_dir)
+                    if persisted is not None:
+                        config_yaml_path = persisted
+                        logger.info("Persisted resume config YAML to stable path: %s", persisted)
+
+            if config_yaml_path:
+                container_yaml = utils.host_to_container_path(config_yaml_path, host_output_dir)
+                if container_yaml:
+                    extra_run_args = ["--config", container_yaml]
+                    logger.info(f"Will use container config path: {container_yaml}")
                 else:
-                    logger.error(
-                        "Resume requested for this stage, but could not find a valid config YAML file in the latest temp directory. Switching to 'New Crawl Phase'."
+                    logger.critical(
+                        f"Failed to convert host YAML path '{config_yaml_path}' to container path. Cannot resume. Exiting loop."
                     )
-                    current_stage_name = "New Crawl Phase"  # Fallback if YAML disappears
-                    # Continue loop iteration to start as a new crawl phase
+                    final_status = "failed_state_error"
+                    break  # Exit outer loop
             else:
                 logger.error(
-                    "Resume requested for this stage, but no temporary directory found. Switching to 'New Crawl Phase'."
+                    "Resume requested for this stage, but could not find a valid config YAML file. Switching to 'New Crawl Phase'."
                 )
-                current_stage_name = "New Crawl Phase"  # Fallback if temp dir disappears
+                current_stage_name = "New Crawl Phase"  # Fallback if YAML disappears
+                # Continue loop iteration to start as a new crawl phase
 
         logger.debug(f"Current worker count for this stage: {crawl_state.current_workers}")
         logger.debug(f"Base passthrough args: {zimit_passthrough_args}")

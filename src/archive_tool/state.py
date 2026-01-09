@@ -86,10 +86,42 @@ class CrawlState:
 
     def save_persistent_state(self):
         """Save state to JSON file."""
-        # Ensure all listed temp dirs actually exist before saving
-        valid_temp_dirs = [p for p in self.temp_dirs_host_paths if Path(p).is_dir()]
-        # Use the potentially cleaned list for saving
-        self.temp_dirs_host_paths = sorted(list(set(valid_temp_dirs)))
+        # Ensure all listed temp dirs actually exist before saving.
+        #
+        # Note: during storage incidents (e.g., sshfs stale mount), `is_dir()` /
+        # `stat()` can raise. Treat those as "unknown" and keep the path rather
+        # than crashing or silently dropping it.
+        entries: list[tuple[float, str]] = []
+        seen: set[str] = set()
+        for raw in list(self.temp_dirs_host_paths):
+            p = Path(raw)
+            try:
+                is_dir = p.is_dir()
+            except OSError as exc:
+                logger.warning("save_persistent_state: could not stat temp dir %s: %s", p, exc)
+                is_dir = True
+
+            if not is_dir:
+                continue
+
+            try:
+                canonical = str(p.resolve())
+            except Exception:
+                canonical = str(p)
+
+            if canonical in seen:
+                continue
+            seen.add(canonical)
+
+            try:
+                mtime = float(p.stat().st_mtime)
+            except OSError:
+                mtime = 0.0
+            entries.append((mtime, canonical))
+
+        # Keep oldest first so the newest temp dir is at the end of the list.
+        entries.sort(key=lambda item: item[0])
+        self.temp_dirs_host_paths = [p for _, p in entries]
         data = {
             "current_workers": self.current_workers,
             "initial_workers": self.initial_workers,

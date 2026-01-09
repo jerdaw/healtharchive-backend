@@ -515,6 +515,9 @@ These are used for:
 ### 5.4 YAML config discovery (for resuming)
 
 * `find_latest_config_yaml(temp_dir_path: Path) -> Optional[Path]`
+* `find_latest_config_yaml_in_temp_dirs(temp_dirs: List[Path]) -> Optional[Path]`
+* `persist_resume_config(config_yaml_path: Path, host_output_dir: Path) -> Optional[Path]`
+* `find_stable_resume_config(host_output_dir: Path) -> Optional[Path]`
 
 Looks for:
 
@@ -528,6 +531,13 @@ collections/crawl-*/crawl-*.yml
 ```
 
 under a temp dir and returns the newest file. This is the config YAML used to **resume** a previous crawl queue.
+
+Durability shim (Phase 4):
+
+* When a resume config YAML is discovered, `archive_tool` will best-effort copy it to:
+  * `<output-dir>/.zimit_resume.yaml`
+* Subsequent runs prefer this stable path first (before probing `.tmp*` dirs), which reduces
+  the chance of losing resume capability due to ambiguous temp-dir ordering.
 
 ### 5.5 WARC discovery
 
