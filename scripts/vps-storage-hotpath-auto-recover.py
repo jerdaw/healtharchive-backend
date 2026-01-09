@@ -7,6 +7,7 @@ import json
 import os
 import stat
 import subprocess
+import sys
 import time
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
@@ -356,6 +357,16 @@ def main(argv: list[str] | None = None) -> int:
         help="WARC tiering bind-mount manifest (for hot path checks).",
     )
     p.add_argument(
+        "--simulate-broken-path",
+        action="append",
+        default=[],
+        help=(
+            "DRILL ONLY (dry-run): treat the given path as if it were failing with "
+            "Errno 107 (Transport endpoint is not connected). "
+            "Use a temporary --state-file/--lock-file for drills to avoid affecting production watchdog state."
+        ),
+    )
+    p.add_argument(
         "--min-failure-age-seconds",
         type=int,
         default=120,
@@ -445,6 +456,14 @@ def main(argv: list[str] | None = None) -> int:
         help="Output filename under --textfile-out-dir.",
     )
     args = p.parse_args(argv)
+    simulate_broken_raw = list(getattr(args, "simulate_broken_path", []) or [])
+    simulate_mode = bool(simulate_broken_raw)
+    if simulate_mode and bool(args.apply):
+        print(
+            "ERROR: --simulate-broken-path is only allowed in dry-run mode (omit --apply).",
+            file=sys.stderr,
+        )
+        return 2
 
     now = _utc_now()
 
@@ -502,7 +521,16 @@ def main(argv: list[str] | None = None) -> int:
 
     hot_paths = _read_manifest_hot_paths(manifest_path)
 
+    def _canon_path(path: Path) -> str:
+        try:
+            return str(path.expanduser().resolve())
+        except Exception:
+            return str(path)
+
+    simulate_broken_paths = {_canon_path(Path(p)) for p in simulate_broken_raw if str(p).strip()}
+
     detected: dict[str, dict] = {}
+    simulated: dict[str, dict] = {}
 
     # Probe running job output dirs (primary signal).
     for job in running_jobs:
@@ -533,6 +561,56 @@ def main(argv: list[str] | None = None) -> int:
                 "errno": errno,
                 "mount": _get_mount_info(str(hot)) or {},
             }
+
+    if simulate_broken_paths:
+        running_by_output_dir = {
+            _canon_path(Path(job.output_dir)): job for job in running_jobs if job.output_dir
+        }
+        hot_by_path = {_canon_path(p): p for p in hot_paths}
+        detected_paths = {str(info.get("path") or "") for info in detected.values()}
+
+        for raw in sorted(simulate_broken_paths):
+            if raw in detected_paths:
+                continue
+
+            job = running_by_output_dir.get(raw)
+            hot = hot_by_path.get(raw)
+            kind = "simulated_path"
+            info: dict[str, object] = {"simulated": True}
+            if job is not None and job.output_dir is not None:
+                kind = "job_output_dir"
+                info.update(
+                    {
+                        "kind": kind,
+                        "job_id": int(job.job_id),
+                        "source": str(job.source_code),
+                        "path": str(job.output_dir),
+                        "errno": 107,
+                        "mount": _get_mount_info(str(job.output_dir)) or {},
+                    }
+                )
+                impacted_sources.add(str(job.source_code))
+            elif hot is not None:
+                kind = "tiering_hot_path"
+                info.update(
+                    {
+                        "kind": kind,
+                        "path": str(hot),
+                        "errno": 107,
+                        "mount": _get_mount_info(str(hot)) or {},
+                    }
+                )
+            else:
+                info.update(
+                    {
+                        "kind": kind,
+                        "path": raw,
+                        "errno": 107,
+                        "mount": _get_mount_info(raw) or {},
+                    }
+                )
+
+            simulated[f"simulated:{raw}"] = info
 
     # Track observations and confirm persistence across runs.
     obs = state.setdefault("observations", {})
@@ -572,6 +650,9 @@ def main(argv: list[str] | None = None) -> int:
         if consecutive >= int(args.confirm_runs) and age >= float(args.min_failure_age_seconds):
             eligible.append(info)
 
+    if simulated:
+        eligible.extend(simulated.values())
+
     last_apply_ok = int(state.get("last_apply_ok") or 0)
     last_apply_epoch = int(state.get("last_apply_epoch") or 0)
 
@@ -586,7 +667,7 @@ def main(argv: list[str] | None = None) -> int:
                 metrics_ok=1,
                 last_apply_ok=int(state.get("last_apply_ok") or last_apply_ok),
                 last_apply_epoch=int(state.get("last_apply_epoch") or last_apply_epoch),
-                detected_targets=len(detected),
+                detected_targets=(len(detected) + len(simulated)),
             )
         except Exception:
             pass
@@ -596,33 +677,40 @@ def main(argv: list[str] | None = None) -> int:
     if not eligible:
         return finish(0)
 
-    # Rate limiting.
-    rec = state.get("recoveries") or {}
-    global_items = rec.get("global") if isinstance(rec, dict) else []
-    if not isinstance(global_items, list):
-        global_items = []
-
-    last_apply = _parse_utc(str(state.get("last_apply_utc") or ""))
-    if last_apply is not None:
-        cooldown_age = (now - last_apply).total_seconds()
-        if cooldown_age < float(args.cooldown_seconds):
-            print(
-                f"SKIP: last recovery was {cooldown_age:.0f}s ago (cooldown={int(args.cooldown_seconds)}s)."
-            )
-            return finish(0)
-
+    # Rate limiting (bypassed in drill simulation mode).
     hour_cutoff = now - timedelta(hours=1)
     day_cutoff = now - timedelta(days=1)
-    if _count_recent_timestamps(global_items, since_utc=hour_cutoff) >= int(
-        args.max_recoveries_per_hour
-    ):
-        print("SKIP: global hourly recovery cap reached.")
-        return finish(0)
-    if _count_recent_timestamps(global_items, since_utc=day_cutoff) >= int(
-        args.max_recoveries_per_day
-    ):
-        print("SKIP: global daily recovery cap reached.")
-        return finish(0)
+    if simulate_mode:
+        print(
+            "DRILL: simulate-broken-path active; bypassing recovery cooldown/caps (dry-run only)."
+        )
+        rec = state.get("recoveries") or {}
+        global_items: list[str] = []
+    else:
+        rec = state.get("recoveries") or {}
+        global_items = rec.get("global") if isinstance(rec, dict) else []
+        if not isinstance(global_items, list):
+            global_items = []
+
+        last_apply = _parse_utc(str(state.get("last_apply_utc") or ""))
+        if last_apply is not None:
+            cooldown_age = (now - last_apply).total_seconds()
+            if cooldown_age < float(args.cooldown_seconds):
+                print(
+                    f"SKIP: last recovery was {cooldown_age:.0f}s ago (cooldown={int(args.cooldown_seconds)}s)."
+                )
+                return finish(0)
+
+        if _count_recent_timestamps(global_items, since_utc=hour_cutoff) >= int(
+            args.max_recoveries_per_hour
+        ):
+            print("SKIP: global hourly recovery cap reached.")
+            return finish(0)
+        if _count_recent_timestamps(global_items, since_utc=day_cutoff) >= int(
+            args.max_recoveries_per_day
+        ):
+            print("SKIP: global daily recovery cap reached.")
+            return finish(0)
 
     impacted_job_ids: set[int] = set()
     for info in eligible:
@@ -630,7 +718,7 @@ def main(argv: list[str] | None = None) -> int:
         if job_id is not None:
             impacted_job_ids.add(int(job_id))
 
-    if impacted_job_ids:
+    if impacted_job_ids and not simulate_mode:
         jobs_rec = rec.get("jobs") if isinstance(rec, dict) else {}
         if not isinstance(jobs_rec, dict):
             jobs_rec = {}
