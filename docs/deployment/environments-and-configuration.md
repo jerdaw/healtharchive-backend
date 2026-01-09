@@ -143,6 +143,10 @@ Notes:
   - `HEALTHARCHIVE_COMPARE_LIVE_MAX_RENDER_LINES` (default `5000`).
   - `HEALTHARCHIVE_COMPARE_LIVE_MAX_CONCURRENCY` (default `4`).
   - `HEALTHARCHIVE_COMPARE_LIVE_USER_AGENT` (default identifies HealthArchive).
+- Indexing integrity (optional, Phase 4 safety rail):
+  - `HEALTHARCHIVE_INDEX_WARC_VERIFY_LEVEL` (default `0`; allowed: `0|1|2`).
+  - `HEALTHARCHIVE_INDEX_WARC_VERIFY_MAX_DECOMPRESSED_BYTES` (default unset; bounds Level 1 gzip checks per file).
+  - `HEALTHARCHIVE_INDEX_WARC_VERIFY_MAX_RECORDS` (default unset; bounds Level 2 WARC iteration per file).
 - `HEALTHARCHIVE_PUBLIC_SITE_URL` sets the public base URL used in RSS links.
 - In `production` (and `staging`), if the admin token is missing, admin/metrics
   endpoints fail closed (HTTP 500) instead of being left open.

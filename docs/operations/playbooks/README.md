@@ -40,6 +40,7 @@ Other playbooks:
 - Adoption signals entry (quarterly): `adoption-signals.md`
 - Outreach + verification (external, privacy-safe): `outreach-and-verification.md`
 - WARC storage tiering (SSD + Storage Box): `warc-storage-tiering.md`
+- WARC integrity verification (verify-warcs): `warc-integrity-verification.md`
 - Storage Box / sshfs stale mount recovery (Errno 107): `storagebox-sshfs-stale-mount-recovery.md`
 - Replay service (if enabled): `replay-service.md`
 - Annual campaign operations (seasonal): `annual-campaign.md`
