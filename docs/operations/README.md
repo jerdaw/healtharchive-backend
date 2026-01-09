@@ -1,6 +1,7 @@
 # Operations docs
 
 - Ops playbooks (task-oriented checklists): `playbooks/README.md`
+- Incident notes / postmortems (internal): `incidents/README.md`
 - Observability + private stats contract (public vs private boundaries): `observability-and-private-stats.md`
 - Annual capture campaign (scope + seeds): `annual-campaign.md`
 - Automation implementation plan (phased, production-only): `automation-implementation-plan.md`

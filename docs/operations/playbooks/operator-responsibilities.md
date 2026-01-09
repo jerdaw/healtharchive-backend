@@ -14,6 +14,8 @@ This file is intentionally brief; it points to canonical docs when you need deta
 - If the deploy script fails: don’t retry blindly.
   - Read the drift report and verifier output and fix the underlying mismatch.
   - Canonical: `../baseline-drift.md`
+- If you had to do manual steps or discovered drift, update the canonical runbook/playbook so the next operator can follow reality.
+  - Canonical: `../ops-cadence-checklist.md`
 
 ## Ongoing automation maintenance
 
@@ -40,6 +42,8 @@ This file is intentionally brief; it points to canonical docs when you need deta
 - Confirm timers are still enabled and not silently failing.
   - `./scripts/verify_ops_automation.sh` and spot-check `journalctl`
   - Playbook: `automation-maintenance.md`
+- Do a quick docs drift skim (production runbook + incident response) and fix anything stale.
+  - Canonical: `../ops-cadence-checklist.md`
 
 ## Security posture (always)
 

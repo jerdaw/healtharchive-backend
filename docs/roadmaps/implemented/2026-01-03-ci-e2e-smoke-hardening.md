@@ -75,7 +75,7 @@ In `scripts/verify_public_surface.py`:
 5. Update docs:
    - Backend: `docs/operations/monitoring-and-ci-checklist.md`
    - Backend: `docs/development/testing-guidelines.md`
-   - Frontend: `docs/development/bilingual-dev-guide.md` (if needed)
+   - Frontend: `healtharchive-frontend/docs/development/bilingual-dev-guide.md` (if needed)
 6. Run:
    - `healtharchive-backend: make check`
    - `healtharchive-frontend: npm run check`

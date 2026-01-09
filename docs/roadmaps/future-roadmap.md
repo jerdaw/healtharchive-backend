@@ -35,6 +35,13 @@ Supporting materials:
 - `../operations/partner-kit.md`
 - `../operations/verification-packet.md`
 
+## Transparency & public reporting (policy posture)
+
+- Incident disclosure posture (current default: Option B):
+  - Publish public-safe notes only when an incident changes user expectations (outage/degradation, integrity risk, security posture, policy change).
+  - Decision record: `../decisions/2026-01-09-public-incident-disclosure-posture.md`
+  - Revisit later: consider moving to “Option A” (always publish public-safe notes for sev0/sev1) once operations are demonstrably stable over multiple full campaign cycles.
+
 ## Technical backlog (candidates)
 
 Keep this list short; prefer linking to the canonical doc that explains the item.

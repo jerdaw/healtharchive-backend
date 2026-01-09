@@ -48,7 +48,7 @@ links to the detailed checklist later in this file.
 - **In GitHub for both repos** – see §7:
   - [ ] Commit and push CI workflows:
         `.github/workflows/backend-ci.yml` and
-        `.github/workflows/frontend-ci.yml`.
+        `healtharchive-frontend/.github/workflows/frontend-ci.yml`.
   - [ ] Enable Actions in the GitHub UI if prompted.
   - [ ] Configure branch protection on `main` to require the CI checks before
         merging.
@@ -583,7 +583,7 @@ To prevent merging changes that break tests or linting:
      - In the backend repo, select the check corresponding to
        `.github/workflows/backend-ci.yml` (e.g., `Backend CI`).
      - In the frontend repo, select the check corresponding to
-       `.github/workflows/frontend-ci.yml` (e.g., `Frontend CI`).
+       `healtharchive-frontend/.github/workflows/frontend-ci.yml` (e.g., `Frontend CI`).
    - Optionally enable **Include administrators** so even admin users must
      wait for green CI.
 

@@ -15,7 +15,7 @@ Notes:
 - This plan is written against **current implementation reality**. Where code already
   exists, phases focus on configuration + verification rather than new development.
 - Keep `docs/operations/healtharchive-ops-roadmap.md` short; it should reference canonical docs
-  and `../roadmaps/future-roadmap.md` rather than duplicating this historical plan.
+  and `docs/roadmaps/future-roadmap.md` rather than duplicating this historical plan.
 
 ## Phase 0 — Baseline inventory (one-time; repeat after major changes)
 
@@ -402,5 +402,5 @@ cd /opt/healtharchive-backend
 
 Non-code/external work (partners, verifier, mentions/citations log) is tracked in:
 
-- `future-roadmap.md`
-- `../operations/healtharchive-ops-roadmap.md`
+- `docs/roadmaps/future-roadmap.md`
+- `docs/operations/healtharchive-ops-roadmap.md`
