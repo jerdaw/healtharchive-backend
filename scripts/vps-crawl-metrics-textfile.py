@@ -250,12 +250,14 @@ def main(argv: list[str] | None = None) -> int:
 
         output_dir_ok = 0
         output_dir_errno = 0
-        if job.output_dir:
-            output_dir_ok, output_dir_errno = _probe_readable_dir(Path(job.output_dir))
+        output_dir_path: Path | None = Path(job.output_dir) if job.output_dir else None
+        if output_dir_path:
+            output_dir_ok, output_dir_errno = _probe_readable_dir(output_dir_path)
 
         log_probe_ok = 0
         log_probe_errno = 0
         log_path: Path | None = None
+        log_candidate: Path | None = None
         if job.combined_log_path:
             log_candidate = Path(job.combined_log_path)
             log_probe_ok, log_probe_errno = _probe_readable_file(log_candidate)
@@ -273,6 +275,17 @@ def main(argv: list[str] | None = None) -> int:
             if log_path is not None:
                 log_probe_ok = 1
                 log_probe_errno = -1
+
+        if (
+            output_dir_path
+            and output_dir_ok == 0
+            and output_dir_errno not in (0, -1)
+            and (log_path or log_candidate)
+        ):
+            target = log_path or log_candidate
+            if target and target.is_relative_to(output_dir_path):
+                log_probe_ok = 0
+                log_probe_errno = output_dir_errno
 
         progress_known = 0
         age_seconds = -1.0
