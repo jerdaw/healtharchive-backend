@@ -2189,6 +2189,7 @@ def cmd_verify_warcs(args: argparse.Namespace) -> None:
     apply_quarantine = bool(getattr(args, "apply_quarantine", False))
     json_out_raw = getattr(args, "json_out", None)
     json_out = Path(json_out_raw).expanduser() if json_out_raw else None
+    json_out_user_provided = json_out is not None
     metrics_file_raw = getattr(args, "metrics_file", None)
     metrics_file = Path(metrics_file_raw).expanduser() if metrics_file_raw else None
 
@@ -2240,6 +2241,13 @@ def cmd_verify_warcs(args: argparse.Namespace) -> None:
 
     now_utc = datetime.now(timezone.utc)
     ts = now_utc.strftime("%Y%m%dT%H%M%SZ")
+
+    # Always emit a JSON report by default for audit/debuggability.
+    # If the user did not pass --json-out, use <output_dir>/warc_verify/... and treat
+    # failures to write as best-effort (verification results remain the source of truth).
+    if json_out is None:
+        json_out = output_dir / "warc_verify" / f"verify-warcs-{job_id}-{ts}.json"
+        json_out_user_provided = False
 
     quarantined: list[dict[str, str]] = []
     if apply_quarantine and report.failures:
@@ -2297,12 +2305,16 @@ def cmd_verify_warcs(args: argparse.Namespace) -> None:
                     job.status = "retryable"
                     job.retry_count = 0
 
-            if json_out is None:
-                json_out = output_dir / "warc_verify" / f"verify-warcs-{job_id}-{ts}.json"
-
     if json_out is not None:
-        json_out.parent.mkdir(parents=True, exist_ok=True)
-        json_out.write_text(report.to_json(), encoding="utf-8")
+        try:
+            json_out.parent.mkdir(parents=True, exist_ok=True)
+            json_out.write_text(report.to_json(), encoding="utf-8")
+        except Exception as exc:  # pragma: no cover - best-effort unless explicit
+            if json_out_user_provided:
+                print(f"ERROR: failed to write JSON report {json_out}: {exc}", file=sys.stderr)
+                sys.exit(1)
+            print(f"WARN: failed to write JSON report {json_out}: {exc}", file=sys.stderr)
+            json_out = None
 
     if metrics_file is not None:
         # Best-effort: metrics writing should never be the reason a verification fails.
@@ -2389,7 +2401,7 @@ def cmd_verify_warcs(args: argparse.Namespace) -> None:
         print(f"Quarantined {len(quarantined)} WARC file(s).")
         print(f"Marker: {output_dir / 'WARCS_QUARANTINED.txt'}")
 
-    if json_out is not None:
+    if (json_out_user_provided or quarantined or report.warcs_failed > 0) and json_out is not None:
         print("")
         print(f"JSON report: {json_out}")
 
