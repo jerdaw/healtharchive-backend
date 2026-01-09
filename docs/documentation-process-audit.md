@@ -116,7 +116,7 @@ Evidence:
 
 - Explicit canonical sources + pointer strategy.
 - Explicit separation:
-  - backlog (`future-roadmap.md`)
+  - backlog (`roadmaps/future-roadmap.md`)
   - active plans (`docs/roadmaps/*.md`)
   - canonical docs (deployment/ops/dev)
 
