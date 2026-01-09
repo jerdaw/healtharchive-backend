@@ -108,6 +108,13 @@ s.close()
 PY
 }
 
+if [[ "${SKIP_FRONTEND_BUILD}" == "1" && -z "${BACKEND_PORT}" ]]; then
+  api_base="${NEXT_PUBLIC_API_BASE_URL:-}"
+  if [[ -n "${api_base}" && "${api_base}" =~ ^https?://(127\.0\.0\.1|localhost):([0-9]{2,5})(/|$) ]]; then
+    BACKEND_PORT="${BASH_REMATCH[2]}"
+  fi
+fi
+
 BACKEND_PORT="${BACKEND_PORT:-$(pick_free_port)}"
 FRONTEND_PORT="${FRONTEND_PORT:-$(pick_free_port)}"
 
