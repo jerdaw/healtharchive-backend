@@ -42,6 +42,7 @@ Other playbooks:
 - WARC storage tiering (SSD + Storage Box): `warc-storage-tiering.md`
 - WARC integrity verification (verify-warcs): `warc-integrity-verification.md`
 - Storage Box / sshfs stale mount recovery (Errno 107): `storagebox-sshfs-stale-mount-recovery.md`
+- Storage Box / sshfs recovery drills (safe on production): `storagebox-sshfs-stale-mount-drills.md`
 - Replay service (if enabled): `replay-service.md`
 - Annual campaign operations (seasonal): `annual-campaign.md`
 - Incident response (when something breaks): `incident-response.md`
