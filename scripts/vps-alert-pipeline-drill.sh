@@ -22,14 +22,14 @@ Usage:
   # Dry-run:
   ./scripts/vps-alert-pipeline-drill.sh
 
-  # Apply for ~3 minutes (requires sudo):
-  sudo ./scripts/vps-alert-pipeline-drill.sh --apply --duration-seconds 180
+  # Apply for ~10 minutes (requires sudo):
+  sudo ./scripts/vps-alert-pipeline-drill.sh --apply --duration-seconds 600
 
 Options:
   --apply                 Actually write/remove the metric file (default: dry-run)
   --out-dir DIR           node_exporter textfile collector dir (default: /var/lib/node_exporter/textfile_collector)
   --out-file FILE         Output filename (default: healtharchive_alert_pipeline_drill.prom)
-  --duration-seconds N    How long to keep the metric file before removing it (default: 180; use 0 to keep)
+  --duration-seconds N    How long to keep the metric file before removing it (default: 600; use 0 to keep)
 
 Verify (on the VPS):
   curl -s http://127.0.0.1:9090/api/v1/alerts | head
@@ -43,7 +43,9 @@ EOF
 APPLY="false"
 OUT_DIR="/var/lib/node_exporter/textfile_collector"
 OUT_FILE="healtharchive_alert_pipeline_drill.prom"
-DURATION_SECONDS="180"
+# Default: 10 minutes. This intentionally exceeds conservative Prometheus scrape intervals
+# so the metric is very likely to be scraped at least once.
+DURATION_SECONDS="600"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -143,4 +145,3 @@ echo "Waiting ${DURATION_SECONDS}s before removing drill metric..."
 sleep "${DURATION_SECONDS}"
 echo "OK: removing drill metric."
 exit 0
-
