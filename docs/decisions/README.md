@@ -52,4 +52,3 @@ If multiple decisions occur on one day, add a suffix:
 5) Mark status as `accepted` once you commit to it.
 
 If a decision changes later, create a new decision record and mark the old one as `superseded` (link both directions).
-
