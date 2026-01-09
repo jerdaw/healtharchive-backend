@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import stat
 from pathlib import Path
 
@@ -24,6 +25,7 @@ from ha_backend.indexing.text_extraction import (
 )
 from ha_backend.indexing.warc_discovery import discover_temp_warcs_for_job, discover_warcs_for_job
 from ha_backend.indexing.warc_reader import iter_html_records
+from ha_backend.indexing.warc_verify import WarcVerificationOptions, verify_warcs
 from ha_backend.infra_errors import is_storage_infra_errno
 from ha_backend.models import ArchiveJob, Snapshot, SnapshotOutlink
 
@@ -127,6 +129,64 @@ def index_job(job_id: int) -> int:
 
             if not warc_paths:
                 logger.warning("No WARC files discovered for job %s in %s", job_id, output_dir)
+                job.status = "index_failed"
+                return 1
+
+            # Phase 4 safety rail: ensure we can at least stat + open/read every
+            # discovered WARC before we delete any existing snapshots.
+            #
+            # Level 0 is always on (cheap). Operators can opt into deeper checks
+            # via env vars if they want to gate indexing on gzip/WARC integrity.
+            verify_level_raw = os.environ.get("HEALTHARCHIVE_INDEX_WARC_VERIFY_LEVEL", "0")
+            try:
+                verify_level = int(verify_level_raw)
+            except Exception:
+                verify_level = 0
+            if verify_level not in (0, 1, 2):
+                logger.warning(
+                    "Invalid HEALTHARCHIVE_INDEX_WARC_VERIFY_LEVEL=%r; expected 0/1/2; using 0.",
+                    verify_level_raw,
+                )
+                verify_level = 0
+
+            verify_max_decompressed_bytes = os.environ.get(
+                "HEALTHARCHIVE_INDEX_WARC_VERIFY_MAX_DECOMPRESSED_BYTES"
+            )
+            max_decompressed_bytes: int | None = None
+            if verify_max_decompressed_bytes:
+                try:
+                    max_decompressed_bytes = int(verify_max_decompressed_bytes)
+                    if max_decompressed_bytes <= 0:
+                        max_decompressed_bytes = None
+                except Exception:
+                    max_decompressed_bytes = None
+
+            verify_max_records = os.environ.get("HEALTHARCHIVE_INDEX_WARC_VERIFY_MAX_RECORDS")
+            max_records: int | None = None
+            if verify_max_records:
+                try:
+                    max_records = int(verify_max_records)
+                    if max_records <= 0:
+                        max_records = None
+                except Exception:
+                    max_records = None
+
+            verify_options = WarcVerificationOptions(
+                level=verify_level,
+                max_decompressed_bytes=max_decompressed_bytes,
+                max_records=max_records,
+            )
+            verify_report = verify_warcs(warc_paths, options=verify_options)
+            if verify_report.warcs_failed:
+                sample = ", ".join(f.path for f in verify_report.failures[:3])
+                logger.error(
+                    "Pre-index WARC verification failed for job %s (level=%s): failed=%d/%d sample=%s",
+                    job_id,
+                    verify_level,
+                    verify_report.warcs_failed,
+                    verify_report.warcs_checked,
+                    sample,
+                )
                 job.status = "index_failed"
                 return 1
 
