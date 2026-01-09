@@ -240,3 +240,16 @@ groups:
           summary: "Cleanup automation metrics missing"
           description: "Cleanup automation metrics script failed. Check healtharchive-cleanup-automation.service logs and configuration."
           runbook_url: "https://github.com/jerdaw/healtharchive-backend/blob/main/docs/operations/playbooks/cleanup-automation.md"
+
+  - name: healtharchive.drills
+    rules:
+      - alert: HealthArchiveAlertPipelineDrill
+        expr: healtharchive_alert_pipeline_drill == 1
+        for: 30s
+        labels:
+          severity: drill
+          service: healtharchive
+        annotations:
+          summary: "Drill: alert pipeline test"
+          description: "This alert is intentionally triggered during operator drills to validate Prometheus→Alertmanager wiring. It should be routed to a null receiver by default."
+          runbook_url: "https://github.com/jerdaw/healtharchive-backend/blob/main/docs/operations/playbooks/storagebox-sshfs-stale-mount-drills.md"

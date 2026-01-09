@@ -207,12 +207,23 @@ global:
 
 route:
   receiver: healtharchive-webhook
+  routes:
+    # Drill-only alerts should not page operators by default. They still appear
+    # in Prometheus/Alertmanager UIs for verification during drills.
+    - matchers:
+        - severity="drill"
+      receiver: healtharchive-null
+      group_by: ["alertname"]
+      group_wait: 0s
+      group_interval: 1m
+      repeat_interval: 1h
   group_by: ["alertname"]
   group_wait: 30s
   group_interval: 5m
   repeat_interval: 12h
 
 receivers:
+  - name: healtharchive-null
   - name: healtharchive-webhook
     webhook_configs:
       - url: ${webhook_url}
