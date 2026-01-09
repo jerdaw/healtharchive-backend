@@ -67,7 +67,7 @@ Precondition:
 
 ```bash
 cd /opt/healtharchive-backend
-sudo ./scripts/vps-alert-pipeline-drill.sh --apply --duration-seconds 180
+sudo ./scripts/vps-alert-pipeline-drill.sh --apply --duration-seconds 600
 ```
 
 ### 2.2 Confirm Prometheus sees the alert
@@ -82,7 +82,7 @@ curl -s http://127.0.0.1:9090/api/v1/alerts | rg 'HealthArchiveAlertPipelineDril
 curl -s http://127.0.0.1:9093/api/v2/alerts | rg 'HealthArchiveAlertPipelineDrill' || true
 ```
 
-After ~3 minutes, the script removes the metric file and the alert should resolve.
+After ~10 minutes, the script removes the metric file and the alert should resolve.
 
 If you ever need to clean up manually:
 
@@ -108,4 +108,3 @@ High-level steps:
 4) Run post-incident integrity checks:
    - `ha-backend verify-warcs --job-id <ID> --level 1 --since-minutes <window>`
    - follow `warc-integrity-verification.md` if anything fails
-
