@@ -14,6 +14,7 @@
 
 Canonical docs to consult first:
 
+- `docs/project.md` – project docs portal (multi-repo navigation).
 - `docs/README.md` – docs index.
 - `docs/architecture.md` – architecture & implementation details.
 - `docs/documentation-guidelines.md` – documentation policy and canonical sources.
@@ -40,7 +41,7 @@ From the repo root (Python project):
 - Create venv (if not already done) – adjust to my actual workflow:
   ```bash
   make venv
-````
+  ```
 
 * Run checks (what CI runs):
 
@@ -50,31 +51,29 @@ From the repo root (Python project):
 
 For how to:
 
-* Start the FastAPI app for local dev,
-* Run specific CLI flows end-to-end,
-* Wire up Docker + `archive_tool`,
+- Start the FastAPI app for local dev,
+- Run specific CLI flows end-to-end,
+- Wire up Docker + `archive_tool`,
 
 → **Follow `docs/development/live-testing.md` rather than inventing new commands**.
 
 When you add/modify functionality, you should:
 
-* Keep checks passing (`make check`).
-* Prefer adding/adjusting tests close to the code you touch (e.g., API route tests, indexing pipeline tests, worker tests).
+- Keep checks passing (`make check`).
+- Prefer adding/adjusting tests close to the code you touch (e.g., API route tests, indexing pipeline tests, worker tests).
 
 ---
 
 ## Git workflow (commits & pushes)
 
-When you have full access (and `origin` is configured), **make regular best-practice commits and pushes as you go** — you do not need the user to explicitly ask you to commit/push.
+Default for agentic work: **do not commit or push** unless the human operator explicitly asks.
 
 Guidelines:
 
-* Prefer small, logically grouped commits over big “catch-all” commits.
-* Use the existing message style (e.g., `fix: ...`, `docs: ...`, `ops: ...`).
-* Before pushing, run the closest relevant local checks (usually `make check`) and keep the branch reasonably up to date.
-* Never commit secrets, `.env` files, or machine-specific artifacts.
-
-If you do *not* have full access or pushing would require approval, commit locally when helpful but ask before pushing.
+- If asked to commit: prefer small, logically grouped commits over big “catch-all” commits.
+- Use the existing message style (e.g., `fix: ...`, `docs: ...`, `ops: ...`).
+- Run the closest relevant local checks before pushing (usually `make check`).
+- Never commit secrets, `.env` files, or machine-specific artifacts.
 
 ---
 
@@ -82,11 +81,16 @@ If you do *not* have full access or pushing would require approval, commit local
 
 When you change behavior, do routine hygiene in the same series of commits:
 
-* Update relevant docs (especially runbooks/playbooks under `docs/**`) so operators and future devs can follow the new reality.
-* Add/adjust tests for new behavior and bug fixes to prevent regressions.
-* Update `.gitignore` when you introduce new local artifacts, generated files, or caches.
-* Keep things tidy: remove dead code, unused imports, and accidental debug logging; keep scripts safe to re-run.
-* If you introduce new project conventions/workflows, update `AGENTS.md` to reflect them.
+- Update relevant docs (especially runbooks/playbooks under `docs/**`) so operators and future devs can follow the new reality.
+- For new procedural docs, use the templates:
+  - Runbook: `docs/deployment/runbook-template.md`
+  - Playbook: `docs/operations/playbooks/playbook-template.md`
+  - Incident note: `docs/operations/incidents/incident-template.md`
+  - Decision record: `docs/decisions/decision-template.md`
+- Add/adjust tests for new behavior and bug fixes to prevent regressions.
+- Update `.gitignore` when you introduce new local artifacts, generated files, or caches.
+- Keep things tidy: remove dead code, unused imports, and accidental debug logging; keep scripts safe to re-run.
+- If you introduce new project conventions/workflows, update `AGENTS.md` to reflect them.
 
 ---
 
@@ -94,36 +98,37 @@ When you change behavior, do routine hygiene in the same series of commits:
 
 ### Data model
 
-* SQLAlchemy models defined under `src/ha_backend/models.py`:
+- SQLAlchemy models defined under `src/ha_backend/models.py`:
 
-  * `Source` – logical content origin (e.g., `"hc"`, `"phac"`).
-  * `ArchiveJob` – a crawl job and its lifecycle (`queued`, `running`, `completed`, `failed`, `indexed`, `index_failed`, etc.).
-  * `Snapshot` – a single captured page with URL, capture timestamp, WARC path, language, etc.
+  - `Source` – logical content origin (e.g., `"hc"`, `"phac"`).
+  - `ArchiveJob` – a crawl job and its lifecycle (`queued`, `running`, `completed`, `failed`, `indexed`, `index_failed`, etc.).
+  - `Snapshot` – a single captured page with URL, capture timestamp, WARC path, language, etc.
 
 If you change models:
 
-* Think through migrations and existing queries/routes.
-* Don’t drop/change columns in a way that silently breaks APIs.
-* Update Pydantic schemas in `ha_backend/api/schemas.py` (and admin schemas) coherently.
+- Think through migrations and existing queries/routes.
+- Don’t drop/change columns in a way that silently breaks APIs.
+- Update Pydantic schemas in `ha_backend/api/schemas.py` (and admin schemas) coherently.
 
 ### Job lifecycle / worker
 
-* Job creation via `SourceJobConfig` in `ha_backend/job_registry.py`:
+- Job creation via `SourceJobConfig` in `ha_backend/job_registry.py`:
 
-  * Seeds, `name_template`, and `tool_options` live there.
-* `ArchiveJob.config` JSON is the **single source of truth** for building `archive_tool` CLI args.
-* Worker loop (`ha_backend/worker/main.py`):
+  - Seeds, `name_template`, and `tool_options` live there.
 
-  * Picks `queued`/`retryable` jobs.
-  * Runs `run_persistent_job(job_id)`.
-  * Applies retry semantics.
-  * On success, runs `index_job(job_id)`.
+- `ArchiveJob.config` JSON is the **single source of truth** for building `archive_tool` CLI args.
+- Worker loop (`ha_backend/worker/main.py`):
+
+  - Picks `queued`/`retryable` jobs.
+  - Runs `run_persistent_job(job_id)`.
+  - Applies retry semantics.
+  - On success, runs `index_job(job_id)`.
 
 If you change job states, retry logic, or indexing behavior, update:
 
-* Worker logic,
-* Admin views (status counts, job details),
-* Metrics (`/metrics`).
+- Worker logic,
+- Admin views (status counts, job details),
+- Metrics (`/metrics`).
 
 ---
 
@@ -133,28 +138,28 @@ The `archive_tool` package lives under `src/archive_tool/` and is maintained as
 part of this repository. It originated as an earlier standalone crawler repo
 but should now be treated as an in-tree, first-class component of the backend.
 
-* The backend primarily talks to it via the CLI (`archive-tool` or the
+- The backend primarily talks to it via the CLI (`archive-tool` or the
   configured command) and imports a small set of helpers (`archive_tool.state`,
   `archive_tool.utils`) for WARC and state discovery.
-* You **may** change and refactor `src/archive_tool/**` when needed, but:
+- You **may** change and refactor `src/archive_tool/**` when needed, but:
 
-  * Keep the CLI contract used by `ha_backend/jobs.py` and
+  - Keep the CLI contract used by `ha_backend/jobs.py` and
     `ha_backend/job_registry.py` in sync (flags such as `--seeds`,
     `--name`, `--output-dir`, monitoring/VPN options, `--relax-perms`,
     etc.).
-  * If you change how `.archive_state.json` or temp dirs are laid out,
+  - If you change how `.archive_state.json` or temp dirs are laid out,
     update WARC discovery (`ha_backend/indexing/warc_discovery.py`) and
     cleanup (`ha_backend/cli.py:cmd_cleanup_job`) at the same time.
-  * Preserve or intentionally migrate any behavior relied on by tests under
+  - Preserve or intentionally migrate any behavior relied on by tests under
     `tests/` (worker flows, job status transitions, indexing expectations).
 
-* When in doubt:
+- When in doubt:
 
-  * Treat `ha_backend/jobs.py` and `ha_backend/job_registry.py` as the main
+  - Treat `ha_backend/jobs.py` and `ha_backend/job_registry.py` as the main
     integration points for CLI construction and configuration.
-  * Treat `ha_backend/indexing/warc_discovery.py` and `cmd_cleanup_job` as
+  - Treat `ha_backend/indexing/warc_discovery.py` and `cmd_cleanup_job` as
     the integration points for WARC/state discovery and cleanup.
-  * Add or adjust tests close to the code you change.
+  - Add or adjust tests close to the code you change.
 
 The backend and `archive_tool` are expected to evolve together; it is fine for
 changes to span both sides as long as they are coherent and tested.
@@ -165,17 +170,17 @@ changes to span both sides as long as they are coherent and tested.
 
 Key pieces:
 
-* `ha_backend/indexing/warc_discovery.py` – use `CrawlState` + `find_all_warc_files` to discover WARCs.
-* `ha_backend/indexing/warc_reader.py` – stream HTML records from WARCs.
-* `ha_backend/indexing/text_extraction.py` – extract title/text/snippet/language.
-* `ha_backend/indexing/mapping.py` – map an archive record to a `Snapshot` ORM instance.
-* `ha_backend/indexing/pipeline.py` – `index_job(job_id)` orchestrates the whole indexing step.
+- `ha_backend/indexing/warc_discovery.py` – use `CrawlState` + `find_all_warc_files` to discover WARCs.
+- `ha_backend/indexing/warc_reader.py` – stream HTML records from WARCs.
+- `ha_backend/indexing/text_extraction.py` – extract title/text/snippet/language.
+- `ha_backend/indexing/mapping.py` – map an archive record to a `Snapshot` ORM instance.
+- `ha_backend/indexing/pipeline.py` – `index_job(job_id)` orchestrates the whole indexing step.
 
 If you change indexing:
 
-* Don’t break the assumption that **indexed snapshots reference a WARC path / record that `viewer.py` can replay**.
-* Keep per-record errors logged but non-fatal where feasible.
-* Keep pagination and performance in mind with large WARC sets.
+- Don’t break the assumption that **indexed snapshots reference a WARC path / record that `viewer.py` can replay**.
+- Keep per-record errors logged but non-fatal where feasible.
+- Keep pagination and performance in mind with large WARC sets.
 
 ---
 
@@ -183,34 +188,35 @@ If you change indexing:
 
 Public routes (for the frontend):
 
-* `GET /api/health` – status and basic stats.
-* `GET /api/sources` – summarized counts by source.
-* `GET /api/search` – paginated search with `q`, `source`, `page`, `pageSize`.
-* `GET /api/snapshot/{id}` – metadata for one snapshot.
-* `GET /api/snapshots/raw/{id}` – raw HTML replay.
-* `GET /api/usage` – aggregated daily usage metrics for public reporting.
-* `GET /api/changes` – change-event feed (edition-aware by default).
-* `GET /api/changes/compare` – precomputed diff between adjacent captures.
-* `GET /api/changes/rss` – RSS feed for change events.
-* `GET /api/exports` – export manifest (formats + limits).
-* `GET /api/exports/snapshots` – snapshot metadata export (JSONL/CSV).
-* `GET /api/exports/changes` – change event export (JSONL/CSV).
-* `GET /api/snapshots/{id}/timeline` – timeline for a page group.
-* `POST /api/reports` – public issue report intake.
+- `GET /api/health` – status and basic stats.
+- `GET /api/sources` – summarized counts by source.
+- `GET /api/search` – paginated search with `q`, `source`, `page`, `pageSize`.
+- `GET /api/snapshot/{id}` – metadata for one snapshot.
+- `GET /api/snapshots/raw/{id}` – raw HTML replay.
+- `GET /api/usage` – aggregated daily usage metrics for public reporting.
+- `GET /api/changes` – change-event feed (edition-aware by default).
+- `GET /api/changes/compare` – precomputed diff between adjacent captures.
+- `GET /api/changes/rss` – RSS feed for change events.
+- `GET /api/exports` – export manifest (formats + limits).
+- `GET /api/exports/snapshots` – snapshot metadata export (JSONL/CSV).
+- `GET /api/exports/changes` – change event export (JSONL/CSV).
+- `GET /api/snapshots/{id}/timeline` – timeline for a page group.
+- `POST /api/reports` – public issue report intake.
 
 Admin & metrics:
 
-* `/api/admin/**` – job lists, details, snapshots per job, status counts.
-* `/metrics` – Prometheus-style counts, behind `require_admin`.
+- `/api/admin/**` – job lists, details, snapshots per job, status counts.
+- `/metrics` – Prometheus-style counts, behind `require_admin`.
 
 When you add/modify endpoints:
 
-* Keep public/admin responsibilities separate.
-* Maintain existing query semantics:
+- Keep public/admin responsibilities separate.
+- Maintain existing query semantics:
 
-  * `page >= 1`, `1 <= pageSize <= 100`, etc.
-  * Filtering by `source` using `Source.code`.
-* Update the relevant Pydantic schemas and tests accordingly.
+  - `page >= 1`, `1 <= pageSize <= 100`, etc.
+  - Filtering by `source` using `Source.code`.
+
+- Update the relevant Pydantic schemas and tests accordingly.
 
 ---
 
@@ -218,29 +224,30 @@ When you add/modify endpoints:
 
 Admin auth is via `require_admin`:
 
-* Controlled by `HEALTHARCHIVE_ENV` and `HEALTHARCHIVE_ADMIN_TOKEN`.
-* In `production`/`staging`, a missing admin token should fail closed.
-* When the token is set, admin/metrics require either:
+- Controlled by `HEALTHARCHIVE_ENV` and `HEALTHARCHIVE_ADMIN_TOKEN`.
+- In `production`/`staging`, a missing admin token should fail closed.
+- When the token is set, admin/metrics require either:
 
-  * `Authorization: Bearer <token>`, or
-  * `X-Admin-Token: <token>`.
+  - `Authorization: Bearer <token>`, or
+  - `X-Admin-Token: <token>`.
 
 Do **not** weaken this behavior:
 
-* Don’t expose admin endpoints without auth in non-dev environments.
-* Don’t log secrets or tokens.
+- Don’t expose admin endpoints without auth in non-dev environments.
+- Don’t log secrets or tokens.
 
 ---
 
 ## Cleanup & retention
 
-* Cleanup is done per job via `ha-backend cleanup-job --id ID --mode temp`.
-* It removes:
+- Cleanup is done per job via `ha-backend cleanup-job --id ID --mode temp`.
+- It removes:
 
-  * temp crawl dirs (`.tmp*`),
-  * `.archive_state.json`,
+  - temp crawl dirs (`.tmp*`),
+  - `.archive_state.json`,
     consistent with `archive_tool`’s own cleanup behavior.
-* Only safe when jobs are `indexed` or explicitly `index_failed` and not being retried.
+
+- Only safe when jobs are `indexed` or explicitly `index_failed` and not being retried.
 
 Don’t make cleanup more aggressive (e.g. deleting WARCs or ZIMs) without carefully updating docs and CLI semantics.
 
@@ -248,30 +255,31 @@ Don’t make cleanup more aggressive (e.g. deleting WARCs or ZIMs) without caref
 
 ## Testing & expectations
 
-* Tests live under `tests/` and use `pytest`.
-* Many tests:
+- Tests live under `tests/` and use `pytest`.
+- Many tests:
 
-  * Set `HEALTHARCHIVE_DATABASE_URL` to a temporary path.
-  * Re-create the schema via `Base.metadata.drop_all()` / `create_all()`.
+  - Set `HEALTHARCHIVE_DATABASE_URL` to a temporary path.
+  - Re-create the schema via `Base.metadata.drop_all()` / `create_all()`.
 
 When you change behavior:
 
-* Add/adjust tests rather than disabling existing ones.
-* Keep DB setup/teardown patterns consistent.
+- Add/adjust tests rather than disabling existing ones.
+- Keep DB setup/teardown patterns consistent.
 
 ---
 
 ## Safety rails / things not to touch casually
 
-* Don’t:
+- Don’t:
 
-  * Change `HEALTHARCHIVE_ARCHIVE_ROOT` semantics in a way that would break existing job locations on disk without explicit migration.
-  * Remove or relax job status transitions and retry guards.
-  * Expose `/api/admin/**` or `/metrics` publicly.
-* Be cautious with:
+  - Change `HEALTHARCHIVE_ARCHIVE_ROOT` semantics in a way that would break existing job locations on disk without explicit migration.
+  - Remove or relax job status transitions and retry guards.
+  - Expose `/api/admin/**` or `/metrics` publicly.
 
-  * ORM model changes (`ArchiveJob`, `Snapshot`, `Source`).
-  * CORS configuration in `ha_backend/api/__init__.py`.
-  * Anything under `src/archive_tool/**` beyond doc updates.
+- Be cautious with:
+
+  - ORM model changes (`ArchiveJob`, `Snapshot`, `Source`).
+  - CORS configuration in `ha_backend/api/__init__.py`.
+  - Anything under `src/archive_tool/**` beyond doc updates.
 
 For non-trivial changes, **explain your plan and assumptions in the chat before editing**.

@@ -56,7 +56,7 @@ This batch is intentionally chosen while the annual crawl is running because it:
 ## Docs setup (do first, before coding)
 
 This repo separates backlog vs implementation plans vs canonical docs to avoid drift
-(see `../documentation-guidelines.md`).
+(see `docs/documentation-guidelines.md`).
 
 1) **Create this plan doc**
 - File: `docs/roadmaps/implemented/2026-01-03-crawl-safe-roadmap-batch.md` (this document)
@@ -68,15 +68,15 @@ This repo separates backlog vs implementation plans vs canonical docs to avoid d
 - Update `docs/roadmaps/README.md` to list this plan under “Implementation plans (active)”.
 
 4) **Canonical docs that must remain accurate during/after implementation**
-- Governance/CI guidance: `../operations/monitoring-and-ci-checklist.md`
-- Dataset integrity contract: `../operations/export-integrity-contract.md`
-- Dataset verification runbook: `../operations/dataset-release-runbook.md`
-- Frontend implementation guide: `../../../healtharchive-frontend/docs/implementation-guide.md`
+- Governance/CI guidance: `docs/operations/monitoring-and-ci-checklist.md`
+- Dataset integrity contract: `docs/operations/export-integrity-contract.md`
+- Dataset verification runbook: `docs/operations/dataset-release-runbook.md`
+- Frontend implementation guide: `healtharchive-frontend/docs/implementation-guide.md`
 - External work templates:
-  - `../operations/outreach-templates.md`
-  - `../operations/partner-kit.md`
-  - `../operations/verification-packet.md`
-  - `../operations/mentions-log-template.md`
+  - `docs/operations/outreach-templates.md`
+  - `docs/operations/partner-kit.md`
+  - `docs/operations/verification-packet.md`
+  - `docs/operations/mentions-log-template.md`
 
 Rule: keep canonical docs describing **what exists and how to use/operate it**; keep this plan
 describing **what we will do and in what order**.
@@ -134,7 +134,7 @@ describing **what we will do and in what order**.
   - Do not introduce ongoing maintenance burdens without clear benefit.
 - **Public-safety and privacy posture**:
   - Keep outreach artifacts public-safe (no private emails, no sensitive identifiers).
-  - Follow `../operations/data-handling-retention.md`.
+  - Follow `docs/operations/data-handling-retention.md`.
 - **Operational stability**:
   - Avoid configuration changes that can lock you out of your repos or block emergency fixes.
   - Prefer staged rollouts for governance changes (warn → enforce).
@@ -175,8 +175,8 @@ Current implementation:
 - Release builder:
   - `healtharchive-datasets/scripts/build_release.py`
 - Contract + runbook (backend docs, canonical policy):
-  - `../operations/export-integrity-contract.md`
-  - `../operations/dataset-release-runbook.md`
+  - `docs/operations/export-integrity-contract.md`
+  - `docs/operations/dataset-release-runbook.md`
 
 Current behavior summary:
 
@@ -207,7 +207,7 @@ Current scaffolding:
   - `healtharchive-frontend/.github/CODEOWNERS`
   - `healtharchive-frontend/.github/pull_request_template.md`
 - CI + monitoring guidance already exists:
-  - `../operations/monitoring-and-ci-checklist.md`
+  - `docs/operations/monitoring-and-ci-checklist.md`
 
 Interpretation:
 
@@ -222,12 +222,12 @@ Backlog reference: `docs/roadmaps/future-roadmap.md` (“External / IRL work”)
 
 Existing docs/templates:
 
-- Outreach templates: `../operations/outreach-templates.md`
-- Partner kit (internal guide; points at canonical public assets): `../operations/partner-kit.md`
-- Verification packet outline: `../operations/verification-packet.md`
-- Mentions log template: `../operations/mentions-log-template.md`
-- Adoption signals playbook (quarterly; VPS-stored entries): `../operations/playbooks/adoption-signals.md`
-- Data-handling constraints (privacy): `../operations/data-handling-retention.md`
+- Outreach templates: `docs/operations/outreach-templates.md`
+- Partner kit (internal guide; points at canonical public assets): `docs/operations/partner-kit.md`
+- Verification packet outline: `docs/operations/verification-packet.md`
+- Mentions log template: `docs/operations/mentions-log-template.md`
+- Adoption signals playbook (quarterly; VPS-stored entries): `docs/operations/playbooks/adoption-signals.md`
+- Data-handling constraints (privacy): `docs/operations/data-handling-retention.md`
 
 Interpretation:
 
@@ -266,7 +266,7 @@ Interpretation:
 ### Dataset release pipeline hardening
 
 1) **Integrity enforcement**
-- `manifest.json` is validated against `../operations/export-integrity-contract.md` before publishing.
+- `manifest.json` is validated against `docs/operations/export-integrity-contract.md` before publishing.
 - Checksum verification is performed and must pass before publishing.
 - `truncated=true` results in a hard failure (no publish).
 
@@ -363,7 +363,7 @@ Objective: confirm what already exists, define exact deltas, and avoid duplicate
 - Dataset pipeline:
   - Confirm current workflow actually performs retries/backoff (in script) and how failures surface in Actions.
   - Confirm whether checksum verification is currently enforced (likely not).
-  - Confirm whether manifest fields match `../operations/export-integrity-contract.md`.
+  - Confirm whether manifest fields match `docs/operations/export-integrity-contract.md`.
 - Governance:
   - Inventory current GitHub repo settings (out of git):
     - branch protection on `main`,
@@ -414,7 +414,7 @@ Summary: this batch is viable and crawl-safe. One of the four items (“power co
     - Outputs: gzipped JSONL exports + `manifest.json` + `SHA256SUMS`.
     - File: `healtharchive-datasets/scripts/build_release.py`
 - Confirmed remaining hardening needs (Phase 2 scope stays valid):
-  - Explicit manifest validation aligned to `../operations/export-integrity-contract.md`.
+  - Explicit manifest validation aligned to `docs/operations/export-integrity-contract.md`.
   - Explicit checksum verification as a required step before publishing (e.g., `sha256sum -c SHA256SUMS`).
   - Workflow-level hardening such as concurrency control, timeouts, and failure artifacts.
   - Decide/tag immutability posture (workflow currently allows release updates via `allowUpdates: true`).
@@ -424,17 +424,17 @@ Summary: this batch is viable and crawl-safe. One of the four items (“power co
 - The “solo-fast” posture and CI-as-deploy-gate are already documented and supported:
   - `healtharchive-backend/CONTRIBUTING.md`
   - `healtharchive-frontend/CONTRIBUTING.md`
-  - Canonical policy doc: `../operations/monitoring-and-ci-checklist.md`
+  - Canonical policy doc: `docs/operations/monitoring-and-ci-checklist.md`
 - CI workflows and stable job IDs exist (see Phase 1 inventory).
 - Unknown (operator-only): current branch protection settings in GitHub UI; audit required before changing anything.
 
 **External / IRL outreach + verification**
 
 - Templates and public-safe scaffolding exist:
-  - `../operations/outreach-templates.md`
-  - `../operations/partner-kit.md`
-  - `../operations/verification-packet.md`
-  - `../operations/mentions-log-template.md`
+  - `docs/operations/outreach-templates.md`
+  - `docs/operations/partner-kit.md`
+  - `docs/operations/verification-packet.md`
+  - `docs/operations/mentions-log-template.md`
 - Unknown (operator-only): current real-world status (partners contacted, verifier candidates, existing mentions).
 - Recommendation for execution hygiene:
   - Keep private contact tracking out of git entirely.
@@ -449,7 +449,7 @@ Summary: this batch is viable and crawl-safe. One of the four items (“power co
 - Fixed annual sentinel configuration:
   - `healtharchive-annual-campaign-sentinel` is configured as yearly with sufficient grace.
 - Intentional exception:
-  - `healtharchive-cleanup-automation` remains disabled and is not monitored in Healthchecks (see `../operations/playbooks/healthchecks-parity.md`).
+  - `healtharchive-cleanup-automation` remains disabled and is not monitored in Healthchecks (see `docs/operations/playbooks/healthchecks-parity.md`).
 
 ---
 
@@ -475,7 +475,7 @@ Decision trigger (explicit):
 - Switch to Mode B when there is more than one regular committer, or when you want stricter enforcement than “social contract + hooks”.
 
 1.2 Document the policy (canonical docs)
-- Primary reference: `../operations/monitoring-and-ci-checklist.md`
+- Primary reference: `docs/operations/monitoring-and-ci-checklist.md`
 - Ensure it clearly states:
   - what “green main” means,
   - what checks are required,
@@ -512,7 +512,7 @@ Important:
 
 - Do not rename workflow/job IDs after you enable required checks, or GitHub will treat them as missing.
 - Cross-repo e2e checks require a token if the sibling repo is private:
-  - Secret: `HEALTHARCHIVE_CI_READ_TOKEN` (documented in `../operations/monitoring-and-ci-checklist.md`).
+  - Secret: `HEALTHARCHIVE_CI_READ_TOKEN` (documented in `docs/operations/monitoring-and-ci-checklist.md`).
 
 1.4 Implement missing governance artifacts (datasets repo)
 - Add `CODEOWNERS` and a PR template to datasets repo if absent, consistent with backend/frontend.
@@ -543,7 +543,7 @@ Phase exit criteria:
 
 #### Phase 1 notes (completed 2026-01-03)
 
-- Policy documentation updated (canonical): `../operations/monitoring-and-ci-checklist.md`
+- Policy documentation updated (canonical): `docs/operations/monitoring-and-ci-checklist.md`
   - Adds Mode A vs Mode B framing, includes datasets in “run checks before push”, and records a check-name inventory.
 - Datasets repo governance artifacts added:
   - `.github/CODEOWNERS`, `.github/pull_request_template.md`
@@ -705,14 +705,14 @@ Phase exit criteria:
 #### Phase 3 notes (completed 2026-01-03)
 
 - Added URL canonicalization so `includeDuplicates` is removed automatically when `view=pages` (no-op flag).
-  - Implementation: `../../../healtharchive-frontend/src/app/[locale]/archive/page.tsx`
+  - Implementation: `healtharchive-frontend/src/app/[locale]/archive/page.tsx`
 - Improved UI discoverability with an inline tooltip explaining what “Include duplicates” means (snapshots view).
-  - Implementation: `../../../healtharchive-frontend/src/app/[locale]/archive/page.tsx`
+  - Implementation: `healtharchive-frontend/src/app/[locale]/archive/page.tsx`
 - Added regression tests covering URL semantics and filter round-trips:
-  - `../../../healtharchive-frontend/tests/archive.test.tsx`
-  - `../../../healtharchive-frontend/tests/searchWithinResults.test.tsx`
+  - `healtharchive-frontend/tests/archive.test.tsx`
+  - `healtharchive-frontend/tests/searchWithinResults.test.tsx`
 - Documented the stable `/archive` query param contract:
-  - `../../../healtharchive-frontend/docs/implementation-guide.md`
+  - `healtharchive-frontend/docs/implementation-guide.md`
 
 ---
 
@@ -734,8 +734,8 @@ Recommended split:
 
 - Private contact tracker (not in git): a local notes file, password manager notes, or a private spreadsheet.
 - Public-safe logs:
-  - Mentions/citations log: use `../operations/mentions-log-template.md` as the format.
-  - Adoption signals entries (quarterly): store on VPS under `/srv/healtharchive/ops/adoption/` (see `../operations/playbooks/adoption-signals.md`).
+  - Mentions/citations log: use `docs/operations/mentions-log-template.md` as the format.
+  - Adoption signals entries (quarterly): store on VPS under `/srv/healtharchive/ops/adoption/` (see `docs/operations/playbooks/adoption-signals.md`).
 
 4.2 Build a target list (distribution partners + verifiers)
 
@@ -761,7 +761,7 @@ For each candidate, collect privately:
 
 4.3 Outreach cadence (execute using templates)
 
-Use `../operations/outreach-templates.md`:
+Use `docs/operations/outreach-templates.md`:
 
 - Send initial outreach (Template A/B/C).
 - Follow-up at 1 week.
@@ -775,7 +775,7 @@ Record (privately):
 
 4.4 Partner kit usage (public assets)
 
-Reference internal guide: `../operations/partner-kit.md`.
+Reference internal guide: `docs/operations/partner-kit.md`.
 
 Operational checklist:
 
@@ -788,7 +788,7 @@ Operational checklist:
 
 4.5 Verification workflow
 
-Use `../operations/verification-packet.md` as the packet outline:
+Use `docs/operations/verification-packet.md` as the packet outline:
 
 - Fill metrics from `/status` (public numbers only).
 - Provide the verifier a short list of what verification means, and ask for permission to name them publicly.
@@ -798,7 +798,7 @@ Use `../operations/verification-packet.md` as the packet outline:
 
 Create a real mentions log (not just the template) and keep it current:
 
-- Start from `../operations/mentions-log-template.md`.
+- Start from `docs/operations/mentions-log-template.md`.
 - Add entries only when there is a public link and permission to name (or record “Pending”).
 
 4.7 Healthchecks.io alignment (ongoing hygiene)
@@ -811,8 +811,8 @@ Define a quarterly (or per-change) procedure:
 
 Canonical refs:
 
-- `../deployment/systemd/README.md`
-- `../deployment/production-single-vps.md`
+- `docs/deployment/systemd/README.md`
+- `docs/deployment/production-single-vps.md`
 
 Phase exit criteria:
 - At least one distribution partner and verifier secured (with permission).
@@ -822,11 +822,11 @@ Phase exit criteria:
 #### Phase 4 notes (scaffolding completed 2026-01-03; execution is operator-only)
 
 - Added an operator playbook to run outreach and verification work in a privacy-safe way:
-  - `../operations/playbooks/outreach-and-verification.md`
+  - `docs/operations/playbooks/outreach-and-verification.md`
 - Created a public-safe mentions log (link-only; do not name without permission):
-  - `../operations/mentions-log.md`
+  - `docs/operations/mentions-log.md`
 - Updated ops indexes so the playbook and log are discoverable:
-  - `../operations/README.md`, `../operations/playbooks/README.md`, `../operations/ops-cadence-checklist.md`
+  - `docs/operations/README.md`, `docs/operations/playbooks/README.md`, `docs/operations/ops-cadence-checklist.md`
 
 ---
 
@@ -853,5 +853,5 @@ Phase exit criteria:
 
 #### Phase 5 notes (completed 2026-01-03)
 
-- Updated backlog (`future-roadmap.md`) so completed items are removed and ongoing operator-only work points to playbooks/logs instead of an “active plan”.
+- Updated backlog (`docs/roadmaps/future-roadmap.md`) so completed items are removed and ongoing operator-only work points to playbooks/logs instead of an “active plan”.
 - Archived this plan and updated roadmap indexes (`docs/roadmaps/README.md`, `docs/roadmaps/implemented/README.md`).

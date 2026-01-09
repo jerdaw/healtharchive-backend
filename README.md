@@ -19,6 +19,11 @@ VPS + Tailscale-only SSH + nightly backups), see
 `docs/deployment/production-single-vps.md`.
 This README is intentionally shorter and focused on practical usage.
 
+Related repositories (project is multi-repo):
+
+- Frontend UI: https://github.com/jerdaw/healtharchive-frontend
+- Dataset releases: https://github.com/jerdaw/healtharchive-datasets
+
 Production entrypoints (VPS):
 
 - Deploy gate (includes baseline drift + public surface checks):
