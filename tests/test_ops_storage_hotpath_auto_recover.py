@@ -358,3 +358,112 @@ def test_storage_hotpath_watchdog_apply_does_not_start_worker_if_inactive(
     flattened = [" ".join(c) for c in calls]
     assert not any(c.startswith("systemctl stop healtharchive-worker.service") for c in flattened)
     assert not any(c.startswith("systemctl start healtharchive-worker.service") for c in flattened)
+
+
+def test_storage_hotpath_watchdog_simulate_broken_path_dry_run_drill(
+    tmp_path, monkeypatch, capsys
+) -> None:
+    mod = _load_script_module(
+        "vps-storage-hotpath-auto-recover.py",
+        module_name="ha_test_vps_storage_hotpath_auto_recover_simulate",
+    )
+    _init_test_db(tmp_path, monkeypatch, "hotpath_simulate.db")
+
+    jobs_root = tmp_path / "jobs"
+    output_dir = jobs_root / "hc" / "jobdir"
+    storagebox_mount = tmp_path / "storagebox"
+    storagebox_mount.mkdir(parents=True)
+
+    with get_session() as session:
+        seed_sources(session)
+        session.flush()
+        hc = session.query(Source).filter_by(code="hc").one()
+        job = ArchiveJob(
+            source=hc,
+            name="hc-20260101",
+            status="running",
+            started_at=datetime.now(timezone.utc),
+            output_dir=str(output_dir),
+            config={},
+        )
+        session.add(job)
+        session.flush()
+
+    # No real filesystem failure: only the simulation flag should make the script "detect" a problem.
+    monkeypatch.setattr(mod, "_probe_readable_dir", lambda _p: (1, -1))
+    monkeypatch.setattr(mod, "_systemctl_is_active", lambda _u: True)
+    monkeypatch.setattr(
+        mod,
+        "_get_mount_info",
+        lambda _p: {"source": "dummy", "target": str(output_dir), "fstype": "fuse.sshfs"},
+    )
+
+    state_file = tmp_path / "state.json"
+    lock_file = tmp_path / "lock"
+    out_dir = tmp_path / "out"
+    sentinel = tmp_path / "sentinel"
+    manifest = tmp_path / "warc-tiering.binds"
+    manifest.write_text(f"{tmp_path / 'cold'} {tmp_path / 'hot'}\n", encoding="utf-8")
+
+    rc = mod.main(
+        [
+            "--jobs-root",
+            str(jobs_root),
+            "--storagebox-mount",
+            str(storagebox_mount),
+            "--manifest",
+            str(manifest),
+            "--state-file",
+            str(state_file),
+            "--lock-file",
+            str(lock_file),
+            "--sentinel-file",
+            str(sentinel),
+            "--textfile-out-dir",
+            str(out_dir),
+            "--textfile-out-file",
+            "hotpath.prom",
+            "--simulate-broken-path",
+            str(output_dir),
+            # Make this a fast, self-contained drill (no need to run twice).
+            "--confirm-runs",
+            "1",
+            "--min-failure-age-seconds",
+            "0",
+        ]
+    )
+    assert rc == 0
+
+    captured = capsys.readouterr()
+    assert "DRILL: simulate-broken-path active" in captured.out
+    assert "DRY-RUN: detected" in captured.out
+    assert "Planned actions (dry-run):" in captured.out
+
+    prom = (out_dir / "hotpath.prom").read_text(encoding="utf-8")
+    assert "healtharchive_storage_hotpath_auto_recover_detected_targets 1" in prom
+
+    # Safety: simulation should never be allowed in apply mode.
+    rc_apply = mod.main(
+        [
+            "--apply",
+            "--jobs-root",
+            str(jobs_root),
+            "--storagebox-mount",
+            str(storagebox_mount),
+            "--manifest",
+            str(manifest),
+            "--state-file",
+            str(state_file),
+            "--lock-file",
+            str(lock_file),
+            "--sentinel-file",
+            str(sentinel),
+            "--textfile-out-dir",
+            str(out_dir),
+            "--textfile-out-file",
+            "hotpath.prom",
+            "--simulate-broken-path",
+            str(output_dir),
+        ]
+    )
+    assert rc_apply == 2
