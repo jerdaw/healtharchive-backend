@@ -209,8 +209,6 @@ def find_latest_config_yaml(temp_dir_path: Path) -> Optional[Path]:
     Zimit's on-disk layout can vary slightly across versions, so we probe a
     small set of known patterns in preference order.
     """
-    latest_mod_time: float = 0.0
-    latest_yaml: Optional[Path] = None
     patterns = [
         # Preferred (documented) zimit layout.
         "collections/crawl-*/crawls/crawl-*.yaml",
@@ -234,6 +232,8 @@ def find_latest_config_yaml(temp_dir_path: Path) -> Optional[Path]:
         return None
     try:
         for search_pattern_str in patterns:
+            latest_mod_time: float = 0.0
+            latest_yaml: Optional[Path] = None
             logger.debug(
                 "Searching for resume config YAML pattern '%s' in directory: %s",
                 search_pattern_str,
@@ -267,6 +267,71 @@ def find_latest_config_yaml(temp_dir_path: Path) -> Optional[Path]:
 
     logger.info(f"No config YAML files found in subdirs of {temp_dir_path}.")
     return None
+
+
+def get_stable_resume_config_path(host_output_dir: Path) -> Path:
+    """
+    Return the stable resume-config path under a job's output dir.
+
+    This acts as a durability shim: even if zimit's `.tmp*` directory selection
+    is ambiguous, we keep a best-effort copy in a stable location so a retry can
+    resume the crawl queue when possible.
+    """
+    return host_output_dir / constants.RESUME_CONFIG_FILE_NAME
+
+
+def find_stable_resume_config(host_output_dir: Path) -> Optional[Path]:
+    path = get_stable_resume_config_path(host_output_dir)
+    try:
+        if path.is_file():
+            return path.resolve()
+    except OSError as exc:
+        logger.warning("Stable resume config unreadable: %s (%s)", path, exc)
+        return None
+    return None
+
+
+def persist_resume_config(config_yaml_path: Path, host_output_dir: Path) -> Optional[Path]:
+    """
+    Best-effort: copy a discovered resume YAML into the stable location.
+    """
+    dest = get_stable_resume_config_path(host_output_dir)
+    try:
+        content = config_yaml_path.read_bytes()
+    except OSError as exc:
+        logger.warning("Could not read resume config YAML %s: %s", config_yaml_path, exc)
+        return None
+
+    try:
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        tmp = dest.with_suffix(f"{dest.suffix}.tmp.{os.getpid()}")
+        tmp.write_bytes(content)
+        tmp.replace(dest)
+        return dest.resolve()
+    except OSError as exc:
+        logger.warning("Could not persist resume config YAML to %s: %s", dest, exc)
+        return None
+
+
+def find_latest_config_yaml_in_temp_dirs(temp_dirs: List[Path]) -> Optional[Path]:
+    """
+    Find the newest config YAML across all tracked `.tmp*` directories.
+    """
+
+    best: Optional[Path] = None
+    best_mtime: float = 0.0
+    for temp_dir in temp_dirs:
+        candidate = find_latest_config_yaml(temp_dir)
+        if candidate is None:
+            continue
+        try:
+            mtime = candidate.stat().st_mtime
+        except OSError:
+            mtime = 0.0
+        if best is None or mtime > best_mtime:
+            best = candidate
+            best_mtime = mtime
+    return best
 
 
 def find_all_warc_files(temp_dir_paths: List[Path]) -> List[Path]:
