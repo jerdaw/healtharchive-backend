@@ -163,3 +163,57 @@ def test_cli_verify_warcs_can_quarantine_and_mark_retryable(tmp_path: Path, monk
         assert stored_job is not None
         assert stored_job.status == "retryable"
         assert stored_job.retry_count == 0
+
+
+def test_cli_verify_warcs_level0_does_not_coerce_to_level1(tmp_path: Path, monkeypatch) -> None:
+    _init_test_db(tmp_path, monkeypatch)
+
+    output_dir = tmp_path / "job-output"
+    warcs_dir = output_dir / "warcs"
+    warcs_dir.mkdir(parents=True, exist_ok=True)
+
+    # Level 0 should only do basic read checks; it must not attempt gzip
+    # decompression and should therefore accept non-gzip files.
+    not_gzip = warcs_dir / "not-gzip.warc.gz"
+    not_gzip.write_bytes(b"not a gzip stream, but readable")
+
+    with get_session() as session:
+        src = Source(code="hc", name="Health Canada", enabled=True)
+        session.add(src)
+        session.flush()
+
+        created_job = ArchiveJob(
+            source_id=src.id,
+            name="hc-verify-level0",
+            output_dir=str(output_dir),
+            status="completed",
+            retry_count=0,
+        )
+        session.add(created_job)
+        session.flush()
+        job_id = created_job.id
+
+    parser = cli_module.build_parser()
+    args = parser.parse_args(
+        [
+            "verify-warcs",
+            "--job-id",
+            str(job_id),
+            "--level",
+            "0",
+            "--limit-warcs",
+            "1",
+        ]
+    )
+
+    stdout = StringIO()
+    old_stdout = sys.stdout
+    try:
+        sys.stdout = stdout
+        args.func(args)
+    finally:
+        sys.stdout = old_stdout
+
+    out = stdout.getvalue()
+    assert "level:         0" in out
+    assert "failed=0" in out
