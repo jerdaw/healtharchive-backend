@@ -217,3 +217,52 @@ def test_cli_verify_warcs_level0_does_not_coerce_to_level1(tmp_path: Path, monke
     out = stdout.getvalue()
     assert "level:         0" in out
     assert "failed=0" in out
+
+
+def test_cli_verify_warcs_writes_default_json_report(tmp_path: Path, monkeypatch) -> None:
+    _init_test_db(tmp_path, monkeypatch)
+
+    output_dir = tmp_path / "job-output"
+    warcs_dir = output_dir / "warcs"
+    warcs_dir.mkdir(parents=True, exist_ok=True)
+
+    warc = warcs_dir / "good.warc.gz"
+    _write_test_warc_gz(warc)
+
+    with get_session() as session:
+        src = Source(code="hc", name="Health Canada", enabled=True)
+        session.add(src)
+        session.flush()
+
+        created_job = ArchiveJob(
+            source_id=src.id,
+            name="hc-verify-default-json",
+            output_dir=str(output_dir),
+            status="completed",
+            retry_count=0,
+        )
+        session.add(created_job)
+        session.flush()
+        job_id = created_job.id
+
+    parser = cli_module.build_parser()
+    args = parser.parse_args(
+        [
+            "verify-warcs",
+            "--job-id",
+            str(job_id),
+            "--level",
+            "0",
+            "--limit-warcs",
+            "1",
+        ]
+    )
+
+    args.func(args)
+
+    reports_dir = output_dir / "warc_verify"
+    assert reports_dir.is_dir()
+    report_files = list(reports_dir.glob(f"verify-warcs-{job_id}-*.json"))
+    assert len(report_files) == 1
+    payload = report_files[0].read_text(encoding="utf-8")
+    assert '"warcsTotal"' in payload
