@@ -85,7 +85,7 @@ Recovery restored a writable output directory and reset the job’s retry budget
       /opt/healtharchive-backend/.venv/bin/python3 - <<'PY'
       from ha_backend.db import get_session
       from ha_backend.models import ArchiveJob
-      
+
       job_id = 7
       with get_session() as session:
           job = session.get(ArchiveJob, job_id)

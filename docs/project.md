@@ -37,4 +37,3 @@ Some docs refer to sibling repos using paths like `healtharchive-frontend/...`.
 Those references assume a local “sibling repos” workspace (like
 `/home/jer/LocalSync/healtharchive/`). When browsing a single repo on GitHub,
 use the GitHub links above to navigate instead.
-
