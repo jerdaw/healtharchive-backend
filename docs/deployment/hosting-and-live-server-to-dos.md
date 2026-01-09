@@ -286,7 +286,7 @@ Checklist for each non‑dev environment:
     to ensure temp artifacts are being pruned over time.
 
 For local development it is sufficient to keep `HEALTHARCHIVE_ARCHIVE_ROOT`
-inside the repo (e.g. `./.dev-archive-root`) and delete it manually when you
+inside the repo (e.g. `<./.dev-archive-root>`) and delete it manually when you
 want a clean slate.
 
 ---
