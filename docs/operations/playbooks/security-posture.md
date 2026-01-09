@@ -7,7 +7,7 @@ Canonical references:
 - Production runbook: `../../deployment/production-single-vps.md`
 - Hosting checklist (TLS/HSTS): `../../deployment/hosting-and-live-server-to-dos.md`
 - Env wiring + CORS: `../../deployment/environments-and-configuration.md`
-- Admin verification: `../../scripts/verify-security-and-admin.sh`
+- Admin verification: `./scripts/verify-security-and-admin.sh`
 
 ## Secrets discipline (always)
 

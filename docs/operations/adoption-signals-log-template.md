@@ -10,7 +10,7 @@ Recommended cadence: **quarterly**.
 Suggested location on the VPS:
 
 - `/srv/healtharchive/ops/adoption/`
-- One file per quarter (e.g., `2026-Q1.md`)
+- One file per quarter (e.g., `YYYY-QN.md`)
 
 ## Adoption signals — YYYY-QN (UTC)
 

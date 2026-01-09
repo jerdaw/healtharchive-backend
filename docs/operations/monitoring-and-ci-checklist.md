@@ -96,7 +96,7 @@ Where it runs:
 
 - Backend repo CI: `.github/workflows/backend-ci.yml` job `e2e-smoke`
   - Tests backend changes against latest frontend `main`.
-- Frontend repo CI: `.github/workflows/frontend-ci.yml` job `e2e-smoke`
+- Frontend repo CI: `healtharchive-frontend/.github/workflows/frontend-ci.yml` job `e2e-smoke`
   - Tests frontend changes against latest backend `main`.
 - If cross-repo checkout fails (private repo), set a repo secret:
   - `HEALTHARCHIVE_CI_READ_TOKEN` (PAT with read access)
@@ -497,7 +497,7 @@ Tune these based on actual volumes and acceptable thresholds.
 Workflows live at:
 
 - Backend: `.github/workflows/backend-ci.yml`
-- Frontend: `.github/workflows/frontend-ci.yml`
+- Frontend: `healtharchive-frontend/.github/workflows/frontend-ci.yml`
 
 Each should:
 

@@ -12,6 +12,8 @@ This checklist is intentionally short. If a task feels too heavy to do regularly
   - `cd /opt/healtharchive-backend && ./scripts/vps-deploy.sh --apply --baseline-mode live`
 - **Verify observability is still healthy** (internal; loopback-only):
   - `cd /opt/healtharchive-backend && ./scripts/vps-verify-observability.sh`
+- **Update docs if reality changed**
+  - If you had to do manual steps not captured in a runbook/playbook, update the canonical doc(s) so the next deploy is repeatable.
 - If the deploy script fails, **don’t retry blindly**:
   - read the drift report / verifier output
   - fix the underlying mismatch (policy vs reality)
@@ -55,7 +57,9 @@ See: `../deployment/systemd/README.md`
   - Note any incidents, slowdowns, or crawl failures.
   - Confirm `/status` and `/impact` look reasonable and are current.
 - **Changelog update**
-  - Add a short entry in `/changelog` reflecting meaningful updates.
+  - Add a short entry in `/changelog` reflecting meaningful updates (process: `healtharchive-frontend/docs/changelog-process.md`).
+- **Docs drift skim** (10 minutes)
+  - Skim the production runbook + any playbooks you used recently; fix drift you notice.
 - **Search quality spot-check** (lightweight)
   - Run a few common queries on `/archive` and ensure results look plausible.
 - **Automation sanity check**
@@ -68,6 +72,8 @@ See: `../deployment/systemd/README.md`
 - **Dataset release integrity**
   - Confirm a dataset release exists for the expected quarter/date.
   - Verify checksums: `sha256sum -c SHA256SUMS` (see `dataset-release-runbook.md`).
+- **Docs maintenance**
+  - Re-read `incidents/severity.md` + `playbooks/incident-response.md` and ensure they match current reality.
 - **Adoption signals entry** (public-safe)
   - Add a dated entry under `/srv/healtharchive/ops/adoption/` (links + aggregates only).
 - **Mentions log refresh** (public-safe)
@@ -96,4 +102,5 @@ See: `../deployment/systemd/README.md`
 
 - **Changelog**: public-facing changes and policy updates.
 - **Impact report**: monthly coverage + reliability + usage snapshot.
+- **Incident notes**: for outages/degradations/manual interventions: `incidents/README.md`.
 - **Internal ops log**: optional private notes (date + key checks + issues).

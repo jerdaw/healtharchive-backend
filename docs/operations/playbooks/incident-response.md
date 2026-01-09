@@ -7,6 +7,17 @@ Canonical references:
 - Production runbook: `../../deployment/production-single-vps.md`
 - Monitoring checklist: `../monitoring-and-ci-checklist.md`
 - Baseline drift: `../baseline-drift.md`
+- Incident notes (template + where to file): `../incidents/README.md`
+
+## First: start an incident note
+
+As soon as you suspect this is “an incident” (not routine maintenance), start a note so you can record a timeline and the exact recovery steps.
+
+- Create a new file: `docs/operations/incidents/YYYY-MM-DD-short-slug.md`
+- Copy the template: `docs/operations/incidents/incident-template.md`
+- Pick an initial severity using: `docs/operations/incidents/severity.md`
+
+If you can’t easily edit the repo on the VPS, capture the note in a local scratchpad and copy it into the repo later.
 
 ## When the site/API looks broken
 

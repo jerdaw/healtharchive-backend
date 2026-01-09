@@ -668,7 +668,7 @@ When complete:
 - Risk: bilingual content behaves poorly with stemming/tokenization.
   - Mitigation: keep `TS_CONFIG='simple'`; include French smoke tests in golden queries.
 - Risk: regressions hidden by updated expectations.
-  - Mitigation: treat `search-golden-queries.md` as a contract; update only when coverage changes.
+- Mitigation: treat `docs/operations/search-golden-queries.md` as a contract; update only when coverage changes.
 
 ---
 
