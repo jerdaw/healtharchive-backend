@@ -11,6 +11,7 @@ Rules:
 - Keep them brief and procedural.
 - Avoid duplicating canonical docs; link to the runbook/checklist that owns the details.
 - Prefer stable command entrypoints (scripts) so steps don’t drift.
+- Use the template for new playbooks: `playbook-template.md`
 
 Recommended starting points:
 

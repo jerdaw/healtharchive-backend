@@ -5,10 +5,14 @@ This folder contains the canonical documentation for the **HealthArchive backend
 
 ## Recommended reading order
 
+0. Project docs portal (multi-repo navigation)
+   - `project.md`
 1. Architecture & implementation (how the code works)
    - `architecture.md`
 2. Documentation guidelines (how docs stay sane)
    - `documentation-guidelines.md`
+   - `documentation-process-audit.md` (audit of doc processes; 2026-01-09)
+   - `decisions/README.md` (decision records for high-stakes choices)
 3. Local development / live testing (how to run it locally)
    - `development/live-testing.md`
    - `development/dev-environment-setup.md` (local setup + local vs VPS guidance)

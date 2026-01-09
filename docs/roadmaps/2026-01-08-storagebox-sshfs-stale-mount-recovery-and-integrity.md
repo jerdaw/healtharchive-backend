@@ -350,6 +350,69 @@ This plan is “done” when all of the following are true in production:
    - indexing continues and does not silently miss valid WARCs.
 5) Job retry semantics are improved so infra failures do **not** burn crawl retry budgets (or at minimum, are clearly separated and visible).
 
+## Implementation audit (status + deviations)
+
+This section maps each phase’s deliverables to concrete repo artifacts and notes any production-only enablement that may still be pending (e.g., deferred to avoid interrupting an active annual crawl).
+
+### Status summary (repo)
+
+- **Phase 0 (docs): implemented**
+  - Operator playbook: `docs/operations/playbooks/storagebox-sshfs-stale-mount-recovery.md`
+  - Production runbook update: `docs/deployment/production-single-vps.md`
+  - Drills playbook: `docs/operations/playbooks/storagebox-sshfs-stale-mount-drills.md`
+- **Phase 1 (observability hardening): implemented**
+  - Crawl metrics hardening + new per-job probes: `scripts/vps-crawl-metrics-textfile.py`
+  - Shared crawl log parsing hardening: `src/ha_backend/crawl_stats.py`
+  - Tiering metrics (manifest hot paths + systemd state): `scripts/vps-tiering-metrics-textfile.py`
+  - Alerts: `ops/observability/alerting/healtharchive-alerts.yml`
+  - Tests: `tests/test_ops_metrics_textfile_scripts.py`, `scripts/verify_healthchecks_alignment.py`
+- **Phase 2 (auto-recovery watchdog): implemented (shipped disabled-by-default)**
+  - Watchdog script: `scripts/vps-storage-hotpath-auto-recover.py`
+  - Systemd templates: `docs/deployment/systemd/healtharchive-storage-hotpath-auto-recover.service`, `docs/deployment/systemd/healtharchive-storage-hotpath-auto-recover.timer`
+  - Unit enablement docs: `docs/deployment/systemd/README.md`
+  - Tiering scripts made watchdog-friendly:
+    - `scripts/vps-warc-tiering-bind-mounts.sh` (includes `--repair-stale-mounts`)
+    - `scripts/vps-annual-output-tiering.py` (includes `--repair-stale-mounts`)
+  - Tests: `tests/test_ops_storage_hotpath_auto_recover.py`
+- **Phase 3 (worker + job lifecycle robustness): implemented**
+  - Infra error taxonomy helpers: `src/ha_backend/infra_errors.py`
+  - Exception-safe job runner with infra classification: `src/ha_backend/jobs.py`
+  - Worker retry semantics honoring infra classification: `src/ha_backend/worker/main.py`
+    - Includes an infra-error requeue backoff via `queued_at` (default 120s; configurable via `HEALTHARCHIVE_WORKER_INFRA_ERROR_BACKOFF_SECONDS`) to prevent rapid retry loops when storage is broken.
+  - Tests: `tests/test_jobs_persistent.py`, `tests/test_worker.py`
+- **Phase 4 (integrity + completeness): implemented**
+  - WARC verify core: `src/ha_backend/indexing/warc_verify.py`
+  - CLI entrypoint: `src/ha_backend/cli.py` (`ha-backend verify-warcs`)
+  - Pre-index verification safety rail: `src/ha_backend/indexing/pipeline.py` (level configurable via env)
+  - Resume/completeness hardening: `src/archive_tool/constants.py`, `src/archive_tool/utils.py`, `src/archive_tool/main.py`, `src/archive_tool/state.py`
+  - Playbook: `docs/operations/playbooks/warc-integrity-verification.md`
+  - Tests: `tests/test_warc_verify.py`, `tests/test_archive_tool_temp_dir_discovery.py`
+- **Phase 5 (tests + drills): implemented**
+  - Watchdog dry-run simulation flag: `scripts/vps-storage-hotpath-auto-recover.py` (`--simulate-broken-path`)
+  - Alert pipeline drill:
+    - Rule: `ops/observability/alerting/healtharchive-alerts.yml` (`HealthArchiveAlertPipelineDrill`)
+    - Installer routing drill severity to null receiver: `scripts/vps-install-observability-alerting.sh`
+    - Drill script: `scripts/vps-alert-pipeline-drill.sh`
+
+### Deviations from the original Phase 2 sketch (intentional)
+
+- The Phase 2 watchdog **re-applies tiering by running scripts** (paths configurable) rather than restarting the tiering systemd units directly.
+  - Rationale: keep behavior explicit, idempotent, and self-contained in the watchdog (units may differ across hosts).
+- The Phase 2 script’s “restart wait” flags are named:
+  - `--restart-wait-seconds` and `--restart-probe-interval-seconds` (not the earlier placeholder names).
+
+### Production enablement / follow-ups (operator action; may be deferred mid-crawl)
+
+- **Enable Phase 2 automation (optional; high impact):**
+  - Create sentinel: `/etc/healtharchive/storage-hotpath-auto-recover-enabled`
+  - Enable timer: `systemctl enable --now healtharchive-storage-hotpath-auto-recover.timer`
+  - Note: enabling during an active crawl is intentionally conservative; schedule for a maintenance window if you want “zero chance” of accidental worker interruption.
+  - Operational note: if you are auditing this after an incident during an active annual crawl, it is reasonable to leave this disabled until the crawl completes.
+- **Healthchecks parity (external/operator-only):**
+  - Update the Healthchecks UI and/or `/etc/healtharchive/healthchecks.env` if you want this timer covered (see `docs/operations/playbooks/healthchecks-parity.md`).
+- **Full recovery drill (Phase 5.2):**
+  - Not expected to be run on production outside a maintenance window; use staging if/when available.
+
 ## Roadmap / implementation plan (sequenced work)
 
 This plan is intentionally **sequential** and biased toward “ship the safest detection first”.
@@ -668,7 +731,8 @@ Policy decisions (explicitly decide and record):
 - Trigger conditions (any of these should qualify):
   - A running job has `output_dir_ok=0` with errno=107 for **>= 2 minutes**, confirmed by **2 consecutive watchdog runs**.
   - Tiering manifest contains hot paths with `hot_path_ok=0` and errno=107 for **>= 2 minutes**, confirmed by **2 consecutive watchdog runs**.
-  - Optional: base Storage Box mount unreadable for **>= 2 minutes** (already alerted; watchdog can act sooner if it sees errno=107).
+  - Optional (not currently a standalone trigger): base Storage Box mount unreadable for **>= 2 minutes**.
+    - Note: the Phase 2 watchdog does probe the base mount and will restart it **as part of a recovery** if it detects it is unhealthy, but it does not currently run solely because the base mount is down (hot-path triggers remain the primary signal).
 
 - Actions allowed (ordered from least to most invasive):
   1) stop worker (to prevent further filesystem interactions during repair)
@@ -722,7 +786,7 @@ Implementation outline:
   - `--max-recoveries-per-job-per-day` (default: `3`)
   - `--min-failure-age-seconds` (default: `120`; do not react to a single transient stat failure)
   - `--cooldown-seconds` (default: `900`; minimum time between apply-mode recoveries)
-  - `--storagebox-restart-wait-seconds` (default: `60`) and `--storagebox-restart-probe-interval-seconds` (default: `5`)
+  - `--restart-wait-seconds` (default: `60`) and `--restart-probe-interval-seconds` (default: `5`)
 
 - Detection logic (pure; easy to unit test):
   - Probe base mount readability:
@@ -749,8 +813,8 @@ Implementation outline:
      - if it fails and path is still unreadable, fallback to `umount -l <path>`
      - never unmount broad parents (only the specific mountpoint paths)
   5) re-apply tiering:
-     - `systemctl restart healtharchive-warc-tiering.service`
-     - `systemctl start healtharchive-annual-output-tiering.service` (or run the script) so annual job dirs are re-mounted
+     - `scripts/vps-warc-tiering-bind-mounts.sh --apply --manifest ... --storagebox-mount ...`
+     - `scripts/vps-annual-output-tiering.py --apply --year <UTC year>` (or start the systemd unit if you prefer)
   6) recover jobs:
      - Prefer targeted recovery: set only impacted `status=running` jobs to `status=retryable` (based on output_dir unreadable), and annotate `crawler_stage`.
      - Fallback (if targeted DB update is not implemented yet):
@@ -1243,12 +1307,20 @@ If Phase 2 introduces a new timer:
 
 - **Mitigation:** quarantine only for pre-index jobs; treat post-index corruption as a critical incident with a dedicated playbook.
 
-## Open questions to resolve during implementation
+## Resolved questions and follow-ups
 
 1) Are per-job output directories mounted via `sshfs` directly, or via bind mounts from `/srv/healtharchive/storagebox`?
-   - `mount` output during the incident showed `fuse.sshfs` at the hot paths; we should confirm the intended architecture in code/scripts.
+   - Confirmed in production output during the incident: **direct `sshfs` mounts** at per-job output dirs and imports hot paths (fstype `fuse.sshfs`), even when the base mount service remained active.
+   - The implementation treats these as “hot paths” and does not assume a single-mount architecture.
 2) Should we consolidate to a single `sshfs` mount (storagebox root) + local bind mounts for job outputs to reduce failure surface?
+   - Not implemented as part of this plan; treated as a potential future infra project with a larger blast radius and replay/perf implications.
 3) Should Errno 107 trigger an immediate “stop all crawling” posture, or can we safely isolate per-job repair while others continue?
+   - Current posture: **stop the worker during recovery** (manual or watchdog) to prevent repeated IO touches while hot paths are stale.
+   - The automation is disabled-by-default and rate-limited; operators can defer enabling during active crawls if desired.
 4) What is the minimal integrity check that catches the majority of real corruption without being expensive on the VPS?
+   - Implemented: Level 0 always-on pre-index; Level 1 gzip checks are available and recommended for post-incident windows; Level 2 WARC parsing is opt-in/sampled.
+   - CLI: `ha-backend verify-warcs` supports all three levels and bounded work.
 5) Should we tune `sshfs` options (e.g., `kernel_cache`, reconnect/keepalive) to reduce the chance of stale mountpoints, and what is the replay/crawl performance impact?
+   - Not changed in this plan; treat as infra tuning work best done outside the annual crawl window and validated via drills/metrics.
 6) Do we want a dedicated “staging” VPS (even temporary) solely to run full recovery drills without risking the annual crawl?
+   - Not provisioned yet; we implemented production-safe dry-run drills and a no-paging alert pipeline drill, and recommend staging if/when it becomes worthwhile.
