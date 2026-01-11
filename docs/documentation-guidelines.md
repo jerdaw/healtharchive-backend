@@ -4,23 +4,20 @@ Keep documentation accurate, minimal, and easy to maintain across repos.
 
 ## Canonical sources
 
-- Project docs portal (multi-repo navigation): `healtharchive-backend/docs/project.md`
+- **Documentation Site**: Run `make docs-serve` in the backend repo root.
+- **Navigation Config**: `healtharchive-backend/mkdocs.yml` (Source of truth for sidebar structure).
 - Cross-repo environment wiring: `healtharchive-backend/docs/deployment/environments-and-configuration.md`
 - Ops roadmap/todo: `healtharchive-backend/docs/operations/healtharchive-ops-roadmap.md`
-  - Keep the non-git copy in `/home/jer/LocalSync/healtharchive/docs/operations/healtharchive-ops-roadmap.md` synced.
-- Public partner kit and data dictionary:
-  - `healtharchive-frontend/public/partner-kit/healtharchive-brief.md`
-  - `healtharchive-frontend/public/partner-kit/healtharchive-citation.md`
-  - `healtharchive-frontend/public/exports/healtharchive-data-dictionary.md`
 - Future roadmap backlog (not-yet-implemented work): `healtharchive-backend/docs/roadmaps/future-roadmap.md`
 - Implemented plans archive (historical records): `healtharchive-backend/docs/roadmaps/implemented/`
-- Historical upgrade program (archived): `healtharchive-backend/docs/roadmaps/implemented/2025-12-24-6-phase-upgrade-roadmap-2025.md`
+- Frontend documentation: Symlinked under `healtharchive-backend/docs/frontend/`.
 
 ## When adding or changing docs
 
 - Prefer one canonical source. Use pointers elsewhere instead of copying text.
-- Keep docs close to the code they describe; if cross-repo, link to the canonical doc.
-- Update the relevant docs index (`docs/README.md` or `docs/operations/README.md`).
+- Keep docs close to the code they describe.
+- **Registry**: New docs must be added to the `nav` section of `mkdocs.yml` to appear in the sidebar navigation.
+- Use MkDocs Material features like **Admonitions** (`!!! note`), **Tabs**, and **Mermaid** diagrams.
 - Documentation should be English-only; do not duplicate it in other languages.
 - Avoid "phase" labels or other implementation-ordering labels outside `docs/roadmaps` and explicit implementation plans. The order that something was implemented in is not something that needs documentation; rather documentation should focus on key elements of what was implemented, how it was implemented, and how it is to be used.
 - Keep public copy public-safe (no secrets, private emails, or internal IPs).

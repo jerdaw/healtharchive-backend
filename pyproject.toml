@@ -30,6 +30,11 @@ dev = [
   "bandit",
   "pip-audit",
   "pre-commit",
+  "mkdocs-material[imaging]",
+  "mkdocs-monorepo-plugin",
+  "mkdocs-swagger-ui-tag",
+  "cairosvg",
+  "pillow",
 ]
 
 [build-system]

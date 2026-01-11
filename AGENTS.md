@@ -14,8 +14,9 @@
 
 Canonical docs to consult first:
 
-- `docs/project.md` – project docs portal (multi-repo navigation).
-- `docs/README.md` – docs index.
+- **Documentation Site**: Run `make docs-serve` locally to view the unified docs site.
+- **AI Context**: `docs/llms.txt` (Auto-generated context for agents).
+- `mkdocs.yml` – navigation source of truth.
 - `docs/architecture.md` – architecture & implementation details.
 - `docs/documentation-guidelines.md` – documentation policy and canonical sources.
 - `docs/development/live-testing.md` – step-by-step local testing flows.
@@ -28,7 +29,7 @@ Canonical docs to consult first:
 - `docs/deployment/production-single-vps.md` – current production runbook (Hetzner + Tailscale-only SSH, nightly backups, NAS pull).
 - `docs/roadmaps/future-roadmap.md` – backlog of not-yet-implemented work.
 - `docs/roadmaps/implemented/` – historical implementation plans (executed).
-- Frontend bilingual/dev architecture: `../healtharchive-frontend/docs/development/bilingual-dev-guide.md`
+- Frontend bilingual/dev architecture: `docs/frontend/development/bilingual-dev-guide.md` (symlinked)
 
 When you’re doing anything beyond tiny local changes, **open those docs and sync your mental model first**.
 
@@ -47,6 +48,13 @@ From the repo root (Python project):
 
   ```bash
   make check
+  ```
+
+- **Documentation**:
+
+  ```bash
+  make docs-serve  # View the unified site locally
+  make docs-build  # Build static site to site/
   ```
 
 For how to:
@@ -87,6 +95,7 @@ When you change behavior, do routine hygiene in the same series of commits:
   - Playbook: `docs/operations/playbooks/playbook-template.md`
   - Incident note: `docs/operations/incidents/incident-template.md`
   - Decision record: `docs/decisions/decision-template.md`
+- **Update Navigation**: When adding new files, add them to `mkdocs.yml` if you want them in the sidebar.
 - Add/adjust tests for new behavior and bug fixes to prevent regressions.
 - Update `.gitignore` when you introduce new local artifacts, generated files, or caches.
 - Keep things tidy: remove dead code, unused imports, and accidental debug logging; keep scripts safe to re-run.
