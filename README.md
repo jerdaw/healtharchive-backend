@@ -22,7 +22,7 @@ This README is intentionally shorter and focused on practical usage.
 Related repositories (project is multi-repo):
 
 - Frontend UI: https://github.com/jerdaw/healtharchive-frontend
-- Dataset releases: https://github.com/jerdaw/healtharchive-datasets
+- **Documentation Site**: Run `make docs-serve` in the backend repo for a searchable web UI.
 
 Production entrypoints (VPS):
 
@@ -40,12 +40,13 @@ Production entrypoints (VPS):
 ```text
 .
 ├── README.md
-├── docs/
-│   ├── README.md             # Docs index
+├── docs/                     # Documentation Source (MkDocs)
 │   ├── architecture.md       # Detailed architecture and implementation guide
 │   ├── development/          # Local dev + live-testing flows
 │   ├── deployment/           # Deployment/runbooks/checklists
-│   └── operations/           # Monitoring/uptime/CI guidance
+│   ├── operations/           # Monitoring/uptime/CI/Ops guidance
+│   └── frontend/             # [Symlink] Frontend documentation
+├── mkdocs.yml                # Documentation Navigation Source of Truth
 ├── pyproject.toml            # Package + dependency metadata
 ├── requirements.txt          # Convenience requirements file (mirrors pyproject)
 ├── alembic/                  # Database migrations

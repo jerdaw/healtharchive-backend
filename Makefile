@@ -1,4 +1,4 @@
-.PHONY: venv format format-check lint docs-check precommit typecheck test security audit check
+.PHONY: venv format format-check lint precommit typecheck test security audit check docs-serve docs-build
 
 VENV ?= .venv
 VENV_BIN := $(VENV)/bin
@@ -24,8 +24,6 @@ format-check:
 lint:
 	$(RUFF) check .
 
-docs-check:
-	$(PYTHON) ./scripts/check_docs_references.py
 
 precommit:
 	$(PRE_COMMIT) run --all-files
@@ -42,4 +40,14 @@ security:
 audit:
 	$(PIP_AUDIT) || true
 
-check: format-check lint docs-check precommit typecheck test security audit
+docs-serve:
+	PYTHONPATH=src $(VENV_BIN)/python3 scripts/export_openapi.py
+	$(VENV_BIN)/python3 scripts/generate_llms_txt.py
+	$(VENV_BIN)/mkdocs serve
+
+docs-build:
+	PYTHONPATH=src $(VENV_BIN)/python3 scripts/export_openapi.py
+	$(VENV_BIN)/python3 scripts/generate_llms_txt.py
+	$(VENV_BIN)/mkdocs build --strict
+
+check: format-check lint precommit typecheck test security audit docs-build

@@ -1,0 +1,84 @@
+site_name: HealthArchive
+site_url: https://docs.healtharchive.ca
+repo_name: jer/healtharchive
+repo_url: https://github.com/jer/healtharchive
+edit_uri: edit/main/docs/
+
+theme:
+  name: material
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: teal
+      accent: purple
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: teal
+      accent: purple
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.code.annotate
+
+plugins:
+  - search
+  - social
+  - swagger-ui-tag
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.tasklist:
+      custom_checkbox: true
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/jer/healtharchive
+    - icon: fontawesome/brands/twitter
+      link: https://twitter.com/healtharchive
+
+nav:
+  - Home: README.md
+  - Operations:
+      - Overview: operations/README.md
+      - Ops Roadmap: operations/healtharchive-ops-roadmap.md
+      - Incidents:
+          - Overview: operations/incidents/README.md
+          - Storage Hotpath: operations/incidents/2026-01-08-storage-hotpath-sshfs-stale-mount.md
+          - Annual Crawl Stalled: operations/incidents/2026-01-09-annual-crawl-hc-job-stalled.md
+          - PHAC Permission Denied: operations/incidents/2026-01-09-annual-crawl-phac-output-dir-permission-denied.md
+      - Playbooks: operations/playbooks/README.md
+      - Baseline Drift: operations/baseline-drift.md
+      - Dataset Release: operations/dataset-release-runbook.md
+  - Backend:
+      - Architecture: architecture.md
+      - Decisions: decisions/README.md
+      - Deployment: deployment/README.md
+      - Development: development/README.md
+      - Guidelines: documentation-guidelines.md
+  - API: api.md
+  - Frontend:
+      - Overview: frontend/README.md
+      - I18n: frontend/i18n.md
+      - Implementation: frontend/implementation-guide.md
+  - Roadmaps: roadmaps/README.md
