@@ -11,7 +11,7 @@ Before=healtharchive-worker.service
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-ExecStart=/opt/healtharchive-backend/scripts/vps-warc-tiering-bind-mounts.sh --apply
+ExecStart=/opt/healtharchive-backend/scripts/vps-warc-tiering-bind-mounts.sh --apply --repair-stale-mounts
 
 [Install]
 WantedBy=multi-user.target

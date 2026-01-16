@@ -66,8 +66,9 @@ Keep this list short; prefer linking to the canonical doc that explains the item
 
 - Consider whether a separate staging backend is worth it (increases ops surface; only do if it buys real safety).
   - See: `../deployment/environments-and-configuration.md`
-- Storage Box / `sshfs` hot-path health + auto-recovery + data integrity (active plan):
-  - `2026-01-08-storagebox-sshfs-stale-mount-recovery-and-integrity.md`
+- Tiering health alerting:
+  - Enable `healtharchive-tiering-metrics.timer` on the VPS and add alerts on `healtharchive_tiering_*` metrics.
+  - This closes the loop so `healtharchive-warc-tiering.service` failures are visible quickly (not just in `systemctl status`).
 
 ### Repo governance (future)
 

@@ -67,6 +67,7 @@ nav:
           - Storage Hotpath: operations/incidents/2026-01-08-storage-hotpath-sshfs-stale-mount.md
           - Annual Crawl Stalled: operations/incidents/2026-01-09-annual-crawl-hc-job-stalled.md
           - PHAC Permission Denied: operations/incidents/2026-01-09-annual-crawl-phac-output-dir-permission-denied.md
+          - Replay Smoke 503: operations/incidents/2026-01-16-replay-smoke-503-and-warctieringfailed.md
       - Playbooks: operations/playbooks/README.md
       - Baseline Drift: operations/baseline-drift.md
       - Dataset Release: operations/dataset-release-runbook.md

@@ -9,7 +9,7 @@ These drills are designed to be safe on production **even mid-crawl**.
 
 Canonical background:
 
-- Roadmap context: `../../roadmaps/2026-01-08-storagebox-sshfs-stale-mount-recovery-and-integrity.md`
+- Roadmap context: `../../roadmaps/implemented/2026-01-08-storagebox-sshfs-stale-mount-recovery-and-integrity.md`
 - Real incident recovery procedure: `storagebox-sshfs-stale-mount-recovery.md`
 
 ## 0) Safety rules
