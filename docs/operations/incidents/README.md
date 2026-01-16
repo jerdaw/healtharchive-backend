@@ -39,6 +39,7 @@ One file per incident:
 Example:
 
 - `2026-01-09-annual-crawl-phac-output-dir-permission-denied.md`
+- `2026-01-16-replay-smoke-503-and-warctieringfailed.md`
 
 ---
 
