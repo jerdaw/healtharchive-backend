@@ -13,8 +13,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from ha_backend.db import get_session
-from ha_backend.models import ArchiveJob, Source
+DEFAULT_DEPLOY_LOCK_FILE = "/tmp/healtharchive-backend-deploy.lock"
 
 
 @dataclass(frozen=True)
@@ -212,6 +211,20 @@ def _is_unit_present(unit: str) -> bool:
 def _systemctl_is_active(unit: str) -> bool:
     r = _run_read(["systemctl", "is-active", unit])
     return r.stdout.strip() == "active"
+
+
+def _file_age_seconds(path: Path, *, now_utc: datetime) -> float | None:
+    try:
+        st = path.stat()
+    except FileNotFoundError:
+        return None
+    except OSError:
+        return 0.0
+    try:
+        mtime = datetime.fromtimestamp(st.st_mtime, tz=timezone.utc)
+    except (OverflowError, OSError, ValueError):
+        return 0.0
+    return max(0.0, (now_utc - mtime).total_seconds())
 
 
 def _write_metrics(
@@ -456,6 +469,17 @@ def main(argv: list[str] | None = None) -> int:
         help="Path to ha-backend CLI (used for recover-stale-jobs).",
     )
     p.add_argument(
+        "--deploy-lock-file",
+        default=DEFAULT_DEPLOY_LOCK_FILE,
+        help="If this file exists (and is not stale), skip the run to avoid flapping during deploys.",
+    )
+    p.add_argument(
+        "--deploy-lock-max-age-seconds",
+        type=float,
+        default=2 * 60 * 60,
+        help="Treat --deploy-lock-file as stale if older than this; proceed if stale.",
+    )
+    p.add_argument(
         "--textfile-out-dir",
         default="/var/lib/node_exporter/textfile_collector",
         help="node_exporter textfile collector directory.",
@@ -493,11 +517,40 @@ def main(argv: list[str] | None = None) -> int:
     sentinel_file = Path(args.sentinel_file)
     manifest_path = Path(args.manifest)
 
+    deploy_lock_file = Path(str(args.deploy_lock_file))
+    deploy_lock_age_seconds = _file_age_seconds(deploy_lock_file, now_utc=now)
+    if deploy_lock_age_seconds is not None and deploy_lock_age_seconds <= float(
+        args.deploy_lock_max_age_seconds
+    ):
+        state["last_skip_utc"] = now.replace(microsecond=0).isoformat()
+        state["last_skip_reason"] = "deploy_lock"
+        state["last_skip_deploy_lock_file"] = str(deploy_lock_file)
+        state["last_skip_deploy_lock_age_seconds"] = int(deploy_lock_age_seconds)
+        try:
+            _write_metrics(
+                out_dir=Path(str(args.textfile_out_dir)),
+                out_file=str(args.textfile_out_file),
+                sentinel_file=sentinel_file,
+                now_utc=now,
+                state=state,
+                metrics_ok=1,
+                last_apply_ok=int(state.get("last_apply_ok") or 0),
+                last_apply_epoch=int(state.get("last_apply_epoch") or 0),
+                detected_targets=0,
+            )
+        except Exception:
+            pass
+        _save_state(state_path, state)
+        return 0
+
     running_jobs: list[RunningJob] = []
     impacted_sources: set[str] = set()
 
     # Discovery: running jobs (DB) is best-effort; manifest hot paths are independent.
     try:
+        from ha_backend.db import get_session
+        from ha_backend.models import ArchiveJob, Source
+
         with get_session() as session:
             rows = (
                 session.query(
