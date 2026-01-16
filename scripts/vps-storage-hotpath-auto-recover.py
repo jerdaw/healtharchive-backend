@@ -431,6 +431,16 @@ def main(argv: list[str] | None = None) -> int:
         help="Storage Box mount systemd unit to restart if base mount is unhealthy.",
     )
     p.add_argument(
+        "--replay-unit",
+        default="healtharchive-replay.service",
+        help="Replay systemd unit to restart after successful mount recovery (best-effort).",
+    )
+    p.add_argument(
+        "--replay-smoke-unit",
+        default="healtharchive-replay-smoke.service",
+        help="Replay smoke systemd unit to run after successful replay restart (best-effort).",
+    )
+    p.add_argument(
         "--annual-output-tiering-script",
         default="/opt/healtharchive-backend/scripts/vps-annual-output-tiering.py",
         help="Annual output tiering script to re-run after recovery.",
@@ -778,10 +788,17 @@ def main(argv: list[str] | None = None) -> int:
 
         print("")
         print("Planned actions (dry-run):")
-        if worker_was_active:
-            print(f"  1) systemctl stop {args.worker_unit}")
+        if worker_was_active and impacted_sources:
+            print(
+                f"  1) systemctl stop {args.worker_unit} (only if a running job output dir is stale)"
+            )
         else:
-            print(f"  1) (skip) worker not active: {args.worker_unit}")
+            if not worker_was_active:
+                print(f"  1) (skip) worker not active: {args.worker_unit}")
+            else:
+                print(
+                    f"  1) (skip) no running job output dirs impacted; keep worker running: {args.worker_unit}"
+                )
 
         if stale_mountpoints:
             print(f"  2) unmount stale mountpoints ({len(stale_mountpoints)}):")
@@ -826,10 +843,22 @@ def main(argv: list[str] | None = None) -> int:
         else:
             print("  6) (skip) no impacted sources detected; no recover-stale-jobs call planned")
 
-        if worker_was_active:
+        if worker_was_active and impacted_sources:
             print(f"  7) systemctl start {args.worker_unit}")
         else:
-            print("  7) (skip) worker was not active; will not start it")
+            if not worker_was_active:
+                print("  7) (skip) worker was not active; will not start it")
+            else:
+                print("  7) (skip) worker was kept running; no start needed")
+
+        if _is_unit_present(str(args.replay_unit)):
+            print(
+                f"  8) systemctl restart {args.replay_unit} (best-effort; replay should see clean mounts)"
+            )
+            if _is_unit_present(str(args.replay_smoke_unit)):
+                print(f"  9) systemctl start {args.replay_smoke_unit} (best-effort)")
+        else:
+            print(f"  8) (skip) replay unit not present: {args.replay_unit}")
 
         return finish(0)
 
@@ -853,10 +882,14 @@ def main(argv: list[str] | None = None) -> int:
         errors.append(s)
 
     worker_was_active = _systemctl_is_active(str(args.worker_unit))
-    if worker_was_active:
+    worker_stopped = False
+    should_quiesce_worker = worker_was_active and bool(impacted_sources)
+    if should_quiesce_worker:
         cp = _run_apply(["systemctl", "stop", str(args.worker_unit)], timeout_seconds=30)
         if cp.returncode != 0:
             note_err("systemctl stop worker failed", cp)
+        else:
+            worker_stopped = True
 
     stale_mountpoints: list[dict] = []
     for info in eligible:
@@ -882,22 +915,29 @@ def main(argv: list[str] | None = None) -> int:
             }
         )
 
+    did_unmount = False
     for item in stale_mountpoints:
         path = item["path"]
         cp = _run_apply(["umount", path], timeout_seconds=10)
         if cp.returncode == 0:
+            did_unmount = True
             continue
         cp2 = _run_apply(["umount", "-l", path], timeout_seconds=10)
         if cp2.returncode != 0:
             note_err(f"umount failed path={path}", cp2)
+        else:
+            did_unmount = True
 
     storage_ok, storage_errno = _probe_readable_dir(storagebox_mount)
+    did_restart_storagebox = False
+    did_apply_tiering = False
     if storage_ok == 0:
         if _is_unit_present(str(args.storagebox_unit)):
             cp = _run_apply(["systemctl", "restart", str(args.storagebox_unit)], timeout_seconds=60)
             if cp.returncode != 0:
                 note_err("systemctl restart storagebox failed", cp)
             else:
+                did_restart_storagebox = True
                 deadline = time.monotonic() + float(args.restart_wait_seconds)
                 while time.monotonic() < deadline:
                     ok, _errno = _probe_readable_dir(storagebox_mount)
@@ -931,6 +971,8 @@ def main(argv: list[str] | None = None) -> int:
             )
             if cp.returncode != 0:
                 note_err("tiering bind mounts apply failed", cp)
+            else:
+                did_apply_tiering = True
         else:
             errors.append(f"tiering apply script not found: {tiering_script}")
 
@@ -988,7 +1030,18 @@ def main(argv: list[str] | None = None) -> int:
     if errors:
         post_ok = False
 
-    if post_ok and worker_was_active:
+    # If we changed mounts, restart replay so it sees a clean view of /srv/healtharchive/jobs.
+    if post_ok and (did_unmount or did_restart_storagebox or did_apply_tiering):
+        if _is_unit_present(str(args.replay_unit)):
+            cp = _run_apply(["systemctl", "restart", str(args.replay_unit)], timeout_seconds=60)
+            if cp.returncode != 0:
+                note_err("systemctl restart replay failed", cp)
+                post_ok = False
+        if _is_unit_present(str(args.replay_smoke_unit)):
+            # Best-effort: a missing sentinel (ConditionPathExists) will cause the unit to skip.
+            _run_apply(["systemctl", "start", str(args.replay_smoke_unit)], timeout_seconds=60)
+
+    if post_ok and worker_stopped:
         cp = _run_apply(["systemctl", "start", str(args.worker_unit)], timeout_seconds=30)
         if cp.returncode != 0:
             note_err("systemctl start worker failed", cp)

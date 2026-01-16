@@ -190,7 +190,7 @@ ExecStart=/usr/bin/docker run --rm --name healtharchive-replay \
   --cap-drop=ALL \
   --security-opt no-new-privileges:true \
   -v /srv/healtharchive/replay:/webarchive:rw \
-  -v /srv/healtharchive/jobs:/warcs:ro \
+  -v /srv/healtharchive/jobs:/warcs:ro,rshared \
   webrecorder/pywb:2.9.1
 
 [Install]
@@ -204,6 +204,9 @@ Notes:
 - We run as `hareplay:healtharchive` to avoid the container needing to
   `useradd`/`su` internally (which fails when `--cap-drop=ALL` removes
   `CAP_SETUID`/`CAP_SETGID`).
+- The `rshared` bind propagation on `/srv/healtharchive/jobs` helps pywb see
+  nested mounts under that tree (e.g., Storage Box tiering bind mounts) without
+  requiring a container restart after mount repairs.
 
 Enable + start:
 
