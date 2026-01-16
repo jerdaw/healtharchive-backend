@@ -10,6 +10,8 @@ PYTEST := $(if $(wildcard $(VENV_BIN)/pytest),$(VENV_BIN)/pytest,pytest)
 BANDIT := $(if $(wildcard $(VENV_BIN)/bandit),$(VENV_BIN)/bandit,bandit)
 PIP_AUDIT := $(if $(wildcard $(VENV_BIN)/pip-audit),$(VENV_BIN)/pip-audit,pip-audit)
 PRE_COMMIT := $(if $(wildcard $(VENV_BIN)/pre-commit),$(VENV_BIN)/pre-commit,pre-commit)
+PYTHON_RUN := $(if $(wildcard $(VENV_BIN)/python3),$(VENV_BIN)/python3,$(PYTHON))
+MKDOCS := $(if $(wildcard $(VENV_BIN)/mkdocs),$(VENV_BIN)/mkdocs,mkdocs)
 
 venv:
 	$(PYTHON) -m venv $(VENV)
@@ -41,13 +43,13 @@ audit:
 	$(PIP_AUDIT) || true
 
 docs-serve:
-	PYTHONPATH=src $(VENV_BIN)/python3 scripts/export_openapi.py
-	$(VENV_BIN)/python3 scripts/generate_llms_txt.py
-	$(VENV_BIN)/mkdocs serve
+	PYTHONPATH=src $(PYTHON_RUN) scripts/export_openapi.py
+	$(PYTHON_RUN) scripts/generate_llms_txt.py
+	$(MKDOCS) serve
 
 docs-build:
-	PYTHONPATH=src $(VENV_BIN)/python3 scripts/export_openapi.py
-	$(VENV_BIN)/python3 scripts/generate_llms_txt.py
-	$(VENV_BIN)/mkdocs build --strict
+	PYTHONPATH=src $(PYTHON_RUN) scripts/export_openapi.py
+	$(PYTHON_RUN) scripts/generate_llms_txt.py
+	$(MKDOCS) build --strict
 
 check: format-check lint precommit typecheck test security audit docs-build
