@@ -22,7 +22,7 @@ def test_storage_hotpath_auto_recover_systemd_template_requires_venv() -> None:
         / "healtharchive-storage-hotpath-auto-recover.service"
     )
     text = unit_path.read_text(encoding="utf-8")
-    assert "ConditionPathIsExecutable=/opt/healtharchive-backend/.venv/bin/python3" in text
+    assert "ConditionPathExists=/opt/healtharchive-backend/.venv/bin/python3" in text
     assert (
         "ExecStart=/opt/healtharchive-backend/.venv/bin/python3 "
         "/opt/healtharchive-backend/scripts/vps-storage-hotpath-auto-recover.py --apply"
