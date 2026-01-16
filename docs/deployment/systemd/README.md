@@ -538,8 +538,13 @@ class:
 
 - `OSError: [Errno 107] Transport endpoint is not connected`
 
-It can stop the worker and unmount stale paths, so keep it **disabled by
-default** and enable only after:
+It can unmount stale hot paths and re-apply tiering. It will only stop the
+worker if a **running job output directory** is detected as stale (Errno 107);
+for stale import/tiering hot paths, it keeps the worker running. It also
+restarts replay (best-effort) after successful mount recovery so replay sees a
+clean view of `/srv/healtharchive/jobs`.
+
+Keep it **disabled by default** and enable only after:
 
 - Phase 1 alerting/metrics are working (you have visibility),
 - you have validated the watchdog in dry-run mode first.
