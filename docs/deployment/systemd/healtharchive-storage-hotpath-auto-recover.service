@@ -5,7 +5,7 @@ After=network-online.target
 ConditionPathExists=/etc/healtharchive/backend.env
 ConditionPathExists=/etc/healtharchive/storagebox.env
 ConditionPathExists=/etc/healtharchive/storage-hotpath-auto-recover-enabled
-ConditionPathIsExecutable=/opt/healtharchive-backend/.venv/bin/python3
+ConditionPathExists=/opt/healtharchive-backend/.venv/bin/python3
 ConditionPathExists=/opt/healtharchive-backend/scripts/vps-storage-hotpath-auto-recover.py
 
 [Service]

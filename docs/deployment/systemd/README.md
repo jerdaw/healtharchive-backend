@@ -141,7 +141,7 @@ matches your operational readiness.
   - Recommended; low-risk and catches “silent” ops drift.
 - **Storage hot-path auto-recover** (`healtharchive-storage-hotpath-auto-recover.timer`)
   - Dangerous if misconfigured; only enable after you’ve validated Phase 1 alerts and run the watchdog in dry-run mode.
-  - The unit is gated by a venv executable check and the watchdog skips runs while `/tmp/healtharchive-backend-deploy.lock` exists (to avoid flapping during deploys).
+  - The unit is gated by a venv presence check and the watchdog skips runs while `/tmp/healtharchive-backend-deploy.lock` exists (to avoid flapping during deploys).
 
 If a timer is enabled, also ensure its sentinel file exists under
 `/etc/healtharchive/` (see the enablement sections below).
