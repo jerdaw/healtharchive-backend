@@ -604,6 +604,11 @@ def main():
         logger.info(
             f"Current State: Workers={crawl_state.current_workers}, VPN Rotations={crawl_state.vpn_rotations_done}, Worker Reductions={crawl_state.worker_reductions_done}"
         )
+        # This is a new crawl stage (not a resume), so give the monitor-driven
+        # strategies (restart/worker reduction/VPN) a fresh budget. Keeping these
+        # counts sticky across *stages* makes long, multi-stage crawls much harder
+        # to self-heal on a single VPS.
+        crawl_state.reset_adaptation_counts()
         initial_run_mode = "New Crawl (with Consolidation)"
     else:  # No ZIM, no resume, no prior WARCs
         logger.info("Run Mode: FRESH crawl.")
@@ -904,12 +909,17 @@ def main():
 
                     # 3. Container Restart (Requires Container Restart)
                     #
-                    # Only apply when explicitly enabled, and prefer using the
-                    # monitor's stall detection rather than reacting to transient error storms.
+                    # Only apply when explicitly enabled. In addition to the
+                    # monitor's stall detection, allow restart on persistent
+                    # error-threshold events (e.g. repeated ERR_HTTP2_* on canada.ca)
+                    # to avoid getting stuck in "backoff-only" loops.
                     if (
                         adaptation_performed_type is None
                         and getattr(script_args, "enable_adaptive_restart", False)
-                        and event_status == "stalled"
+                        and (
+                            event_status == "stalled"
+                            or event_reason in {"http_threshold", "timeout_threshold"}
+                        )
                     ):
                         logger.info("Attempting strategy: Container Restart")
                         try:

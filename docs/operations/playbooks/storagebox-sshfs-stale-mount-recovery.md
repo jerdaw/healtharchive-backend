@@ -123,6 +123,13 @@ sudo ./scripts/vps-warc-tiering-bind-mounts.sh --apply --repair-stale-mounts
 
 If this fails with Errno 107 under `/srv/healtharchive/jobs/imports/...`, unmount those stale import mountpoints too and re-run.
 
+If the systemd unit is in a `failed` state, clear it and re-run (prevents repeated `WarcTieringFailed` alerts):
+
+```bash
+systemctl is-failed healtharchive-warc-tiering.service && sudo systemctl reset-failed healtharchive-warc-tiering.service || true
+sudo systemctl start healtharchive-warc-tiering.service
+```
+
 2) Re-apply annual output tiering (campaign job output dirs → Storage Box):
 
 Preferred (avoids the systemd unit’s internal worker stop/start):
@@ -172,6 +179,18 @@ If a job ended up `failed` due to the mount issue and you want it to run again:
 
 ```bash
 sudo systemctl start healtharchive-worker.service
+```
+
+---
+
+## Replay note (after mount repairs)
+
+If replay smoke tests start returning `503` for previously indexed jobs after a mount/tiering incident, restart replay to refresh its view of `/srv/healtharchive/jobs`:
+
+```bash
+sudo systemctl restart healtharchive-replay.service
+sudo systemctl start healtharchive-replay-smoke.service
+curl -s http://127.0.0.1:9100/metrics | rg '^healtharchive_replay_smoke_'
 ```
 
 ---
