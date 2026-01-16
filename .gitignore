@@ -47,3 +47,11 @@ tmp-*.warc.gz
 .pytest_cache/
 .coverage
 .mypy_cache/
+
+# Docs build artifacts
+site/
+docs/llms.txt
+docs/openapi.json
+
+# Local docs symlink (optional convenience)
+docs/frontend
