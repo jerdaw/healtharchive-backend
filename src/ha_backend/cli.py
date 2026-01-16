@@ -1554,7 +1554,9 @@ def cmd_recover_stale_jobs(args: argparse.Namespace) -> None:
     print(f"Cutoff (UTC):    {cutoff.replace(microsecond=0).isoformat()}")
     print(f"Source filter:   {source_filter or '(none)'}")
     print(f"Limit:           {limit or '(none)'}")
-    print(f"Require progress: {'(none)' if require_no_progress_seconds is None else f'no progress for ≥{require_no_progress_seconds}s'}")
+    print(
+        f"Require progress: {'(none)' if require_no_progress_seconds is None else f'no progress for ≥{require_no_progress_seconds}s'}"
+    )
     print("")
 
     def _find_latest_combined_log(output_dir: Path) -> Path | None:
