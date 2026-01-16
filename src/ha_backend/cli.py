@@ -1513,10 +1513,9 @@ def cmd_recover_stale_jobs(args: argparse.Namespace) -> None:
     This is safe-by-default: it prints a recovery plan unless --apply is passed.
     """
     from datetime import datetime, timedelta, timezone
+    from pathlib import Path
 
     from sqlalchemy import or_
-
-    from pathlib import Path
 
     from .crawl_stats import parse_crawl_log_progress
     from .models import ArchiveJob as ORMArchiveJob

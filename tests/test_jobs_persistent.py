@@ -162,7 +162,7 @@ def test_run_persistent_job_builds_monitoring_and_vpn_args(tmp_path, monkeypatch
         "60",
         "--enable-adaptive-restart",
         "--max-container-restarts",
-        "2",
+        "6",
         "--backoff-delay-minutes",
         "15",
         "--relax-perms",

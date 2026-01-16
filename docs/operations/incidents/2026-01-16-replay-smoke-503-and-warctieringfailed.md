@@ -114,4 +114,3 @@ curl -s http://127.0.0.1:9100/metrics | rg '^healtharchive_replay_smoke_'
 - Tiering script (VPS): `scripts/vps-warc-tiering-bind-mounts.sh`
 - Replay smoke playbook: `../playbooks/replay-smoke-tests.md`
 - Storage recovery playbook: `../playbooks/storagebox-sshfs-stale-mount-recovery.md`
-

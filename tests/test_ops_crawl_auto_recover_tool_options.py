@@ -41,7 +41,7 @@ def test_ensure_recovery_tool_options_adds_defaults() -> None:
     assert tool["initial_workers"] == 1
     assert tool["enable_monitoring"] is True
     assert tool["enable_adaptive_restart"] is True
-    assert tool["max_container_restarts"] == 2
+    assert tool["max_container_restarts"] == 6
 
 
 def test_ensure_recovery_tool_options_preserves_existing_values() -> None:
@@ -87,4 +87,4 @@ def test_ensure_recovery_tool_options_fixes_bad_max_container_restarts() -> None
     changed = module._ensure_recovery_tool_options(job)
     assert changed is True
     assert job.config is not None
-    assert job.config["tool_options"]["max_container_restarts"] == 2
+    assert job.config["tool_options"]["max_container_restarts"] == 6
