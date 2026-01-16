@@ -13,6 +13,7 @@ Implemented plans:
 - `2026-01-03-crawl-safe-roadmap-batch.md`
 - `2026-01-03-ops-automation-verification-json.md`
 - `2026-01-03-ops-automation-verifier-improvements.md`
+- `2026-01-08-storagebox-sshfs-stale-mount-recovery-and-integrity.md`
 
 Rules:
 
