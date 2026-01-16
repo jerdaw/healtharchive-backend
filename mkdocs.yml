@@ -78,7 +78,7 @@ nav:
       - Guidelines: documentation-guidelines.md
   - API: api.md
   - Frontend:
-      - Overview: frontend/README.md
-      - I18n: frontend/i18n.md
-      - Implementation: frontend/implementation-guide.md
+      - Overview: frontend-external/README.md
+      - I18n: frontend-external/i18n.md
+      - Implementation: frontend-external/implementation-guide.md
   - Roadmaps: roadmaps/README.md
