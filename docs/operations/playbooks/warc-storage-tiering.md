@@ -221,6 +221,9 @@ systemctl status healtharchive-warc-tiering.service --no-pager
 mount | rg /srv/healtharchive/jobs/imports/legacy- || true
 ```
 
+Note: the template service runs `vps-warc-tiering-bind-mounts.sh --apply --repair-stale-mounts` so it can automatically
+unmount stale Errno 107 mountpoints and re-apply bind mounts.
+
 If the unit is in a `failed` state from a prior incident, clear it before retrying:
 
 ```bash
@@ -232,6 +235,14 @@ Manual validation (safe):
 
 ```bash
 sudo /opt/healtharchive-backend/scripts/vps-warc-tiering-bind-mounts.sh
+```
+
+If `healtharchive-warc-tiering.service` repeatedly ends up in `failed` (e.g., after an sshfs disconnect),
+consider enabling the tiering health metrics timer so failures are visible quickly:
+
+```bash
+sudo systemctl enable --now healtharchive-tiering-metrics.timer
+curl -s http://127.0.0.1:9100/metrics | rg '^healtharchive_tiering_' || true
 ```
 
 ### Replay note (restart after tiering changes)

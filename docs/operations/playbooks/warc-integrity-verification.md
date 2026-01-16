@@ -8,7 +8,7 @@ Use this playbook when you suspect WARC corruption or replay integrity risk, esp
 
 This playbook is intentionally procedural; for background see:
 
-- Roadmap/incident context: `docs/roadmaps/2026-01-08-storagebox-sshfs-stale-mount-recovery-and-integrity.md`
+- Roadmap/incident context: `docs/roadmaps/implemented/2026-01-08-storagebox-sshfs-stale-mount-recovery-and-integrity.md`
 - Storage infra recovery: `storagebox-sshfs-stale-mount-recovery.md`
 
 ## 0) Safety rules (do not skip)

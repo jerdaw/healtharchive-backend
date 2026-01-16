@@ -8,7 +8,7 @@ This typically indicates a **stale FUSE mount** (often `sshfs`) where the mountp
 
 For background and the full implementation plan (prevention + automation + integrity), see:
 
-- `../../roadmaps/2026-01-08-storagebox-sshfs-stale-mount-recovery-and-integrity.md`
+- `../../roadmaps/implemented/2026-01-08-storagebox-sshfs-stale-mount-recovery-and-integrity.md`
 - Drills (safe on production): `storagebox-sshfs-stale-mount-drills.md`
 
 ---
