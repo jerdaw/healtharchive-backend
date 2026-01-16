@@ -10,7 +10,9 @@ PYTEST := $(if $(wildcard $(VENV_BIN)/pytest),$(VENV_BIN)/pytest,pytest)
 BANDIT := $(if $(wildcard $(VENV_BIN)/bandit),$(VENV_BIN)/bandit,bandit)
 PIP_AUDIT := $(if $(wildcard $(VENV_BIN)/pip-audit),$(VENV_BIN)/pip-audit,pip-audit)
 PRE_COMMIT := $(if $(wildcard $(VENV_BIN)/pre-commit),$(VENV_BIN)/pre-commit,pre-commit)
-PYTHON_RUN := $(if $(wildcard $(VENV_BIN)/python3),$(VENV_BIN)/python3,$(PYTHON))
+HAS_PYTHON := $(shell command -v python >/dev/null 2>&1 && echo 1 || echo 0)
+PYTHON_FALLBACK := $(if $(filter 1,$(HAS_PYTHON)),python,$(PYTHON))
+PYTHON_RUN := $(if $(wildcard $(VENV_BIN)/python3),$(VENV_BIN)/python3,$(PYTHON_FALLBACK))
 MKDOCS := $(if $(wildcard $(VENV_BIN)/mkdocs),$(VENV_BIN)/mkdocs,mkdocs)
 
 venv:
