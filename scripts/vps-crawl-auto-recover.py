@@ -119,7 +119,10 @@ def _ensure_recovery_tool_options(job: ArchiveJob) -> bool:
     except (TypeError, ValueError):
         max_restarts = 0
     if max_restarts <= 0:
-        tool["max_container_restarts"] = 2
+        # Long crawls (e.g., canada.ca) can exhaust a tiny restart budget early,
+        # leading to repeated manual intervention. Keep this conservative but
+        # non-trivial to improve self-healing.
+        tool["max_container_restarts"] = 6
         changed = True
 
     if changed:
@@ -140,6 +143,15 @@ def main(argv: list[str] | None = None) -> int:
         type=int,
         default=5400,
         help="Consider a running job stalled if no crawled-count increase for this long.",
+    )
+    parser.add_argument(
+        "--skip-if-any-job-progress-within-seconds",
+        type=int,
+        default=600,
+        help=(
+            "Safety: if any other running job has made progress within this window, skip recovery "
+            "to avoid interrupting a healthy crawl when the worker is stopped/restarted."
+        ),
     )
     parser.add_argument(
         "--recover-older-than-minutes",
@@ -207,6 +219,7 @@ def main(argv: list[str] | None = None) -> int:
         raise
 
     stalled: list[tuple[RunningJob, float]] = []
+    progress_age_by_job_id: dict[int, float] = {}
     for job in running_jobs:
         log_path = _find_job_log(job)
         if log_path is None:
@@ -215,6 +228,7 @@ def main(argv: list[str] | None = None) -> int:
         if progress is None:
             continue
         age = progress.last_progress_age_seconds(now_utc=now)
+        progress_age_by_job_id[int(job.job_id)] = float(age)
         if age >= float(args.stall_threshold_seconds):
             stalled.append((job, age))
 
@@ -223,6 +237,21 @@ def main(argv: list[str] | None = None) -> int:
 
     # Only recover one job per run (worker processes one job at a time).
     job, age = stalled[0]
+    guard_seconds = int(args.skip_if_any_job_progress_within_seconds or 0)
+    if guard_seconds > 0:
+        other_recent = [
+            (jid, a)
+            for jid, a in progress_age_by_job_id.items()
+            if jid != int(job.job_id) and a < float(guard_seconds)
+        ]
+        if other_recent:
+            jid, a = sorted(other_recent, key=lambda item: item[1])[0]
+            print(
+                f"SKIP job_id={job.job_id} source={job.source_code}: stalled for {age:.0f}s, "
+                f"but another running job_id={jid} made progress {a:.0f}s ago (<{guard_seconds}s guard)."
+            )
+            return 0
+
     recent_n = _count_recent_recoveries(state, job.job_id, since_utc=recent_cutoff)
     if recent_n >= int(args.max_recoveries_per_job_per_day):
         print(
@@ -265,6 +294,8 @@ def main(argv: list[str] | None = None) -> int:
             "recover-stale-jobs",
             "--older-than-minutes",
             str(int(args.recover_older_than_minutes)),
+            "--require-no-progress-seconds",
+            str(int(args.stall_threshold_seconds)),
             "--apply",
             "--source",
             job.source_code,

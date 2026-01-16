@@ -221,10 +221,26 @@ systemctl status healtharchive-warc-tiering.service --no-pager
 mount | rg /srv/healtharchive/jobs/imports/legacy- || true
 ```
 
+If the unit is in a `failed` state from a prior incident, clear it before retrying:
+
+```bash
+systemctl is-failed healtharchive-warc-tiering.service && sudo systemctl reset-failed healtharchive-warc-tiering.service || true
+sudo systemctl start healtharchive-warc-tiering.service
+```
+
 Manual validation (safe):
 
 ```bash
 sudo /opt/healtharchive-backend/scripts/vps-warc-tiering-bind-mounts.sh
+```
+
+### Replay note (restart after tiering changes)
+
+Replay runs in a long-lived Docker container and bind-mounts `/srv/healtharchive/jobs` into `/warcs`. After fixing stale mounts or changing tiering binds, restart replay so it sees a clean view of the mountpoints:
+
+```bash
+sudo systemctl restart healtharchive-replay.service
+sudo systemctl start healtharchive-replay-smoke.service
 ```
 
 ## Annual outputs: automatically tier to Storage Box

@@ -47,10 +47,13 @@ Manual recovery (stop worker + recover stale jobs) was intentionally deferred wh
 - 2026-01-09T07:34:37Z — Last observed `crawlStatus` progress for job 6 (`crawled=437`, `total=3209`, `pending=1`).
 - 2026-01-09T12:57:17Z — Status snapshot shows multi-hour no-progress and `stalled=1`.
 - 2026-01-09T13:33:23Z — Status snapshot still shows `stalled=1`.
+- 2026-01-16T02:56:12Z — Manual recovery performed (stop worker + recover stale jobs). Job 6 restarted and began a new crawl attempt.
 
 ## Root cause
 
-Unknown at time of write-up. Strong signals point to crawl progress blocked by repeated page navigation timeouts and/or a crawler worker getting stuck on a specific URL.
+Unknown. Strong signals point to crawl progress blocked by repeated page load failures/timeouts and/or a crawler worker getting stuck on a specific URL.
+
+As of 2026-01-16, the job showed many `net::ERR_HTTP2_PROTOCOL_ERROR` failures on canada.ca and `archive_tool` applied repeated backoff delays after hitting its HTTP/network error threshold.
 
 ## Contributing factors
 
@@ -59,16 +62,14 @@ Unknown at time of write-up. Strong signals point to crawl progress blocked by r
 
 ## Resolution / Recovery
 
-Not performed yet (deferred while `cihr` continues).
+Performed on 2026-01-16 (VPS):
 
-Planned recovery steps once it is safe to interrupt crawling:
-
-- Follow `docs/operations/playbooks/crawl-stalls.md`:
+- Followed `docs/operations/playbooks/crawl-stalls.md`:
   - `sudo systemctl stop healtharchive-worker.service`
   - `set -a; source /etc/healtharchive/backend.env; set +a`
-  - `/opt/healtharchive-backend/.venv/bin/ha-backend recover-stale-jobs --older-than-minutes 60 --source hc --limit 5 --apply`
+  - `/opt/healtharchive-backend/.venv/bin/ha-backend recover-stale-jobs --older-than-minutes 5 --apply --source hc --limit 1`
   - `sudo systemctl start healtharchive-worker.service`
-  - Re-check `./scripts/vps-crawl-status.sh --year 2026 --job-id 6` for advancing `crawlStatus`.
+- Verified the job restarted (`Started at` updated) and a new combined log was created.
 
 ## Post-incident verification
 
@@ -95,6 +96,7 @@ TBD (once recovered).
 
 - Operator snapshot script: `scripts/vps-crawl-status.sh`
 - Latest combined log (as of 2026-01-09 12:57Z snapshot): `/srv/healtharchive/jobs/hc/20260101T000502Z__hc-20260101/archive_new_crawl_phase_-_attempt_1_20260109_060517.combined.log`
+- Latest combined log after 2026-01-16 recovery: `/srv/healtharchive/jobs/hc/20260101T000502Z__hc-20260101/archive_new_crawl_phase_-_attempt_1_20260116_025617.combined.log`
 - Playbook: `../playbooks/crawl-stalls.md`
 - Playbook: `../playbooks/incident-response.md`
 - Related: `2026-01-09-annual-crawl-phac-output-dir-permission-denied.md`

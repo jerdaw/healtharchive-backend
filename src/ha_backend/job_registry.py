@@ -86,7 +86,10 @@ SOURCE_JOB_CONFIGS: Dict[str, SourceJobConfig] = {
             "enable_adaptive_restart": True,
             "enable_vpn_rotation": False,
             "initial_workers": 1,
-            "max_container_restarts": 2,
+            # canada.ca is noisy (HTTP2/protocol errors + long tail timeouts). A
+            # small restart budget is often exhausted early on long annual runs,
+            # leaving the crawl unable to self-heal without manual intervention.
+            "max_container_restarts": 6,
             "log_level": "INFO",
             "relax_perms": True,  # ensure WARCs are readable on host in dev
         },
@@ -113,7 +116,8 @@ SOURCE_JOB_CONFIGS: Dict[str, SourceJobConfig] = {
             "enable_adaptive_restart": True,
             "enable_vpn_rotation": False,
             "initial_workers": 1,
-            "max_container_restarts": 2,
+            # canada.ca is noisy (HTTP2/protocol errors + long tail timeouts).
+            "max_container_restarts": 6,
             "log_level": "INFO",
             "relax_perms": True,
         },
@@ -138,7 +142,7 @@ SOURCE_JOB_CONFIGS: Dict[str, SourceJobConfig] = {
             "enable_adaptive_restart": True,
             "enable_vpn_rotation": False,
             "initial_workers": 1,
-            "max_container_restarts": 2,
+            "max_container_restarts": 6,
             "log_level": "INFO",
             "relax_perms": True,
         },

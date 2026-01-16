@@ -42,7 +42,27 @@ curl -s http://127.0.0.1:9100/metrics | rg '^healtharchive_replay_smoke_'
    sudo systemctl status healtharchive-replay.service --no-pager -l
    curl -I https://replay.healtharchive.ca/ | head
    ```
-3. If replay is up but a source fails, re-run replay reconcile:
+3. If replay is up (`/` is `200`) but smoke requests return `503`, suspect WARC/mount access (often after `sshfs`/tiering incidents).
+
+   1) Ensure the WARC tiering unit is not stuck in a failed state:
+   ```bash
+   systemctl is-failed healtharchive-warc-tiering.service && sudo systemctl reset-failed healtharchive-warc-tiering.service || true
+   sudo systemctl start healtharchive-warc-tiering.service
+   sudo systemctl status healtharchive-warc-tiering.service --no-pager -l | sed -n '1,120p'
+   ```
+
+   2) Restart replay to refresh its view of `/srv/healtharchive/jobs`:
+   ```bash
+   sudo systemctl restart healtharchive-replay.service
+   ```
+
+   3) Re-run smoke:
+   ```bash
+   sudo systemctl start healtharchive-replay-smoke.service
+   curl -s http://127.0.0.1:9100/metrics | rg '^healtharchive_replay_smoke_'
+   ```
+
+4. If replay is up but a source still fails, re-run replay reconcile:
    ```bash
    sudo systemctl start healtharchive-replay-reconcile.service
    ```

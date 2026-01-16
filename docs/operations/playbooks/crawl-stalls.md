@@ -58,7 +58,12 @@ sudo systemctl stop healtharchive-worker.service
 
 # Mark the running job retryable so the worker can pick it up again.
 set -a; source /etc/healtharchive/backend.env; set +a
-/opt/healtharchive-backend/.venv/bin/ha-backend recover-stale-jobs --older-than-minutes 5 --apply --source SOURCE --limit 5
+/opt/healtharchive-backend/.venv/bin/ha-backend recover-stale-jobs \
+  --older-than-minutes 5 \
+  --require-no-progress-seconds 3600 \
+  --apply \
+  --source SOURCE \
+  --limit 5
 
 # Start the worker again.
 sudo systemctl start healtharchive-worker.service

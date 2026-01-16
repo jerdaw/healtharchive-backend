@@ -1516,6 +1516,9 @@ def cmd_recover_stale_jobs(args: argparse.Namespace) -> None:
 
     from sqlalchemy import or_
 
+    from pathlib import Path
+
+    from .crawl_stats import parse_crawl_log_progress
     from .models import ArchiveJob as ORMArchiveJob
     from .models import Source
 
@@ -1524,6 +1527,13 @@ def cmd_recover_stale_jobs(args: argparse.Namespace) -> None:
     if older_than_minutes <= 0:
         print("ERROR: --older-than-minutes must be > 0.", file=sys.stderr)
         sys.exit(2)
+
+    require_no_progress_seconds = getattr(args, "require_no_progress_seconds", None)
+    if require_no_progress_seconds is not None:
+        require_no_progress_seconds = int(require_no_progress_seconds)
+        if require_no_progress_seconds <= 0:
+            print("ERROR: --require-no-progress-seconds must be > 0.", file=sys.stderr)
+            sys.exit(2)
 
     include_missing_started_at = bool(getattr(args, "include_missing_started_at", False))
     source_filter = (getattr(args, "source", None) or "").strip().lower() or None
@@ -1544,7 +1554,31 @@ def cmd_recover_stale_jobs(args: argparse.Namespace) -> None:
     print(f"Cutoff (UTC):    {cutoff.replace(microsecond=0).isoformat()}")
     print(f"Source filter:   {source_filter or '(none)'}")
     print(f"Limit:           {limit or '(none)'}")
+    print(f"Require progress: {'(none)' if require_no_progress_seconds is None else f'no progress for ≥{require_no_progress_seconds}s'}")
     print("")
+
+    def _find_latest_combined_log(output_dir: Path) -> Path | None:
+        try:
+            candidates = sorted(
+                output_dir.glob("archive_*.combined.log"),
+                key=lambda p: p.stat().st_mtime,
+                reverse=True,
+            )
+        except OSError:
+            return None
+        return candidates[0] if candidates else None
+
+    def _find_log_for_job(job: ORMArchiveJob) -> Path | None:
+        if job.combined_log_path:
+            p = Path(job.combined_log_path)
+            try:
+                if p.is_file():
+                    return p
+            except OSError:
+                return None
+        if not job.output_dir:
+            return None
+        return _find_latest_combined_log(Path(job.output_dir))
 
     with get_session() as session:
         query = session.query(ORMArchiveJob).filter(ORMArchiveJob.status == "running")
@@ -1591,6 +1625,38 @@ def cmd_recover_stale_jobs(args: argparse.Namespace) -> None:
             print("No stale running jobs found.")
             return
 
+        # Optional: tighten the selection to jobs with no progress in logs.
+        if require_no_progress_seconds is not None:
+            filtered: list[ORMArchiveJob] = []
+            skipped: list[str] = []
+            for job in jobs:
+                log_path = _find_log_for_job(job)
+                progress_age = None
+                if log_path is not None:
+                    progress = parse_crawl_log_progress(log_path)
+                    if progress is not None:
+                        progress_age = int(progress.last_progress_age_seconds(now_utc=now))
+                if progress_age is None:
+                    # If we can't determine progress, err on the side of allowing recovery
+                    # (often indicates infra/mount issues or missing logs).
+                    filtered.append(job)
+                    continue
+                if progress_age >= require_no_progress_seconds:
+                    filtered.append(job)
+                else:
+                    skipped.append(
+                        f"job_id={job.id} (progress_age_seconds={progress_age} < {require_no_progress_seconds})"
+                    )
+            if skipped:
+                print("Skipping jobs with recent progress:")
+                for line in skipped:
+                    print(f"- {line}")
+                print("")
+            jobs = filtered
+            if not jobs:
+                print("No stale running jobs matched the progress requirement.")
+                return
+
         for job in jobs:
             started_at = job.started_at
             if started_at is not None and started_at.tzinfo is None:
@@ -1604,9 +1670,16 @@ def cmd_recover_stale_jobs(args: argparse.Namespace) -> None:
             if started_at is not None:
                 age_min = int((now - started_at).total_seconds() // 60)
             source_code = job.source.code if job.source else "?"
+            progress_age_str = "-"
+            log_path = _find_log_for_job(job)
+            if log_path is not None:
+                progress = parse_crawl_log_progress(log_path)
+                if progress is not None:
+                    progress_age_str = str(int(progress.last_progress_age_seconds(now_utc=now)))
             print(
                 f"job_id={job.id} source={source_code} status={job.status} "
-                f"started_at={started_str} age_min={age_min} name={job.name}"
+                f"started_at={started_str} age_min={age_min} "
+                f"last_progress_age_seconds={progress_age_str} name={job.name}"
             )
 
         if not apply_mode:
@@ -3941,6 +4014,15 @@ def build_parser() -> argparse.ArgumentParser:
         type=int,
         required=True,
         help="Mark jobs as stale if started more than this many minutes ago.",
+    )
+    p_recover.add_argument(
+        "--require-no-progress-seconds",
+        type=int,
+        default=None,
+        help=(
+            "Optional safety: only recover jobs whose combined logs show no increase in crawled-count for at least this long. "
+            "If progress cannot be determined, the job is still considered recoverable."
+        ),
     )
     p_recover.add_argument(
         "--include-missing-started-at",
