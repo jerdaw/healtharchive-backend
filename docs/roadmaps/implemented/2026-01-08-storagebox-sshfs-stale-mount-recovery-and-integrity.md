@@ -190,4 +190,3 @@ As of 2026-01-16, this plan is considered implemented; the operational “surfac
   - replay smoke tests: `healtharchive-replay-smoke.timer`
 
 Remaining follow-up (not in this plan) is alerting/visibility on the new metrics.
-
