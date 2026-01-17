@@ -1,0 +1,4071 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://docs.healtharchive.ca/architecture/">
+      
+      
+        <link rel="prev" href="../operations/dataset-release-runbook/">
+      
+      
+        <link rel="next" href="../decisions/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.1">
+    
+    
+      
+        <title>Architecture - HealthArchive</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  
+<meta property="og:type" content="website" />
+<meta property="og:title" content="Architecture - HealthArchive" />
+<meta property="og:image" content="https://docs.healtharchive.ca/assets/images/social/architecture.png" />
+<meta property="og:image:type" content="image/png" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+<meta property="og:url" content="https://docs.healtharchive.ca/architecture/" />
+<meta property="twitter:card" content="summary_large_image" />
+<meta property="twitter:title" content="Architecture - HealthArchive" />
+<meta property="twitter:image" content="https://docs.healtharchive.ca/assets/images/social/architecture.png" />
+</head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="teal" data-md-color-accent="purple">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#healtharchive-backend-architecture-implementation-guide" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="HealthArchive" class="md-header__button md-logo" aria-label="HealthArchive" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            HealthArchive
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Architecture
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="teal" data-md-color-accent="purple"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="teal" data-md-color-accent="purple"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/jerdaw/healtharchive-backend" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    jerdaw/healtharchive-backend
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href=".." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../project/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Project
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../operations/" class="md-tabs__link">
+          
+  
+  
+  Operations
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="./" class="md-tabs__link">
+          
+  
+  
+  Backend
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../api/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  API
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../frontend-external/" class="md-tabs__link">
+          
+  
+  
+  Frontend
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../datasets-external/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Datasets
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../roadmaps/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Roadmaps
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="HealthArchive" class="md-nav__button md-logo" aria-label="HealthArchive" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    HealthArchive
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/jerdaw/healtharchive-backend" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    jerdaw/healtharchive-backend
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../project/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Project
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Operations
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Operations
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../operations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../operations/healtharchive-ops-roadmap/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Ops Roadmap
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_3" id="__nav_3_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Incidents
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Incidents
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../operations/incidents/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../operations/incidents/2026-01-08-storage-hotpath-sshfs-stale-mount/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Storage Hotpath
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../operations/incidents/2026-01-09-annual-crawl-hc-job-stalled/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Annual Crawl Stalled
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../operations/incidents/2026-01-09-annual-crawl-phac-output-dir-permission-denied/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    PHAC Permission Denied
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../operations/incidents/2026-01-16-replay-smoke-503-and-warctieringfailed/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Replay Smoke 503
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../operations/playbooks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Playbooks
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../operations/baseline-drift/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Baseline Drift
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../operations/dataset-release-runbook/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dataset Release
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Backend
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Backend
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-highlevel-architecture" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. High‑level architecture
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1. High‑level architecture">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#11-components" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.1 Components
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#12-data-flow-overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.2 Data flow overview
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-configuration-environment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Configuration &amp; environment
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. Configuration &amp; environment">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#21-config-module-ha_backendconfigpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.1 Config module (ha_backend/config.py)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2.1 Config module (ha_backend/config.py)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#archivetoolconfig" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ArchiveToolConfig
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#databaseconfig" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DatabaseConfig
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#22-logging-ha_backendlogging_configpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.2 Logging (ha_backend/logging_config.py)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-data-model-sqlalchemy-orm" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Data model (SQLAlchemy ORM)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. Data model (SQLAlchemy ORM)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#31-source" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.1 Source
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#32-archivejob" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.2 ArchiveJob
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#33-snapshot" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.3 Snapshot
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-job-registry-creation-ha_backendjob_registrypy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Job registry &amp; creation (ha_backend/job_registry.py)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. Job registry &amp; creation (ha_backend/job_registry.py)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#41-sourcejobconfig" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.1 SourceJobConfig
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#42-job-name-and-output-dir" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.2 Job name and output dir
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#43-job-config-json" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.3 Job config JSON
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#44-create_job_for_source" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.4 create_job_for_source
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-archive_tool-integration-job-runner-ha_backendjobspy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. archive_tool integration &amp; job runner (ha_backend/jobs.py)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. archive_tool integration &amp; job runner (ha_backend/jobs.py)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#51-runtimearchivejob" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.1 RuntimeArchiveJob
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#52-run_persistent_job-dbbacked-jobs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.2 run_persistent_job – DB‑backed jobs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#53-maintaining-the-archive_tool-integration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.3 Maintaining the archive_tool integration
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-indexing-pipeline-ha_backendindexing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Indexing pipeline (ha_backend/indexing/*)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="6. Indexing pipeline (ha_backend/indexing/*)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#61-warc-discovery-warc_discoverypy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.1 WARC discovery (warc_discovery.py)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#62-warc-reading-warc_readerpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.2 WARC reading (warc_reader.py)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#63-text-extraction-text_extractionpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.3 Text extraction (text_extraction.py)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#64-mapping-records-to-snapshot-mappingpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.4 Mapping records to Snapshot (mapping.py)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#65-orchestration-pipelinepy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.5 Orchestration (pipeline.py)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-viewer-helper-ha_backendindexingviewerpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. Viewer helper (ha_backend/indexing/viewer.py)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8-http-api-ha_backendapi" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. HTTP API (ha_backend/api/*)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="8. HTTP API (ha_backend/api/*)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#81-public-schemas-schemaspy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.1 Public schemas (schemas.py)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#82-public-routes-routes_publicpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.2 Public routes (routes_public.py)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#83-admin-auth-depspy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.3 Admin auth (deps.py)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#84-admin-schemas-schemas_adminpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.4 Admin schemas (schemas_admin.py)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#85-admin-routes-routes_adminpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.5 Admin routes (routes_admin.py)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#86-metrics-prometheusstyle" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.6 Metrics (Prometheus‑style)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#87-cors" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.7 CORS
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#9-worker-loop-ha_backendworkermainpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9. Worker loop (ha_backend/worker/main.py)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="9. Worker loop (ha_backend/worker/main.py)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#91-selection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9.1 Selection
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#92-processing-a-single-job" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9.2 Processing a single job
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#93-main-loop" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9.3 Main loop
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#10-cleanup-retention-future" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10. Cleanup &amp; retention (future)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="10. Cleanup &amp; retention (future)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#101-cleanup-flags-on-archivejob" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10.1 Cleanup flags on ArchiveJob
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#102-cli-command-cleanup-job" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10.2 CLI command: cleanup-job
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#103-metrics-for-cleanup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10.3 Metrics for cleanup
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#11-cli-commands-summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        11. CLI commands summary
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#12-testing-development" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        12. Testing &amp; development
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#13-relationship-to-archive_tool-and-the-frontend" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        13. Relationship to archive_tool and the frontend
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../decisions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Decisions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../deployment/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deployment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../development/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Development
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../documentation-guidelines/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Guidelines
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Frontend
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Frontend
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../frontend-external/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../frontend-external/i18n/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    I18n
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../frontend-external/implementation-guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Implementation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../datasets-external/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Datasets
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../roadmaps/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Roadmaps
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#1-highlevel-architecture" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. High‑level architecture
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1. High‑level architecture">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#11-components" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.1 Components
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#12-data-flow-overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.2 Data flow overview
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-configuration-environment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Configuration &amp; environment
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2. Configuration &amp; environment">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#21-config-module-ha_backendconfigpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.1 Config module (ha_backend/config.py)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2.1 Config module (ha_backend/config.py)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#archivetoolconfig" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ArchiveToolConfig
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#databaseconfig" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        DatabaseConfig
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#22-logging-ha_backendlogging_configpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.2 Logging (ha_backend/logging_config.py)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-data-model-sqlalchemy-orm" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Data model (SQLAlchemy ORM)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. Data model (SQLAlchemy ORM)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#31-source" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.1 Source
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#32-archivejob" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.2 ArchiveJob
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#33-snapshot" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.3 Snapshot
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-job-registry-creation-ha_backendjob_registrypy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Job registry &amp; creation (ha_backend/job_registry.py)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="4. Job registry &amp; creation (ha_backend/job_registry.py)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#41-sourcejobconfig" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.1 SourceJobConfig
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#42-job-name-and-output-dir" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.2 Job name and output dir
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#43-job-config-json" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.3 Job config JSON
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#44-create_job_for_source" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.4 create_job_for_source
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-archive_tool-integration-job-runner-ha_backendjobspy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. archive_tool integration &amp; job runner (ha_backend/jobs.py)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. archive_tool integration &amp; job runner (ha_backend/jobs.py)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#51-runtimearchivejob" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.1 RuntimeArchiveJob
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#52-run_persistent_job-dbbacked-jobs" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.2 run_persistent_job – DB‑backed jobs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#53-maintaining-the-archive_tool-integration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5.3 Maintaining the archive_tool integration
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-indexing-pipeline-ha_backendindexing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Indexing pipeline (ha_backend/indexing/*)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="6. Indexing pipeline (ha_backend/indexing/*)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#61-warc-discovery-warc_discoverypy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.1 WARC discovery (warc_discovery.py)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#62-warc-reading-warc_readerpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.2 WARC reading (warc_reader.py)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#63-text-extraction-text_extractionpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.3 Text extraction (text_extraction.py)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#64-mapping-records-to-snapshot-mappingpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.4 Mapping records to Snapshot (mapping.py)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#65-orchestration-pipelinepy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6.5 Orchestration (pipeline.py)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-viewer-helper-ha_backendindexingviewerpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. Viewer helper (ha_backend/indexing/viewer.py)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8-http-api-ha_backendapi" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. HTTP API (ha_backend/api/*)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="8. HTTP API (ha_backend/api/*)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#81-public-schemas-schemaspy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.1 Public schemas (schemas.py)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#82-public-routes-routes_publicpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.2 Public routes (routes_public.py)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#83-admin-auth-depspy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.3 Admin auth (deps.py)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#84-admin-schemas-schemas_adminpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.4 Admin schemas (schemas_admin.py)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#85-admin-routes-routes_adminpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.5 Admin routes (routes_admin.py)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#86-metrics-prometheusstyle" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.6 Metrics (Prometheus‑style)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#87-cors" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8.7 CORS
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#9-worker-loop-ha_backendworkermainpy" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9. Worker loop (ha_backend/worker/main.py)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="9. Worker loop (ha_backend/worker/main.py)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#91-selection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9.1 Selection
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#92-processing-a-single-job" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9.2 Processing a single job
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#93-main-loop" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9.3 Main loop
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#10-cleanup-retention-future" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10. Cleanup &amp; retention (future)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="10. Cleanup &amp; retention (future)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#101-cleanup-flags-on-archivejob" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10.1 Cleanup flags on ArchiveJob
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#102-cli-command-cleanup-job" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10.2 CLI command: cleanup-job
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#103-metrics-for-cleanup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10.3 Metrics for cleanup
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#11-cli-commands-summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        11. CLI commands summary
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#12-testing-development" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        12. Testing &amp; development
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#13-relationship-to-archive_tool-and-the-frontend" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        13. Relationship to archive_tool and the frontend
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<h1 id="healtharchive-backend-architecture-implementation-guide">HealthArchive Backend – Architecture &amp; Implementation Guide</h1>
+<p>This document is an in‑depth walkthrough of the <strong>HealthArchive.ca backend</strong>
+(<code>healtharchive-backend</code> repo). It covers:</p>
+<ul>
+<li>How the backend is structured.</li>
+<li>How it integrates with the <code>archive_tool</code> crawler subpackage.</li>
+<li>The data model and job lifecycle.</li>
+<li>The indexing pipeline (WARCs → snapshots).</li>
+<li>HTTP APIs (public + admin) and metrics.</li>
+<li>Worker loop, retries, and cleanup/retention (future).</li>
+</ul>
+<p>For <code>archive_tool</code> internals (log parsing, Docker orchestration, run modes),
+see <code>src/archive_tool/docs/documentation.md</code>. For a shorter, task‑oriented
+overview of common commands and local testing flows, see
+<code>development/live-testing.md</code>. For deployment‑oriented configuration
+(staging/prod env vars, DNS, Vercel), see
+<code>deployment/hosting-and-live-server-to-dos.md</code>.</p>
+<hr />
+<h2 id="1-highlevel-architecture">1. High‑level architecture</h2>
+<h3 id="11-components">1.1 Components</h3>
+<ul>
+<li><strong>archive_tool</strong> (internal subpackage under <code>src/archive_tool/</code>):</li>
+<li>CLI wrapper around <code>zimit</code> + Docker.</li>
+<li>Manages temporary output dirs, WARCs, and final ZIM build.</li>
+<li>Tracks persistent state in <code>.archive_state.json</code> + <code>.tmp*</code> directories.</li>
+<li>
+<p>Implements stall/error detection, adaptive worker reductions, and VPN
+    rotation (when enabled).</p>
+</li>
+<li>
+<p><strong>Backend package</strong> (<code>src/ha_backend/</code>):</p>
+</li>
+<li>Orchestrates crawl <strong>jobs</strong> using <code>archive_tool</code> as a subprocess.</li>
+<li>Stores job and snapshot metadata in a relational database via SQLAlchemy.</li>
+<li>Indexes WARCs into <code>Snapshot</code> rows.</li>
+<li>Exposes HTTP APIs via FastAPI.</li>
+<li>Provides a worker loop to process queued jobs.</li>
+<li>
+<p>Offers CLI commands for admins (job creation, status, retry, cleanup).</p>
+</li>
+<li>
+<p><strong>External dependencies</strong>:</p>
+</li>
+<li>Docker &amp; <code>ghcr.io/openzim/zimit</code> image.</li>
+<li>Database (SQLite by default; Postgres recommended in production).</li>
+<li>Optional VPN client/command for rotation (e.g., <code>nordvpn</code>).</li>
+</ul>
+<h3 id="12-data-flow-overview">1.2 Data flow overview</h3>
+<ol>
+<li><strong>Job creation</strong>:</li>
+<li>Admin runs <code>ha-backend create-job --source hc</code>.</li>
+<li>
+<p>Backend:</p>
+<ul>
+<li>Ensures a <code>Source</code> row exists.</li>
+<li>Uses <code>SourceJobConfig</code> to build seeds, tool options, and <code>output_dir</code>.</li>
+<li>Inserts an <code>ArchiveJob</code> with <code>status="queued"</code>.</li>
+</ul>
+</li>
+<li>
+<p><strong>Crawl (archive_tool)</strong>:</p>
+</li>
+<li>Worker or CLI runs <code>run_persistent_job(job_id)</code>:<ul>
+<li>Builds <code>archive_tool</code> CLI args from <code>ArchiveJob.config</code> and <code>output_dir</code>.</li>
+<li>Runs <code>archive_tool</code> as a subprocess (no in‑process calls).</li>
+<li>Marks job <code>running</code> → <code>completed</code> or <code>failed</code> with <code>crawler_exit_code</code>
+   and <code>crawler_status</code>.</li>
+</ul>
+</li>
+<li>
+<p><code>archive_tool</code>:</p>
+<ul>
+<li>Validates Docker.</li>
+<li>Determines run mode (Fresh/Resume/New‑with‑Consolidation/Overwrite).</li>
+<li>Spawns <code>docker run ghcr.io/openzim/zimit zimit ...</code>.</li>
+<li>Tracks temp dirs and state, discovers WARCs, and optionally runs a
+   final ZIM build (depending on its configuration).</li>
+</ul>
+</li>
+<li>
+<p><strong>Indexing (WARCs → Snapshot)</strong>:</p>
+</li>
+<li>Worker calls <code>index_job(job_id)</code> when crawl succeeds.</li>
+<li>
+<p>Backend:</p>
+<ul>
+<li>Uses <code>CrawlState</code> + <code>find_all_warc_files</code> to locate WARCs under
+   <code>output_dir</code>.</li>
+<li>Streams WARC records, extracts HTML, text, language, etc.</li>
+<li>Writes <code>Snapshot</code> rows for each captured page.</li>
+<li>Marks job <code>indexed</code> with <code>indexed_page_count</code>.</li>
+</ul>
+</li>
+<li>
+<p><strong>Change tracking (Snapshot → Change events)</strong>:</p>
+</li>
+<li>A background task (<code>ha-backend compute-changes</code>) computes <strong>precomputed</strong>
+     change events between adjacent captures of the same <code>normalized_url_group</code>.</li>
+<li>Outputs <code>SnapshotChange</code> rows with:<ul>
+<li>provenance (from/to snapshot IDs, timestamps),</li>
+<li>summary stats (sections/lines changed),</li>
+<li>and a renderable diff artifact when available.</li>
+</ul>
+</li>
+<li>
+<p>This work is intentionally <strong>off the request path</strong> to keep APIs fast.</p>
+</li>
+<li>
+<p><strong>Serving</strong>:</p>
+</li>
+<li>
+<p>FastAPI app:</p>
+<ul>
+<li><code>GET /api/search</code> queries <code>Snapshot</code> for search results.</li>
+<li><code>GET /api/stats</code> provides lightweight public archive totals for frontend metrics.</li>
+<li><code>GET /api/sources</code> summarises captures per <code>Source</code>.</li>
+<li><code>GET /api/snapshot/{id}</code> returns metadata for a single snapshot.</li>
+<li><code>GET /api/snapshots/raw/{id}</code> replays archived HTML from a WARC.</li>
+<li><code>GET /api/changes</code> and <code>GET /api/changes/compare</code> expose change feeds and diffs.</li>
+<li><code>GET /api/snapshots/{id}/timeline</code> returns a capture timeline for a page group.</li>
+</ul>
+</li>
+<li>
+<p><strong>Admin &amp; cleanup</strong>:</p>
+</li>
+<li>Admin API:<ul>
+<li><code>GET /api/admin/jobs</code> / <code>{id}</code> for job status and config.</li>
+<li><code>GET /metrics</code> for Prometheus‑style metrics.</li>
+</ul>
+</li>
+<li>CLI:<ul>
+<li><code>ha-backend retry-job</code> to reattempt failed jobs.</li>
+<li><code>ha-backend cleanup-job</code> to delete temp dirs/state for indexed jobs,
+   updating <code>cleanup_status</code>.</li>
+</ul>
+</li>
+</ol>
+<hr />
+<h2 id="2-configuration-environment">2. Configuration &amp; environment</h2>
+<h3 id="21-config-module-ha_backendconfigpy">2.1 Config module (<code>ha_backend/config.py</code>)</h3>
+<p>Key roles:</p>
+<ul>
+<li>Locate the <strong>archive root</strong> (<code>--output-dir</code> base) and <code>archive_tool</code> command.</li>
+<li>Read the <strong>database URL</strong>.</li>
+</ul>
+<p>Admin‑related configuration is handled separately in <code>ha_backend/api/deps.py</code>,
+which reads <code>HEALTHARCHIVE_ADMIN_TOKEN</code> from the environment. When this token
+is <strong>unset</strong>, admin and metrics endpoints are effectively open and should only
+be used in local development. In staging and production you should always set
+<code>HEALTHARCHIVE_ADMIN_TOKEN</code> to a long, random value and treat it as a secret.</p>
+<h4 id="archivetoolconfig">ArchiveToolConfig</h4>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nd">@dataclass</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="k">class</span><span class="w"> </span><span class="nc">ArchiveToolConfig</span><span class="p">:</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>    <span class="n">archive_root</span><span class="p">:</span> <span class="n">Path</span> <span class="o">=</span> <span class="n">DEFAULT_ARCHIVE_ROOT</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>    <span class="n">archive_tool_cmd</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">DEFAULT_ARCHIVE_TOOL_CMD</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">ensure_archive_root</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>        <span class="bp">self</span><span class="o">.</span><span class="n">archive_root</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">parents</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</code></pre></div>
+<p>Defaults:</p>
+<ul>
+<li><code>DEFAULT_ARCHIVE_ROOT</code> = <code>/mnt/nasd/nobak/healtharchive/jobs</code></li>
+<li><code>DEFAULT_ARCHIVE_TOOL_CMD</code> = <code>"archive-tool"</code></li>
+</ul>
+<p>Env overrides:</p>
+<ul>
+<li><code>HEALTHARCHIVE_ARCHIVE_ROOT</code> → archive root.</li>
+<li><code>HEALTHARCHIVE_TOOL_CMD</code> → CLI to call (e.g., <code>archive-tool</code>, <code>python run_archive.py</code>).</li>
+</ul>
+<h4 id="databaseconfig">DatabaseConfig</h4>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="nd">@dataclass</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="k">class</span><span class="w"> </span><span class="nc">DatabaseConfig</span><span class="p">:</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>    <span class="n">database_url</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">DEFAULT_DATABASE_URL</span>
+</code></pre></div>
+<p>Defaults:</p>
+<ul>
+<li><code>DEFAULT_DATABASE_URL = "sqlite:///healtharchive.db"</code> in the repo root.</li>
+</ul>
+<p>Env override:</p>
+<ul>
+<li><code>HEALTHARCHIVE_DATABASE_URL</code>.</li>
+</ul>
+<h3 id="22-logging-ha_backendlogging_configpy">2.2 Logging (<code>ha_backend/logging_config.py</code>)</h3>
+<p>Centralized logging configuration:</p>
+<ul>
+<li>Reads <code>HEALTHARCHIVE_LOG_LEVEL</code> (default <code>INFO</code>).</li>
+<li>On first call, uses <code>logging.basicConfig(...)</code> with:</li>
+<li>Format: <code>"%(asctime)s [%(levelname)s] %(name)s: %(message)s"</code>.</li>
+<li>Adjusts noisy loggers:</li>
+<li><code>sqlalchemy.engine</code> → <code>WARNING</code>.</li>
+<li><code>uvicorn.access</code> → <code>INFO</code>.</li>
+</ul>
+<p>Used in:</p>
+<ul>
+<li><code>ha_backend.api.__init__</code> (API startup).</li>
+<li><code>ha_backend.cli.main</code> (CLI entrypoint).</li>
+</ul>
+<hr />
+<h2 id="3-data-model-sqlalchemy-orm">3. Data model (SQLAlchemy ORM)</h2>
+<p>Defined in <code>src/ha_backend/models.py</code>, with <code>Base</code> from <code>ha_backend.db</code>.</p>
+<h3 id="31-source">3.1 Source</h3>
+<p>Represents a logical content origin (e.g., Health Canada, PHAC).</p>
+<p>Important fields:</p>
+<ul>
+<li><code>id: int</code> (PK)</li>
+<li><code>code: str</code> – short code (<code>"hc"</code>, <code>"phac"</code>) – unique, indexed.</li>
+<li><code>name: str</code> – human‑readable name.</li>
+<li><code>base_url: str | None</code></li>
+<li><code>description: str | None</code></li>
+<li><code>enabled: bool</code></li>
+<li>Timestamps: <code>created_at</code>, <code>updated_at</code></li>
+</ul>
+<p>Relationships:</p>
+<ul>
+<li><code>jobs: List[ArchiveJob]</code> – all jobs for this source.</li>
+<li><code>snapshots: List[Snapshot]</code> – all snapshots for this source.</li>
+</ul>
+<h3 id="32-archivejob">3.2 ArchiveJob</h3>
+<p>Represents a single <code>archive_tool</code> run (or family of runs) for a source.</p>
+<p>Key fields:</p>
+<ul>
+<li>Identity:</li>
+<li><code>id: int</code> (PK)</li>
+<li><code>source_id: int | None</code> → FK to <code>sources.id</code></li>
+<li><code>name: str</code> – must match <code>--name</code> for <code>archive_tool</code>; used in ZIM naming.</li>
+<li>
+<p><code>output_dir: str</code> – host path used as <code>--output-dir</code> for <code>archive_tool</code>.</p>
+</li>
+<li>
+<p>Lifecycle/status:</p>
+</li>
+<li><code>status: str</code> – high‑level state; typical values:<ul>
+<li><code>queued</code></li>
+<li><code>running</code></li>
+<li><code>retryable</code></li>
+<li><code>failed</code></li>
+<li><code>completed</code> (crawl succeeded)</li>
+<li><code>indexing</code></li>
+<li><code>indexed</code></li>
+<li><code>index_failed</code></li>
+</ul>
+</li>
+<li><code>queued_at</code>, <code>started_at</code>, <code>finished_at</code>: timestamps.</li>
+<li>
+<p><code>retry_count: int</code> – number of times the worker retried the crawl.</p>
+</li>
+<li>
+<p>Configuration:</p>
+</li>
+<li>
+<p><code>config: JSON | None</code> – “opaque” config used to reconstruct the CLI:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="p">{</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="w">  </span><span class="nt">&quot;seeds&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;https://...&quot;</span><span class="p">],</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="w">  </span><span class="nt">&quot;zimit_passthrough_args&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;--profile&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;foo&quot;</span><span class="p">],</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="w">  </span><span class="nt">&quot;tool_options&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="w">    </span><span class="nt">&quot;cleanup&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="w">    </span><span class="nt">&quot;overwrite&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="w">    </span><span class="nt">&quot;enable_monitoring&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="w">    </span><span class="nt">&quot;enable_adaptive_workers&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
+<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="w">    </span><span class="nt">&quot;enable_vpn_rotation&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
+<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a><span class="w">    </span><span class="nt">&quot;initial_workers&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span>
+<a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a><span class="w">    </span><span class="nt">&quot;log_level&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;INFO&quot;</span><span class="p">,</span>
+<a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a><span class="w">    </span><span class="nt">&quot;...&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;...&quot;</span>
+<a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a><span class="w">  </span><span class="p">}</span>
+<a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a><span class="p">}</span>
+</code></pre></div>
+</li>
+<li>
+<p>Crawl metrics:</p>
+</li>
+<li><code>crawler_exit_code: int | None</code> – exit code from the <code>archive_tool</code> process.</li>
+<li><code>crawler_status: str | None</code> – summarised status (e.g. <code>"success"</code>, <code>"failed"</code>).</li>
+<li><code>crawler_stage: str | None</code> – last known stage (not heavily used yet).</li>
+<li><code>last_stats_json: JSON | None</code> – parsed crawl stats from the latest combined log, when available.</li>
+<li>
+<p><code>pages_crawled</code>, <code>pages_total</code>, <code>pages_failed</code>: simple integer metrics derived from <code>last_stats_json</code> (best-effort).</p>
+</li>
+<li>
+<p>WARC/ZIM counts:</p>
+</li>
+<li><code>warc_file_count: int</code> – number of WARCs discovered for this job.</li>
+<li>
+<p><code>indexed_page_count: int</code> – number of <code>Snapshot</code>s created during indexing.</p>
+</li>
+<li>
+<p>Filesystem paths:</p>
+</li>
+<li><code>final_zim_path: str | None</code> – if a ZIM is produced by <code>archive_tool</code> or manual <code>warc2zim</code>.</li>
+<li><code>combined_log_path: str | None</code> – path to the latest combined log, used for stats/debugging.</li>
+<li>
+<p><code>state_file_path: str | None</code> – path to <code>.archive_state.json</code> within <code>output_dir</code> (may be <code>None</code> after cleanup).</p>
+</li>
+<li>
+<p>Cleanup state (future):</p>
+</li>
+<li><code>cleanup_status: str</code> – describes whether any cleanup has occurred:<ul>
+<li><code>"none"</code> (default) – temp dirs &amp; state still present (or never existed).</li>
+<li><code>"temp_cleaned"</code> – <code>cleanup-job</code> or an equivalent operation removed temp dirs/state.</li>
+<li>Future values could represent more aggressive cleanup.</li>
+</ul>
+</li>
+<li><code>cleaned_at: datetime | None</code> – when cleanup was performed.</li>
+</ul>
+<p>Relationships:</p>
+<ul>
+<li><code>source: Source | None</code> – parent source.</li>
+<li><code>snapshots: List[Snapshot]</code> – all snapshots produced by this job.</li>
+</ul>
+<h3 id="33-snapshot">3.3 Snapshot</h3>
+<p>Represents a single captured web page (an HTML response) extracted from a WARC.</p>
+<p>Key fields:</p>
+<ul>
+<li>Identity:</li>
+<li><code>id: int</code> (PK)</li>
+<li><code>job_id: int | None</code> → FK to <code>archive_jobs.id</code></li>
+<li>
+<p><code>source_id: int | None</code> → FK to <code>sources.id</code></p>
+</li>
+<li>
+<p>URL &amp; grouping:</p>
+</li>
+<li><code>url: str</code> – full URL of the capture (including query string).</li>
+<li>
+<p><code>normalized_url_group: str | None</code> – optional canonicalised URL for grouping (e.g., removing query or anchors).</p>
+</li>
+<li>
+<p>Timing:</p>
+</li>
+<li>
+<p><code>capture_timestamp: datetime</code> – from <code>WARC-Date</code> or HTTP headers.</p>
+</li>
+<li>
+<p>HTTP &amp; content:</p>
+</li>
+<li><code>mime_type: str | None</code></li>
+<li><code>status_code: int | None</code></li>
+<li><code>title: str | None</code> – extracted from <code>&lt;title&gt;</code> or headings.</li>
+<li><code>snippet: str | None</code> – short preview text.</li>
+<li>
+<p><code>language: str | None</code> – ISO language (e.g. <code>"en"</code>, <code>"fr"</code>).</p>
+</li>
+<li>
+<p>Storage / replay:</p>
+</li>
+<li><code>warc_path: str</code> – path to the <code>.warc.gz</code> file on disk.</li>
+<li><code>warc_record_id: str | None</code> – WARC record identifier or offset (see <code>indexing.viewer</code>).</li>
+<li><code>raw_snapshot_path: str | None</code> – optional path to a static HTML export, if you create such stubs.</li>
+<li><code>content_hash: str | None</code> – hash of the HTML body for deduplication.</li>
+</ul>
+<p>Relationships:</p>
+<ul>
+<li><code>job: ArchiveJob | None</code></li>
+<li><code>source: Source | None</code></li>
+</ul>
+<hr />
+<h2 id="4-job-registry-creation-ha_backendjob_registrypy">4. Job registry &amp; creation (<code>ha_backend/job_registry.py</code>)</h2>
+<p>The job registry defines default behavior and seeds for each source code (<code>"hc"</code>, <code>"phac"</code>).</p>
+<h3 id="41-sourcejobconfig">4.1 SourceJobConfig</h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="nd">@dataclass</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="k">class</span><span class="w"> </span><span class="nc">SourceJobConfig</span><span class="p">:</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>    <span class="n">source_code</span><span class="p">:</span> <span class="nb">str</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>    <span class="n">name_template</span><span class="p">:</span> <span class="nb">str</span>
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>    <span class="n">default_seeds</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span>
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>    <span class="n">default_zimit_passthrough_args</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span>
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>    <span class="n">default_tool_options</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span>
+<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>    <span class="n">schedule_hint</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+</code></pre></div>
+<p>Examples:</p>
+<ul>
+<li>
+<p><code>hc</code> (Health Canada):</p>
+</li>
+<li>
+<p><code>name_template = "hc-{date:%Y%m%d}"</code></p>
+</li>
+<li><code>default_seeds = ["https://www.canada.ca/en/health-canada.html"]</code></li>
+<li>
+<p><code>default_tool_options</code>:</p>
+<ul>
+<li><code>cleanup = False</code></li>
+<li><code>overwrite = False</code></li>
+<li><code>enable_monitoring = False</code> (can be changed per environment)</li>
+<li><code>enable_adaptive_workers = False</code></li>
+<li><code>enable_vpn_rotation = False</code></li>
+<li><code>initial_workers = 1</code></li>
+<li><code>log_level = "INFO"</code></li>
+</ul>
+</li>
+<li>
+<p><code>phac</code> (Public Health Agency of Canada) is similar with a PHAC home page seed.</p>
+</li>
+</ul>
+<h3 id="42-job-name-and-output-dir">4.2 Job name and output dir</h3>
+<ul>
+<li><code>generate_job_name(source_cfg, now)</code>:</li>
+<li>Renders <code>name_template</code> using <code>{date:%Y%m%d}</code> from UTC timestamp.</li>
+<li>
+<p>E.g. <code>hc-20251209</code>.</p>
+</li>
+<li>
+<p><code>build_output_dir_for_job(source_code, job_name, archive_root, now)</code>:</p>
+</li>
+</ul>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>&lt;archive_root&gt;/&lt;source_code&gt;/&lt;YYYYMMDDThhmmssZ&gt;__&lt;job_name&gt;
+</code></pre></div>
+<p>Example:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>/mnt/nasd/nobak/healtharchive/jobs/hc/20251209T210911Z__hc-20251209
+</code></pre></div>
+<h3 id="43-job-config-json">4.3 Job config JSON</h3>
+<ul>
+<li><code>build_job_config(source_cfg, extra_seeds=None, overrides=None)</code>:</li>
+<li>Merges <code>default_seeds</code> + extra seeds.</li>
+<li>Copies <code>default_zimit_passthrough_args</code>.</li>
+<li>Copies and updates <code>default_tool_options</code> with any <code>overrides</code>.</li>
+<li>
+<p>Performs basic validation of <code>tool_options</code> to fail fast on
+    misconfiguration:</p>
+<ul>
+<li>If <code>enable_adaptive_workers=True</code> but <code>enable_monitoring</code> is not <code>True</code>,
+  a <code>ValueError</code> is raised.</li>
+<li>If <code>enable_vpn_rotation=True</code> but <code>enable_monitoring</code> is not <code>True</code>,
+  a <code>ValueError</code> is raised.</li>
+<li>If <code>enable_vpn_rotation=True</code> but <code>vpn_connect_command</code> is missing or
+  empty, a <code>ValueError</code> is raised.</li>
+</ul>
+</li>
+</ul>
+<p>Result structure:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="p">{</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="w">  </span><span class="nt">&quot;seeds&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;https://...&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;...&quot;</span><span class="p">],</span>
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="w">  </span><span class="nt">&quot;zimit_passthrough_args&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="w">  </span><span class="nt">&quot;tool_options&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="w">    </span><span class="nt">&quot;cleanup&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
+<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a><span class="w">    </span><span class="nt">&quot;overwrite&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
+<a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a><span class="w">    </span><span class="nt">&quot;enable_monitoring&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
+<a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a><span class="w">    </span><span class="nt">&quot;enable_adaptive_workers&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
+<a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a><span class="w">    </span><span class="nt">&quot;enable_vpn_rotation&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
+<a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a><span class="w">    </span><span class="nt">&quot;initial_workers&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span>
+<a id="__codelineno-6-11" name="__codelineno-6-11" href="#__codelineno-6-11"></a><span class="w">    </span><span class="nt">&quot;log_level&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;INFO&quot;</span>
+<a id="__codelineno-6-12" name="__codelineno-6-12" href="#__codelineno-6-12"></a><span class="w">  </span><span class="p">}</span>
+<a id="__codelineno-6-13" name="__codelineno-6-13" href="#__codelineno-6-13"></a><span class="p">}</span>
+</code></pre></div>
+<h3 id="44-create_job_for_source">4.4 create_job_for_source</h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">create_job_for_source</span><span class="p">(</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>    <span class="n">source_code</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>    <span class="o">*</span><span class="p">,</span>
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>    <span class="n">session</span><span class="p">:</span> <span class="n">Session</span><span class="p">,</span>
+<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>    <span class="n">overrides</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">ORMArchiveJob</span><span class="p">:</span>
+</code></pre></div>
+<p>Steps:</p>
+<ol>
+<li>Look up <code>SourceJobConfig</code> for <code>source_code</code>.</li>
+<li>Ensure a <code>Source</code> row with that code exists (or raise).</li>
+<li>Resolve <code>archive_root</code> from config.</li>
+<li>Generate <code>job_name</code> and <code>output_dir</code>.</li>
+<li>Build <code>job_config</code>.</li>
+<li>Insert an <code>ArchiveJob</code>:</li>
+<li><code>status="queued"</code>, <code>queued_at=now</code>, <code>config=job_config</code>.</li>
+</ol>
+<p>The CLI command <code>ha-backend create-job --source hc</code> is a thin wrapper around this.</p>
+<hr />
+<h2 id="5-archive_tool-integration-job-runner-ha_backendjobspy">5. archive_tool integration &amp; job runner (<code>ha_backend/jobs.py</code>)</h2>
+<h3 id="51-runtimearchivejob">5.1 RuntimeArchiveJob</h3>
+<p><code>RuntimeArchiveJob</code> is a small helper for ad‑hoc runs (<code>ha-backend run-job</code>) that:</p>
+<ul>
+<li>Holds just a <code>name</code> and <code>seeds: list[str]</code>.</li>
+<li>Creates a timestamped job directory under the archive root (unless overridden).</li>
+<li>Builds the <code>archive_tool</code> CLI command.</li>
+<li>Executes it via <code>subprocess.run(...)</code>.</li>
+</ul>
+<p>This path is used by:</p>
+<ul>
+<li><code>ha-backend run-job</code> – direct, non‑persistent jobs.</li>
+</ul>
+<h3 id="52-run_persistent_job-dbbacked-jobs">5.2 run_persistent_job – DB‑backed jobs</h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">run_persistent_job</span><span class="p">(</span><span class="n">job_id</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>    <span class="o">...</span>
+</code></pre></div>
+<p>Responsibilities:</p>
+<ol>
+<li>
+<p><strong>Load job and mark running</strong>:</p>
+</li>
+<li>
+<p>Using <code>get_session()</code>:</p>
+<ul>
+<li>Fetch <code>ArchiveJob</code> by ID.</li>
+<li>Validate <code>status in ("queued", "retryable")</code>.</li>
+<li>Extract <code>config</code>, splitting into:</li>
+<li><code>tool_options</code></li>
+<li><code>zimit_passthrough_args</code></li>
+<li><code>seeds</code></li>
+<li>Validate that <code>seeds</code> is non‑empty.</li>
+<li>Record <code>output_dir</code> and <code>name</code>.</li>
+<li>Set:</li>
+<li><code>status = "running"</code></li>
+<li><code>started_at = now</code></li>
+</ul>
+</li>
+<li>
+<p><strong>Build CLI options from tool_options</strong>:</p>
+</li>
+<li>
+<p>Core:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="n">initial_workers</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">tool_options</span><span class="o">.</span><span class="n">initial_workers</span><span class="p">)</span>
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="n">cleanup</span> <span class="o">=</span> <span class="nb">bool</span><span class="p">(</span><span class="n">tool_options</span><span class="o">.</span><span class="n">cleanup</span><span class="p">)</span>
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="n">overwrite</span> <span class="o">=</span> <span class="nb">bool</span><span class="p">(</span><span class="n">tool_options</span><span class="o">.</span><span class="n">overwrite</span><span class="p">)</span>
+<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="n">log_level</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">tool_options</span><span class="o">.</span><span class="n">log_level</span><span class="p">)</span>
+</code></pre></div>
+</li>
+<li>
+<p>Monitoring options:</p>
+<p>Only if <code>enable_monitoring</code> is <code>True</code>:</p>
+<ul>
+<li>Adds <code>--enable-monitoring</code>.</li>
+<li>Optionally:</li>
+<li><code>monitor_interval_seconds</code> → <code>--monitor-interval-seconds N</code></li>
+<li><code>stall_timeout_minutes</code> → <code>--stall-timeout-minutes N</code></li>
+<li><code>error_threshold_timeout</code> → <code>--error-threshold-timeout N</code></li>
+<li><code>error_threshold_http</code> → <code>--error-threshold-http N</code></li>
+</ul>
+</li>
+<li>
+<p>Adaptive workers:</p>
+<p>Only if both <code>enable_monitoring</code> and <code>enable_adaptive_workers</code> are <code>True</code>:</p>
+<ul>
+<li>Adds <code>--enable-adaptive-workers</code>.</li>
+<li>Optionally:</li>
+<li><code>min_workers</code> → <code>--min-workers N</code></li>
+<li><code>max_worker_reductions</code> → <code>--max-worker-reductions N</code></li>
+</ul>
+</li>
+<li>
+<p>VPN rotation:</p>
+<p>Only if <code>enable_monitoring</code>, <code>enable_vpn_rotation</code>, and <code>vpn_connect_command</code>
+ are all present:</p>
+<ul>
+<li>Adds:</li>
+</ul>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>--enable-vpn-rotation
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>--vpn-connect-command<span class="w"> </span><span class="s2">&quot;&lt;vpn_connect_command&gt;&quot;</span>
+</code></pre></div>
+<ul>
+<li>Optionally:</li>
+<li><code>max_vpn_rotations</code> → <code>--max-vpn-rotations N</code></li>
+<li><code>vpn_rotation_frequency_minutes</code> → <code>--vpn-rotation-frequency-minutes N</code></li>
+</ul>
+</li>
+<li>
+<p>Backoff:</p>
+<p>Only when monitoring is enabled and <code>backoff_delay_minutes</code> is set:</p>
+<ul>
+<li><code>--backoff-delay-minutes N</code>.</li>
+</ul>
+</li>
+<li>
+<p>Zimit passthrough:</p>
+<ul>
+<li><code>zimit_passthrough_args</code> are appended <strong>after</strong> a literal <code>"--"</code> so
+   <code>archive_tool</code> passes them directly to <code>zimit</code>.</li>
+</ul>
+</li>
+<li>
+<p>The final <code>extra_args</code> passed to <code>RuntimeArchiveJob.run(...)</code> look like:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="o">[</span>archive_tool_flags...,<span class="w"> </span><span class="s2">&quot;--&quot;</span>,<span class="w"> </span>zimit_passthrough_args...<span class="o">]</span>
+</code></pre></div>
+</li>
+<li>
+<p><strong>Execute archive_tool</strong>:</p>
+</li>
+<li>
+<p>Instantiates <code>RuntimeArchiveJob(name, seeds)</code>.</p>
+</li>
+<li>
+<p>Calls:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="n">rc</span> <span class="o">=</span> <span class="n">runtime_job</span><span class="o">.</span><span class="n">run</span><span class="p">(</span>
+<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>    <span class="n">initial_workers</span><span class="o">=</span><span class="n">initial_workers</span><span class="p">,</span>
+<a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a>    <span class="n">cleanup</span><span class="o">=</span><span class="n">cleanup</span><span class="p">,</span>
+<a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a>    <span class="n">overwrite</span><span class="o">=</span><span class="n">overwrite</span><span class="p">,</span>
+<a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a>    <span class="n">log_level</span><span class="o">=</span><span class="n">log_level</span><span class="p">,</span>
+<a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a>    <span class="n">extra_args</span><span class="o">=</span><span class="n">full_extra_args</span><span class="p">,</span>
+<a id="__codelineno-12-7" name="__codelineno-12-7" href="#__codelineno-12-7"></a>    <span class="n">stream_output</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+<a id="__codelineno-12-8" name="__codelineno-12-8" href="#__codelineno-12-8"></a>    <span class="n">output_dir_override</span><span class="o">=</span><span class="n">Path</span><span class="p">(</span><span class="n">output_dir_str</span><span class="p">),</span>
+<a id="__codelineno-12-9" name="__codelineno-12-9" href="#__codelineno-12-9"></a><span class="p">)</span>
+</code></pre></div>
+</li>
+<li>
+<p><code>output_dir_override</code> ensures a specific job directory under the archive
+     root (matching the DB record) is used, and created if needed.</p>
+</li>
+<li>
+<p><strong>Update job status</strong>:</p>
+</li>
+<li>
+<p>After the subprocess returns:</p>
+<ul>
+<li><code>crawler_exit_code = rc</code></li>
+<li><code>finished_at = now</code></li>
+<li><code>status = "completed"</code> and <code>crawler_status = "success"</code> if <code>rc == 0</code></li>
+<li>Otherwise:</li>
+<li><code>status = "failed"</code></li>
+<li><code>crawler_status = "failed"</code></li>
+</ul>
+</li>
+</ol>
+<p>The worker uses <code>run_persistent_job(job_id)</code> for each queued job.</p>
+<h3 id="53-maintaining-the-archive_tool-integration">5.3 Maintaining the archive_tool integration</h3>
+<p>The backend and <code>archive_tool</code> share a small but important contract:</p>
+<ul>
+<li>
+<p><strong>Configuration JSON</strong>:</p>
+</li>
+<li>
+<p><code>ArchiveJob.config</code> stores a dict that is the serialised form of
+    <code>ArchiveJobConfig</code> from <code>ha_backend.archive_contract</code>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="p">{</span>
+<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a><span class="w">  </span><span class="nt">&quot;seeds&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;https://...&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;...&quot;</span><span class="p">],</span>
+<a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a><span class="w">  </span><span class="nt">&quot;zimit_passthrough_args&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;--pageLimit&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;10&quot;</span><span class="p">],</span>
+<a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a><span class="w">  </span><span class="nt">&quot;tool_options&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a><span class="w">    </span><span class="nt">&quot;cleanup&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
+<a id="__codelineno-13-6" name="__codelineno-13-6" href="#__codelineno-13-6"></a><span class="w">    </span><span class="nt">&quot;overwrite&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
+<a id="__codelineno-13-7" name="__codelineno-13-7" href="#__codelineno-13-7"></a><span class="w">    </span><span class="nt">&quot;enable_monitoring&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
+<a id="__codelineno-13-8" name="__codelineno-13-8" href="#__codelineno-13-8"></a><span class="w">    </span><span class="nt">&quot;enable_adaptive_workers&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
+<a id="__codelineno-13-9" name="__codelineno-13-9" href="#__codelineno-13-9"></a><span class="w">    </span><span class="nt">&quot;enable_vpn_rotation&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
+<a id="__codelineno-13-10" name="__codelineno-13-10" href="#__codelineno-13-10"></a><span class="w">    </span><span class="nt">&quot;initial_workers&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span>
+<a id="__codelineno-13-11" name="__codelineno-13-11" href="#__codelineno-13-11"></a><span class="w">    </span><span class="nt">&quot;log_level&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;INFO&quot;</span><span class="p">,</span>
+<a id="__codelineno-13-12" name="__codelineno-13-12" href="#__codelineno-13-12"></a><span class="w">    </span><span class="nt">&quot;relax_perms&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<a id="__codelineno-13-13" name="__codelineno-13-13" href="#__codelineno-13-13"></a><span class="w">    </span><span class="nt">&quot;monitor_interval_seconds&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">30</span><span class="p">,</span>
+<a id="__codelineno-13-14" name="__codelineno-13-14" href="#__codelineno-13-14"></a><span class="w">    </span><span class="nt">&quot;stall_timeout_minutes&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">30</span><span class="p">,</span>
+<a id="__codelineno-13-15" name="__codelineno-13-15" href="#__codelineno-13-15"></a><span class="w">    </span><span class="nt">&quot;error_threshold_timeout&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">10</span><span class="p">,</span>
+<a id="__codelineno-13-16" name="__codelineno-13-16" href="#__codelineno-13-16"></a><span class="w">    </span><span class="nt">&quot;error_threshold_http&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">10</span><span class="p">,</span>
+<a id="__codelineno-13-17" name="__codelineno-13-17" href="#__codelineno-13-17"></a><span class="w">    </span><span class="nt">&quot;min_workers&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span>
+<a id="__codelineno-13-18" name="__codelineno-13-18" href="#__codelineno-13-18"></a><span class="w">    </span><span class="nt">&quot;max_worker_reductions&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">2</span><span class="p">,</span>
+<a id="__codelineno-13-19" name="__codelineno-13-19" href="#__codelineno-13-19"></a><span class="w">    </span><span class="nt">&quot;vpn_connect_command&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;vpn connect ca&quot;</span><span class="p">,</span>
+<a id="__codelineno-13-20" name="__codelineno-13-20" href="#__codelineno-13-20"></a><span class="w">    </span><span class="nt">&quot;max_vpn_rotations&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">3</span><span class="p">,</span>
+<a id="__codelineno-13-21" name="__codelineno-13-21" href="#__codelineno-13-21"></a><span class="w">    </span><span class="nt">&quot;vpn_rotation_frequency_minutes&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">60</span><span class="p">,</span>
+<a id="__codelineno-13-22" name="__codelineno-13-22" href="#__codelineno-13-22"></a><span class="w">    </span><span class="nt">&quot;backoff_delay_minutes&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">15</span>
+<a id="__codelineno-13-23" name="__codelineno-13-23" href="#__codelineno-13-23"></a><span class="w">  </span><span class="p">}</span>
+<a id="__codelineno-13-24" name="__codelineno-13-24" href="#__codelineno-13-24"></a><span class="p">}</span>
+</code></pre></div>
+</li>
+<li>
+<p><code>SourceJobConfig.default_tool_options</code> in <code>ha_backend.job_registry</code> is the
+    source of truth for defaults; overrides are merged via
+    <code>build_job_config(...)</code> which uses <code>ArchiveToolOptions</code> +
+    <code>validate_tool_options(...)</code> to enforce invariants that mirror
+    <code>archive_tool.cli</code> (e.g. monitoring required for adaptive/VPN).</p>
+</li>
+<li>
+<p><strong>CLI construction</strong>:</p>
+</li>
+<li>
+<p><code>ha_backend.jobs.run_persistent_job</code> is the only place that maps
+    <code>tool_options</code> fields to <code>archive_tool</code> CLI flags. It expects the argument
+    model described in <code>src/archive_tool/docs/documentation.md</code> and
+    <code>archive_tool/cli.py</code>.</p>
+</li>
+<li>
+<p>If you add or rename CLI options in <code>archive_tool</code>:</p>
+<ul>
+<li>Extend <code>ArchiveToolOptions</code> and <code>ArchiveJobConfig</code> to carry the new
+  fields.</li>
+<li>Update <code>run_persistent_job</code> to add/remove the corresponding flags.</li>
+<li>Adjust tests under <code>tests/test_job_registry.py</code>,
+  <code>tests/test_archive_contract.py</code>, and <code>tests/test_jobs_persistent.py</code>
+  that assert config and CLI behaviour.</li>
+</ul>
+</li>
+<li>
+<p><strong>Stats and logs</strong>:</p>
+</li>
+<li>
+<p><code>archive_tool</code> writes combined logs
+    <code>archive_&lt;stage_name&gt;_*.combined.log</code> under each job's <code>output_dir</code> and
+    emits <code>"Crawl statistics"</code> JSON lines that
+    <code>archive_tool.utils.parse_last_stats_from_log</code> can parse.</p>
+</li>
+<li>
+<p><code>ha_backend.crawl_stats.update_job_stats_from_logs</code>:</p>
+<ul>
+<li>Locates the latest combined log for a job.</li>
+<li>Calls <code>parse_last_stats_from_log(log_path)</code> to obtain a stats dict.</li>
+<li>Stores it in <code>ArchiveJob.last_stats_json</code>.</li>
+<li>Updates <code>pages_crawled</code>, <code>pages_total</code>, <code>pages_failed</code>, and
+  <code>combined_log_path</code> as a best-effort summary.</li>
+</ul>
+</li>
+<li>
+<p><code>/metrics</code> exposes these page counters via:</p>
+<ul>
+<li><code>healtharchive_jobs_pages_crawled_total</code></li>
+<li><code>healtharchive_jobs_pages_failed_total</code></li>
+<li>per-source variants, backed by the <code>pages_*</code> fields on <code>ArchiveJob</code>.</li>
+</ul>
+</li>
+<li>
+<p><strong>WARC discovery and cleanup</strong>:</p>
+</li>
+<li>
+<p><code>ha_backend.indexing.warc_discovery.discover_warcs_for_job</code> relies on
+    <code>archive_tool.state.CrawlState</code> and <code>archive_tool.utils.find_all_warc_files</code>
+    / <code>find_latest_temp_dir_fallback</code> for WARC discovery and temp dir
+    tracking.</p>
+</li>
+<li><code>ha_backend.cli.cmd_cleanup_job</code> uses <code>CrawlState</code> and
+    <code>archive_tool.utils.cleanup_temp_dirs</code> to remove <code>.tmp*</code> directories and
+    <code>.archive_state.json</code> safely once jobs are indexed.</li>
+</ul>
+<p>If you change log formats, state layout, or directory structure in
+<code>archive_tool</code>, update the corresponding backend helpers (<code>ArchiveJobConfig</code>,
+<code>run_persistent_job</code>, <code>update_job_stats_from_logs</code>, WARC discovery, and
+cleanup) and their tests to keep the contract in sync.</p>
+<hr />
+<h2 id="6-indexing-pipeline-ha_backendindexing">6. Indexing pipeline (<code>ha_backend/indexing/*</code>)</h2>
+<p>The indexing pipeline converts the WARCs produced by <code>archive_tool</code> into
+structured <code>Snapshot</code> rows.</p>
+<h3 id="61-warc-discovery-warc_discoverypy">6.1 WARC discovery (<code>warc_discovery.py</code>)</h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="kn">from</span><span class="w"> </span><span class="nn">archive_tool.state</span><span class="w"> </span><span class="kn">import</span> <span class="n">CrawlState</span>
+<a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a><span class="kn">from</span><span class="w"> </span><span class="nn">archive_tool.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">find_all_warc_files</span><span class="p">,</span> <span class="n">find_latest_temp_dir_fallback</span>
+</code></pre></div>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">discover_warcs_for_job</span><span class="p">(</span>
+<a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a>    <span class="n">job</span><span class="p">:</span> <span class="n">ArchiveJob</span><span class="p">,</span>
+<a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a>    <span class="o">*</span><span class="p">,</span>
+<a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a>    <span class="n">allow_fallback</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">,</span>
+<a id="__codelineno-15-5" name="__codelineno-15-5" href="#__codelineno-15-5"></a><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">Path</span><span class="p">]:</span>
+</code></pre></div>
+<p>Steps:</p>
+<ol>
+<li>Resolve <code>host_output_dir = Path(job.output_dir).resolve()</code>.</li>
+<li>Instantiate <code>CrawlState(host_output_dir, initial_workers=1)</code>:</li>
+<li>This loads <code>.archive_state.json</code> if present.</li>
+<li>Get <code>temp_dirs = state.get_temp_dir_paths()</code>:</li>
+<li>Returns only existing directories and prunes missing ones from state.</li>
+<li>If <code>temp_dirs</code> is empty and <code>allow_fallback</code>:</li>
+<li>Use <code>find_latest_temp_dir_fallback(host_output_dir)</code> to scan for <code>.tmp*</code>
+     directories.</li>
+<li>If still empty → return <code>[]</code>.</li>
+<li>Call <code>find_all_warc_files(temp_dirs)</code>:</li>
+<li>Returns a de‑duplicated list of <code>*.warc.gz</code> files under each
+     <code>collections/crawl-*/archive</code> directory.</li>
+</ol>
+<p>This ensures the backend uses <strong>exactly the same</strong> WARC discovery logic as
+<code>archive_tool</code> itself.</p>
+<h3 id="62-warc-reading-warc_readerpy">6.2 WARC reading (<code>warc_reader.py</code>)</h3>
+<p>Wraps <code>warcio</code> to stream HTML response records from a <code>.warc.gz</code> file.</p>
+<p>Exports a generator like:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">iter_html_records</span><span class="p">(</span><span class="n">warc_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Iterator</span><span class="p">[</span><span class="n">ArchiveRecord</span><span class="p">]:</span>
+<a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>    <span class="o">...</span>
+</code></pre></div>
+<p>Where <code>ArchiveRecord</code> provides:</p>
+<ul>
+<li><code>url: str</code></li>
+<li><code>capture_timestamp: datetime</code></li>
+<li><code>headers: dict[str, str]</code></li>
+<li><code>body_bytes: bytes</code></li>
+<li><code>warc_path: Path</code></li>
+<li><code>warc_record_id: str | None</code></li>
+</ul>
+<h3 id="63-text-extraction-text_extractionpy">6.3 Text extraction (<code>text_extraction.py</code>)</h3>
+<p>Helpers:</p>
+<ul>
+<li><code>extract_title(html: str) -&gt; str</code> – heuristics over <code>&lt;title&gt;</code> / headings.</li>
+<li><code>extract_text(html: str) -&gt; str</code> – uses BeautifulSoup to pull visible text.</li>
+<li><code>make_snippet(text: str) -&gt; str</code> – short preview (~N chars/words).</li>
+<li><code>detect_language(text: str, headers: dict) -&gt; str</code> – simple language detection,
+  leveraging headers or heuristics (kept basic for now).</li>
+</ul>
+<h3 id="64-mapping-records-to-snapshot-mappingpy">6.4 Mapping records to Snapshot (<code>mapping.py</code>)</h3>
+<p><code>record_to_snapshot(job, source, rec, title, snippet, language)</code>:</p>
+<ul>
+<li>Takes:</li>
+<li><code>ArchiveJob</code></li>
+<li><code>Source</code></li>
+<li><code>ArchiveRecord</code> from <code>iter_html_records</code></li>
+<li><code>title</code>, <code>snippet</code>, <code>language</code> from text extraction</li>
+<li>Produces a new <code>Snapshot</code> instance with:</li>
+<li><code>job_id</code>, <code>source_id</code></li>
+<li><code>url</code>, <code>normalized_url_group</code></li>
+<li><code>capture_timestamp</code></li>
+<li><code>mime_type</code>, <code>status_code</code></li>
+<li><code>title</code>, <code>snippet</code>, <code>language</code></li>
+<li><code>warc_path</code>, <code>warc_record_id</code></li>
+<li><code>content_hash</code> (if computed)</li>
+</ul>
+<h3 id="65-orchestration-pipelinepy">6.5 Orchestration (<code>pipeline.py</code>)</h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">index_job</span><span class="p">(</span><span class="n">job_id</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+</code></pre></div>
+<p>Steps:</p>
+<ol>
+<li>Load <code>ArchiveJob</code> by ID, ensure:</li>
+<li><code>job.source</code> is not <code>None</code>.</li>
+<li><code>job.status in ("completed", "index_failed", "indexed")</code>.</li>
+<li>Validate <code>output_dir</code> exists.</li>
+<li>Discover WARCs:</li>
+<li><code>warc_paths = discover_warcs_for_job(job)</code>.</li>
+<li>Sets <code>job.warc_file_count = len(warc_paths)</code>.</li>
+<li>If no WARCs found:<ul>
+<li>Logs warning.</li>
+<li>Sets <code>job.status = "index_failed"</code> and returns <code>1</code>.</li>
+</ul>
+</li>
+<li>Clear previous snapshots for this job:</li>
+<li><code>DELETE FROM snapshots WHERE job_id = :job_id</code>.</li>
+<li>Mark job as indexing:</li>
+<li><code>job.indexed_page_count = 0</code>, <code>job.status = "indexing"</code>.</li>
+<li>For each WARC path:</li>
+<li>Iterate <code>iter_html_records(warc_path)</code>.</li>
+<li>Decode <code>html = rec.body_bytes.decode("utf-8", errors="replace")</code>.</li>
+<li>Use text extraction functions to get <code>title</code>, <code>text</code>, <code>snippet</code>, <code>language</code>.</li>
+<li>Call <code>record_to_snapshot(...)</code> to construct a <code>Snapshot</code>.</li>
+<li><code>session.add(snapshot)</code>; flush every 500 additions.</li>
+<li>Count snapshots in <code>n_snapshots</code>.</li>
+<li>On per‑record errors, log and continue.</li>
+<li>On success:</li>
+<li>Set <code>job.indexed_page_count = n_snapshots</code>.</li>
+<li>Set <code>job.status = "indexed"</code>.</li>
+<li>Return <code>0</code>.</li>
+<li>On unexpected error:</li>
+<li>Log at error level.</li>
+<li>Set <code>job.status = "index_failed"</code>.</li>
+<li>Return <code>1</code>.</li>
+</ol>
+<hr />
+<h2 id="7-viewer-helper-ha_backendindexingviewerpy">7. Viewer helper (<code>ha_backend/indexing/viewer.py</code>)</h2>
+<p>The viewer helper is used by <code>GET /api/snapshots/raw/{id}</code> to reconstruct the
+HTML for a snapshot from its WARC.</p>
+<p>Design:</p>
+<ul>
+<li>Either:</li>
+<li>Use <code>warc_record_id</code> to seek directly to a known record, or</li>
+<li>Fallback to scanning <code>warc_path</code> for the first matching URL + timestamp.</li>
+</ul>
+<p>The API route:</p>
+<ul>
+<li>Validates that <code>Snapshot</code> and its <code>warc_path</code> exist.</li>
+<li>Calls <code>find_record_for_snapshot(snapshot)</code>:</li>
+<li>Returns an <code>ArchiveRecord</code> or <code>None</code>.</li>
+<li>Decodes <code>record.body_bytes</code> as UTF‑8 with replacement.</li>
+<li>Writes <code>HTMLResponse(content=html, media_type="text/html")</code>.</li>
+</ul>
+<p>This is used by the Next.js frontend for the embedded snapshot viewer.</p>
+<hr />
+<h2 id="8-http-api-ha_backendapi">8. HTTP API (<code>ha_backend/api/*</code>)</h2>
+<h3 id="81-public-schemas-schemaspy">8.1 Public schemas (<code>schemas.py</code>)</h3>
+<p>Public Pydantic models:</p>
+<ul>
+<li><code>SourceSummarySchema</code> – used by <code>/api/sources</code>:</li>
+</ul>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a><span class="n">sourceCode</span><span class="p">:</span> <span class="nb">str</span>
+<a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a><span class="n">sourceName</span><span class="p">:</span> <span class="nb">str</span>
+<a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a><span class="n">recordCount</span><span class="p">:</span> <span class="nb">int</span>
+<a id="__codelineno-18-4" name="__codelineno-18-4" href="#__codelineno-18-4"></a><span class="n">firstCapture</span><span class="p">:</span> <span class="nb">str</span>
+<a id="__codelineno-18-5" name="__codelineno-18-5" href="#__codelineno-18-5"></a><span class="n">lastCapture</span><span class="p">:</span> <span class="nb">str</span>
+<a id="__codelineno-18-6" name="__codelineno-18-6" href="#__codelineno-18-6"></a><span class="n">latestRecordId</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span>
+</code></pre></div>
+<ul>
+<li>
+<p><code>SnapshotSummarySchema</code> – used by <code>/api/search</code>:</p>
+</li>
+<li>
+<p><code>id</code>, <code>title</code>, <code>sourceCode</code>, <code>sourceName</code>, <code>language</code>, <code>captureDate</code>,
+    <code>originalUrl</code>, <code>snippet</code>, <code>rawSnapshotUrl</code>.</p>
+</li>
+<li>
+<p><code>SearchResponseSchema</code>:</p>
+</li>
+<li>
+<p><code>results: List[SnapshotSummarySchema]</code>, <code>total</code>, <code>page</code>, <code>pageSize</code>.</p>
+</li>
+<li>
+<p><code>ArchiveStatsSchema</code> – used by <code>/api/stats</code>:</p>
+</li>
+<li>
+<p><code>snapshotsTotal</code>, <code>pagesTotal</code>, <code>sourcesTotal</code>, <code>latestCaptureDate</code>, <code>latestCaptureAgeDays</code>.</p>
+</li>
+<li>
+<p><code>SnapshotDetailSchema</code> – used by <code>/api/snapshot/{id}</code>:</p>
+</li>
+<li>
+<p>Contains metadata for a single snapshot including <code>mimeType</code> and
+    <code>statusCode</code>, plus <code>rawSnapshotUrl</code>.</p>
+</li>
+</ul>
+<h3 id="82-public-routes-routes_publicpy">8.2 Public routes (<code>routes_public.py</code>)</h3>
+<ul>
+<li>
+<p><code>GET /api/health</code>:</p>
+</li>
+<li>
+<p>Returns JSON with:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a><span class="p">{</span>
+<a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a><span class="w">  </span><span class="nt">&quot;status&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;ok&quot;</span><span class="p">,</span>
+<a id="__codelineno-19-3" name="__codelineno-19-3" href="#__codelineno-19-3"></a><span class="w">  </span><span class="nt">&quot;checks&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-19-4" name="__codelineno-19-4" href="#__codelineno-19-4"></a><span class="w">    </span><span class="nt">&quot;db&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;ok&quot;</span><span class="p">,</span>
+<a id="__codelineno-19-5" name="__codelineno-19-5" href="#__codelineno-19-5"></a><span class="w">    </span><span class="nt">&quot;jobs&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-19-6" name="__codelineno-19-6" href="#__codelineno-19-6"></a><span class="w">      </span><span class="nt">&quot;queued&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span>
+<a id="__codelineno-19-7" name="__codelineno-19-7" href="#__codelineno-19-7"></a><span class="w">      </span><span class="nt">&quot;indexed&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">5</span><span class="p">,</span>
+<a id="__codelineno-19-8" name="__codelineno-19-8" href="#__codelineno-19-8"></a><span class="w">      </span><span class="err">...</span>
+<a id="__codelineno-19-9" name="__codelineno-19-9" href="#__codelineno-19-9"></a><span class="w">    </span><span class="p">},</span>
+<a id="__codelineno-19-10" name="__codelineno-19-10" href="#__codelineno-19-10"></a><span class="w">    </span><span class="nt">&quot;snapshots&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-19-11" name="__codelineno-19-11" href="#__codelineno-19-11"></a><span class="w">      </span><span class="nt">&quot;total&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">12345</span>
+<a id="__codelineno-19-12" name="__codelineno-19-12" href="#__codelineno-19-12"></a><span class="w">    </span><span class="p">}</span>
+<a id="__codelineno-19-13" name="__codelineno-19-13" href="#__codelineno-19-13"></a><span class="w">  </span><span class="p">}</span>
+<a id="__codelineno-19-14" name="__codelineno-19-14" href="#__codelineno-19-14"></a><span class="p">}</span>
+</code></pre></div>
+</li>
+<li>
+<p>If the DB connectivity check fails, returns HTTP 500 with
+    <code>{"status": "error", "checks": {"db": "error"}}</code>.</p>
+</li>
+<li>
+<p><code>GET /api/stats</code>:</p>
+</li>
+<li>
+<p>Returns lightweight, cacheable archive totals used by the frontend:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a><span class="p">{</span>
+<a id="__codelineno-20-2" name="__codelineno-20-2" href="#__codelineno-20-2"></a><span class="w">  </span><span class="nt">&quot;snapshotsTotal&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">12345</span><span class="p">,</span>
+<a id="__codelineno-20-3" name="__codelineno-20-3" href="#__codelineno-20-3"></a><span class="w">  </span><span class="nt">&quot;pagesTotal&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">6789</span><span class="p">,</span>
+<a id="__codelineno-20-4" name="__codelineno-20-4" href="#__codelineno-20-4"></a><span class="w">  </span><span class="nt">&quot;sourcesTotal&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">2</span><span class="p">,</span>
+<a id="__codelineno-20-5" name="__codelineno-20-5" href="#__codelineno-20-5"></a><span class="w">  </span><span class="nt">&quot;latestCaptureDate&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;2025-04-19&quot;</span><span class="p">,</span>
+<a id="__codelineno-20-6" name="__codelineno-20-6" href="#__codelineno-20-6"></a><span class="w">  </span><span class="nt">&quot;latestCaptureAgeDays&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">3</span>
+<a id="__codelineno-20-7" name="__codelineno-20-7" href="#__codelineno-20-7"></a><span class="p">}</span>
+</code></pre></div>
+</li>
+<li>
+<p><code>GET /api/sources</code>:</p>
+</li>
+<li>
+<p>Aggregates <code>Snapshot</code> by <code>source_id</code>:</p>
+<ul>
+<li>Counts, first/last capture dates, latest snapshot ID.</li>
+</ul>
+</li>
+<li>
+<p><code>GET /api/search</code>:</p>
+</li>
+<li>
+<p>Query params:</p>
+<ul>
+<li><code>q: str | None</code> – keyword.</li>
+<li><code>source: str | None</code> – source code (e.g. <code>"hc"</code>).</li>
+<li><code>sort: "relevance" | "newest" | None</code> – ordering mode.</li>
+<li><code>view: "snapshots" | "pages" | None</code> – results grouping mode.</li>
+<li><code>includeNon2xx: bool</code> – include non‑2xx HTTP status captures (defaults to <code>false</code>).</li>
+<li><code>from: YYYY-MM-DD | None</code> – filter captures from this UTC date, inclusive.</li>
+<li><code>to: YYYY-MM-DD | None</code> – filter captures up to this UTC date, inclusive.</li>
+<li><code>page: int</code> – 1‑based page index (default <code>1</code>, must be <code>&gt;= 1</code>).</li>
+<li><code>pageSize: int</code> – results per page (default <code>20</code>, minimum <code>1</code>, maximum <code>100</code>).</li>
+</ul>
+</li>
+<li>Filters:<ul>
+<li><code>Source.code == source.lower()</code> when <code>source</code> set.</li>
+<li>By default (<code>includeNon2xx=false</code>), filters out snapshots with a known non‑2xx
+  <code>status_code</code> (keeps <code>status_code IS NULL</code> and <code>200–299</code>).</li>
+<li>Keyword filter / query intent:</li>
+<li>URL lookup: when <code>q</code> looks like a URL (or starts with <code>url:</code>), treat it as
+    a <em>page</em> lookup and filter by the normalized URL group (with a small set of
+    common scheme/<code>www.</code> variants).</li>
+<li>Boolean/field syntax: when <code>q</code> contains <code>AND</code>/<code>OR</code>/<code>NOT</code>, parentheses, <code>-term</code>,
+    or <code>title:</code>/<code>snippet:</code>/<code>url:</code> prefixes, parse it and apply a boolean filter
+    using case-insensitive substring matching.</li>
+<li>Plain text:<ul>
+<li>On Postgres with <code>sort="relevance"</code>: full‑text search (FTS) against
+  <code>snapshots.search_vector</code>.</li>
+<li>If FTS yields no results, fall back to tokenized substring matching.</li>
+<li>If that still yields no results and <code>pg_trgm</code> is available, fall back to
+    pg_trgm word-level trigram similarity for fuzzy matching (misspellings).</li>
+<li>Otherwise: tokenized substring matching on <code>title</code>, <code>snippet</code>, and <code>url</code>.</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Ordering:<ul>
+<li>Default sort:</li>
+<li>When <code>q</code> is present: <code>sort="relevance"</code>.</li>
+<li>When <code>q</code> is absent: <code>sort="newest"</code>.<ul>
+<li><code>sort="relevance"</code> (when <code>q</code> present):</li>
+<li>On Postgres: uses FTS (<code>websearch_to_tsquery</code> + <code>ts_rank_cd</code>) against
+    <code>snapshots.search_vector</code>, with small heuristics (phrase-in-title boost,
+    URL depth/querystring penalties) and an optional authority boost from
+    <code>page_signals.inlink_count</code> (when available).</li>
+<li>On SQLite/other DBs: uses a DB‑agnostic match score (title &gt; URL &gt; snippet),
+    then (when available) a small authority tie-break from <code>page_signals</code>,
+    then recency.</li>
+</ul>
+</li>
+<li><code>sort="newest"</code>: orders by recency.</li>
+<li>When <code>includeNon2xx=true</code>, 2xx snapshots are still prioritised ahead of 3xx,
+  unknown, and 4xx/5xx captures.</li>
+</ul>
+</li>
+<li>Grouping:<ul>
+<li>Default view: <code>view="snapshots"</code> (returns individual captures; <code>total</code> counts snapshots).</li>
+<li><code>view="pages"</code> returns only the <strong>latest</strong> snapshot for each page group
+  (<code>normalized_url_group</code>, falling back to <code>url</code> with query/fragment stripped), and
+  <code>total</code> counts page groups.</li>
+<li>When <code>view="pages"</code> is used for browse (no <code>q</code> and no date range), the API can optionally
+  use the <code>pages</code> table as a fast path (controlled by <code>HA_PAGES_FASTPATH</code>). This is a
+  metadata-only optimization and does not affect replay fidelity.</li>
+<li>When available, <code>pageSnapshotsCount</code> is included on <code>view="pages"</code> results to show the
+  number of captures for that page group.</li>
+</ul>
+</li>
+<li>
+<p>Pagination semantics:</p>
+<ul>
+<li><code>total</code> is the total number of matching items across all pages (snapshots
+  for <code>view="snapshots"</code>, page groups for <code>view="pages"</code>).</li>
+<li><code>results</code> contains at most <code>pageSize</code> snapshots for the requested <code>page</code>
+  (in <code>view="pages"</code>, these are the latest snapshots for each page group).</li>
+<li>Requesting a page past the end of the result set returns <code>200 OK</code> with <code>results: []</code> and <code>total</code> unchanged.</li>
+<li>Supplying an invalid <code>page</code> (<code>&lt; 1</code>) or <code>pageSize</code> (<code>&lt; 1</code> or <code>&gt; 100</code>) yields <code>422 Unprocessable Entity</code> from FastAPI’s validation.</li>
+</ul>
+</li>
+<li>
+<p><code>GET /api/snapshot/{id}</code>:</p>
+</li>
+<li>
+<p>Loads <code>Snapshot</code> + <code>Source</code>.</p>
+</li>
+<li>Returns <code>SnapshotDetailSchema</code>.</li>
+<li>
+<p>404 if snapshot or source missing.</p>
+</li>
+<li>
+<p><code>GET /api/snapshots/raw/{id}</code>:</p>
+</li>
+<li>
+<p>Validates <code>Snapshot</code> exists and <code>warc_path</code> points to an existing file.</p>
+</li>
+<li>Uses <code>find_record_for_snapshot(snapshot)</code> to get a WARC record.</li>
+<li>Returns an HTML page via <code>HTMLResponse</code> that includes the reconstructed archived HTML
+    plus a lightweight HealthArchive top bar (navigation links + disclaimer) so it can be
+    viewed standalone.</li>
+</ul>
+<h3 id="83-admin-auth-depspy">8.3 Admin auth (<code>deps.py</code>)</h3>
+<p><code>require_admin</code> is a FastAPI dependency used to protect admin and metrics
+endpoints.</p>
+<p>Behavior:</p>
+<ul>
+<li>Reads <code>HEALTHARCHIVE_ENV</code> and <code>HEALTHARCHIVE_ADMIN_TOKEN</code> from the
+  environment.</li>
+<li>If <code>HEALTHARCHIVE_ENV</code> is <code>"production"</code> or <code>"staging"</code> and
+  <code>HEALTHARCHIVE_ADMIN_TOKEN</code> is <strong>unset</strong>:</li>
+<li>Admin and metrics endpoints <strong>fail closed</strong> with HTTP 500 and a clear
+    error detail (<code>"Admin token not configured for this environment"</code>).</li>
+<li>In other environments (or when <code>HEALTHARCHIVE_ENV</code> is unset) and the admin
+  token is <strong>unset</strong>:</li>
+<li>Admin endpoints are <strong>open</strong> (dev mode convenience).</li>
+<li>When <code>HEALTHARCHIVE_ADMIN_TOKEN</code> is set:</li>
+<li>Requires the same token via either:<ul>
+<li><code>Authorization: Bearer &lt;token&gt;</code> header, or</li>
+<li><code>X-Admin-Token: &lt;token&gt;</code> header.</li>
+</ul>
+</li>
+<li>On mismatch/missing token → <code>HTTP 403</code>.</li>
+</ul>
+<h3 id="84-admin-schemas-schemas_adminpy">8.4 Admin schemas (<code>schemas_admin.py</code>)</h3>
+<p>Key models:</p>
+<ul>
+<li>
+<p><code>JobSummarySchema</code> – used for lists:</p>
+</li>
+<li>
+<p>Contains the key job fields plus:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a><span class="n">cleanupStatus</span><span class="p">:</span> <span class="nb">str</span>
+<a id="__codelineno-21-2" name="__codelineno-21-2" href="#__codelineno-21-2"></a><span class="n">cleanedAt</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">datetime</span><span class="p">]</span>
+</code></pre></div>
+</li>
+<li>
+<p><code>JobDetailSchema</code> – extended view for a single job:</p>
+</li>
+<li>
+<p>Includes status, worker counters, pages, WARC counts, ZIM/log/state paths,
+    <code>config</code> (JSON), and <code>lastStats</code> (JSON, reserved).</p>
+</li>
+<li>
+<p>Also includes <code>cleanupStatus</code> and <code>cleanedAt</code>.</p>
+</li>
+<li>
+<p><code>JobSnapshotSummarySchema</code> – minimal <code>Snapshot</code> view in a job context.</p>
+</li>
+<li>
+<p><code>JobListResponseSchema</code> – wrapper for job list results.</p>
+</li>
+<li>
+<p><code>JobStatusCountsSchema</code> – dictionary of <code>{status: count}</code>.</p>
+</li>
+</ul>
+<h3 id="85-admin-routes-routes_adminpy">8.5 Admin routes (<code>routes_admin.py</code>)</h3>
+<p>All routes are under <code>/api/admin</code> and use <code>require_admin</code> for auth. They are
+intended for internal operator tooling (CLI or a future admin console), not
+for the public web UI.</p>
+<ul>
+<li><code>GET /api/admin/jobs</code> → <code>JobListResponseSchema</code>:</li>
+<li>Filters:<ul>
+<li><code>source: str | None</code> – by source code.</li>
+<li><code>status: str | None</code> – by job status.</li>
+<li><code>limit</code> (1–500, default 50), <code>offset</code> (≥0).</li>
+</ul>
+</li>
+<li>
+<p>Joins <code>ArchiveJob</code> with <code>Source</code> (outer join).</p>
+</li>
+<li>
+<p><code>GET /api/admin/jobs/{job_id}</code> → <code>JobDetailSchema</code>:</p>
+</li>
+<li>Joins <code>ArchiveJob</code> with <code>Source</code>.</li>
+<li>
+<p>404 if job not found.</p>
+</li>
+<li>
+<p><code>GET /api/admin/jobs/status-counts</code> → <code>JobStatusCountsSchema</code>:</p>
+</li>
+<li>
+<p>SQL: <code>SELECT status, COUNT(*) FROM archive_jobs GROUP BY status</code>.</p>
+</li>
+<li>
+<p><code>GET /api/admin/jobs/{job_id}/snapshots</code> → <code>List[JobSnapshotSummarySchema]</code>:</p>
+</li>
+<li>Lists snapshots for a given job with pagination (<code>limit</code>, <code>offset</code>).</li>
+</ul>
+<h3 id="86-metrics-prometheusstyle">8.6 Metrics (Prometheus‑style)</h3>
+<p>Defined directly in <code>ha_backend.api.__init__</code>:</p>
+<ul>
+<li><code>GET /metrics</code>:</li>
+<li>Protected by <code>require_admin</code> (same token behavior) and intended for
+    scrape‑only use by monitoring systems (e.g., Prometheus) and internal
+    tooling.</li>
+<li>Computes:<ul>
+<li><code>healtharchive_jobs_total{status="..."}</code></li>
+<li><code>healtharchive_jobs_cleanup_status_total{cleanup_status="..."}</code></li>
+<li><code>healtharchive_snapshots_total</code></li>
+<li><code>healtharchive_snapshots_total{source="hc"}</code>, etc.</li>
+</ul>
+</li>
+</ul>
+<h3 id="87-cors">8.7 CORS</h3>
+<ul>
+<li>CORS is enabled on the public API routes. Allowed origins are derived from
+  <code>HEALTHARCHIVE_CORS_ORIGINS</code> (comma-separated). Defaults cover local dev and
+  production (<code>http://localhost:3000</code>, <code>http://localhost:5173</code>,
+  <code>https://healtharchive.ca</code>, <code>https://www.healtharchive.ca</code>).</li>
+<li>Admin and metrics routes remain token-gated even when CORS allows browser
+  access to public routes.</li>
+</ul>
+<p>Typical environment setups:</p>
+<ul>
+<li><strong>Local development</strong>:</li>
+</ul>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a><span class="c1"># often no override needed; defaults already include localhost:3000/5173</span>
+<a id="__codelineno-22-2" name="__codelineno-22-2" href="#__codelineno-22-2"></a><span class="nb">export</span><span class="w"> </span><span class="nv">HEALTHARCHIVE_DATABASE_URL</span><span class="o">=</span>sqlite:///<span class="k">$(</span><span class="nb">pwd</span><span class="k">)</span>/.dev-healtharchive.db
+<a id="__codelineno-22-3" name="__codelineno-22-3" href="#__codelineno-22-3"></a><span class="nb">export</span><span class="w"> </span><span class="nv">HEALTHARCHIVE_ARCHIVE_ROOT</span><span class="o">=</span><span class="k">$(</span><span class="nb">pwd</span><span class="k">)</span>/.dev-archive-root
+<a id="__codelineno-22-4" name="__codelineno-22-4" href="#__codelineno-22-4"></a><span class="c1"># Optional CORS override if your frontend runs on a different origin:</span>
+<a id="__codelineno-22-5" name="__codelineno-22-5" href="#__codelineno-22-5"></a><span class="c1"># export HEALTHARCHIVE_CORS_ORIGINS=http://localhost:3000</span>
+</code></pre></div>
+<ul>
+<li><strong>Staging</strong> (example):</li>
+</ul>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a><span class="c1"># frontend served from https://healtharchive.vercel.app</span>
+<a id="__codelineno-23-2" name="__codelineno-23-2" href="#__codelineno-23-2"></a><span class="nb">export</span><span class="w"> </span><span class="nv">HEALTHARCHIVE_CORS_ORIGINS</span><span class="o">=</span>https://healtharchive.vercel.app
+</code></pre></div>
+<ul>
+<li><strong>Production</strong> (example):</li>
+</ul>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-24-1" name="__codelineno-24-1" href="#__codelineno-24-1"></a><span class="c1"># frontend served from https://healtharchive.ca and https://www.healtharchive.ca</span>
+<a id="__codelineno-24-2" name="__codelineno-24-2" href="#__codelineno-24-2"></a><span class="nb">export</span><span class="w"> </span><span class="nv">HEALTHARCHIVE_CORS_ORIGINS</span><span class="o">=</span>https://healtharchive.ca,https://www.healtharchive.ca
+</code></pre></div>
+<p>In all cases, CORS affects only the browser’s ability to call public routes;
+admin and metrics endpoints still require the admin token when configured.</p>
+<hr />
+<h2 id="9-worker-loop-ha_backendworkermainpy">9. Worker loop (<code>ha_backend/worker/main.py</code>)</h2>
+<p>The worker processes jobs end‑to‑end: crawl and index.</p>
+<h3 id="91-selection">9.1 Selection</h3>
+<p><code>_select_next_crawl_job(session)</code>:</p>
+<ul>
+<li>Query:</li>
+</ul>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-25-1" name="__codelineno-25-1" href="#__codelineno-25-1"></a><span class="n">session</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="n">ArchiveJob</span><span class="p">)</span> \
+<a id="__codelineno-25-2" name="__codelineno-25-2" href="#__codelineno-25-2"></a>  <span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">Source</span><span class="p">)</span> \
+<a id="__codelineno-25-3" name="__codelineno-25-3" href="#__codelineno-25-3"></a>  <span class="o">.</span><span class="n">filter</span><span class="p">(</span><span class="n">ArchiveJob</span><span class="o">.</span><span class="n">status</span><span class="o">.</span><span class="n">in_</span><span class="p">([</span><span class="s2">&quot;queued&quot;</span><span class="p">,</span> <span class="s2">&quot;retryable&quot;</span><span class="p">]))</span> \
+<a id="__codelineno-25-4" name="__codelineno-25-4" href="#__codelineno-25-4"></a>  <span class="o">.</span><span class="n">order_by</span><span class="p">(</span><span class="n">ArchiveJob</span><span class="o">.</span><span class="n">queued_at</span><span class="o">.</span><span class="n">asc</span><span class="p">()</span><span class="o">.</span><span class="n">nullsfirst</span><span class="p">(),</span>
+<a id="__codelineno-25-5" name="__codelineno-25-5" href="#__codelineno-25-5"></a>            <span class="n">ArchiveJob</span><span class="o">.</span><span class="n">created_at</span><span class="o">.</span><span class="n">asc</span><span class="p">())</span> \
+<a id="__codelineno-25-6" name="__codelineno-25-6" href="#__codelineno-25-6"></a>  <span class="o">.</span><span class="n">first</span><span class="p">()</span>
+</code></pre></div>
+<ul>
+<li>Chooses the oldest queued/retryable job, preferring jobs with the earliest
+  <code>queued_at</code>.</li>
+</ul>
+<h3 id="92-processing-a-single-job">9.2 Processing a single job</h3>
+<p><code>_process_single_job()</code>:</p>
+<ol>
+<li>Select a job → get <code>job_id</code>.</li>
+<li>Run <code>run_persistent_job(job_id)</code>:</li>
+<li>Executes <code>archive_tool</code> and returns a process exit code.</li>
+<li>Reload job in a new session and apply retry semantics:</li>
+<li>If <code>crawl_rc != 0</code> or <code>job.status == "failed"</code>:<ul>
+<li>If <code>job.retry_count &lt; MAX_CRAWL_RETRIES</code>:</li>
+<li>Increment <code>job.retry_count</code>.</li>
+<li>Set <code>job.status = "retryable"</code>.</li>
+<li>Else:</li>
+<li>Log error; job remains in <code>failed</code>.</li>
+</ul>
+</li>
+<li>Else (crawl succeeded):<ul>
+<li>Log that indexing will start.</li>
+</ul>
+</li>
+<li>If crawl succeeded:</li>
+<li>Run <code>index_job(job_id)</code>.</li>
+<li>Log success/failure for indexing.</li>
+</ol>
+<p>Returns <code>True</code> if a job was processed, <code>False</code> if no jobs were found.</p>
+<h3 id="93-main-loop">9.3 Main loop</h3>
+<p><code>run_worker_loop(poll_interval=30, run_once=False)</code>:</p>
+<ul>
+<li>Logs startup with the given interval and <code>run_once</code>.</li>
+<li>In a loop:</li>
+<li>Calls <code>_process_single_job()</code>.</li>
+<li>If <code>run_once</code> → break after first iteration.</li>
+<li>If no job processed:<ul>
+<li>Logs and sleeps for <code>poll_interval</code> seconds.</li>
+</ul>
+</li>
+<li>Handles <code>KeyboardInterrupt</code> gracefully.</li>
+</ul>
+<hr />
+<h2 id="10-cleanup-retention-future">10. Cleanup &amp; retention (future)</h2>
+<p>Job‑level cleanup is focused on removing <strong>temporary crawl artifacts</strong> (<code>.tmp*</code>
+dirs and <code>.archive_state.json</code>) after indexing is complete.</p>
+<h3 id="101-cleanup-flags-on-archivejob">10.1 Cleanup flags on ArchiveJob</h3>
+<p>New fields:</p>
+<ul>
+<li><code>cleanup_status: str</code>:</li>
+<li><code>"none"</code> – no cleanup performed (default).</li>
+<li><code>"temp_cleaned"</code> – temporary dirs and state file have been deleted.</li>
+<li>Future values could represent more aggressive cleanup modes.</li>
+<li><code>cleaned_at: datetime | None</code> – when cleanup occurred.</li>
+</ul>
+<p>These fields are exposed through:</p>
+<ul>
+<li>Admin schemas (<code>JobSummarySchema</code>, <code>JobDetailSchema</code>).</li>
+<li>Metrics (<code>healtharchive_jobs_cleanup_status_total</code>).</li>
+</ul>
+<h3 id="102-cli-command-cleanup-job">10.2 CLI command: cleanup-job</h3>
+<p><code>ha-backend cleanup-job --id JOB_ID [--mode temp] [--force]</code></p>
+<p>Implementation notes:</p>
+<ul>
+<li>Currently supports only <code>--mode temp</code>:</li>
+<li>
+<p>Any other mode → error.</p>
+</li>
+<li>
+<p>Behavior:</p>
+</li>
+<li>
+<p>Load the <code>ArchiveJob</code> by ID.</p>
+</li>
+<li>If job is missing → error, exit 1.</li>
+<li>If replay is enabled globally (<code>HEALTHARCHIVE_REPLAY_BASE_URL</code> is set) and
+     <code>--force</code> is <strong>not</strong> provided:<ul>
+<li>Refuse cleanup and exit 1.</li>
+<li>Rationale: <code>--mode temp</code> can delete WARCs required for replay.</li>
+</ul>
+</li>
+<li>If <code>job.status</code> is <strong>not</strong> one of:<ul>
+<li><code>"indexed"</code> – indexing completed successfully, or</li>
+<li><code>"index_failed"</code> – indexing failed and you have decided not to retry,
+ then refuse cleanup and exit 1.</li>
+<li>This ensures we don’t delete temp dirs while a job might still be
+   resumed or indexing is in progress.</li>
+</ul>
+</li>
+<li>Validate <code>output_dir</code> exists and is a directory.</li>
+<li>Use <code>archive_tool.state.CrawlState(output_dir, initial_workers=1)</code> to
+     instantiate state and locate the state file.</li>
+<li>Use <code>state.get_temp_dir_paths()</code> to get known temp dirs; fall back to
+     <code>find_latest_temp_dir_fallback</code> if none are tracked.</li>
+<li>If neither temp dirs nor the state file exist:<ul>
+<li>Print a message that there is nothing to clean up and <strong>do not</strong> change
+   <code>cleanup_status</code> or <code>cleaned_at</code>.</li>
+</ul>
+</li>
+<li>Otherwise (if temp dirs and/or state file exist):<ul>
+<li>Call <code>cleanup_temp_dirs(temp_dirs, state.state_file_path)</code>:</li>
+<li>Deletes <code>.tmp*</code> directories and the <code>.archive_state.json</code>.</li>
+<li>Update job:<ul>
+<li><code>cleanup_status = "temp_cleaned"</code></li>
+<li><code>cleaned_at = now</code></li>
+<li><code>state_file_path = None</code></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<p>Operational warning:</p>
+<ul>
+<li><code>cleanup-job --mode temp</code> will delete WARCs if they live under the job’s
+  <code>.tmp*</code> directory (common for legacy imports and some crawl layouts).
+  If you intend to serve the job via replay (pywb), do not run cleanup for that
+  job — replay depends on WARCs remaining on disk.
+  If replay is enabled globally, you must pass <code>--force</code> to run cleanup; treat
+  this as an emergency override.</li>
+</ul>
+<blockquote>
+<p><strong>Caution:</strong> This cleanup removes WARCs stored under <code>.tmp*</code> directories,
+consistent with <code>archive_tool</code>’s own <code>--cleanup</code> behavior. In v1 you should
+only run it once you have:
+- Indexed the job successfully (<code>status="indexed"</code>), and
+- Verified any desired ZIM or exports derived from these WARCs.</p>
+</blockquote>
+<h3 id="103-metrics-for-cleanup">10.3 Metrics for cleanup</h3>
+<p><code>/metrics</code> includes:</p>
+<ul>
+<li><code>healtharchive_jobs_cleanup_status_total{cleanup_status="none"}</code></li>
+<li><code>healtharchive_jobs_cleanup_status_total{cleanup_status="temp_cleaned"}</code></li>
+</ul>
+<p>This gives a quick overview of how many jobs still have temp artifacts versus
+those that have been cleaned.</p>
+<hr />
+<h2 id="11-cli-commands-summary">11. CLI commands summary</h2>
+<p>All commands are available via the <code>ha-backend</code> entrypoint.</p>
+<ul>
+<li>Environment / connectivity:</li>
+<li><code>check-env</code> – show archive root and ensure it exists.</li>
+<li><code>check-archive-tool</code> – run <code>archive-tool --help</code>.</li>
+<li>
+<p><code>check-db</code> – simple DB connectivity check.</p>
+</li>
+<li>
+<p>Direct, non‑persistent job:</p>
+</li>
+<li>
+<p><code>run-job</code> – run <code>archive_tool</code> immediately with explicit <code>--name</code>, <code>--seeds</code>,
+    <code>--initial-workers</code>, etc.</p>
+</li>
+<li>
+<p>Persistent jobs (DB‑backed):</p>
+</li>
+<li><code>create-job --source CODE</code> – create <code>ArchiveJob</code> using registry defaults.</li>
+<li><code>run-db-job --id ID</code> – run <code>archive_tool</code> for an existing job.</li>
+<li><code>index-job --id ID</code> – index an existing job’s WARCs into snapshots.</li>
+<li><code>register-job-dir --source CODE --output-dir PATH [--name NAME]</code> –
+    attach a DB <code>ArchiveJob</code> to an existing archive_tool output directory
+    (useful when a crawl has already been run and you want to index its
+    WARCs).</li>
+<li>
+<p>Job configs default to <code>relax_perms=True</code> for dev (adds <code>--relax-perms</code> so
+    temp WARCs are chmod’d readable on the host after a crawl).</p>
+</li>
+<li>
+<p>Seeding:</p>
+</li>
+<li>
+<p><code>seed-sources</code> – insert baseline <code>Source</code> rows for <code>hc</code>, <code>phac</code>.</p>
+</li>
+<li>
+<p>Admin / introspection:</p>
+</li>
+<li><code>list-jobs</code> – list recent jobs with basic fields.</li>
+<li><code>show-job --id ID</code> – detailed job info including config.</li>
+<li><code>retry-job --id ID</code> – mark:<ul>
+<li><code>failed</code> jobs as <code>retryable</code> (for another crawl).</li>
+<li><code>index_failed</code> jobs as <code>completed</code> (for re-indexing).</li>
+</ul>
+</li>
+<li><code>cleanup-job --id ID [--mode temp] [--force]</code> – cleanup temp dirs/state for jobs in
+    status <code>indexed</code> or <code>index_failed</code>.</li>
+<li><code>replay-index-job --id ID</code> – create/refresh the pywb collection + CDX index
+    for a job (so snapshots can be browsed via replay).</li>
+<li><code>start-worker [--poll-interval N] [--once]</code> – start the worker loop.</li>
+</ul>
+<hr />
+<h2 id="12-testing-development">12. Testing &amp; development</h2>
+<ul>
+<li>Tests are written with <code>pytest</code> and live under <code>tests/</code>.</li>
+<li>To run checks:</li>
+</ul>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-26-1" name="__codelineno-26-1" href="#__codelineno-26-1"></a>make<span class="w"> </span>venv
+<a id="__codelineno-26-2" name="__codelineno-26-2" href="#__codelineno-26-2"></a>make<span class="w"> </span>check
+</code></pre></div>
+<ul>
+<li>Many tests configure a temporary SQLite DB by:</li>
+<li>Setting <code>HEALTHARCHIVE_DATABASE_URL</code> to a temp file.</li>
+<li>Resetting <code>db_module._engine</code> and <code>_SessionLocal</code>.</li>
+<li>Calling <code>Base.metadata.drop_all()</code> / <code>create_all()</code> to fully reset the schema.</li>
+</ul>
+<p>This allows development and CI to run in isolated environments without
+touching real data.</p>
+<hr />
+<h2 id="13-relationship-to-archive_tool-and-the-frontend">13. Relationship to archive_tool and the frontend</h2>
+<ul>
+<li><strong>archive_tool</strong>:</li>
+<li>Lives under <code>src/archive_tool/</code> and is maintained as part of this repo.
+    It originated as an earlier standalone crawler project but is now the
+    in-tree crawler/orchestrator subpackage for the backend.</li>
+<li>The backend calls it strictly via the CLI (<code>archive-tool</code>) as a subprocess.</li>
+<li>
+<p>Its internal behavior (Docker orchestration, run modes, monitoring,
+    adaptive strategies) is documented in <code>src/archive_tool/docs/documentation.md</code>.</p>
+</li>
+<li>
+<p><strong>Frontend (healtharchive-frontend)</strong>:</p>
+</li>
+<li>Next.js 16 app using the backend’s HTTP APIs:<ul>
+<li><code>/api/health</code></li>
+<li><code>/api/sources</code></li>
+<li><code>/api/search</code></li>
+<li><code>/api/snapshot/{id}</code></li>
+<li><code>/api/snapshots/raw/{id}</code></li>
+</ul>
+</li>
+<li>The frontend currently still supports a demo dataset, but is gradually
+    being wired to these real APIs.</li>
+</ul>
+<p>Together, the backend + <code>archive_tool</code> + frontend form a pipeline from:</p>
+<blockquote>
+<p>Web → crawl (Docker + <code>zimit</code>) → WARCs → Snapshots in DB → searchable
+archive UI at HealthArchive.ca.</p>
+</blockquote>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://github.com/jerdaw/healtharchive-backend" target="_blank" rel="noopener" title="github.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+    </a>
+  
+    
+    
+    
+    
+      
+      
+    
+    <a href="https://twitter.com/healtharchive" target="_blank" rel="noopener" title="twitter.com" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M459.4 151.7c.3 4.5.3 9.1.3 13.6 0 138.7-105.6 298.6-298.6 298.6-59.5 0-114.7-17.2-161.1-47.1 8.4 1 16.6 1.3 25.3 1.3 49.1 0 94.2-16.6 130.3-44.8-46.1-1-84.8-31.2-98.1-72.8 6.5 1 13 1.6 19.8 1.6 9.4 0 18.8-1.3 27.6-3.6-48.1-9.7-84.1-52-84.1-103v-1.3c14 7.8 30.2 12.7 47.4 13.3-28.3-18.8-46.8-51-46.8-87.4 0-19.5 5.2-37.4 14.3-53C87.4 130.8 165 172.4 252.1 176.9c-1.6-7.8-2.6-15.9-2.6-24C249.5 95.1 296.3 48 354.4 48c30.2 0 57.5 12.7 76.7 33.1 23.7-4.5 46.5-13.3 66.6-25.3-7.8 24.4-24.4 44.8-46.1 57.8 21.1-2.3 41.6-8.1 60.4-16.2-14.3 20.8-32.2 39.3-52.6 54.3"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.tabs", "navigation.sections", "navigation.top", "search.suggest", "search.highlight", "content.code.copy", "content.code.annotate"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>

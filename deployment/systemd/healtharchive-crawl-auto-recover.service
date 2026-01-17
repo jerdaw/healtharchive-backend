@@ -1,0 +1,13 @@
+[Unit]
+Description=HealthArchive crawl auto-recovery (restart stalled running jobs)
+Wants=network-online.target
+After=network-online.target
+ConditionPathExists=/etc/healtharchive/backend.env
+ConditionPathExists=/etc/healtharchive/crawl-auto-recover-enabled
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+EnvironmentFile=/etc/healtharchive/backend.env
+ExecStart=/opt/healtharchive-backend/.venv/bin/python3 /opt/healtharchive-backend/scripts/vps-crawl-auto-recover.py --apply

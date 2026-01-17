@@ -1,0 +1,17 @@
+[Unit]
+Description=HealthArchive WARC tiering bind mounts (Storage Box -> canonical paths)
+After=healtharchive-storagebox-sshfs.service
+Requires=healtharchive-storagebox-sshfs.service
+
+# Ensure tiered paths exist before services that may read WARCs.
+Before=healtharchive-api.service
+Before=healtharchive-replay.service
+Before=healtharchive-worker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/opt/healtharchive-backend/scripts/vps-warc-tiering-bind-mounts.sh --apply --repair-stale-mounts
+
+[Install]
+WantedBy=multi-user.target

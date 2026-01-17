@@ -1,0 +1,327 @@
+# Production baseline policy (desired state)
+
+# This file is the canonical, versioned definition of what the production VPS
+# should look like for HealthArchive. It is intentionally small and focused on
+# invariants that matter for security, correctness, and operability.
+#
+# Paired tooling:
+# - Observed snapshot generator: `scripts/baseline_snapshot.py`
+# - Drift checker: `scripts/check_baseline_drift.py`
+#
+# The drift checker validates this policy against the real VPS configuration
+# (without printing or persisting secrets).
+
+version = 5
+
+# The operator account expected to run deploy scripts and ops checks.
+operator_user = "haadmin"
+
+# The shared ops group used for sensitive-but-operator-writable directories.
+ops_group = "healtharchive"
+
+[urls]
+frontend_primary = "https://healtharchive.ca"
+frontend_aliases = ["https://www.healtharchive.ca"]
+api_base = "https://api.healtharchive.ca"
+
+[files]
+backend_env_file = "/etc/healtharchive/backend.env"
+caddyfile = "/etc/caddy/Caddyfile"
+
+[backend_env_required]
+HEALTHARCHIVE_ENV = "production"
+HEALTHARCHIVE_ARCHIVE_ROOT = "/srv/healtharchive/jobs"
+HEALTHARCHIVE_PUBLIC_SITE_URL = "https://healtharchive.ca"
+HEALTHARCHIVE_REPLAY_BASE_URL = "https://replay.healtharchive.ca"
+HEALTHARCHIVE_REPLAY_PREVIEW_DIR = "/srv/healtharchive/replay/previews"
+HEALTHARCHIVE_USAGE_METRICS_ENABLED = "1"
+HEALTHARCHIVE_USAGE_METRICS_WINDOW_DAYS = "30"
+HEALTHARCHIVE_EXPORTS_ENABLED = "1"
+
+[backend_env_csv_set_equals]
+# CORS allowlist is intentionally strict in this project. Keep it narrow and
+# keep it exact (no extra origins in prod).
+HEALTHARCHIVE_CORS_ORIGINS = [
+  "https://healtharchive.ca",
+  "https://www.healtharchive.ca",
+  "https://healtharchive.vercel.app",
+]
+
+[cors]
+# When running drift checks in --mode live, validate that the API actually
+# returns the expected CORS headers for allowed origins (and does not for a
+# known-disallowed origin).
+probe_path = "/api/health"
+disallowed_origins = ["https://example.com"]
+
+[security]
+# Admin endpoints must not be public in production.
+admin_token_required = true
+
+# HSTS should be enabled at the reverse proxy for the API domain.
+hsts_required = true
+hsts_header_min_max_age_seconds = 31536000
+
+[filesystem]
+[[filesystem.paths]]
+path = "/etc/healtharchive"
+owner = "root"
+group = "healtharchive"
+mode = "0750"
+required = true
+
+[[filesystem.paths]]
+path = "/etc/healtharchive/observability"
+owner = "root"
+group = "healtharchive"
+mode = "0750"
+required = true
+
+[[filesystem.paths]]
+path = "/etc/healtharchive/backend.env"
+owner = "root"
+group = "healtharchive"
+mode = "0640"
+required = true
+
+[[filesystem.paths]]
+path = "/etc/healtharchive/baseline-drift-enabled"
+owner = "root"
+group = "root"
+mode = "0644"
+required = true
+
+[[filesystem.paths]]
+path = "/etc/healtharchive/observability/prometheus_backend_admin_token"
+owner = "root"
+group = "healtharchive"
+mode = "0640"
+required = true
+
+[[filesystem.paths]]
+path = "/etc/healtharchive/observability/postgres_exporter_password"
+owner = "root"
+group = "healtharchive"
+mode = "0640"
+required = true
+
+[[filesystem.paths]]
+path = "/etc/healtharchive/observability/postgres_exporter.env"
+owner = "root"
+group = "healtharchive"
+mode = "0640"
+required = true
+
+[[filesystem.paths]]
+path = "/etc/healtharchive/observability/alertmanager_webhook_url"
+owner = "root"
+group = "healtharchive"
+mode = "0640"
+required = true
+
+[[filesystem.paths]]
+path = "/etc/healtharchive/observability/pushover_app_token"
+owner = "root"
+group = "healtharchive"
+mode = "0640"
+required = true
+
+[[filesystem.paths]]
+path = "/etc/healtharchive/observability/pushover_user_key"
+owner = "root"
+group = "healtharchive"
+mode = "0640"
+required = true
+
+[[filesystem.paths]]
+path = "/etc/healtharchive/observability/grafana_admin_password"
+owner = "root"
+group = "root"
+mode = "0600"
+required = true
+
+[[filesystem.paths]]
+path = "/etc/healtharchive/observability/postgres_grafana_password"
+owner = "root"
+group = "root"
+mode = "0600"
+required = true
+
+[[filesystem.paths]]
+path = "/etc/prometheus/prometheus.yml"
+owner = "root"
+group = "root"
+mode = "0644"
+required = true
+
+[[filesystem.paths]]
+path = "/etc/prometheus/rules/healtharchive-alerts.yml"
+owner = "root"
+group = "root"
+mode = "0644"
+required = true
+
+[[filesystem.paths]]
+path = "/etc/prometheus/alertmanager.yml"
+owner = "root"
+group = "prometheus"
+mode = "0640"
+required = true
+
+[[filesystem.paths]]
+path = "/etc/grafana/provisioning/dashboards/healtharchive.yaml"
+owner = "root"
+group = "root"
+mode = "0644"
+required = true
+
+[[filesystem.paths]]
+path = "/etc/systemd/system/healtharchive-worker.service.d/override.conf"
+owner = "root"
+group = "root"
+mode = "0644"
+required = true
+
+[[filesystem.paths]]
+path = "/srv/healtharchive/backups"
+owner = "root"
+group = "healtharchive"
+mode = "2770"
+required = true
+
+[[filesystem.paths]]
+path = "/srv/healtharchive/ops"
+owner = "root"
+group = "healtharchive"
+mode = "2770"
+required = true
+
+[[filesystem.paths]]
+path = "/srv/healtharchive/ops/observability"
+owner = "root"
+group = "healtharchive"
+mode = "2770"
+required = true
+
+[[filesystem.paths]]
+path = "/srv/healtharchive/ops/observability/dashboards"
+owner = "root"
+group = "healtharchive"
+mode = "2770"
+required = true
+
+[[filesystem.paths]]
+path = "/srv/healtharchive/ops/observability/dashboards/healtharchive"
+owner = "root"
+group = "healtharchive"
+mode = "2770"
+required = true
+
+[[filesystem.paths]]
+path = "/srv/healtharchive/ops/observability/alerting"
+owner = "root"
+group = "healtharchive"
+mode = "2770"
+required = true
+
+[[filesystem.paths]]
+path = "/srv/healtharchive/ops/observability/alerting/healtharchive-alerts.yml"
+owner = "root"
+group = "healtharchive"
+mode = "0664"
+required = true
+
+[[filesystem.paths]]
+path = "/srv/healtharchive/ops/baseline"
+owner = "root"
+group = "healtharchive"
+mode = "2770"
+required = true
+
+[[filesystem.paths]]
+path = "/srv/healtharchive/ops/restore-tests"
+owner = "root"
+group = "healtharchive"
+mode = "2770"
+required = true
+
+[[filesystem.paths]]
+path = "/srv/healtharchive/ops/adoption"
+owner = "root"
+group = "healtharchive"
+mode = "2770"
+required = true
+
+[[filesystem.paths]]
+path = "/srv/healtharchive/ops/search-eval"
+owner = "root"
+group = "healtharchive"
+mode = "2770"
+required = true
+
+# Archive root can be owned by the operator user; enforce "exists + writable"
+# rather than a strict owner/group/mode.
+[[filesystem.paths]]
+path = "/srv/healtharchive/jobs"
+required = true
+must_be_writable = true
+
+[systemd]
+[[systemd.units]]
+name = "healtharchive-api.service"
+required = true
+must_be_enabled = true
+
+[[systemd.units]]
+name = "healtharchive-worker.service"
+required = true
+must_be_enabled = true
+
+[[systemd.units]]
+name = "prometheus.service"
+required = true
+must_be_enabled = true
+
+[[systemd.units]]
+name = "prometheus-node-exporter.service"
+required = true
+must_be_enabled = true
+
+[[systemd.units]]
+name = "prometheus-postgres-exporter.service"
+required = true
+must_be_enabled = true
+
+[[systemd.units]]
+name = "grafana-server.service"
+required = true
+must_be_enabled = true
+
+[[systemd.units]]
+name = "prometheus-alertmanager.service"
+required = true
+must_be_enabled = true
+
+[[systemd.units]]
+name = "healtharchive-pushover-relay.service"
+required = true
+must_be_enabled = true
+
+[[systemd.units]]
+name = "healtharchive-admin-proxy.service"
+required = true
+must_be_enabled = true
+
+[[systemd.units]]
+name = "healtharchive-baseline-drift-check.timer"
+required = true
+must_be_enabled = true
+
+[network]
+# These ports should never be reachable directly from the public internet.
+# Enforce by binding to loopback only (and accessing via tailnet-only SSH).
+loopback_only_tcp_ports = [3000, 5432, 8001, 8002, 9090, 9093, 9094, 9100, 9187, 9911]
+
+# A minimal allowlist of ports that may listen on non-loopback interfaces.
+# Note: SSH may listen on all interfaces but is firewalled to tailnet-only in the runbook.
+allowed_non_loopback_tcp_ports = [22, 80, 443]

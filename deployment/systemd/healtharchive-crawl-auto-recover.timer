@@ -1,0 +1,9 @@
+[Unit]
+Description=Run HealthArchive crawl auto-recovery (every 5 minutes)
+
+[Timer]
+OnCalendar=*-*-* *:0/5:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,15 @@
+[Unit]
+Description=HealthArchive baseline drift check (policy vs observed)
+Wants=network-online.target
+After=network-online.target
+ConditionPathExists=/etc/healtharchive/baseline-drift-enabled
+
+[Service]
+Type=oneshot
+User=haadmin
+Group=healtharchive
+WorkingDirectory=/opt/healtharchive-backend
+EnvironmentFile=-/etc/healtharchive/healthchecks.env
+
+# Writes artifacts under /srv/healtharchive/ops/baseline and exits non-zero on required drift.
+ExecStart=/opt/healtharchive-backend/scripts/systemd-healthchecks-wrapper.sh --ping-var HEALTHARCHIVE_HC_PING_BASELINE_DRIFT -- /usr/bin/python3 /opt/healtharchive-backend/scripts/check_baseline_drift.py --mode local

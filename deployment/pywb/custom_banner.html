@@ -1,0 +1,2212 @@
+<!--
+HealthArchive custom replay banner for pywb (non-framed replay).
+
+Deploy by copying this file to:
+  /srv/healtharchive/replay/templates/custom_banner.html
+
+Then restart the replay service:
+  sudo systemctl restart healtharchive-replay.service
+
+Note: When replay is embedded inside HealthArchive (iframe), this template:
+- collapses to a minimal UI (Diff + Details + Hide), and
+- sends lightweight postMessage events so the wrapper UI can track the current
+  archived URL for edition switching.
+
+Implementation note:
+- pywb rewrites absolute `href="https://..."` links inside replayed pages.
+  To keep "Back to HealthArchive" and related links working (including
+  right-click / middle-click open-in-new-tab), this banner generates a `blob:`
+  URL that immediately redirects the browser to the real HealthArchive URL.
+- pywb's wombat layer rewrites `fetch()` and `XMLHttpRequest` by default to load
+  archived resources. For live HealthArchive API calls, this banner uses
+  `XMLHttpRequest` with `xhr._no_rewrite = true` and relies on backend CORS
+  allowing `https://replay.healtharchive.ca` (including `X-Pywb-Requested-With`).
+-->
+
+		<style id="ha-replay-banner-css">
+  #ha-replay-banner {
+	    position: sticky;
+	    top: 0;
+	    z-index: 2147483647;
+    overflow: visible;
+    border-bottom: 1px solid rgba(148, 163, 184, 0.32);
+    background-color: rgba(255, 255, 255, 0.86);
+    background-color: color-mix(in srgb, rgba(255, 255, 255, 0.9) 82%, transparent);
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI",
+      sans-serif;
+    font-size: 14px;
+    line-height: 1.35;
+    -webkit-font-smoothing: antialiased;
+    backdrop-filter: blur(10px) saturate(1.1);
+    box-shadow: 0 8px 18px rgba(15, 23, 42, 0.06);
+  }
+
+  #ha-replay-banner * {
+    box-sizing: border-box;
+  }
+
+  #ha-replay-banner a {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  #ha-replay-banner .ha-replay-inner {
+    padding: 0;
+  }
+
+	  #ha-replay-banner .ha-replay-bar {
+	    display: grid;
+	    grid-template-columns: max-content minmax(0, 1fr) max-content;
+	    align-items: center;
+	    position: relative;
+	    column-gap: 1.15rem;
+	    padding: 0.55rem 0.9rem;
+	    min-height: 56px;
+	    transition:
+	      padding 180ms ease,
+	      min-height 180ms ease,
+	      row-gap 180ms ease,
+	      column-gap 180ms ease;
+	  }
+
+  #ha-replay-banner .ha-replay-left,
+  #ha-replay-banner .ha-replay-right {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    min-width: 0;
+  }
+
+  #ha-replay-banner .ha-replay-left {
+    padding-right: 0.8rem;
+  }
+
+  #ha-replay-banner .ha-replay-right {
+    justify-content: flex-end;
+    flex-wrap: nowrap;
+  }
+
+	  #ha-replay-banner .ha-replay-center {
+	    min-width: 0;
+	    display: flex;
+	    flex-direction: column;
+	    gap: 0.15rem;
+	    overflow: hidden;
+	  }
+
+  #ha-replay-banner .ha-replay-title {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: rgba(15, 23, 42, 0.92);
+    font-weight: 700;
+    letter-spacing: -0.01em;
+  }
+
+	  #ha-replay-banner .ha-replay-meta {
+	    min-width: 0;
+	    display: flex;
+	    align-items: center;
+	    gap: 0.55rem;
+	    overflow: hidden;
+	    white-space: nowrap;
+	    font-size: 1.05rem;
+	    color: rgba(15, 23, 42, 0.72);
+	    font-weight: 650;
+	    max-height: 2.4rem;
+	    transform: translateY(0);
+	    opacity: 1;
+	    transition:
+	      opacity 160ms ease,
+	      max-height 160ms ease,
+	      transform 160ms ease;
+	  }
+
+	  #ha-replay-banner .ha-replay-disclaimer-inline {
+	    min-width: 0;
+	    overflow: hidden;
+	    text-overflow: ellipsis;
+	    white-space: nowrap;
+	    color: #92400e;
+	    font-weight: 600;
+	    font-size: 1rem;
+	    line-height: 1.35;
+	    max-height: 3.2rem;
+	    transform: translateY(0);
+	    opacity: 1;
+	    transition:
+	      opacity 160ms ease,
+	      max-height 160ms ease,
+	      transform 160ms ease;
+	  }
+
+	  #ha-replay-banner.ha-replay-compact .ha-replay-bar {
+	    padding-top: 0.4rem;
+	    padding-bottom: 0.4rem;
+	    min-height: 48px;
+	  }
+
+	  #ha-replay-banner.ha-replay-compact .ha-replay-center {
+	    gap: 0;
+	  }
+
+	  #ha-replay-banner.ha-replay-compact .ha-replay-meta,
+	  #ha-replay-banner.ha-replay-compact .ha-replay-disclaimer-inline {
+	    opacity: 0;
+	    max-height: 0;
+	    transform: translateY(-6px);
+	    pointer-events: none;
+	  }
+
+  #ha-replay-banner .ha-replay-meta-item {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  #ha-replay-banner .ha-replay-meta-item + .ha-replay-meta-item {
+    position: relative;
+    padding-left: 0.65rem;
+  }
+
+  #ha-replay-banner .ha-replay-meta-item + .ha-replay-meta-item::before {
+    content: "";
+    position: absolute;
+    left: 0.22rem;
+    top: 50%;
+    width: 4px;
+    height: 4px;
+    border-radius: 999px;
+    background: rgba(148, 163, 184, 0.95);
+    transform: translateY(-50%);
+  }
+
+  #ha-replay-banner .ha-replay-meta-link {
+    color: rgba(37, 99, 235, 0.95);
+  }
+
+  #ha-replay-banner .ha-replay-meta-link:hover {
+    text-decoration: underline;
+  }
+
+  #ha-replay-banner .ha-replay-btn,
+  #ha-replay-banner .ha-replay-icon-btn {
+	    appearance: none;
+	    border: 1px solid transparent;
+	    background: transparent;
+	    color: rgba(15, 23, 42, 0.78);
+	    border-radius: 12px;
+	    padding: 0.55rem 0.9rem;
+	    font: inherit;
+	    font-weight: 650;
+	    cursor: pointer;
+	    line-height: 1;
+	    text-decoration: none;
+	    display: inline-flex;
+	    align-items: center;
+	    justify-content: center;
+	    gap: 0.35rem;
+	    white-space: nowrap;
+	    user-select: none;
+	  }
+
+  #ha-replay-banner .ha-replay-btn:hover,
+  #ha-replay-banner .ha-replay-icon-btn:hover {
+	    color: rgba(15, 23, 42, 0.95);
+	    background: rgba(148, 163, 184, 0.16);
+	  }
+
+  #ha-replay-banner .ha-replay-btn:focus-visible,
+  #ha-replay-banner .ha-replay-icon-btn:focus-visible,
+  #ha-replay-banner .ha-replay-navlink:focus-visible,
+  #ha-replay-banner .ha-replay-history-item-actions a:focus-visible {
+	    outline: 3px solid rgba(37, 99, 235, 0.45);
+	    outline-offset: 2px;
+	  }
+
+  #ha-replay-banner .ha-replay-btn-primary {
+    background-color: #2563eb;
+    border-color: rgba(37, 99, 235, 0.6);
+    color: #ffffff;
+    box-shadow: 0 8px 18px rgba(37, 99, 235, 0.2);
+  }
+
+  #ha-replay-banner .ha-replay-btn-primary:hover {
+    background-color: #1d4ed8;
+    color: #ffffff;
+  }
+
+  #ha-replay-banner .ha-replay-btn-secondary {
+	    background: rgba(255, 255, 255, 0.7);
+	    border-color: rgba(148, 163, 184, 0.45);
+	    color: rgba(15, 23, 42, 0.85);
+	  }
+
+  #ha-replay-banner .ha-replay-btn-tertiary {
+	    background: rgba(248, 250, 252, 0.78);
+	    border-color: rgba(148, 163, 184, 0.32);
+	    color: rgba(15, 23, 42, 0.82);
+	  }
+
+	  #ha-replay-banner .ha-replay-icon-btn {
+	    padding: 0.55rem 0.75rem;
+	    border-color: rgba(148, 163, 184, 0.28);
+	    background: rgba(255, 255, 255, 0.72);
+	  }
+
+  #ha-replay-banner .ha-replay-icon {
+    font-size: 1.05em;
+    line-height: 1;
+  }
+
+  #ha-replay-banner .ha-replay-navlink {
+    appearance: none;
+    border: 1px solid transparent;
+    background: transparent;
+    color: rgba(15, 23, 42, 0.78);
+    border-radius: 10px;
+    padding: 0.45rem 0.55rem;
+    font: inherit;
+    font-weight: 550;
+    cursor: pointer;
+    line-height: 1.1;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.35rem;
+    white-space: nowrap;
+    user-select: none;
+  }
+
+  #ha-replay-banner .ha-replay-navlink:hover {
+    color: rgba(15, 23, 42, 0.95);
+    text-decoration: underline;
+    background: rgba(148, 163, 184, 0.12);
+    border-color: rgba(148, 163, 184, 0.12);
+  }
+
+  #ha-replay-banner .ha-replay-navlink--primary {
+    color: rgba(37, 99, 235, 0.98);
+    font-weight: 550;
+  }
+
+  #ha-replay-banner [aria-disabled="true"] {
+    opacity: 0.48;
+    cursor: not-allowed;
+  }
+
+  #ha-replay-banner .ha-replay-popover {
+    position: absolute;
+    top: 100%;
+    margin-top: 0.65rem;
+    z-index: 2;
+    display: none;
+    max-height: calc(100vh - 92px);
+    overflow: auto;
+    background: rgba(255, 255, 255, 0.98);
+    border: 1px solid rgba(148, 163, 184, 0.32);
+    border-radius: 16px;
+    box-shadow: 0 18px 44px rgba(15, 23, 42, 0.16);
+  }
+
+  #ha-replay-banner .ha-replay-popover.is-open {
+    display: block;
+  }
+
+  #ha-replay-banner .ha-replay-popover-inner {
+    padding: 0.75rem 0.9rem 0.85rem;
+  }
+
+  #ha-replay-banner .ha-replay-popover-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+  }
+
+  #ha-replay-banner .ha-replay-popover-title {
+    font-weight: 700;
+    color: rgba(15, 23, 42, 0.92);
+  }
+
+	  #ha-replay-banner .ha-replay-history-panel {
+	    right: 0.9rem;
+	    left: auto;
+	    width: min(680px, calc(100vw - 1.8rem));
+	  }
+
+  #ha-replay-banner .ha-replay-history-inner {
+    padding: 0.75rem 0.9rem 0.85rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+  }
+
+  #ha-replay-banner .ha-replay-history-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+  }
+
+  #ha-replay-banner .ha-replay-history-title {
+    font-weight: 700;
+    color: rgba(15, 23, 42, 0.92);
+  }
+
+  #ha-replay-banner .ha-replay-history-body {
+    font-size: 0.95rem;
+    color: rgba(15, 23, 42, 0.82);
+  }
+
+  #ha-replay-banner .ha-replay-history-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+  }
+
+  #ha-replay-banner .ha-replay-history-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.45rem 0.6rem;
+    border-radius: 14px;
+    border: 1px solid rgba(148, 163, 184, 0.22);
+    background: rgba(248, 250, 252, 0.92);
+  }
+
+  #ha-replay-banner .ha-replay-history-item-title {
+    font-weight: 700;
+    color: rgba(15, 23, 42, 0.92);
+  }
+
+  #ha-replay-banner .ha-replay-history-item-subtitle {
+    margin-top: 0.15rem;
+    font-size: 0.85rem;
+    color: rgba(15, 23, 42, 0.6);
+  }
+
+  #ha-replay-banner .ha-replay-history-item-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+
+  #ha-replay-banner .ha-replay-history-item-actions a {
+    padding: 0.25rem 0.6rem;
+    border-radius: 999px;
+    border: 1px solid rgba(148, 163, 184, 0.26);
+    background: rgba(255, 255, 255, 0.82);
+    color: rgba(15, 23, 42, 0.75);
+    font-weight: 700;
+  }
+
+  #ha-replay-banner .ha-replay-history-item-actions a:hover {
+    background: rgba(148, 163, 184, 0.14);
+    transform: none;
+    text-decoration: none;
+    color: rgba(15, 23, 42, 0.95);
+  }
+
+	  #ha-replay-banner.ha-replay-embedded .ha-replay-left,
+	  #ha-replay-banner.ha-replay-embedded .ha-replay-center,
+	  #ha-replay-banner.ha-replay-embedded #ha-replay-history-toggle,
+		  #ha-replay-banner.ha-replay-embedded #ha-replay-history-panel,
+		  #ha-replay-banner.ha-replay-embedded [data-ha-action="raw"],
+		  #ha-replay-banner.ha-replay-embedded [data-ha-action="json"],
+		  #ha-replay-banner.ha-replay-embedded [data-ha-action="cite"],
+		  #ha-replay-banner.ha-replay-embedded [data-ha-action="report"] {
+		    display: none !important;
+		  }
+
+	  #ha-replay-banner.ha-replay-embedded .ha-replay-bar {
+	    display: flex;
+	    justify-content: flex-end;
+	    padding: 0.45rem 0.6rem;
+	    min-height: 44px;
+	  }
+
+		  @media (max-width: 980px) {
+		    #ha-replay-banner:not(.ha-replay-embedded) .ha-replay-right {
+		      overflow-x: auto;
+		      -webkit-overflow-scrolling: touch;
+		      max-width: 70vw;
+		      scrollbar-width: thin;
+		      justify-content: flex-start;
+		    }
+
+		    #ha-replay-banner:not(.ha-replay-embedded) .ha-replay-right > * {
+		      flex: 0 0 auto;
+		    }
+		  }
+
+			  @media (max-width: 780px) {
+			    #ha-replay-banner .ha-replay-bar {
+			      grid-template-columns: minmax(0, 1fr);
+			      grid-template-rows: auto auto auto;
+		      align-items: start;
+		      row-gap: 0.45rem;
+		      padding: 0.55rem 0.65rem;
+		      column-gap: 0.65rem;
+		      min-height: 0;
+		    }
+
+		    #ha-replay-banner .ha-replay-left {
+		      padding-right: 0.35rem;
+		      grid-column: 1;
+		      grid-row: 1;
+		    }
+
+			    #ha-replay-banner .ha-replay-right {
+			      grid-column: 1;
+			      grid-row: 2;
+			      max-width: 100%;
+			      overflow-x: auto;
+			      -webkit-overflow-scrolling: touch;
+			      gap: 0.25rem;
+			      justify-content: flex-start;
+			    }
+
+			    /* Override the (more specific) <=980px max-width clamp so mobile can use the full bar width. */
+			    #ha-replay-banner:not(.ha-replay-embedded) .ha-replay-right {
+			      max-width: none;
+			      width: 100%;
+			      scrollbar-width: thin;
+			    }
+
+			    #ha-replay-banner .ha-replay-center {
+			      grid-column: 1;
+			      grid-row: 3;
+			    }
+
+		    #ha-replay-banner .ha-replay-meta {
+		      flex-direction: column;
+		      align-items: flex-start;
+		      gap: 0.12rem;
+		    }
+
+		    #ha-replay-banner .ha-replay-meta-item + .ha-replay-meta-item {
+		      padding-left: 0;
+		    }
+
+		    #ha-replay-banner .ha-replay-meta-item + .ha-replay-meta-item::before {
+		      content: none;
+		    }
+
+		    #ha-replay-banner .ha-replay-disclaimer-inline {
+		      white-space: normal;
+		      display: -webkit-box;
+		      -webkit-box-orient: vertical;
+		      -webkit-line-clamp: 2;
+		      overflow: hidden;
+		    }
+
+		    #ha-replay-banner .ha-replay-btn,
+		    #ha-replay-banner .ha-replay-icon-btn {
+		      padding: 0.5rem 0.75rem;
+		    }
+
+		    #ha-replay-banner .ha-replay-navlink {
+		      padding: 0.42rem 0.5rem;
+		    }
+
+		    #ha-replay-banner .ha-replay-hide-sm {
+		      display: none !important;
+		    }
+
+		    #ha-replay-banner .ha-replay-history-panel {
+		      left: 0.6rem;
+		      right: 0.6rem;
+		      width: auto;
+		    }
+
+		    #ha-replay-banner.ha-replay-compact .ha-replay-bar {
+		      grid-template-columns: max-content minmax(0, 1fr);
+		      grid-template-rows: auto;
+		      align-items: center;
+		      row-gap: 0;
+		    }
+
+		    #ha-replay-banner.ha-replay-compact .ha-replay-left {
+		      grid-column: 1;
+		      grid-row: 1;
+		    }
+
+			    #ha-replay-banner.ha-replay-compact .ha-replay-right {
+			      grid-column: 2;
+			      grid-row: 1;
+			      overflow-x: auto;
+			      max-width: none;
+			      justify-content: flex-start;
+			    }
+
+		    #ha-replay-banner.ha-replay-compact .ha-replay-center {
+		      display: none;
+		    }
+		  }
+	</style>
+
+	<script id="ha-replay-banner-js">
+	  (function () {
+		    var MESSAGE_TYPE = "haReplayNavigation";
+		    var HEIGHT_MESSAGE_TYPE = "haReplayHeight";
+		    var SNAPSHOT_STORAGE_KEY = "haReplaySnapshotId";
+		    var COMPARE_LATEST_STORAGE_KEY = "haReplayLatestSnapshotId";
+		    var RETURN_URL_STORAGE_KEY = "haReplayReturnUrl";
+		    var refreshCompareLink = null;
+		    var heightTimer = null;
+		    var snapshotIdExplicit = false;
+
+	    function isEmbedded() {
+	      try {
+	        return window !== window.top;
+      } catch (e) {
+        // If we can't access window.top, assume we're embedded.
+        return true;
+      }
+    }
+
+	    function sendReplayNavigation() {
+	      if (!isEmbedded()) return;
+
+      var wb = window.wbinfo || {};
+      var payload = {
+        type: MESSAGE_TYPE,
+        coll: wb.coll || null,
+        timestamp: wb.timestamp || null,
+        url: wb.url || null,
+        topUrl: wb.top_url || null,
+      };
+
+      var key = String(payload.coll) + "|" + String(payload.timestamp) + "|" + String(payload.url);
+      if (sendReplayNavigation._lastKey === key) return;
+      sendReplayNavigation._lastKey = key;
+
+      try {
+        window.parent.postMessage(payload, "*");
+      } catch (e) {
+        // Ignore cross-origin messaging failures.
+      }
+	    }
+
+	    function computeDocumentHeight() {
+	      try {
+	        var doc = document.documentElement;
+	        var body = document.body;
+	        var heights = [
+	          body ? body.scrollHeight : 0,
+	          body ? body.offsetHeight : 0,
+	          doc ? doc.clientHeight : 0,
+	          doc ? doc.scrollHeight : 0,
+	          doc ? doc.offsetHeight : 0,
+	        ];
+	        var max = 0;
+	        for (var i = 0; i < heights.length; i++) {
+	          var v = heights[i];
+	          if (typeof v === "number" && isFinite(v)) max = Math.max(max, v);
+	        }
+	        return max > 0 ? max : null;
+	      } catch (e) {
+	        return null;
+	      }
+	    }
+
+	    function sendReplayHeight() {
+	      if (!isEmbedded()) return;
+
+	      var height = computeDocumentHeight();
+	      if (!height) return;
+	      height = Math.max(0, Math.floor(height));
+	      if (height < 120) return;
+
+	      if (sendReplayHeight._lastHeight === height) return;
+	      sendReplayHeight._lastHeight = height;
+
+	      try {
+	        window.parent.postMessage({ type: HEIGHT_MESSAGE_TYPE, height: height }, "*");
+	      } catch (e) {
+	        // Ignore cross-origin messaging failures.
+	      }
+	    }
+
+	    function scheduleReplayHeight() {
+	      if (!isEmbedded()) return;
+	      if (heightTimer) return;
+	      heightTimer = setTimeout(function () {
+	        heightTimer = null;
+	        sendReplayHeight();
+	      }, 120);
+	    }
+
+	    function onNavigationChanged() {
+	      sendReplayNavigation();
+	      scheduleReplayHeight();
+	      try {
+	        if (typeof refreshCompareLink === "function") refreshCompareLink();
+	      } catch (e) {}
+	    }
+
+	    onNavigationChanged();
+
+	    window.addEventListener("pageshow", onNavigationChanged);
+	    window.addEventListener("hashchange", onNavigationChanged);
+	    window.addEventListener("popstate", onNavigationChanged);
+	    window.addEventListener("load", scheduleReplayHeight);
+	    window.addEventListener("resize", scheduleReplayHeight);
+
+	    try {
+	      var origPushState = history.pushState;
+	      var origReplaceState = history.replaceState;
+
+	      history.pushState = function () {
+	        var result = origPushState.apply(this, arguments);
+	        setTimeout(onNavigationChanged, 0);
+	        return result;
+	      };
+
+	      history.replaceState = function () {
+	        var result = origReplaceState.apply(this, arguments);
+	        setTimeout(onNavigationChanged, 0);
+	        return result;
+	      };
+	    } catch (e) {
+	      // Ignore history patching failures.
+	    }
+
+	    // Allow the banner UI to be disabled for screenshot generation or debugging.
+	    // We use a fragment flag (not a query param) because replay URLs already
+	    // embed the original URL and its query string.
+	    try {
+      if (/ha_nobanner/i.test(window.location.hash || "")) return;
+    } catch (e) {
+      // Ignore location access failures.
+    }
+
+    var STORAGE_KEY = "haReplayBannerDismissed";
+    try {
+      if (localStorage.getItem(STORAGE_KEY) === "1") return;
+    } catch (e) {
+      // Ignore storage failures.
+    }
+
+    function detectLocaleFromOriginalUrl(value) {
+      if (!value || typeof value !== "string") return null;
+      var raw = value.trim();
+      if (!raw) return null;
+
+      try {
+        var u = new URL(raw, window.location.origin);
+        var path = (u.pathname || "").toLowerCase();
+        if (/^\/fr(?:\/|$)/.test(path)) return "fr";
+        if (/^\/en(?:\/|$)/.test(path)) return "en";
+
+        var lang = (u.searchParams.get("lang") || u.searchParams.get("language") || "").toLowerCase();
+        if (lang === "fr" || lang.indexOf("fr") === 0) return "fr";
+        if (lang === "en" || lang.indexOf("en") === 0) return "en";
+
+        var host = (u.hostname || "").toLowerCase();
+        if (host.indexOf("fr.") === 0) return "fr";
+      } catch (e) {
+        var lower = raw.toLowerCase();
+        if (lower.indexOf("/fr/") >= 0) return "fr";
+        if (lower.indexOf("/en/") >= 0) return "en";
+      }
+
+      return null;
+    }
+
+    function resolveUiLocale() {
+      try {
+        var wb = window.wbinfo || {};
+        return (
+          detectLocaleFromOriginalUrl(wb.url) ||
+          detectLocaleFromOriginalUrl(wb.top_url || wb.topUrl) ||
+          "en"
+        );
+      } catch (e) {
+        return "en";
+      }
+    }
+
+    var UI_LOCALE = resolveUiLocale();
+    var UI_LOCALE_TAG = UI_LOCALE === "fr" ? "fr-CA" : "en-CA";
+    var UI_COPY = {
+      en: {
+        archivedReplay: "Archived replay",
+        backupLabel: "Backup:",
+        capturedLabel: "Captured:",
+        disclaimerPrefix: "Independent archive \u00b7 Not an official government website.",
+        disclaimerCapturePrefix: "Archived capture from",
+        disclaimerCaptureSuffix: "\u2014 not current guidance or medical advice.",
+        backAria: "Back to HealthArchive.ca",
+        pageTitleLabel: "Page title",
+        sourceLabel: "Source",
+        snapshotDateLabel: "Snapshot date",
+        languageLabel: "Language",
+        originalUrlLabel: "Original URL",
+        editionLabel: "edition",
+        unknownLabel: "Unknown",
+        detailsLabel: "Details",
+        detailsAria: "View snapshot details on HealthArchive.ca",
+        compareLabel: "View diff",
+        compareAria: "Compare this archived page to the live page",
+        rawLabel: "Raw HTML",
+        rawAria: "View raw HTML for this snapshot",
+        jsonLabel: "Metadata JSON",
+        jsonAria: "View metadata JSON for this snapshot",
+        citeLabel: "Cite",
+	        citeAria: "How to cite HealthArchive snapshots",
+	        reportLabel: "Report issue",
+	        reportAria: "Report an issue with this snapshot",
+	        moreLabel: "More",
+	        moreAria: "More actions",
+	        closeAria: "Close",
+	        historyLabel: "All snapshots",
+	        historyAria: "Toggle snapshot list for this page",
+	        historyTitle: "All snapshots",
+	        historyAllLabel: "Search results",
+	        historyLoading: "Loading snapshots\u2026",
+	        historyUnavailable: "Snapshots are not available for this page.",
+	        historyNone: "No snapshots are available for this page.",
+        historyViewLabel: "View",
+        historyCompareLabel: "Compare",
+        hideLabel: "Hide",
+        hideAria: "Hide this banner",
+        redirectTitle: "Redirecting...",
+        redirectBody: "Redirecting to",
+      },
+      fr: {
+        archivedReplay: "Relecture archivée",
+        backupLabel: "Sauvegarde\u00a0:",
+        capturedLabel: "Capturée\u00a0:",
+        disclaimerPrefix: "Archive indépendante \u00b7 Pas un site officiel du gouvernement.",
+        disclaimerCapturePrefix: "Capture archivée du",
+        disclaimerCaptureSuffix: "\u2014 pas des conseils actuels ni un avis médical.",
+        backAria: "Retour à HealthArchive.ca",
+        pageTitleLabel: "Titre de la page",
+        sourceLabel: "Source",
+        snapshotDateLabel: "Date de capture",
+        languageLabel: "Langue",
+        originalUrlLabel: "URL d’origine",
+        editionLabel: "édition",
+        unknownLabel: "Inconnu",
+        detailsLabel: "Détails",
+        detailsAria: "Voir les détails de la capture sur HealthArchive.ca",
+        compareLabel: "Voir diff",
+        compareAria: "Comparer cette capture archivée à la page en direct",
+        rawLabel: "HTML brut",
+        rawAria: "Voir le HTML brut de cette capture",
+        jsonLabel: "Métadonnées JSON",
+        jsonAria: "Voir les métadonnées JSON de cette capture",
+        citeLabel: "Citer",
+	        citeAria: "Comment citer les captures HealthArchive",
+	        reportLabel: "Signaler un problème",
+	        reportAria: "Signaler un problème avec cette capture",
+	        moreLabel: "Plus",
+	        moreAria: "Plus d’actions",
+	        closeAria: "Fermer",
+	        historyLabel: "Toutes les captures",
+	        historyAria: "Afficher ou masquer la liste des captures de cette page",
+	        historyTitle: "Toutes les captures",
+	        historyAllLabel: "Résultats de recherche",
+	        historyLoading: "Chargement des captures\u2026",
+	        historyUnavailable: "Les captures ne sont pas disponibles pour cette page.",
+	        historyNone: "Aucune capture n’est disponible pour cette page.",
+        historyViewLabel: "Voir",
+        historyCompareLabel: "Comparer",
+        hideLabel: "Masquer",
+        hideAria: "Masquer cette bannière",
+        redirectTitle: "Redirection…",
+        redirectBody: "Redirection vers",
+      },
+    };
+
+    function t(key) {
+      var table = UI_COPY[UI_LOCALE] || UI_COPY.en;
+      return table[key] || UI_COPY.en[key] || String(key);
+    }
+
+	    function loadSnapshotId() {
+	      function readSnapshotId(params) {
+	        if (!params) return null;
+	        return params.get("ha_snapshot") || params.get("haSnapshot");
+	      }
+
+	      function extractSnapshotId(value) {
+	        if (!value || typeof value !== "string") return null;
+	        var rawValue = value.trim();
+	        if (!rawValue) return null;
+
+	        try {
+	          var url = new URL(rawValue, window.location.origin);
+	          var fromQuery = readSnapshotId(url.searchParams);
+	          if (fromQuery) return fromQuery;
+	          var hashValue = url.hash ? url.hash.replace(/^#/, "") : "";
+	          if (hashValue) {
+	            var hashParams = new URLSearchParams(hashValue);
+	            var fromHash = readSnapshotId(hashParams);
+	            if (fromHash) return fromHash;
+	          }
+	        } catch (e) {
+	          try {
+	            var cleaned = rawValue.replace(/^[?#]/, "");
+	            var params = new URLSearchParams(cleaned);
+	            return readSnapshotId(params);
+	          } catch (e2) {}
+	        }
+
+	        return null;
+	      }
+
+	      var snapshotId = null;
+	      try {
+	        try {
+	          snapshotId = extractSnapshotId(window.location.hash || "");
+	        } catch (e) {
+	          snapshotId = null;
+	        }
+	        if (snapshotId) snapshotIdExplicit = true;
+
+	        var hrefCandidates = [];
+	        try {
+	          if (window.WB_wombat_location && window.WB_wombat_location._orig_loc) {
+	            hrefCandidates.push(window.WB_wombat_location._orig_loc.href);
+	          }
+	        } catch (e) {}
+	        try {
+	          if (window.location && window.location._orig_loc) {
+	            hrefCandidates.push(window.location._orig_loc.href);
+	          }
+	        } catch (e) {}
+	        hrefCandidates.push(window.location.href);
+	        for (var i = 0; i < hrefCandidates.length && !snapshotId; i++) {
+	          snapshotId = extractSnapshotId(hrefCandidates[i] || "");
+	        }
+	      } catch (e) {
+	        snapshotId = null;
+	      }
+	      if (snapshotId && !snapshotIdExplicit) snapshotIdExplicit = true;
+
+	      if (!snapshotId) {
+	        try {
+	          var wb = window.wbinfo || {};
+	          snapshotId = extractSnapshotId(wb.top_url || wb.topUrl || "");
+	        } catch (e) {
+	          snapshotId = null;
+	        }
+	      }
+
+	      if (snapshotId) {
+	        try {
+	          sessionStorage.setItem(SNAPSHOT_STORAGE_KEY, String(snapshotId));
+	        } catch (e) {}
+	        return String(snapshotId);
+	      }
+
+	      try {
+	        var stored = sessionStorage.getItem(SNAPSHOT_STORAGE_KEY);
+	        if (stored) return stored;
+	      } catch (e) {}
+	      return null;
+	    }
+
+	    function parseJobIdFromColl(value) {
+	      if (!value || typeof value !== "string") return null;
+	      var match = /^job-(\d+)$/.exec(value.trim());
+	      if (!match) return null;
+	      var parsed = Number(match[1]);
+	      return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+	    }
+
+	    function getWbInfo() {
+	      var wb = window.wbinfo || {};
+	      return {
+	        coll: wb.coll || null,
+	        timestamp: wb.timestamp || null,
+	        url: wb.url || null,
+	        topUrl: wb.top_url || null,
+	      };
+	    }
+
+	        function getApiBaseCandidates(hostname) {
+	      // Prefer api.<apex>, but also try the public site origin (some deployments proxy /api there).
+	      // Include window.location.origin as a last-ditch candidate for localhost/IP debugging.
+	      var scheme = "https://";
+	      try {
+	        scheme = window.location.protocol === "http:" ? "http://" : "https://";
+	      } catch (e) {}
+
+	      var host = String(hostname || "");
+	      var isLocal = host === "localhost" || /^\d+\.\d+\.\d+\.\d+$/.test(host);
+	      if (isLocal) {
+	        var origin = null;
+	        try {
+	          origin = window.location.origin;
+	        } catch (e) {
+	          origin = null;
+	        }
+	        return [
+	          "https://api.healtharchive.ca",
+	          "https://www.healtharchive.ca",
+	          origin,
+	        ].filter(Boolean);
+	      }
+
+	      var parts = host.split(".").filter(Boolean);
+	      var apex = parts.length >= 2 ? parts.slice(-2).join(".") : host;
+	      var apiBase = scheme + "api." + apex;
+	      var siteBase = scheme + "www." + apex;
+	      var apexBase = scheme + apex;
+	      return [apiBase, siteBase, apexBase];
+	    }
+
+	    function getSiteBase(hostname) {
+	      var host = String(hostname || "");
+	      if (host.indexOf("replay.") === 0) {
+	        return "https://" + "www." + host.slice("replay.".length);
+	      }
+	      var parts = host.split(".").filter(Boolean);
+	      if (parts.length >= 3 && parts[0] === "replay") {
+	        parts[0] = "www";
+	        return "https://" + parts.join(".");
+	      }
+	      if (host) return "https://" + host;
+	      return "https://" + "www." + "healtharchive.ca";
+	    }
+
+	    function formatTimestamp(ts) {
+	      if (!ts || typeof ts !== "string" || ts.length < 8) return null;
+	      var year = Number(ts.slice(0, 4));
+      var month = Number(ts.slice(4, 6));
+      var day = Number(ts.slice(6, 8));
+      if (!year || !month || !day) return null;
+      var d = new Date(Date.UTC(year, month - 1, day));
+      if (isNaN(d.getTime())) return null;
+      return d.toLocaleDateString(UI_LOCALE_TAG, { year: "numeric", month: "short", day: "numeric" });
+    }
+
+	    function buildMeta() {
+	      var wb = window.wbinfo || {};
+	      var parts = [];
+	      if (wb.coll) parts.push(t("backupLabel") + " " + wb.coll);
+	      var capture = formatTimestamp(wb.timestamp);
+	      if (capture) parts.push(t("capturedLabel") + " " + capture);
+	      return parts.join(" \u00b7 ");
+	    }
+
+		    function setupCompactBehavior(bannerEl) {
+		      if (!bannerEl) return;
+		      try {
+		        if (bannerEl.classList && bannerEl.classList.contains("ha-replay-embedded")) return;
+		      } catch (e) {}
+
+		      var lastCompact = null;
+		      var ticking = false;
+
+		      function computeCompact() {
+		        var y = 0;
+		        try {
+		          y = window.scrollY != null ? window.scrollY : window.pageYOffset != null ? window.pageYOffset : 0;
+		        } catch (e) {
+		          y = 0;
+		        }
+		        return y > 24;
+		      }
+
+		      function apply() {
+		        ticking = false;
+		        var compact = computeCompact();
+		        if (lastCompact === compact) return;
+		        lastCompact = compact;
+		        try {
+		          bannerEl.classList.toggle("ha-replay-compact", compact);
+		        } catch (e) {}
+		        scheduleReplayHeight();
+		      }
+
+		      function onScroll() {
+		        if (ticking) return;
+		        ticking = true;
+		        try {
+		          if (typeof window.requestAnimationFrame === "function") {
+		            window.requestAnimationFrame(apply);
+		          } else {
+		            setTimeout(apply, 50);
+		          }
+		        } catch (e) {
+		          ticking = false;
+		          apply();
+		        }
+		      }
+
+		      try {
+		        window.addEventListener("scroll", onScroll, { passive: true });
+		      } catch (e) {
+		        try {
+		          window.addEventListener("scroll", onScroll);
+		        } catch (e2) {}
+		      }
+
+		      apply();
+		    }
+
+		    function inject() {
+		      if (!document.body) return;
+
+      var banner = document.getElementById("ha-replay-banner");
+      if (banner) return;
+
+	      var embedded = false;
+	      try {
+	        embedded = isEmbedded();
+	      } catch (e) {
+	        embedded = true;
+	      }
+
+	      var snapshotId = loadSnapshotId();
+
+	      banner = document.createElement("div");
+	      banner.id = "ha-replay-banner";
+	      banner.setAttribute("role", "region");
+	      banner.setAttribute(
+	        "aria-label",
+	        UI_LOCALE === "fr" ? "Avis de relecture HealthArchive" : "HealthArchive replay notice"
+	      );
+	      if (embedded) {
+	        banner.className = "ha-replay-embedded";
+	      }
+
+			        banner.innerHTML =
+			        '<div class="ha-replay-inner">' +
+			        '  <div class="ha-replay-bar">' +
+			        '    <div class="ha-replay-left">' +
+				        '      <a class="ha-replay-btn ha-replay-btn-primary" id="ha-replay-back" data-ha-action="browse" href="#" target="_top" rel="noreferrer noopener" aria-label="' +
+				        t("backAria") +
+				        '">' +
+			        "\u2190 HealthArchive.ca" +
+			        "      </a>" +
+			        "    </div>" +
+			        '    <div class="ha-replay-center" id="ha-replay-summary" aria-label="' +
+			        (UI_LOCALE === "fr" ? "Résumé de la capture" : "Snapshot summary") +
+			        '">' +
+			        '      <div class="ha-replay-title" id="ha-replay-top-title"></div>' +
+			        '      <div class="ha-replay-meta" id="ha-replay-top-meta">' +
+			        '        <span class="ha-replay-meta-item" id="ha-replay-top-date"></span>' +
+			        '        <a class="ha-replay-meta-item ha-replay-meta-link" data-ha-action="origin" id="ha-replay-top-url" href="#" target="_blank" rel="noreferrer noopener"></a>' +
+			        "      </div>" +
+			        '      <div class="ha-replay-disclaimer-inline" id="ha-replay-disclaimer"></div>' +
+			        "    </div>" +
+			        '    <div class="ha-replay-right" id="ha-replay-actions">' +
+			        '      <a class="ha-replay-navlink ha-replay-navlink--primary" data-ha-action="compare" href="#" target="_top" rel="noreferrer noopener" aria-label="' +
+			        t("compareAria") +
+			        '">' +
+			        t("compareLabel") +
+			        "</a>" +
+			        '      <a class="ha-replay-navlink" data-ha-action="details" href="#" target="_top" rel="noreferrer noopener" aria-label="' +
+			        t("detailsAria") +
+			        '">' +
+			        t("detailsLabel") +
+			        "</a>" +
+			        '      <button type="button" class="ha-replay-navlink" id="ha-replay-history-toggle" aria-label="' +
+			        t("historyAria") +
+			        '" aria-expanded="false" aria-controls="ha-replay-history-panel">' +
+			        '        <span id="ha-replay-history-toggle-label">' +
+			        t("historyLabel") +
+			        "</span>" +
+			        "      </button>" +
+			        '      <a class="ha-replay-navlink" data-ha-action="raw" href="#" target="_blank" rel="noreferrer noopener" aria-label="' +
+			        t("rawAria") +
+			        '">' +
+			        t("rawLabel") +
+			        "</a>" +
+			        '      <a class="ha-replay-navlink" data-ha-action="json" href="#" target="_blank" rel="noreferrer noopener" aria-label="' +
+			        t("jsonAria") +
+			        '">' +
+			        t("jsonLabel") +
+			        "</a>" +
+			        '      <a class="ha-replay-navlink" data-ha-action="cite" href="#" target="_top" rel="noreferrer noopener" aria-label="' +
+			        t("citeAria") +
+			        '">' +
+			        t("citeLabel") +
+			        "</a>" +
+			        '      <a class="ha-replay-navlink" data-ha-action="report" href="#" target="_top" rel="noreferrer noopener" aria-label="' +
+			        t("reportAria") +
+			        '">' +
+			        t("reportLabel") +
+			        "</a>" +
+			        '      <button type="button" class="ha-replay-navlink" id="ha-replay-hide" aria-label="' +
+			        t("hideAria") +
+			        '">' +
+			        t("hideLabel") +
+			        "</button>" +
+			        "    </div>" +
+			        '<div class="ha-replay-popover ha-replay-history-panel" id="ha-replay-history-panel" aria-hidden="true">' +
+			        '  <div class="ha-replay-history-inner">' +
+			        '    <div class="ha-replay-history-heading">' +
+			        '      <div class="ha-replay-history-title">' +
+			        t("historyTitle") +
+			        "</div>" +
+			        '      <a class="ha-replay-btn ha-replay-btn-tertiary" data-ha-action="historyPage" href="#" target="_top" rel="noreferrer noopener">' +
+			        t("historyAllLabel") +
+			        "</a>" +
+			        "    </div>" +
+			        '    <div class="ha-replay-history-body" id="ha-replay-history-body"></div>' +
+			        "  </div>" +
+			        "</div>" +
+			        "  </div>" +
+			        "</div>";
+
+		      document.body.insertBefore(banner, document.body.firstChild);
+		      setupCompactBehavior(banner);
+
+      var titleEl = document.getElementById("ha-replay-top-title");
+      if (titleEl) {
+        try {
+          titleEl.textContent = document.title || "";
+          titleEl.setAttribute("title", document.title || "");
+        } catch (e) {}
+      }
+
+	      var disclaimerEl = document.getElementById("ha-replay-disclaimer");
+	      if (disclaimerEl) {
+	        disclaimerEl.textContent = t("disclaimerPrefix");
+	        disclaimerEl.setAttribute("title", t("disclaimerPrefix"));
+	      }
+
+	      var urlEl = document.getElementById("ha-replay-top-url");
+		      try {
+		        var wbUrl = getWbInfo().url;
+		        if (urlEl && wbUrl) {
+		          urlEl.textContent = String(wbUrl).replace(/^https?:\/\//i, "");
+		          urlEl.setAttribute("title", wbUrl);
+		        }
+		      } catch (e) {}
+
+      function bindHideButton(id) {
+        var btn = document.getElementById(id);
+        if (!btn) return;
+        btn.addEventListener("click", function () {
+          try {
+            localStorage.setItem(STORAGE_KEY, "1");
+          } catch (e) {}
+          var el = document.getElementById("ha-replay-banner");
+          if (el && el.parentNode) el.parentNode.removeChild(el);
+        });
+      }
+
+	      bindHideButton("ha-replay-hide");
+
+	      // Avoid pywb rewriting our "escape hatch" navigation by:
+	      //  - not embedding HealthArchive URLs directly in HTML attributes, and
+	      //  - using buttons with explicit JS navigation.
+		      try {
+		        var haBase = getSiteBase(window.location.hostname);
+		        var haLocalePrefix = UI_LOCALE === "fr" ? "/fr" : "";
+		        var haRoot = haBase + haLocalePrefix;
+		        var apiCandidates = getApiBaseCandidates(window.location.hostname);
+		        var apiBase = apiCandidates[0];
+		        var wbInfo = getWbInfo();
+		        var originalUrl = wbInfo.url || "";
+
+		        function normalizeHost(hostname) {
+		          return String(hostname || "").trim().toLowerCase().replace(/^www\./, "");
+		        }
+
+		        var haApexHost = null;
+		        try {
+		          haApexHost = normalizeHost(new URL(haBase).hostname);
+		        } catch (e) {
+		          haApexHost = null;
+		        }
+
+		        function isHealthArchiveHost(hostname) {
+		          if (!hostname || !haApexHost) return false;
+		          return normalizeHost(hostname) === haApexHost;
+		        }
+
+		        function loadHaReturnUrl() {
+		          function readReturn(params) {
+		            if (!params) return null;
+		            return params.get("ha_return") || params.get("haReturn");
+		          }
+
+		          function extractReturn(value) {
+		            if (!value || typeof value !== "string") return null;
+		            var rawValue = value.trim();
+		            if (!rawValue) return null;
+
+		            try {
+		              var url = new URL(rawValue, window.location.origin);
+		              var fromQuery = readReturn(url.searchParams);
+		              if (fromQuery) return fromQuery;
+		              var hashValue = url.hash ? url.hash.replace(/^#/, "") : "";
+		              if (hashValue) {
+		                var hashParams = new URLSearchParams(hashValue);
+		                var fromHash = readReturn(hashParams);
+		                if (fromHash) return fromHash;
+		              }
+		            } catch (e) {
+		              try {
+		                var cleaned = rawValue.replace(/^[?#]/, "");
+		                var params = new URLSearchParams(cleaned);
+		                return readReturn(params);
+		              } catch (e2) {}
+		            }
+
+		            return null;
+		          }
+
+		          function normalizeReturnDest(value) {
+		            if (!value || typeof value !== "string") return null;
+		            var raw = value.trim();
+		            if (!raw) return null;
+
+		            if (/^https?:\/\//i.test(raw)) {
+		              try {
+		                var u = new URL(raw);
+		                return isHealthArchiveHost(u.hostname) ? u.href : null;
+		              } catch (e) {
+		                return null;
+		              }
+		            }
+
+		            if (raw[0] === "/") return haBase + raw;
+		            return null;
+		          }
+
+		          var stored = null;
+		          try {
+		            stored = sessionStorage.getItem(RETURN_URL_STORAGE_KEY);
+		          } catch (e) {}
+
+		          var rawReturn = null;
+		          try {
+		            rawReturn = extractReturn(window.location.hash || "");
+		          } catch (e) {
+		            rawReturn = null;
+		          }
+
+		          if (!rawReturn) {
+		            var hrefCandidates = [];
+		            try {
+		              if (window.WB_wombat_location && window.WB_wombat_location._orig_loc) {
+		                hrefCandidates.push(window.WB_wombat_location._orig_loc.href);
+		              }
+		            } catch (e) {}
+		            try {
+		              if (window.location && window.location._orig_loc) {
+		                hrefCandidates.push(window.location._orig_loc.href);
+		              }
+		            } catch (e) {}
+		            try {
+		              hrefCandidates.push(window.location.href);
+		            } catch (e) {}
+
+		            for (var i = 0; i < hrefCandidates.length; i++) {
+		              try {
+		                rawReturn = extractReturn(hrefCandidates[i]);
+		                if (rawReturn) break;
+		              } catch (e) {}
+		            }
+		          }
+
+		          if (!rawReturn) {
+		            try {
+		              var ref = document.referrer || "";
+		              if (ref) {
+		                var refUrl = new URL(ref);
+		                if (isHealthArchiveHost(refUrl.hostname)) {
+		                  rawReturn = refUrl.href;
+		                }
+		              }
+		            } catch (e) {}
+		          }
+
+		          var dest = normalizeReturnDest(rawReturn) || normalizeReturnDest(stored) || stored || null;
+		          if (dest) {
+		            try {
+		              sessionStorage.setItem(RETURN_URL_STORAGE_KEY, dest);
+		            } catch (e) {}
+		          }
+
+		          return dest || null;
+		        }
+
+		        function buildArchiveSearchUrl(originalUrlValue) {
+		          try {
+		            var cleanUrl = stripUrlFragment(originalUrlValue);
+		            if (!cleanUrl) return haRoot + "/archive?focus=results";
+	            return (
+	              haRoot +
+	              "/archive?view=snapshots&q=" +
+	              encodeURIComponent(cleanUrl) +
+	              "&focus=results"
+	            );
+	          } catch (e) {
+	            return haRoot + "/archive?focus=results";
+	          }
+		        }
+
+		        var archiveSearchUrl = buildArchiveSearchUrl(originalUrl);
+		        var returnUrl = loadHaReturnUrl();
+		        var routes = {
+		          browse: returnUrl || archiveSearchUrl,
+		        };
+
+		        routes.details = snapshotId ? haRoot + "/snapshot/" + snapshotId : archiveSearchUrl;
+		        routes.compare = originalUrl
+		          ? haRoot + "/compare-live?url=" + encodeURIComponent(stripUrlFragment(originalUrl)) + "&run=1"
+		          : haRoot + "/compare-live";
+	        routes.origin = originalUrl ? stripUrlFragment(originalUrl) : "";
+	        routes.historyPage = archiveSearchUrl;
+
+	        if (snapshotId) {
+	          routes.cite = haRoot + "/cite?snapshot=" + snapshotId;
+	        } else if (originalUrl) {
+	          routes.cite = haRoot + "/cite?url=" + encodeURIComponent(stripUrlFragment(originalUrl));
+	        } else {
+	          routes.cite = haRoot + "/cite";
+	        }
+
+	        function stripUrlFragment(value) {
+	          if (!value || typeof value !== "string") return "";
+	          var idx = value.indexOf("#");
+	          return idx >= 0 ? value.slice(0, idx) : value;
+	        }
+
+	        function buildReportUrl(snapshotIdValue, originalUrlValue) {
+	          try {
+	            var params = [];
+	            if (snapshotIdValue) params.push("snapshot=" + encodeURIComponent(String(snapshotIdValue)));
+	            var cleanUrl = stripUrlFragment(originalUrlValue);
+	            if (cleanUrl) params.push("url=" + encodeURIComponent(cleanUrl));
+	            if (snapshotIdValue) {
+	              params.push(
+	                "page=" +
+	                  encodeURIComponent(haLocalePrefix + "/snapshot/" + snapshotIdValue)
+	              );
+	            }
+	            return haRoot + "/report?" + params.join("&");
+	          } catch (e) {
+	            return haRoot + "/report";
+	          }
+	        }
+
+	        routes.report = buildReportUrl(snapshotId, originalUrl);
+	        routes.history = snapshotId
+	          ? haRoot + "/snapshot/" + snapshotId + "?view=details"
+	          : archiveSearchUrl;
+
+	        if (snapshotId) {
+	          routes.raw = apiBase + "/api/snapshots/raw/" + snapshotId;
+	          routes.json = apiBase + "/api/snapshot/" + snapshotId;
+	          routes.timeline = apiBase + "/api/snapshots/" + snapshotId + "/timeline";
+	        }
+
+	        function safeJson(url, timeoutMs) {
+	          // pywb's wombat rewrites fetch() but supports opt-out for XHR via the
+	          // per-instance `_no_rewrite` flag.
+	          return new Promise(function (resolve, reject) {
+	            if (!url) {
+	              reject(new Error("missing_url"));
+	              return;
+	            }
+
+	            var xhr = null;
+	            try {
+	              xhr = new XMLHttpRequest();
+	            } catch (e) {
+	              reject(e);
+	              return;
+	            }
+
+	            var timedOut = false;
+	            var timer = null;
+	            try {
+	              timer = setTimeout(function () {
+	                timedOut = true;
+	                try {
+	                  xhr.abort();
+	                } catch (e) {}
+	                reject(new Error("timeout"));
+	              }, timeoutMs || 3500);
+	            } catch (e) {
+	              timer = null;
+	            }
+
+	            try {
+	              xhr._no_rewrite = true;
+	            } catch (e) {}
+
+	            xhr.onreadystatechange = function () {
+	              if (xhr.readyState !== 4 || timedOut) return;
+	              if (timer) clearTimeout(timer);
+
+	              try {
+	                var ok = xhr.status >= 200 && xhr.status < 300;
+	                if (!ok) throw new Error("status " + xhr.status);
+	                var text = xhr.responseText || "";
+	                resolve(JSON.parse(text));
+	              } catch (e) {
+	                reject(e);
+	              }
+	            };
+
+	            xhr.onerror = function () {
+	              if (timer) clearTimeout(timer);
+	              if (timedOut) return;
+	              reject(new Error("network_error"));
+	            };
+
+	            try {
+	              xhr.open("GET", String(url), true);
+	              xhr.withCredentials = false;
+	              try {
+	                xhr.setRequestHeader("Accept", "application/json");
+	              } catch (e) {}
+	              xhr.send(null);
+	            } catch (e) {
+	              if (timer) clearTimeout(timer);
+	              reject(e);
+	            }
+	          });
+	        }
+
+	        function isHtmlMimeType(value) {
+	          if (!value || typeof value !== "string") return false;
+	          var normalized = value.split(";")[0].trim().toLowerCase();
+	          return normalized === "text/html" || normalized === "application/xhtml+xml";
+	        }
+
+	        function formatIsoDate(value) {
+	          if (!value || typeof value !== "string") return null;
+	          try {
+	            var d = new Date(value);
+	            if (isNaN(d.getTime())) return null;
+	            return d.toLocaleDateString(UI_LOCALE_TAG, { year: "numeric", month: "short", day: "numeric" });
+	          } catch (e) {
+	            return null;
+	          }
+	        }
+
+	        function compactUrl(value) {
+	          if (!value || typeof value !== "string") return null;
+	          var raw = value.trim();
+	          if (!raw) return null;
+	          try {
+	            var u = new URL(raw);
+	            var host = u.hostname || "";
+	            var path = (u.pathname || "") + (u.search || "");
+	            var out = host + path;
+	            if (out.length > 1 && out[out.length - 1] === "/") out = out.slice(0, -1);
+	            return out || raw;
+	          } catch (e) {
+	            return raw.replace(/^https?:\/\//i, "");
+	          }
+	        }
+
+	        function buildSnapshotSummary(snapshotDetail) {
+	          try {
+	            if (!snapshotDetail) return null;
+	            return String(snapshotDetail.id || "") || null;
+	          } catch (e) {
+	            return null;
+	          }
+	        }
+
+	        function formatIsoDateYmd(value) {
+	          if (!value || typeof value !== "string" || value.length < 10) return null;
+	          try {
+	            var year = Number(value.slice(0, 4));
+	            var month = Number(value.slice(5, 7));
+	            var day = Number(value.slice(8, 10));
+	            if (!year || !month || !day) return null;
+	            var d = new Date(Date.UTC(year, month - 1, day));
+	            if (isNaN(d.getTime())) return null;
+	            return d.toLocaleDateString(UI_LOCALE_TAG, { year: "numeric", month: "short", day: "numeric" });
+	          } catch (e) {
+	            return null;
+	          }
+	        }
+
+	        function buildSnapshotDateLabel(detail) {
+	          var wb = getWbInfo();
+	          var captureLabel =
+	            (detail ? formatIsoDate(detail.captureTimestamp) : null) ||
+	            (detail ? formatIsoDateYmd(detail.captureDate) : null) ||
+	            formatTimestamp(wb.timestamp);
+	          var jobId = null;
+	          if (detail && detail.jobId != null) jobId = detail.jobId;
+	          if (jobId == null) jobId = parseJobIdFromColl(wb.coll);
+	          if (captureLabel && jobId != null) {
+	            return (
+	              captureLabel +
+	              " \u00b7 " +
+	              t("editionLabel") +
+	              " #" +
+	              String(jobId)
+	            );
+	          }
+	          if (captureLabel) return captureLabel;
+	          return null;
+	        }
+
+	        function setValueText(valueId, value, fallbackText) {
+	          var el = document.getElementById(valueId);
+	          if (!el) return;
+	          if (!value) {
+	            el.textContent = fallbackText || "";
+	            return;
+	          }
+	          el.textContent = String(value);
+	        }
+
+	        function applySnapshotDetail(detail) {
+	          if (embedded) return;
+	          try {
+	            var titleText =
+	              (detail && detail.title ? String(detail.title) : "") ||
+	              (function () {
+	                try {
+	                  return document.title || "";
+	                } catch (e) {
+	                  return "";
+	                }
+	              })();
+	            var titleEl = document.getElementById("ha-replay-top-title");
+	            if (titleEl) {
+	              titleEl.textContent = titleText;
+	              titleEl.setAttribute("title", titleText);
+	            }
+
+		            var dateLabel = buildSnapshotDateLabel(detail);
+		            setValueText("ha-replay-top-date", dateLabel, "");
+
+	            var originalUrlValue =
+	              (detail && detail.originalUrl ? String(detail.originalUrl) : "") ||
+	              (function () {
+	                try {
+	                  return getWbInfo().url || "";
+	                } catch (e) {
+	                  return "";
+	                }
+	              })();
+		            var urlEl = document.getElementById("ha-replay-top-url");
+		            if (urlEl) {
+		              var compact = compactUrl(originalUrlValue) || originalUrlValue;
+		              urlEl.textContent = compact;
+		              urlEl.setAttribute("title", originalUrlValue);
+		            }
+
+		            var disclaimerEl = document.getElementById("ha-replay-disclaimer");
+	            if (disclaimerEl) {
+	              var captureForDisclaimer =
+	                (detail ? formatIsoDate(detail.captureTimestamp) : null) ||
+	                (detail ? formatIsoDateYmd(detail.captureDate) : null) ||
+	                formatTimestamp(getWbInfo().timestamp);
+	              if (captureForDisclaimer) {
+	                disclaimerEl.textContent =
+	                  t("disclaimerPrefix") +
+	                  " " +
+	                  t("disclaimerCapturePrefix") +
+	                  " " +
+	                  captureForDisclaimer +
+	                  " " +
+	                  t("disclaimerCaptureSuffix");
+	              } else {
+	                disclaimerEl.textContent = t("disclaimerPrefix");
+	              }
+	            }
+
+	            // Intentionally omit the "Backup/Captured" meta line from the banner
+	            // to keep the header compact; the snapshot date above is the primary cue.
+	          } catch (e) {}
+	        }
+
+	        function setCompareRoute(latestSnapshotId) {
+	          if (!latestSnapshotId) return;
+	          routes.compare = haRoot + "/compare-live?to=" + latestSnapshotId + "&run=1";
+	          try {
+	            sessionStorage.setItem(COMPARE_LATEST_STORAGE_KEY, String(latestSnapshotId));
+	          } catch (e) {}
+	        }
+
+	        function loadCachedLatestSnapshotId() {
+	          try {
+	            var stored = sessionStorage.getItem(COMPARE_LATEST_STORAGE_KEY);
+	            if (stored) return stored;
+	          } catch (e) {}
+	          return null;
+	        }
+
+	        function buildResolveUrl(base, jobId, originalUrl, timestamp14) {
+	          var query = "jobId=" + encodeURIComponent(String(jobId)) + "&url=" + encodeURIComponent(originalUrl);
+	          if (timestamp14) query += "&timestamp=" + encodeURIComponent(String(timestamp14));
+	          return base + "/api/replay/resolve?" + query;
+	        }
+
+	        function buildLatestUrl(base, snapshotIdValue) {
+	          return base + "/api/snapshots/" + encodeURIComponent(String(snapshotIdValue)) + "/latest";
+	        }
+
+	        function resolveSnapshotAndLatest() {
+	          if (snapshotId && snapshotIdExplicit) {
+	            // The user is viewing a specific snapshot; do not override it by resolving
+	            // based on timestamp/original URL. We only need the "latest snapshot"
+	            // info for the View diff link.
+	            var base = apiCandidates && apiCandidates.length ? apiCandidates[0] : null;
+	            if (base) {
+	              routes.raw = base + "/api/snapshots/raw/" + snapshotId;
+	              routes.json = base + "/api/snapshot/" + snapshotId;
+	              routes.timeline = base + "/api/snapshots/" + snapshotId + "/timeline";
+	              return safeJson(buildLatestUrl(base, snapshotId), 3500)
+	                .then(function (latest) {
+	                  if (latest && latest.found && latest.snapshotId) {
+	                    setCompareRoute(String(latest.snapshotId));
+	                  } else {
+	                    setCompareRoute(snapshotId);
+	                  }
+	                })
+	                .catch(function () {});
+	            }
+	            return Promise.resolve();
+	          }
+
+	          var wb = getWbInfo();
+	          var jobId = parseJobIdFromColl(wb.coll);
+	          var originalUrl = wb.url;
+	          var timestamp14 = typeof wb.timestamp === "string" && /^\d{14}$/.test(wb.timestamp) ? wb.timestamp : null;
+
+	          if (snapshotId) {
+	            routes.browse = haRoot + "/snapshot/" + snapshotId;
+	            routes.details = haRoot + "/snapshot/" + snapshotId;
+	            routes.history = haRoot + "/snapshot/" + snapshotId + "?view=details";
+	            routes.report = buildReportUrl(snapshotId, originalUrl);
+	            routes.cite = haRoot + "/cite?snapshot=" + snapshotId;
+	            routes.raw = apiBase + "/api/snapshots/raw/" + snapshotId;
+	            routes.json = apiBase + "/api/snapshot/" + snapshotId;
+	            routes.timeline = apiBase + "/api/snapshots/" + snapshotId + "/timeline";
+	          }
+
+	          if (!jobId || !originalUrl) {
+	            var cached = loadCachedLatestSnapshotId();
+	            if (cached) setCompareRoute(cached);
+	            return Promise.resolve();
+	          }
+
+	          var bases = apiCandidates.slice();
+	          function tryResolveAt(index) {
+	            if (index >= bases.length) return Promise.resolve();
+	            var base = bases[index];
+	            var resolveUrl = buildResolveUrl(base, jobId, originalUrl, timestamp14);
+	            return safeJson(resolveUrl, 3500)
+	              .then(function (resolved) {
+	                if (!resolved || !resolved.snapshotId) return;
+	                if (resolved.mimeType != null && !isHtmlMimeType(resolved.mimeType)) return;
+	                snapshotId = String(resolved.snapshotId);
+	                try {
+	                  sessionStorage.setItem(SNAPSHOT_STORAGE_KEY, String(snapshotId));
+	                } catch (e) {}
+	                routes.browse = haRoot + "/snapshot/" + snapshotId;
+	                routes.details = haRoot + "/snapshot/" + snapshotId;
+	                routes.history = haRoot + "/snapshot/" + snapshotId + "?view=details";
+	                routes.report = buildReportUrl(snapshotId, originalUrl);
+	                routes.cite = haRoot + "/cite?snapshot=" + snapshotId;
+	                routes.raw = base + "/api/snapshots/raw/" + snapshotId;
+	                routes.json = base + "/api/snapshot/" + snapshotId;
+	                routes.timeline = base + "/api/snapshots/" + snapshotId + "/timeline";
+	                return safeJson(buildLatestUrl(base, snapshotId), 3500).then(function (latest) {
+	                  if (latest && latest.found && latest.snapshotId) {
+	                    setCompareRoute(String(latest.snapshotId));
+	                  } else {
+	                    setCompareRoute(snapshotId);
+	                  }
+	                });
+	              })
+	              .catch(function () {
+	                return tryResolveAt(index + 1);
+	              });
+	          }
+
+	          return tryResolveAt(0);
+	        }
+
+	        var snapshotDetailCache = {};
+	        var snapshotDetailPendingId = null;
+	        var snapshotDetailBaseById = {};
+
+	        function normalizeBase(value) {
+	          if (!value) return null;
+	          var s = String(value).trim();
+	          if (!s) return null;
+	          return s.replace(/\/+$/, "");
+	        }
+
+	        function uniqueBases(values) {
+	          var out = [];
+	          var seen = {};
+	          (values || []).forEach(function (v) {
+	            var base = normalizeBase(v);
+	            if (!base) return;
+	            if (seen[base]) return;
+	            seen[base] = true;
+	            out.push(base);
+	          });
+	          return out;
+	        }
+
+	        function buildSnapshotJsonUrl(base, snapshotIdValue) {
+	          return (
+	            normalizeBase(base) +
+	            "/api/snapshot/" +
+	            encodeURIComponent(String(snapshotIdValue))
+	          );
+	        }
+
+	        function fetchSnapshotDetailWithFallback(snapshotIdValue) {
+	          var baseFromRoutes = null;
+	          try {
+	            if (routes && routes.json) {
+	              var parts = String(routes.json).split("/api/snapshot/");
+	              if (parts.length > 1) baseFromRoutes = parts[0];
+	            }
+	          } catch (e) {
+	            baseFromRoutes = null;
+	          }
+
+	          var preferred = snapshotDetailBaseById[snapshotIdValue] || null;
+	          var candidates = uniqueBases([baseFromRoutes, preferred].concat(apiCandidates || []));
+
+	          function tryAt(idx) {
+	            if (idx >= candidates.length) return Promise.reject(new Error("no_api_base"));
+	            var base = candidates[idx];
+	            var url = buildSnapshotJsonUrl(base, snapshotIdValue);
+	            return safeJson(url, 3500)
+	              .then(function (detail) {
+	                return { detail: detail, base: base };
+	              })
+	              .catch(function () {
+	                return tryAt(idx + 1);
+	              });
+	          }
+
+	          return tryAt(0);
+	        }
+
+	        function updateSnapshotDetailUi() {
+	          try {
+	            if (embedded) return;
+	            if (!snapshotId) {
+	              applySnapshotDetail(null);
+	              return;
+	            }
+
+	            var cached = snapshotDetailCache[snapshotId];
+	            if (cached) {
+	              applySnapshotDetail(cached);
+	              return;
+	            }
+
+	            if (snapshotDetailPendingId === snapshotId) return;
+	            var nextSnapshotId = snapshotId;
+	            snapshotDetailPendingId = nextSnapshotId;
+
+	            fetchSnapshotDetailWithFallback(nextSnapshotId)
+	              .then(function (result) {
+	                if (!result || !result.detail) return;
+	                snapshotDetailCache[nextSnapshotId] = result.detail;
+	                snapshotDetailBaseById[nextSnapshotId] = result.base;
+	                if (routes && result.base) {
+	                  routes.raw = result.base + "/api/snapshots/raw/" + nextSnapshotId;
+	                  routes.json = result.base + "/api/snapshot/" + nextSnapshotId;
+	                  routes.timeline =
+	                    result.base + "/api/snapshots/" + nextSnapshotId + "/timeline";
+	                }
+	                if (snapshotId !== nextSnapshotId) return;
+	                applySnapshotDetail(result.detail);
+	              })
+	              .catch(function () {
+	                if (snapshotId === nextSnapshotId) applySnapshotDetail(null);
+	              })
+	              .finally(function () {
+	                if (snapshotDetailPendingId === nextSnapshotId) snapshotDetailPendingId = null;
+	              });
+	          } catch (e) {}
+	        }
+
+	        function makeRedirectBlobUrl(dest) {
+	          try {
+            function escapeHtmlAttr(value) {
+              return String(value)
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;");
+            }
+
+            function escapeHtmlText(value) {
+              return String(value)
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;");
+            }
+
+            var html =
+              "<!doctype html><meta charset=utf-8>" +
+              "<meta name=referrer content=no-referrer>" +
+              "<title>" +
+              escapeHtmlText(t("redirectTitle")) +
+              "</title>" +
+              '<meta http-equiv="refresh" content="0;url=' +
+              escapeHtmlAttr(dest) +
+              '">' +
+              "<p>" +
+              escapeHtmlText(t("redirectBody")) +
+              " <a href=" +
+              JSON.stringify(dest) +
+              ">" +
+              escapeHtmlText(dest) +
+              "</a>...</p>";
+            return URL.createObjectURL(new Blob([html], { type: "text/html" }));
+          } catch (e) {
+            return dest;
+          }
+        }
+
+	        var blobCache = {};
+
+	        function setActionHref(el, dest) {
+	          if (!el) return;
+	          try {
+	            if (!dest) {
+	              el.removeAttribute("data-ha-dest");
+	              if (el.tagName && el.tagName.toLowerCase() === "a") {
+	                el.setAttribute("href", "#");
+	                el.setAttribute("aria-disabled", "true");
+	              }
+	              return;
+	            }
+
+	            var blobUrl = blobCache[dest] || (blobCache[dest] = makeRedirectBlobUrl(dest));
+	            if (el.tagName && el.tagName.toLowerCase() === "a") {
+	              el.setAttribute("href", blobUrl);
+	              el.setAttribute("data-ha-dest", dest);
+	              el.removeAttribute("aria-disabled");
+	            } else {
+	              el.setAttribute("data-ha-dest", dest);
+	              el.removeAttribute("aria-disabled");
+	            }
+	          } catch (e) {}
+	        }
+
+	        function applyRoutes() {
+	          try {
+	            banner.querySelectorAll("[data-ha-action]").forEach(function (el) {
+	              var action = el.getAttribute("data-ha-action");
+	              var dest = routes[action];
+	              setActionHref(el, dest);
+	            });
+	          } catch (e) {}
+	        }
+
+		        function ensureActionClickHandlers() {
+		          try {
+		            banner.querySelectorAll("[data-ha-action]").forEach(function (el) {
+		              if (el._haClickBound) return;
+		              el._haClickBound = true;
+		              el.addEventListener("click", function (event) {
+		                // Allow ctrl/cmd/middle clicks to open in a new tab using the (blob) href.
+		                if (
+		                  event.button !== 0 ||
+	                  event.metaKey ||
+	                  event.ctrlKey ||
+	                  event.shiftKey ||
+	                  event.altKey
+	                ) {
+	                  return;
+	                }
+
+	                var dest = null;
+	                try {
+	                  dest = el.getAttribute("data-ha-dest");
+	                } catch (e) {
+	                  dest = null;
+	                }
+	                if (!dest) {
+	                  event.preventDefault();
+	                  event.stopPropagation();
+	                  return;
+	                }
+
+		                event.preventDefault();
+		                event.stopPropagation();
+
+		                var target = null;
+		                try {
+		                  target = el.getAttribute("target");
+		                } catch (e) {
+	                  target = null;
+	                }
+
+	                try {
+	                  if (String(target || "").toLowerCase() === "_blank") {
+	                    window.open(dest, "_blank", "noopener,noreferrer");
+	                    return;
+	                  }
+	                } catch (e) {}
+
+	                try {
+	                  if (isEmbedded() && window.top) {
+	                    window.top.location.href = dest;
+	                    return;
+	                  }
+	                } catch (e) {}
+
+	                try {
+	                  window.location.href = dest;
+	                } catch (e) {}
+	              });
+	            });
+	          } catch (e) {}
+	        }
+
+	        ensureActionClickHandlers();
+	        applyRoutes();
+	        // Ensure we start from a clean, compact state (hide optional fields and
+	        // show a best-effort snapshot date) even if API calls fail.
+	        updateSnapshotDetailUi();
+
+		        var historyOpen = false;
+		        var historyPanel = document.getElementById("ha-replay-history-panel");
+		        var historyBody = document.getElementById("ha-replay-history-body");
+		        var historyToggle = document.getElementById("ha-replay-history-toggle");
+		        var historyToggleLabel = document.getElementById("ha-replay-history-toggle-label");
+
+		        var timelineCache = {};
+		        var timelinePendingId = null;
+
+	        function formatCaptureDate(value) {
+	          if (!value || typeof value !== "string") return null;
+	          var ymd = value.trim();
+	          if (!/^\d{4}-\d{2}-\d{2}$/.test(ymd)) return formatIsoDateYmd(ymd);
+	          return formatIsoDateYmd(ymd);
+	        }
+
+		        function setHistoryToggleText(value) {
+		          if (!historyToggle) return;
+		          var next = value == null ? "" : String(value);
+		          try {
+		            if (historyToggleLabel) {
+		              historyToggleLabel.textContent = next;
+		            } else {
+		              historyToggle.textContent = next;
+		            }
+		            historyToggle.setAttribute("title", next);
+		          } catch (e) {}
+		        }
+
+		        function setHistoryToggleLabel() {
+		          if (!historyToggle) return;
+		          try {
+		            var cached = snapshotId && timelineCache[snapshotId] ? timelineCache[snapshotId] : null;
+		            setHistoryToggleText(t("historyLabel"));
+		            var count = cached && cached.snapshots ? cached.snapshots.length : null;
+		            historyToggle.disabled = count === 0;
+		          } catch (e) {
+		            historyToggle.disabled = false;
+		            setHistoryToggleText(t("historyLabel"));
+		          }
+		        }
+
+		        function containsEl(container, target) {
+		          if (!container || !target) return false;
+		          if (container === target) return true;
+		          try {
+		            return container.contains(target);
+		          } catch (e) {
+		            return false;
+		          }
+		        }
+
+		        function renderTimeline(timeline) {
+		          if (!historyBody) return;
+		          if (!timeline || !timeline.snapshots || !snapshotId) {
+		            historyBody.textContent = t("historyUnavailable");
+		            return;
+		          }
+		          var snapshots = timeline.snapshots.slice();
+		          if (!snapshots.length) {
+		            historyBody.textContent = t("historyNone");
+		            return;
+		          }
+		          historyBody.innerHTML = "";
+		          var ul = document.createElement("ul");
+		          ul.className = "ha-replay-history-list";
+		          snapshots
+		            .slice()
+		            .reverse()
+		            .forEach(function (item) {
+	              var li = document.createElement("li");
+	              li.className = "ha-replay-history-item";
+
+	              var left = document.createElement("div");
+	              var title = document.createElement("div");
+	              title.className = "ha-replay-history-item-title";
+	              title.textContent = formatCaptureDate(item.captureDate) || item.captureDate || t("unknownLabel");
+	              var subtitle = document.createElement("div");
+	              subtitle.className = "ha-replay-history-item-subtitle";
+	              subtitle.textContent =
+	                item.jobName ||
+	                (UI_LOCALE === "fr" ? "Capture d’édition" : "Edition capture");
+	              left.appendChild(title);
+	              left.appendChild(subtitle);
+
+	              var actions = document.createElement("div");
+	              actions.className = "ha-replay-history-item-actions";
+
+	              var view = document.createElement("a");
+	              view.textContent = t("historyViewLabel");
+	              view.href = item.browseUrl || (haRoot + "/snapshot/" + item.snapshotId);
+	              view.rel = "noreferrer noopener";
+	              view.target = item.browseUrl ? "_self" : "_top";
+	              actions.appendChild(view);
+
+	              if (item.compareFromSnapshotId != null) {
+	                var compare = document.createElement("a");
+	                compare.textContent = t("historyCompareLabel");
+	                var compareDest =
+	                  haRoot +
+	                  "/compare?from=" +
+	                  encodeURIComponent(String(item.compareFromSnapshotId)) +
+	                  "&to=" +
+	                  encodeURIComponent(String(item.snapshotId));
+	                compare.href = makeRedirectBlobUrl(compareDest);
+	                compare.rel = "noreferrer noopener";
+	                compare.target = "_top";
+	                actions.appendChild(compare);
+	              }
+
+	              li.appendChild(left);
+	              li.appendChild(actions);
+	              ul.appendChild(li);
+	            });
+	          historyBody.appendChild(ul);
+	        }
+
+	        function fetchTimelineIfNeeded() {
+	          if (!historyBody) return Promise.resolve();
+	          if (!snapshotId || !routes.timeline) {
+	            historyBody.textContent = t("historyUnavailable");
+	            return Promise.resolve();
+	          }
+	          if (timelineCache[snapshotId]) {
+	            renderTimeline(timelineCache[snapshotId]);
+	            setHistoryToggleLabel();
+	            return Promise.resolve();
+	          }
+	          if (timelinePendingId === snapshotId) return Promise.resolve();
+	          timelinePendingId = snapshotId;
+	          historyBody.textContent = t("historyLoading");
+	          return safeJson(routes.timeline, 4500)
+	            .then(function (timeline) {
+	              if (!timeline || !snapshotId) return;
+	              timelineCache[snapshotId] = timeline;
+	              if (timelinePendingId === snapshotId) timelinePendingId = null;
+	              renderTimeline(timeline);
+	              setHistoryToggleLabel();
+	            })
+	            .catch(function () {
+	              historyBody.textContent = t("historyUnavailable");
+	            })
+	            .finally(function () {
+	              if (timelinePendingId === snapshotId) timelinePendingId = null;
+	            });
+	        }
+
+		        function setHistoryOpen(nextOpen) {
+		          historyOpen = Boolean(nextOpen);
+		          if (historyPanel) {
+		            historyPanel.classList.toggle("is-open", historyOpen);
+		            historyPanel.setAttribute("aria-hidden", historyOpen ? "false" : "true");
+		          }
+	          if (historyToggle) historyToggle.setAttribute("aria-expanded", historyOpen ? "true" : "false");
+	          setHistoryToggleLabel();
+	          if (historyOpen) fetchTimelineIfNeeded();
+	        }
+
+		        if (historyToggle) {
+		          historyToggle.addEventListener("click", function () {
+		            setHistoryOpen(!historyOpen);
+		          });
+		          setHistoryToggleLabel();
+		        }
+
+		        document.addEventListener(
+		          "click",
+		          function (event) {
+		            var target = event ? event.target : null;
+		            try {
+		              if (
+		                historyOpen &&
+		                !containsEl(historyPanel, target) &&
+		                !containsEl(historyToggle, target)
+		              ) {
+		                setHistoryOpen(false);
+		              }
+		            } catch (e) {}
+		          },
+		          true
+		        );
+
+		        document.addEventListener(
+		          "keydown",
+		          function (event) {
+		            try {
+		              if (!event || event.key !== "Escape") return;
+		              if (!historyOpen) return;
+		              event.preventDefault();
+		              event.stopPropagation();
+		              setHistoryOpen(false);
+		              try {
+		                if (historyToggle && typeof historyToggle.focus === "function") historyToggle.focus();
+		              } catch (e) {}
+		            } catch (e) {}
+		          },
+		          true
+		        );
+
+		        var refreshTimer = null;
+		        refreshCompareLink = function () {
+	          if (refreshTimer) clearTimeout(refreshTimer);
+	          refreshTimer = setTimeout(function () {
+	            resolveSnapshotAndLatest()
+	              .finally(function () {
+	                applyRoutes();
+	                updateSnapshotDetailUi();
+	                if (historyOpen) fetchTimelineIfNeeded();
+	                setHistoryToggleLabel();
+	              })
+	              .catch(function () {});
+	          }, 250);
+	        };
+
+	        refreshCompareLink();
+	      } catch (e) {}
+	    }
+
+	    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", inject, { once: true });
+    } else {
+      inject();
+    }
+  })();
+</script>

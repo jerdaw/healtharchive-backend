@@ -1,0 +1,5028 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "HealthArchive Backend API",
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/metrics": {
+      "get": {
+        "summary": "Metrics",
+        "description": "Prometheus-style metrics endpoint summarising jobs and snapshots.",
+        "operationId": "metrics_metrics_get",
+        "parameters": [
+          {
+            "name": "Authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "X-Admin-Token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/reports": {
+      "post": {
+        "summary": "Submit Issue Report",
+        "description": "Accept a public issue report submission.\n\nThis endpoint intentionally collects minimal data and does not accept\nattachments. Reports are meant for metadata errors, broken snapshots,\nmissing coverage, or takedown requests.",
+        "operationId": "submit_issue_report_api_reports_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IssueReportCreateSchema"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IssueReportReceiptSchema"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/usage": {
+      "get": {
+        "summary": "Get Usage Metrics",
+        "description": "Return aggregated usage metrics (daily counts).",
+        "operationId": "get_usage_metrics_api_usage_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UsageMetricsSchema"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/exports": {
+      "get": {
+        "summary": "Get Exports Manifest",
+        "description": "Describe the public export endpoints and limits.",
+        "operationId": "get_exports_manifest_api_exports_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExportManifestSchema"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/exports/snapshots": {
+      "get": {
+        "summary": "Export Snapshots",
+        "description": "Stream snapshot metadata exports in JSONL or CSV format.",
+        "operationId": "export_snapshots_api_exports_snapshots_get",
+        "parameters": [
+          {
+            "name": "format",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "jsonl",
+              "title": "Format"
+            }
+          },
+          {
+            "name": "compressed",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": true,
+              "title": "Compressed"
+            }
+          },
+          {
+            "name": "source",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Source"
+            }
+          },
+          {
+            "name": "afterId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Afterid"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "From"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "To"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "head": {
+        "summary": "Export Snapshots Head",
+        "description": "Return headers for snapshot exports without streaming a body.\n\nSome clients use HEAD requests (`curl -I`) to inspect download headers.",
+        "operationId": "export_snapshots_head_api_exports_snapshots_head",
+        "parameters": [
+          {
+            "name": "format",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "jsonl",
+              "title": "Format"
+            }
+          },
+          {
+            "name": "compressed",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": true,
+              "title": "Compressed"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/exports/changes": {
+      "get": {
+        "summary": "Export Changes",
+        "description": "Stream change event exports in JSONL or CSV format.",
+        "operationId": "export_changes_api_exports_changes_get",
+        "parameters": [
+          {
+            "name": "format",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "jsonl",
+              "title": "Format"
+            }
+          },
+          {
+            "name": "compressed",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": true,
+              "title": "Compressed"
+            }
+          },
+          {
+            "name": "source",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Source"
+            }
+          },
+          {
+            "name": "afterId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Afterid"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "From"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "To"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "head": {
+        "summary": "Export Changes Head",
+        "description": "Return headers for change exports without streaming a body.\n\nSome clients use HEAD requests (`curl -I`) to inspect download headers.",
+        "operationId": "export_changes_head_api_exports_changes_head",
+        "parameters": [
+          {
+            "name": "format",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "default": "jsonl",
+              "title": "Format"
+            }
+          },
+          {
+            "name": "compressed",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": true,
+              "title": "Compressed"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/changes": {
+      "get": {
+        "summary": "List Changes",
+        "description": "Return a feed of precomputed change events.",
+        "operationId": "list_changes_api_changes_get",
+        "parameters": [
+          {
+            "name": "source",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Source"
+            }
+          },
+          {
+            "name": "jobId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Jobid"
+            }
+          },
+          {
+            "name": "latest",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Latest"
+            }
+          },
+          {
+            "name": "includeUnchanged",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Includeunchanged"
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "From"
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "To"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1,
+              "title": "Page"
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Pagesize"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChangeFeedSchema"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/changes/compare": {
+      "get": {
+        "summary": "Get Change Compare",
+        "description": "Return a precomputed diff between two snapshots.",
+        "operationId": "get_change_compare_api_changes_compare_get",
+        "parameters": [
+          {
+            "name": "toSnapshotId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "title": "Tosnapshotid"
+            }
+          },
+          {
+            "name": "fromSnapshotId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Fromsnapshotid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChangeCompareSchema"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/snapshots/{snapshot_id}/compare-live": {
+      "get": {
+        "summary": "Get Compare Live",
+        "description": "Return a live diff between an archived snapshot and the current URL.",
+        "operationId": "get_compare_live_api_snapshots__snapshot_id__compare_live_get",
+        "parameters": [
+          {
+            "name": "snapshot_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Snapshot Id"
+            }
+          },
+          {
+            "name": "mode",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^(main|full)$",
+              "default": "main",
+              "title": "Mode"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CompareLiveSchema"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/snapshots/{snapshot_id}/latest": {
+      "get": {
+        "summary": "Get Snapshot Latest",
+        "description": "Return the most recent snapshot for the same normalized_url_group as snapshot_id.",
+        "operationId": "get_snapshot_latest_api_snapshots__snapshot_id__latest_get",
+        "parameters": [
+          {
+            "name": "snapshot_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Snapshot Id"
+            }
+          },
+          {
+            "name": "requireHtml",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "When true (default), only return the most recent HTML snapshot for this page group.",
+              "default": true,
+              "title": "Requirehtml"
+            },
+            "description": "When true (default), only return the most recent HTML snapshot for this page group."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SnapshotLatestSchema"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/snapshots/{snapshot_id}/timeline": {
+      "get": {
+        "summary": "Get Snapshot Timeline",
+        "description": "Return a timeline of captures for the same normalized URL group.",
+        "operationId": "get_snapshot_timeline_api_snapshots__snapshot_id__timeline_get",
+        "parameters": [
+          {
+            "name": "snapshot_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Snapshot Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SnapshotTimelineSchema"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/changes/rss": {
+      "get": {
+        "summary": "Get Changes Rss",
+        "description": "Return an RSS feed for the latest change events.",
+        "operationId": "get_changes_rss_api_changes_rss_get",
+        "parameters": [
+          {
+            "name": "source",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Source"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/health": {
+      "get": {
+        "summary": "Health Check",
+        "description": "Health endpoint with basic database and summary checks.",
+        "operationId": "health_check_api_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      },
+      "head": {
+        "summary": "Health Check Head",
+        "description": "HEAD variant of the health endpoint.\n\nSome external uptime monitors issue HEAD requests by default; this route\nmirrors the GET health check status code without returning a body.",
+        "operationId": "health_check_head_api_health_head",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/stats": {
+      "get": {
+        "summary": "Get Archive Stats",
+        "description": "Public archive stats used by the frontend (homepage snapshot metrics).\n\nKeep this lightweight and cacheable; it should not leak admin-only details.",
+        "operationId": "get_archive_stats_api_stats_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ArchiveStatsSchema"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sources": {
+      "get": {
+        "summary": "List Sources",
+        "description": "Return per-source summary statistics derived from Snapshot data.",
+        "operationId": "list_sources_api_sources_get",
+        "parameters": [
+          {
+            "name": "lang",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^(en|fr)$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Lang"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SourceSummarySchema"
+                  },
+                  "title": "Response List Sources Api Sources Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sources/{source_code}/editions": {
+      "get": {
+        "summary": "List Source Editions",
+        "description": "Return replayable \"editions\" (ArchiveJobs) for a source.\n\nEach indexed ArchiveJob becomes a discrete edition in the replay service\n(`job-<id>` collection). The frontend uses this to power edition switching.",
+        "operationId": "list_source_editions_api_sources__source_code__editions_get",
+        "parameters": [
+          {
+            "name": "source_code",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Source Code"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SourceEditionSchema"
+                  },
+                  "title": "Response List Source Editions Api Sources  Source Code  Editions Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sources/{source_code}/preview": {
+      "get": {
+        "summary": "Get Source Preview",
+        "description": "Return a cached preview image for a source's replay homepage.\n\nThese previews are generated out-of-band (e.g. via an operator script) and\nstored on disk under HEALTHARCHIVE_REPLAY_PREVIEW_DIR.",
+        "operationId": "get_source_preview_api_sources__source_code__preview_get",
+        "parameters": [
+          {
+            "name": "source_code",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Source Code"
+            }
+          },
+          {
+            "name": "jobId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "title": "Jobid"
+            }
+          },
+          {
+            "name": "lang",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^(en|fr)$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Lang"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "head": {
+        "summary": "Get Source Preview",
+        "description": "Return a cached preview image for a source's replay homepage.\n\nThese previews are generated out-of-band (e.g. via an operator script) and\nstored on disk under HEALTHARCHIVE_REPLAY_PREVIEW_DIR.",
+        "operationId": "get_source_preview_api_sources__source_code__preview_get",
+        "parameters": [
+          {
+            "name": "source_code",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Source Code"
+            }
+          },
+          {
+            "name": "jobId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "title": "Jobid"
+            }
+          },
+          {
+            "name": "lang",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^(en|fr)$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Lang"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/replay/resolve": {
+      "get": {
+        "summary": "Resolve Replay Url",
+        "description": "Resolve a replay URL within a specific job (pywb collection).\n\nUsed by the frontend edition-switching UI to determine whether the current\noriginal URL exists in another job, and if so, which capture timestamp to\nreplay.",
+        "operationId": "resolve_replay_url_api_replay_resolve_get",
+        "parameters": [
+          {
+            "name": "jobId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "title": "Jobid"
+            }
+          },
+          {
+            "name": "url",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4096,
+              "title": "Url"
+            }
+          },
+          {
+            "name": "timestamp",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^\\d{14}$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Timestamp"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReplayResolveSchema"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/search": {
+      "get": {
+        "summary": "Search Snapshots",
+        "description": "Search snapshots by keyword and/or source with simple pagination.",
+        "operationId": "search_snapshots_api_search_get",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 256
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Q"
+            }
+          },
+          {
+            "name": "source",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 16,
+                  "pattern": "^[a-z0-9-]+$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Source"
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/SearchSort"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Sort"
+            }
+          },
+          {
+            "name": "view",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/SearchView"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "View"
+            }
+          },
+          {
+            "name": "includeNon2xx",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Includenon2Xx"
+            }
+          },
+          {
+            "name": "includeDuplicates",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "When view=snapshots, include same-day duplicate captures with identical content.",
+              "default": false,
+              "title": "Includeduplicates"
+            },
+            "description": "When view=snapshots, include same-day duplicate captures with identical content."
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter captures from this UTC date (YYYY-MM-DD), inclusive.",
+              "title": "From"
+            },
+            "description": "Filter captures from this UTC date (YYYY-MM-DD), inclusive."
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Filter captures up to this UTC date (YYYY-MM-DD), inclusive.",
+              "title": "To"
+            },
+            "description": "Filter captures up to this UTC date (YYYY-MM-DD), inclusive."
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1,
+              "title": "Page"
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Pagesize"
+            }
+          },
+          {
+            "name": "ranking",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^(v1|v2)$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Ranking version override (v1|v2). Default is controlled by HA_SEARCH_RANKING_VERSION.",
+              "title": "Ranking"
+            },
+            "description": "Ranking version override (v1|v2). Default is controlled by HA_SEARCH_RANKING_VERSION."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchResponseSchema"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/snapshot/{snapshot_id}": {
+      "get": {
+        "summary": "Get Snapshot Detail",
+        "description": "Return metadata for a single snapshot.",
+        "operationId": "get_snapshot_detail_api_snapshot__snapshot_id__get",
+        "parameters": [
+          {
+            "name": "snapshot_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Snapshot Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SnapshotDetailSchema"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/snapshots/raw/{snapshot_id}": {
+      "get": {
+        "summary": "Get Snapshot Raw",
+        "description": "Serve raw HTML content for a snapshot by reading the underlying WARC record.",
+        "operationId": "get_snapshot_raw_api_snapshots_raw__snapshot_id__get",
+        "parameters": [
+          {
+            "name": "snapshot_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Snapshot Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/jobs": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "List Jobs",
+        "description": "List archive jobs with optional filtering by source code and status.",
+        "operationId": "list_jobs_api_admin_jobs_get",
+        "parameters": [
+          {
+            "name": "source",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Source"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "X-Admin-Token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobListResponseSchema"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/jobs/status-counts": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Job Status Counts",
+        "description": "Return counts of jobs grouped by status.",
+        "operationId": "job_status_counts_api_admin_jobs_status_counts_get",
+        "parameters": [
+          {
+            "name": "Authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "X-Admin-Token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobStatusCountsSchema"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/jobs/{job_id}": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Get Job Detail",
+        "description": "Return detailed information about a single job.",
+        "operationId": "get_job_detail_api_admin_jobs__job_id__get",
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Job Id"
+            }
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "X-Admin-Token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobDetailSchema"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/jobs/{job_id}/snapshots": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "List Job Snapshots",
+        "description": "List snapshots associated with a given job.",
+        "operationId": "list_job_snapshots_api_admin_jobs__job_id__snapshots_get",
+        "parameters": [
+          {
+            "name": "job_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Job Id"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "X-Admin-Token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/JobSnapshotSummarySchema"
+                  },
+                  "title": "Response List Job Snapshots Api Admin Jobs  Job Id  Snapshots Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/reports": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "List Issue Reports",
+        "description": "List issue reports submitted via the public intake form.",
+        "operationId": "list_issue_reports_api_admin_reports_get",
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "name": "category",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Category"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 500,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "X-Admin-Token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IssueReportListResponseSchema"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/reports/{report_id}": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Get Issue Report",
+        "description": "Fetch a single issue report by ID.",
+        "operationId": "get_issue_report_api_admin_reports__report_id__get",
+        "parameters": [
+          {
+            "name": "report_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Report Id"
+            }
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "X-Admin-Token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IssueReportDetailSchema"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/admin/search-debug": {
+      "get": {
+        "tags": [
+          "admin"
+        ],
+        "summary": "Search Debug",
+        "description": "Admin-only debug endpoint for search relevance.\n\nReturns the same ordering as /api/search but with a score breakdown.",
+        "operationId": "search_debug_api_admin_search_debug_get",
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 256
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Q"
+            }
+          },
+          {
+            "name": "source",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 16
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Source"
+            }
+          },
+          {
+            "name": "sort",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/SearchSort"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Sort"
+            }
+          },
+          {
+            "name": "view",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/SearchView"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "View"
+            }
+          },
+          {
+            "name": "includeNon2xx",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "default": false,
+              "title": "Includenon2Xx"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1,
+              "title": "Page"
+            }
+          },
+          {
+            "name": "pageSize",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Pagesize"
+            }
+          },
+          {
+            "name": "ranking",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^(v1|v2)$"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Ranking"
+            }
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Authorization"
+            }
+          },
+          {
+            "name": "X-Admin-Token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Admin-Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchDebugResponseSchema"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ArchiveStatsSchema": {
+        "properties": {
+          "snapshotsTotal": {
+            "type": "integer",
+            "title": "Snapshotstotal"
+          },
+          "pagesTotal": {
+            "type": "integer",
+            "title": "Pagestotal"
+          },
+          "sourcesTotal": {
+            "type": "integer",
+            "title": "Sourcestotal"
+          },
+          "latestCaptureDate": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latestcapturedate"
+          },
+          "latestCaptureAgeDays": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latestcaptureagedays"
+          }
+        },
+        "type": "object",
+        "required": [
+          "snapshotsTotal",
+          "pagesTotal",
+          "sourcesTotal",
+          "latestCaptureDate",
+          "latestCaptureAgeDays"
+        ],
+        "title": "ArchiveStatsSchema"
+      },
+      "ChangeCompareSchema": {
+        "properties": {
+          "event": {
+            "$ref": "#/components/schemas/ChangeEventSchema"
+          },
+          "fromSnapshot": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ChangeCompareSnapshotSchema"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "toSnapshot": {
+            "$ref": "#/components/schemas/ChangeCompareSnapshotSchema"
+          },
+          "diffFormat": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Diffformat"
+          },
+          "diffHtml": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Diffhtml"
+          },
+          "diffTruncated": {
+            "type": "boolean",
+            "title": "Difftruncated"
+          },
+          "diffVersion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Diffversion"
+          },
+          "normalizationVersion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Normalizationversion"
+          }
+        },
+        "type": "object",
+        "required": [
+          "event",
+          "fromSnapshot",
+          "toSnapshot",
+          "diffFormat",
+          "diffHtml",
+          "diffTruncated",
+          "diffVersion",
+          "normalizationVersion"
+        ],
+        "title": "ChangeCompareSchema"
+      },
+      "ChangeCompareSnapshotSchema": {
+        "properties": {
+          "snapshotId": {
+            "type": "integer",
+            "title": "Snapshotid"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "captureDate": {
+            "type": "string",
+            "title": "Capturedate"
+          },
+          "captureTimestamp": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Capturetimestamp"
+          },
+          "originalUrl": {
+            "type": "string",
+            "title": "Originalurl"
+          },
+          "jobId": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Jobid"
+          },
+          "jobName": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Jobname"
+          }
+        },
+        "type": "object",
+        "required": [
+          "snapshotId",
+          "title",
+          "captureDate",
+          "captureTimestamp",
+          "originalUrl",
+          "jobId",
+          "jobName"
+        ],
+        "title": "ChangeCompareSnapshotSchema"
+      },
+      "ChangeEventSchema": {
+        "properties": {
+          "changeId": {
+            "type": "integer",
+            "title": "Changeid"
+          },
+          "changeType": {
+            "type": "string",
+            "title": "Changetype"
+          },
+          "summary": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Summary"
+          },
+          "highNoise": {
+            "type": "boolean",
+            "title": "Highnoise"
+          },
+          "diffAvailable": {
+            "type": "boolean",
+            "title": "Diffavailable"
+          },
+          "sourceCode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sourcecode"
+          },
+          "sourceName": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sourcename"
+          },
+          "normalizedUrlGroup": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Normalizedurlgroup"
+          },
+          "fromSnapshotId": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fromsnapshotid"
+          },
+          "toSnapshotId": {
+            "type": "integer",
+            "title": "Tosnapshotid"
+          },
+          "fromCaptureTimestamp": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fromcapturetimestamp"
+          },
+          "toCaptureTimestamp": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tocapturetimestamp"
+          },
+          "fromJobId": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fromjobid"
+          },
+          "toJobId": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tojobid"
+          },
+          "addedSections": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Addedsections"
+          },
+          "removedSections": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Removedsections"
+          },
+          "changedSections": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Changedsections"
+          },
+          "addedLines": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Addedlines"
+          },
+          "removedLines": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Removedlines"
+          },
+          "changeRatio": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Changeratio"
+          }
+        },
+        "type": "object",
+        "required": [
+          "changeId",
+          "changeType",
+          "summary",
+          "highNoise",
+          "diffAvailable",
+          "sourceCode",
+          "sourceName",
+          "normalizedUrlGroup",
+          "fromSnapshotId",
+          "toSnapshotId",
+          "fromCaptureTimestamp",
+          "toCaptureTimestamp",
+          "fromJobId",
+          "toJobId",
+          "addedSections",
+          "removedSections",
+          "changedSections",
+          "addedLines",
+          "removedLines",
+          "changeRatio"
+        ],
+        "title": "ChangeEventSchema"
+      },
+      "ChangeFeedSchema": {
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "page": {
+            "type": "integer",
+            "title": "Page"
+          },
+          "pageSize": {
+            "type": "integer",
+            "title": "Pagesize"
+          },
+          "results": {
+            "items": {
+              "$ref": "#/components/schemas/ChangeEventSchema"
+            },
+            "type": "array",
+            "title": "Results"
+          }
+        },
+        "type": "object",
+        "required": [
+          "enabled",
+          "total",
+          "page",
+          "pageSize",
+          "results"
+        ],
+        "title": "ChangeFeedSchema"
+      },
+      "CompareLiveDiffSchema": {
+        "properties": {
+          "diffFormat": {
+            "type": "string",
+            "title": "Diffformat"
+          },
+          "diffHtml": {
+            "type": "string",
+            "title": "Diffhtml"
+          },
+          "diffTruncated": {
+            "type": "boolean",
+            "title": "Difftruncated"
+          },
+          "diffVersion": {
+            "type": "string",
+            "title": "Diffversion"
+          },
+          "normalizationVersion": {
+            "type": "string",
+            "title": "Normalizationversion"
+          }
+        },
+        "type": "object",
+        "required": [
+          "diffFormat",
+          "diffHtml",
+          "diffTruncated",
+          "diffVersion",
+          "normalizationVersion"
+        ],
+        "title": "CompareLiveDiffSchema"
+      },
+      "CompareLiveFetchSchema": {
+        "properties": {
+          "requestedUrl": {
+            "type": "string",
+            "title": "Requestedurl"
+          },
+          "finalUrl": {
+            "type": "string",
+            "title": "Finalurl"
+          },
+          "statusCode": {
+            "type": "integer",
+            "title": "Statuscode"
+          },
+          "contentType": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contenttype"
+          },
+          "bytesRead": {
+            "type": "integer",
+            "title": "Bytesread"
+          },
+          "fetchedAt": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Fetchedat"
+          }
+        },
+        "type": "object",
+        "required": [
+          "requestedUrl",
+          "finalUrl",
+          "statusCode",
+          "contentType",
+          "bytesRead",
+          "fetchedAt"
+        ],
+        "title": "CompareLiveFetchSchema"
+      },
+      "CompareLiveRenderInstructionSchema": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "title": "Type"
+          },
+          "lineIndexA": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lineindexa"
+          },
+          "lineIndexB": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lineindexb"
+          }
+        },
+        "type": "object",
+        "required": [
+          "type"
+        ],
+        "title": "CompareLiveRenderInstructionSchema"
+      },
+      "CompareLiveRenderSchema": {
+        "properties": {
+          "archivedLines": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Archivedlines"
+          },
+          "liveLines": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Livelines"
+          },
+          "renderInstructions": {
+            "items": {
+              "$ref": "#/components/schemas/CompareLiveRenderInstructionSchema"
+            },
+            "type": "array",
+            "title": "Renderinstructions"
+          },
+          "renderTruncated": {
+            "type": "boolean",
+            "title": "Rendertruncated"
+          },
+          "renderLineLimit": {
+            "type": "integer",
+            "title": "Renderlinelimit"
+          }
+        },
+        "type": "object",
+        "required": [
+          "archivedLines",
+          "liveLines",
+          "renderInstructions",
+          "renderTruncated",
+          "renderLineLimit"
+        ],
+        "title": "CompareLiveRenderSchema"
+      },
+      "CompareLiveSchema": {
+        "properties": {
+          "archivedSnapshot": {
+            "$ref": "#/components/schemas/ChangeCompareSnapshotSchema"
+          },
+          "liveFetch": {
+            "$ref": "#/components/schemas/CompareLiveFetchSchema"
+          },
+          "stats": {
+            "$ref": "#/components/schemas/CompareLiveStatsSchema"
+          },
+          "diff": {
+            "$ref": "#/components/schemas/CompareLiveDiffSchema"
+          },
+          "render": {
+            "$ref": "#/components/schemas/CompareLiveRenderSchema"
+          },
+          "textModeRequested": {
+            "type": "string",
+            "title": "Textmoderequested"
+          },
+          "textModeUsed": {
+            "type": "string",
+            "title": "Textmodeused"
+          },
+          "textModeFallback": {
+            "type": "boolean",
+            "title": "Textmodefallback"
+          }
+        },
+        "type": "object",
+        "required": [
+          "archivedSnapshot",
+          "liveFetch",
+          "stats",
+          "diff",
+          "render",
+          "textModeRequested",
+          "textModeUsed",
+          "textModeFallback"
+        ],
+        "title": "CompareLiveSchema"
+      },
+      "CompareLiveStatsSchema": {
+        "properties": {
+          "summary": {
+            "type": "string",
+            "title": "Summary"
+          },
+          "addedSections": {
+            "type": "integer",
+            "title": "Addedsections"
+          },
+          "removedSections": {
+            "type": "integer",
+            "title": "Removedsections"
+          },
+          "changedSections": {
+            "type": "integer",
+            "title": "Changedsections"
+          },
+          "addedLines": {
+            "type": "integer",
+            "title": "Addedlines"
+          },
+          "removedLines": {
+            "type": "integer",
+            "title": "Removedlines"
+          },
+          "changeRatio": {
+            "type": "number",
+            "title": "Changeratio"
+          },
+          "highNoise": {
+            "type": "boolean",
+            "title": "Highnoise"
+          }
+        },
+        "type": "object",
+        "required": [
+          "summary",
+          "addedSections",
+          "removedSections",
+          "changedSections",
+          "addedLines",
+          "removedLines",
+          "changeRatio",
+          "highNoise"
+        ],
+        "title": "CompareLiveStatsSchema"
+      },
+      "ExportManifestSchema": {
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled"
+          },
+          "formats": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Formats"
+          },
+          "defaultLimit": {
+            "type": "integer",
+            "title": "Defaultlimit"
+          },
+          "maxLimit": {
+            "type": "integer",
+            "title": "Maxlimit"
+          },
+          "dataDictionaryUrl": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Datadictionaryurl"
+          },
+          "snapshots": {
+            "$ref": "#/components/schemas/ExportResourceSchema"
+          },
+          "changes": {
+            "$ref": "#/components/schemas/ExportResourceSchema"
+          }
+        },
+        "type": "object",
+        "required": [
+          "enabled",
+          "formats",
+          "defaultLimit",
+          "maxLimit",
+          "snapshots",
+          "changes"
+        ],
+        "title": "ExportManifestSchema"
+      },
+      "ExportResourceSchema": {
+        "properties": {
+          "path": {
+            "type": "string",
+            "title": "Path"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "formats": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Formats"
+          }
+        },
+        "type": "object",
+        "required": [
+          "path",
+          "description",
+          "formats"
+        ],
+        "title": "ExportResourceSchema"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "IssueReportCategory": {
+        "type": "string",
+        "enum": [
+          "broken_snapshot",
+          "incorrect_metadata",
+          "missing_snapshot",
+          "takedown",
+          "general_feedback"
+        ],
+        "title": "IssueReportCategory"
+      },
+      "IssueReportCreateSchema": {
+        "properties": {
+          "category": {
+            "$ref": "#/components/schemas/IssueReportCategory"
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 4000,
+            "minLength": 20,
+            "title": "Description"
+          },
+          "snapshotId": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Snapshotid"
+          },
+          "originalUrl": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 4096
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Originalurl"
+          },
+          "reporterEmail": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reporteremail"
+          },
+          "pageUrl": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 4096
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pageurl"
+          },
+          "website": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Website"
+          }
+        },
+        "type": "object",
+        "required": [
+          "category",
+          "description"
+        ],
+        "title": "IssueReportCreateSchema"
+      },
+      "IssueReportDetailSchema": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "category": {
+            "type": "string",
+            "title": "Category"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Createdat"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updatedat"
+          },
+          "snapshotId": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Snapshotid"
+          },
+          "originalUrl": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Originalurl"
+          },
+          "pageUrl": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pageurl"
+          },
+          "reporterEmail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reporteremail"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "internalNotes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Internalnotes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "category",
+          "status",
+          "createdAt",
+          "updatedAt",
+          "snapshotId",
+          "originalUrl",
+          "pageUrl",
+          "reporterEmail",
+          "description",
+          "internalNotes"
+        ],
+        "title": "IssueReportDetailSchema"
+      },
+      "IssueReportListResponseSchema": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/IssueReportSummarySchema"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit"
+          },
+          "offset": {
+            "type": "integer",
+            "title": "Offset"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "limit",
+          "offset"
+        ],
+        "title": "IssueReportListResponseSchema"
+      },
+      "IssueReportReceiptSchema": {
+        "properties": {
+          "reportId": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reportid"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "receivedAt": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Receivedat"
+          }
+        },
+        "type": "object",
+        "required": [
+          "reportId",
+          "status",
+          "receivedAt"
+        ],
+        "title": "IssueReportReceiptSchema"
+      },
+      "IssueReportSummarySchema": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "category": {
+            "type": "string",
+            "title": "Category"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Createdat"
+          },
+          "snapshotId": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Snapshotid"
+          },
+          "originalUrl": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Originalurl"
+          },
+          "pageUrl": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pageurl"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "category",
+          "status",
+          "createdAt",
+          "snapshotId",
+          "originalUrl",
+          "pageUrl"
+        ],
+        "title": "IssueReportSummarySchema"
+      },
+      "JobDetailSchema": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "sourceCode": {
+            "type": "string",
+            "title": "Sourcecode"
+          },
+          "sourceName": {
+            "type": "string",
+            "title": "Sourcename"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "retryCount": {
+            "type": "integer",
+            "title": "Retrycount"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Createdat"
+          },
+          "queuedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Queuedat"
+          },
+          "startedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Startedat"
+          },
+          "finishedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finishedat"
+          },
+          "cleanupStatus": {
+            "type": "string",
+            "title": "Cleanupstatus"
+          },
+          "cleanedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cleanedat"
+          },
+          "outputDir": {
+            "type": "string",
+            "title": "Outputdir"
+          },
+          "crawlerExitCode": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Crawlerexitcode"
+          },
+          "crawlerStatus": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Crawlerstatus"
+          },
+          "crawlerStage": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Crawlerstage"
+          },
+          "warcFileCount": {
+            "type": "integer",
+            "title": "Warcfilecount"
+          },
+          "warcBytesTotal": {
+            "type": "integer",
+            "title": "Warcbytestotal"
+          },
+          "indexedPageCount": {
+            "type": "integer",
+            "title": "Indexedpagecount"
+          },
+          "pagesCrawled": {
+            "type": "integer",
+            "title": "Pagescrawled"
+          },
+          "pagesTotal": {
+            "type": "integer",
+            "title": "Pagestotal"
+          },
+          "pagesFailed": {
+            "type": "integer",
+            "title": "Pagesfailed"
+          },
+          "outputBytesTotal": {
+            "type": "integer",
+            "title": "Outputbytestotal"
+          },
+          "tmpBytesTotal": {
+            "type": "integer",
+            "title": "Tmpbytestotal"
+          },
+          "tmpNonWarcBytesTotal": {
+            "type": "integer",
+            "title": "Tmpnonwarcbytestotal"
+          },
+          "storageScannedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Storagescannedat"
+          },
+          "finalZimPath": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finalzimpath"
+          },
+          "combinedLogPath": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Combinedlogpath"
+          },
+          "stateFilePath": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Statefilepath"
+          },
+          "config": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Config"
+          },
+          "lastStats": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Laststats"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "sourceCode",
+          "sourceName",
+          "name",
+          "status",
+          "retryCount",
+          "createdAt",
+          "queuedAt",
+          "startedAt",
+          "finishedAt",
+          "cleanupStatus",
+          "cleanedAt",
+          "outputDir",
+          "crawlerExitCode",
+          "crawlerStatus",
+          "crawlerStage",
+          "warcFileCount",
+          "warcBytesTotal",
+          "indexedPageCount",
+          "pagesCrawled",
+          "pagesTotal",
+          "pagesFailed",
+          "outputBytesTotal",
+          "tmpBytesTotal",
+          "tmpNonWarcBytesTotal",
+          "finalZimPath",
+          "combinedLogPath",
+          "stateFilePath",
+          "config",
+          "lastStats"
+        ],
+        "title": "JobDetailSchema"
+      },
+      "JobListResponseSchema": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/JobSummarySchema"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit"
+          },
+          "offset": {
+            "type": "integer",
+            "title": "Offset"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "total",
+          "limit",
+          "offset"
+        ],
+        "title": "JobListResponseSchema"
+      },
+      "JobSnapshotSummarySchema": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "url": {
+            "type": "string",
+            "title": "Url"
+          },
+          "captureTimestamp": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Capturetimestamp"
+          },
+          "statusCode": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Statuscode"
+          },
+          "language": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Language"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "url",
+          "captureTimestamp",
+          "statusCode",
+          "language",
+          "title"
+        ],
+        "title": "JobSnapshotSummarySchema"
+      },
+      "JobStatusCountsSchema": {
+        "properties": {
+          "counts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Counts"
+          }
+        },
+        "type": "object",
+        "required": [
+          "counts"
+        ],
+        "title": "JobStatusCountsSchema"
+      },
+      "JobSummarySchema": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "sourceCode": {
+            "type": "string",
+            "title": "Sourcecode"
+          },
+          "sourceName": {
+            "type": "string",
+            "title": "Sourcename"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "retryCount": {
+            "type": "integer",
+            "title": "Retrycount"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Createdat"
+          },
+          "queuedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Queuedat"
+          },
+          "startedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Startedat"
+          },
+          "finishedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finishedat"
+          },
+          "cleanupStatus": {
+            "type": "string",
+            "title": "Cleanupstatus"
+          },
+          "cleanedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cleanedat"
+          },
+          "crawlerExitCode": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Crawlerexitcode"
+          },
+          "crawlerStatus": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Crawlerstatus"
+          },
+          "warcFileCount": {
+            "type": "integer",
+            "title": "Warcfilecount"
+          },
+          "warcBytesTotal": {
+            "type": "integer",
+            "title": "Warcbytestotal"
+          },
+          "indexedPageCount": {
+            "type": "integer",
+            "title": "Indexedpagecount"
+          },
+          "storageScannedAt": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Storagescannedat"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "sourceCode",
+          "sourceName",
+          "name",
+          "status",
+          "retryCount",
+          "createdAt",
+          "queuedAt",
+          "startedAt",
+          "finishedAt",
+          "cleanupStatus",
+          "cleanedAt",
+          "crawlerExitCode",
+          "crawlerStatus",
+          "warcFileCount",
+          "warcBytesTotal",
+          "indexedPageCount"
+        ],
+        "title": "JobSummarySchema"
+      },
+      "ReplayResolveSchema": {
+        "properties": {
+          "found": {
+            "type": "boolean",
+            "title": "Found"
+          },
+          "snapshotId": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Snapshotid"
+          },
+          "captureTimestamp": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Capturetimestamp"
+          },
+          "resolvedUrl": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resolvedurl"
+          },
+          "browseUrl": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Browseurl"
+          },
+          "mimeType": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mimetype"
+          }
+        },
+        "type": "object",
+        "required": [
+          "found"
+        ],
+        "title": "ReplayResolveSchema"
+      },
+      "SearchDebugItemSchema": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "sourceCode": {
+            "type": "string",
+            "title": "Sourcecode"
+          },
+          "sourceName": {
+            "type": "string",
+            "title": "Sourcename"
+          },
+          "language": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Language"
+          },
+          "captureTimestamp": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Capturetimestamp"
+          },
+          "statusCode": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Statuscode"
+          },
+          "originalUrl": {
+            "type": "string",
+            "title": "Originalurl"
+          },
+          "normalizedUrlGroup": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Normalizedurlgroup"
+          },
+          "inlinkCount": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Inlinkcount"
+          },
+          "outlinkCount": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outlinkcount"
+          },
+          "pagerank": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pagerank"
+          },
+          "rankText": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ranktext"
+          },
+          "titleBoost": {
+            "type": "number",
+            "title": "Titleboost"
+          },
+          "archivedPenalty": {
+            "type": "number",
+            "title": "Archivedpenalty"
+          },
+          "queryPenalty": {
+            "type": "number",
+            "title": "Querypenalty"
+          },
+          "trackingPenalty": {
+            "type": "number",
+            "title": "Trackingpenalty"
+          },
+          "depthPenalty": {
+            "type": "number",
+            "title": "Depthpenalty"
+          },
+          "authorityBoost": {
+            "type": "number",
+            "title": "Authorityboost"
+          },
+          "hubnessBoost": {
+            "type": "number",
+            "title": "Hubnessboost"
+          },
+          "pagerankBoost": {
+            "type": "number",
+            "title": "Pagerankboost"
+          },
+          "totalScore": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Totalscore"
+          },
+          "groupScore": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Groupscore"
+          },
+          "bestSnapshotId": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Bestsnapshotid"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "sourceCode",
+          "sourceName",
+          "language",
+          "captureTimestamp",
+          "statusCode",
+          "originalUrl",
+          "normalizedUrlGroup",
+          "inlinkCount",
+          "outlinkCount",
+          "pagerank",
+          "rankText",
+          "titleBoost",
+          "archivedPenalty",
+          "queryPenalty",
+          "trackingPenalty",
+          "depthPenalty",
+          "authorityBoost",
+          "hubnessBoost",
+          "pagerankBoost",
+          "totalScore"
+        ],
+        "title": "SearchDebugItemSchema"
+      },
+      "SearchDebugResponseSchema": {
+        "properties": {
+          "results": {
+            "items": {
+              "$ref": "#/components/schemas/SearchDebugItemSchema"
+            },
+            "type": "array",
+            "title": "Results"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "page": {
+            "type": "integer",
+            "title": "Page"
+          },
+          "pageSize": {
+            "type": "integer",
+            "title": "Pagesize"
+          },
+          "dialect": {
+            "type": "string",
+            "title": "Dialect"
+          },
+          "mode": {
+            "type": "string",
+            "title": "Mode"
+          },
+          "view": {
+            "type": "string",
+            "title": "View"
+          },
+          "sort": {
+            "type": "string",
+            "title": "Sort"
+          },
+          "rankingVersion": {
+            "type": "string",
+            "title": "Rankingversion"
+          },
+          "queryMode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Querymode"
+          },
+          "usedPageSignals": {
+            "type": "boolean",
+            "title": "Usedpagesignals"
+          },
+          "usedSnapshotOutlinks": {
+            "type": "boolean",
+            "title": "Usedsnapshotoutlinks"
+          },
+          "usedPagerank": {
+            "type": "boolean",
+            "title": "Usedpagerank"
+          }
+        },
+        "type": "object",
+        "required": [
+          "results",
+          "total",
+          "page",
+          "pageSize",
+          "dialect",
+          "mode",
+          "view",
+          "sort",
+          "rankingVersion",
+          "queryMode",
+          "usedPageSignals",
+          "usedSnapshotOutlinks",
+          "usedPagerank"
+        ],
+        "title": "SearchDebugResponseSchema"
+      },
+      "SearchResponseSchema": {
+        "properties": {
+          "results": {
+            "items": {
+              "$ref": "#/components/schemas/SnapshotSummarySchema"
+            },
+            "type": "array",
+            "title": "Results"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "page": {
+            "type": "integer",
+            "title": "Page"
+          },
+          "pageSize": {
+            "type": "integer",
+            "title": "Pagesize"
+          }
+        },
+        "type": "object",
+        "required": [
+          "results",
+          "total",
+          "page",
+          "pageSize"
+        ],
+        "title": "SearchResponseSchema"
+      },
+      "SearchSort": {
+        "type": "string",
+        "enum": [
+          "relevance",
+          "newest"
+        ],
+        "title": "SearchSort"
+      },
+      "SearchView": {
+        "type": "string",
+        "enum": [
+          "snapshots",
+          "pages"
+        ],
+        "title": "SearchView"
+      },
+      "SnapshotDetailSchema": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "sourceCode": {
+            "type": "string",
+            "title": "Sourcecode"
+          },
+          "sourceName": {
+            "type": "string",
+            "title": "Sourcename"
+          },
+          "language": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Language"
+          },
+          "captureDate": {
+            "type": "string",
+            "title": "Capturedate"
+          },
+          "captureTimestamp": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Capturetimestamp"
+          },
+          "jobId": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Jobid"
+          },
+          "originalUrl": {
+            "type": "string",
+            "title": "Originalurl"
+          },
+          "snippet": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Snippet"
+          },
+          "rawSnapshotUrl": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rawsnapshoturl"
+          },
+          "browseUrl": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Browseurl"
+          },
+          "mimeType": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mimetype"
+          },
+          "statusCode": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Statuscode"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "sourceCode",
+          "sourceName",
+          "language",
+          "captureDate",
+          "captureTimestamp",
+          "jobId",
+          "originalUrl",
+          "snippet",
+          "rawSnapshotUrl",
+          "browseUrl",
+          "mimeType",
+          "statusCode"
+        ],
+        "title": "SnapshotDetailSchema"
+      },
+      "SnapshotLatestSchema": {
+        "properties": {
+          "found": {
+            "type": "boolean",
+            "title": "Found"
+          },
+          "snapshotId": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Snapshotid"
+          },
+          "captureTimestamp": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Capturetimestamp"
+          },
+          "mimeType": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mimetype"
+          }
+        },
+        "type": "object",
+        "required": [
+          "found"
+        ],
+        "title": "SnapshotLatestSchema"
+      },
+      "SnapshotSummarySchema": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "sourceCode": {
+            "type": "string",
+            "title": "Sourcecode"
+          },
+          "sourceName": {
+            "type": "string",
+            "title": "Sourcename"
+          },
+          "language": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Language"
+          },
+          "captureDate": {
+            "type": "string",
+            "title": "Capturedate"
+          },
+          "captureTimestamp": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Capturetimestamp"
+          },
+          "jobId": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Jobid"
+          },
+          "originalUrl": {
+            "type": "string",
+            "title": "Originalurl"
+          },
+          "snippet": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Snippet"
+          },
+          "pageSnapshotsCount": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pagesnapshotscount"
+          },
+          "rawSnapshotUrl": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rawsnapshoturl"
+          },
+          "browseUrl": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Browseurl"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "sourceCode",
+          "sourceName",
+          "language",
+          "captureDate",
+          "captureTimestamp",
+          "jobId",
+          "originalUrl",
+          "snippet",
+          "rawSnapshotUrl",
+          "browseUrl"
+        ],
+        "title": "SnapshotSummarySchema"
+      },
+      "SnapshotTimelineItemSchema": {
+        "properties": {
+          "snapshotId": {
+            "type": "integer",
+            "title": "Snapshotid"
+          },
+          "captureDate": {
+            "type": "string",
+            "title": "Capturedate"
+          },
+          "captureTimestamp": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Capturetimestamp"
+          },
+          "jobId": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Jobid"
+          },
+          "jobName": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Jobname"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "statusCode": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Statuscode"
+          },
+          "compareFromSnapshotId": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comparefromsnapshotid"
+          },
+          "browseUrl": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Browseurl"
+          }
+        },
+        "type": "object",
+        "required": [
+          "snapshotId",
+          "captureDate",
+          "captureTimestamp",
+          "jobId",
+          "jobName",
+          "title",
+          "statusCode",
+          "compareFromSnapshotId"
+        ],
+        "title": "SnapshotTimelineItemSchema"
+      },
+      "SnapshotTimelineSchema": {
+        "properties": {
+          "sourceCode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sourcecode"
+          },
+          "sourceName": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sourcename"
+          },
+          "normalizedUrlGroup": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Normalizedurlgroup"
+          },
+          "snapshots": {
+            "items": {
+              "$ref": "#/components/schemas/SnapshotTimelineItemSchema"
+            },
+            "type": "array",
+            "title": "Snapshots"
+          }
+        },
+        "type": "object",
+        "required": [
+          "sourceCode",
+          "sourceName",
+          "normalizedUrlGroup",
+          "snapshots"
+        ],
+        "title": "SnapshotTimelineSchema"
+      },
+      "SourceEditionSchema": {
+        "properties": {
+          "jobId": {
+            "type": "integer",
+            "title": "Jobid"
+          },
+          "jobName": {
+            "type": "string",
+            "title": "Jobname"
+          },
+          "recordCount": {
+            "type": "integer",
+            "title": "Recordcount"
+          },
+          "firstCapture": {
+            "type": "string",
+            "title": "Firstcapture"
+          },
+          "lastCapture": {
+            "type": "string",
+            "title": "Lastcapture"
+          },
+          "entryBrowseUrl": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Entrybrowseurl"
+          }
+        },
+        "type": "object",
+        "required": [
+          "jobId",
+          "jobName",
+          "recordCount",
+          "firstCapture",
+          "lastCapture"
+        ],
+        "title": "SourceEditionSchema"
+      },
+      "SourceSummarySchema": {
+        "properties": {
+          "sourceCode": {
+            "type": "string",
+            "title": "Sourcecode"
+          },
+          "sourceName": {
+            "type": "string",
+            "title": "Sourcename"
+          },
+          "baseUrl": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Baseurl"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "recordCount": {
+            "type": "integer",
+            "title": "Recordcount"
+          },
+          "firstCapture": {
+            "type": "string",
+            "title": "Firstcapture"
+          },
+          "lastCapture": {
+            "type": "string",
+            "title": "Lastcapture"
+          },
+          "latestRecordId": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Latestrecordid"
+          },
+          "entryRecordId": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Entryrecordid"
+          },
+          "entryBrowseUrl": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Entrybrowseurl"
+          },
+          "entryPreviewUrl": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Entrypreviewurl"
+          }
+        },
+        "type": "object",
+        "required": [
+          "sourceCode",
+          "sourceName",
+          "recordCount",
+          "firstCapture",
+          "lastCapture",
+          "latestRecordId"
+        ],
+        "title": "SourceSummarySchema"
+      },
+      "UsageMetricsCountsSchema": {
+        "properties": {
+          "searchRequests": {
+            "type": "integer",
+            "title": "Searchrequests"
+          },
+          "snapshotDetailViews": {
+            "type": "integer",
+            "title": "Snapshotdetailviews"
+          },
+          "rawSnapshotViews": {
+            "type": "integer",
+            "title": "Rawsnapshotviews"
+          },
+          "reportSubmissions": {
+            "type": "integer",
+            "title": "Reportsubmissions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "searchRequests",
+          "snapshotDetailViews",
+          "rawSnapshotViews",
+          "reportSubmissions"
+        ],
+        "title": "UsageMetricsCountsSchema"
+      },
+      "UsageMetricsDaySchema": {
+        "properties": {
+          "searchRequests": {
+            "type": "integer",
+            "title": "Searchrequests"
+          },
+          "snapshotDetailViews": {
+            "type": "integer",
+            "title": "Snapshotdetailviews"
+          },
+          "rawSnapshotViews": {
+            "type": "integer",
+            "title": "Rawsnapshotviews"
+          },
+          "reportSubmissions": {
+            "type": "integer",
+            "title": "Reportsubmissions"
+          },
+          "date": {
+            "type": "string",
+            "title": "Date"
+          }
+        },
+        "type": "object",
+        "required": [
+          "searchRequests",
+          "snapshotDetailViews",
+          "rawSnapshotViews",
+          "reportSubmissions",
+          "date"
+        ],
+        "title": "UsageMetricsDaySchema"
+      },
+      "UsageMetricsSchema": {
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled"
+          },
+          "windowDays": {
+            "type": "integer",
+            "title": "Windowdays"
+          },
+          "totals": {
+            "$ref": "#/components/schemas/UsageMetricsCountsSchema"
+          },
+          "daily": {
+            "items": {
+              "$ref": "#/components/schemas/UsageMetricsDaySchema"
+            },
+            "type": "array",
+            "title": "Daily"
+          }
+        },
+        "type": "object",
+        "required": [
+          "enabled",
+          "windowDays",
+          "totals",
+          "daily"
+        ],
+        "title": "UsageMetricsSchema"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      }
+    }
+  }
+}

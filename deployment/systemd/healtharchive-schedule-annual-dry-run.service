@@ -1,0 +1,12 @@
+[Unit]
+Description=HealthArchive annual campaign scheduler (dry run)
+Wants=network-online.target
+After=network-online.target postgresql.service
+ConditionPathExists=/etc/healtharchive/backend.env
+
+[Service]
+Type=oneshot
+User=haadmin
+WorkingDirectory=/opt/healtharchive-backend
+EnvironmentFile=/etc/healtharchive/backend.env
+ExecStart=/usr/bin/bash -c '/opt/healtharchive-backend/.venv/bin/ha-backend schedule-annual --year $(date -u +%%Y) --sources hc phac cihr'

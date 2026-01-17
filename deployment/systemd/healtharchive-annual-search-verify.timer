@@ -1,0 +1,9 @@
+[Unit]
+Description=Run HealthArchive annual search verification (capture once per year when ready)
+
+[Timer]
+OnCalendar=*-*-* 03:10:00 UTC
+Persistent=true
+
+[Install]
+WantedBy=timers.target

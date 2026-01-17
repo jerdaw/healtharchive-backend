@@ -1,0 +1,10 @@
+[Unit]
+Description=HealthArchive annual campaign sentinel (yearly)
+
+[Timer]
+# Run after the annual scheduler (00:05 UTC) and its output-tiering hook.
+OnCalendar=*-01-01 00:20:00 UTC
+Persistent=true
+
+[Install]
+WantedBy=timers.target

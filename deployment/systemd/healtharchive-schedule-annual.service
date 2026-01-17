@@ -1,0 +1,16 @@
+[Unit]
+Description=HealthArchive annual campaign scheduler (enqueue annual jobs)
+Wants=network-online.target
+After=network-online.target postgresql.service
+ConditionPathExists=/etc/healtharchive/backend.env
+ConditionPathExists=/etc/healtharchive/automation-enabled
+RefuseManualStart=yes
+OnSuccess=healtharchive-annual-output-tiering.service
+
+[Service]
+Type=oneshot
+User=haadmin
+WorkingDirectory=/opt/healtharchive-backend
+EnvironmentFile=/etc/healtharchive/backend.env
+EnvironmentFile=-/etc/healtharchive/healthchecks.env
+ExecStart=/opt/healtharchive-backend/scripts/systemd-healthchecks-wrapper.sh --ping-var HEALTHARCHIVE_HC_PING_SCHEDULE_ANNUAL -- /usr/bin/bash -lc '/opt/healtharchive-backend/.venv/bin/ha-backend schedule-annual --apply --year $(date -u +%%Y) --sources hc phac cihr'
