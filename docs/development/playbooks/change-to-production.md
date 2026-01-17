@@ -21,4 +21,4 @@ Canonical references:
 
 - If you add/change a user-facing frontend route that is part of the production “public surface”, update:
   - `scripts/verify_public_surface.py`
-  - Frontend bilingual rules (in the frontend repo): `healtharchive-frontend/docs/development/bilingual-dev-guide.md`
+  - Frontend bilingual rules (in the frontend repo): https://github.com/jerdaw/healtharchive-frontend/blob/main/docs/development/bilingual-dev-guide.md

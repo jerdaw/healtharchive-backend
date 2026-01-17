@@ -45,7 +45,8 @@ Production entrypoints (VPS):
 │   ├── development/          # Local dev + live-testing flows
 │   ├── deployment/           # Deployment/runbooks/checklists
 │   ├── operations/           # Monitoring/uptime/CI/Ops guidance
-│   └── frontend/             # [Symlink] Frontend documentation
+│   ├── frontend-external/    # Link-out pointers to frontend docs (canonical in frontend repo)
+│   └── datasets-external/    # Link-out pointers to datasets repo/docs
 ├── mkdocs.yml                # Documentation Navigation Source of Truth
 ├── pyproject.toml            # Package + dependency metadata
 ├── requirements.txt          # Convenience requirements file (mirrors pyproject)

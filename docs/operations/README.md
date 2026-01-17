@@ -16,6 +16,7 @@
 - Ops cadence checklist (internal routine): `ops-cadence-checklist.md`
 - Ops UI friction log template (internal; ongoing): `ops-ui-friction-log-template.md`
 - Growth constraints (storage + scope budgets): `growth-constraints.md`
+- Legacy crawl imports (historical import notes): `legacy-crawl-imports.md`
 - Restore test procedure (quarterly): `restore-test-procedure.md`
 - Restore test log template: `restore-test-log-template.md`
 - Adoption signals log template (public-safe, quarterly): `adoption-signals-log-template.md`

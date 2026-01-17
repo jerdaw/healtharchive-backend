@@ -13,9 +13,9 @@ For full backend live-testing flows, see `live-testing.md`.
 
 HealthArchive currently lives as **multiple repos**:
 
-- `healtharchive-backend` (Python + FastAPI + worker)
-- `healtharchive-frontend` (Next.js)
-- `healtharchive-datasets` (data pipelines; separate repo)
+- Backend: https://github.com/jerdaw/healtharchive-backend (local dir: `healtharchive-backend/`)
+- Frontend: https://github.com/jerdaw/healtharchive-frontend (local dir: `healtharchive-frontend/`)
+- Datasets: https://github.com/jerdaw/healtharchive-datasets (local dir: `healtharchive-datasets/`)
 
 Many developers keep them in one folder and use the mono-repo root `Makefile`
 to run checks across repos.
@@ -28,7 +28,7 @@ to run checks across repos.
 
 - `git`
 - `python3` (match `healtharchive-backend` requirements)
-- `node` (match `healtharchive-frontend/package.json` `engines.node`)
+- `node` (match frontend `engines.node`: https://github.com/jerdaw/healtharchive-frontend/blob/main/package.json)
 - `make`
 
 Recommended:
@@ -81,9 +81,9 @@ This runs:
 These run automatically on `git push`:
 
 - Backend (runs `make check`):
-  - `healtharchive-backend/scripts/install-pre-push-hook.sh`
+  - `scripts/install-pre-push-hook.sh`
 - Frontend (runs `pre-commit` + `npm run check`):
-  - `healtharchive-frontend/scripts/install-pre-push-hook.sh`
+  - https://github.com/jerdaw/healtharchive-frontend/blob/main/scripts/install-pre-push-hook.sh
 
 Install them on your dev machine:
 
@@ -137,8 +137,8 @@ For enable/rollback steps, see `../deployment/systemd/README.md`.
 These are local-developer guardrails and should run on your dev machine:
 
 - `make check` (workspace root)
-- `healtharchive-backend/scripts/install-pre-push-hook.sh`
-- `healtharchive-frontend/scripts/install-pre-push-hook.sh`
+- `healtharchive-backend/scripts/install-pre-push-hook.sh` (this repo)
+- Frontend hook installer: https://github.com/jerdaw/healtharchive-frontend/blob/main/scripts/install-pre-push-hook.sh
 
 Reason: hooks install into `.git/hooks/` for the repo you’re pushing from (your
 laptop/workstation), not on the server.

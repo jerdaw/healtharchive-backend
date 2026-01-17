@@ -57,7 +57,7 @@ See: `../deployment/systemd/README.md`
   - Note any incidents, slowdowns, or crawl failures.
   - Confirm `/status` and `/impact` look reasonable and are current.
 - **Changelog update**
-  - Add a short entry in `/changelog` reflecting meaningful updates (process: `healtharchive-frontend/docs/changelog-process.md`).
+  - Add a short entry in `/changelog` reflecting meaningful updates (process: https://github.com/jerdaw/healtharchive-frontend/blob/main/docs/changelog-process.md).
 - **Docs drift skim** (10 minutes)
   - Skim the production runbook + any playbooks you used recently; fix drift you notice.
 - **Search quality spot-check** (lightweight)
