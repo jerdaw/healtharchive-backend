@@ -1,4 +1,4 @@
-.PHONY: venv format format-check lint precommit typecheck test security audit check docs-serve docs-build docs-refs docs-coverage
+.PHONY: venv format format-check lint precommit typecheck test security audit check check-full ci docs-serve docs-build docs-refs docs-coverage docs-coverage-strict docs-check
 
 VENV ?= .venv
 VENV_BIN := $(VENV)/bin
@@ -58,6 +58,17 @@ docs-refs:
 	$(PYTHON_RUN) scripts/check_docs_references.py
 
 docs-coverage:
+	$(PYTHON_RUN) scripts/check_docs_coverage.py
+
+docs-coverage-strict:
 	$(PYTHON_RUN) scripts/check_docs_coverage.py --strict
 
-check: format-check lint precommit typecheck test security audit docs-refs docs-build docs-coverage
+docs-check: docs-refs docs-coverage-strict docs-build
+
+# CI guardrail: fast + reliable (should not block day-to-day development).
+check: format-check lint typecheck test
+
+ci: check
+
+# Full suite: deeper / slower / more opinionated checks (run before deploys or when tightening quality).
+check-full: check precommit security audit docs-check

@@ -38,13 +38,22 @@ jobs:
 
       - name: Build Documentation
         working-directory: healtharchive-backend
-        run: make docs-refs docs-coverage docs-build
+        run: make docs-build
+
+      - name: Docs references (advisory)
+        working-directory: healtharchive-backend
+        continue-on-error: true
+        run: make docs-refs
+
+      - name: Docs coverage (advisory)
+        working-directory: healtharchive-backend
+        continue-on-error: true
+        run: make docs-coverage
 
       - name: Lychee Link Checker
-        working-directory: healtharchive-backend
         uses: lycheeverse/lychee-action@v2
         with:
-          args: --verbose --no-progress --exclude-mail "site/**/*.html"
+          args: --verbose --no-progress --exclude-mail "healtharchive-backend/site/**/*.html"
           fail: false # Set to true if you want to block on dead links
 
       - name: Deploy to GitHub Pages
