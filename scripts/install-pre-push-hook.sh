@@ -12,6 +12,7 @@ Usage:
   ./scripts/install-pre-push-hook.sh [--force] [--uninstall]
 
 Notes:
+  - To run the full suite instead: set `HA_PRE_PUSH_FULL=1` (runs `make check-full`).
   - To bypass temporarily: `git push --no-verify` (or set HA_SKIP_PRE_PUSH=1).
 EOF
 }
@@ -90,8 +91,13 @@ fi
 repo_root="\$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 cd "\${repo_root}"
 
-echo "HealthArchive pre-push: running 'make check'..." >&2
-make check
+if [[ "\${HA_PRE_PUSH_FULL:-}" == "1" ]]; then
+  echo "HealthArchive pre-push: running 'make check-full'..." >&2
+  make check-full
+else
+  echo "HealthArchive pre-push: running 'make check'..." >&2
+  make check
+fi
 EOF
 
 chmod +x "${tmp}"

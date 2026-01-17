@@ -10,9 +10,11 @@ If you want step-by-step “run the app and click it” workflows, use:
 
 From the repo root:
 
-- `make check`
+- `make check` (fast CI gate: format check, lint, typecheck, tests)
+- `make check-full` (optional: pre-commit, security scan, docs build/lint)
 
-This is the canonical “everything should be green” command.
+`make check` is intentionally kept low-friction so it can run constantly without blocking development.
+Use `make check-full` before deploys or when you want stricter validation.
 
 ## End-to-end smoke (public surface)
 
@@ -21,6 +23,8 @@ locally and verifies user-critical routes (no browser automation):
 
 - `./scripts/ci-e2e-smoke.sh --frontend-dir ../healtharchive-frontend`
   - If the frontend is already built (CI artifact), add: `--skip-frontend-build`
+
+In CI, the smoke check is treated as a post-merge safety net (runs on `main` pushes / manual runs) rather than a PR gate.
 
 ## Running subsets
 

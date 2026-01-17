@@ -58,7 +58,9 @@ Goal: prove the Python package and DB wiring work in isolation.
 ### 1.1 Run the test suite
 
 ```bash
-make check
+make ci
+# or (full suite):
+# make check-full
 # or (tests only):
 # pytest -q
 ```
