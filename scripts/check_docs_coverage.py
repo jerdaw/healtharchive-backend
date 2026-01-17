@@ -10,7 +10,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterable, Iterator
 
-
 _FENCE_RE = re.compile(r"^\s*(```+|~~~+)")
 _INLINE_LINK_RE = re.compile(r"!?\[[^\]]*\]\(([^)]+)\)")
 _REF_DEF_RE = re.compile(r"^\s*\[[^\]]+\]:\s*(\S+)(?:\s+.*)?$")
