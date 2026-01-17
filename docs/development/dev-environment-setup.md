@@ -80,7 +80,7 @@ This runs:
 
 These run automatically on `git push`:
 
-- Backend (runs `make check`):
+- Backend (runs `make check`; set `HA_PRE_PUSH_FULL=1` to run `make check-full`):
   - `scripts/install-pre-push-hook.sh`
 - Frontend (runs `pre-commit` + `npm run check`):
   - https://github.com/jerdaw/healtharchive-frontend/blob/main/scripts/install-pre-push-hook.sh
