@@ -1,8 +1,11 @@
 site_name: HealthArchive
 site_url: https://docs.healtharchive.ca
-repo_name: jer/healtharchive
-repo_url: https://github.com/jer/healtharchive
+repo_name: jerdaw/healtharchive-backend
+repo_url: https://github.com/jerdaw/healtharchive-backend
 edit_uri: edit/main/docs/
+
+exclude_docs: |
+  frontend/**
 
 theme:
   name: material
@@ -53,12 +56,13 @@ markdown_extensions:
 extra:
   social:
     - icon: fontawesome/brands/github
-      link: https://github.com/jer/healtharchive
+      link: https://github.com/jerdaw/healtharchive-backend
     - icon: fontawesome/brands/twitter
       link: https://twitter.com/healtharchive
 
 nav:
   - Home: README.md
+  - Project: project.md
   - Operations:
       - Overview: operations/README.md
       - Ops Roadmap: operations/healtharchive-ops-roadmap.md
@@ -82,4 +86,5 @@ nav:
       - Overview: frontend-external/README.md
       - I18n: frontend-external/i18n.md
       - Implementation: frontend-external/implementation-guide.md
+  - Datasets: datasets-external/README.md
   - Roadmaps: roadmaps/README.md

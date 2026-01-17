@@ -4,13 +4,36 @@ Keep documentation accurate, minimal, and easy to maintain across repos.
 
 ## Canonical sources
 
-- **Documentation Site**: Run `make docs-serve` in the backend repo root.
-- **Navigation Config**: `healtharchive-backend/mkdocs.yml` (Source of truth for sidebar structure).
-- Cross-repo environment wiring: `healtharchive-backend/docs/deployment/environments-and-configuration.md`
-- Ops roadmap/todo: `healtharchive-backend/docs/operations/healtharchive-ops-roadmap.md`
-- Future roadmap backlog (not-yet-implemented work): `healtharchive-backend/docs/roadmaps/future-roadmap.md`
-- Implemented plans archive (historical records): `healtharchive-backend/docs/roadmaps/implemented/`
-- Frontend documentation: Symlinked under `healtharchive-backend/docs/frontend/`.
+- Docs portal (published): https://docs.healtharchive.ca
+- Docs portal (local): Run `make docs-serve` in the backend repo root.
+- Navigation config: `mkdocs.yml` (source of truth for sidebar structure).
+- Cross-repo environment wiring: `docs/deployment/environments-and-configuration.md`
+- Ops roadmap/todo: `docs/operations/healtharchive-ops-roadmap.md`
+- Future roadmap backlog (not-yet-implemented work): `docs/roadmaps/future-roadmap.md`
+- Implemented plans archive (historical records): `docs/roadmaps/implemented/`
+- Frontend documentation (canonical): https://github.com/jerdaw/healtharchive-frontend/tree/main/docs
+- Datasets documentation (canonical): https://github.com/jerdaw/healtharchive-datasets
+
+## Multi-repo boundary (avoid bleed)
+
+This documentation site is built from the **backend repo only**.
+
+- Frontend docs are canonical in the frontend repo (`docs/**`) and should be linked-to, not copied into this site.
+- Datasets docs are canonical in the datasets repo and should be linked-to, not copied into this site.
+- Frontend PRs should not break backend docs builds (and vice versa).
+
+## Cross-repo linking (avoid drift)
+
+When you reference another repo from docs in this repo:
+
+- Prefer **GitHub links** (or `docs.healtharchive.ca` links for backend docs) over local workspace-relative paths.
+- Treat cross-repo references as pointers. Do not copy text across repos unless it is an intentional public-safe excerpt.
+
+### External pointer pages
+
+If you want another repo’s docs to be discoverable from the docs portal, add a
+small pointer page under `docs/*-external/` and add it to `mkdocs.yml` `nav`.
+Do not mirror the other repo’s docs into this site.
 
 ## When adding or changing docs
 
@@ -60,7 +83,7 @@ For anything public-facing (policy pages, changelog, partner kit):
 - Keep it **public-safe** (no secrets/emails/internal hostnames; avoid sensitive incident details).
 - Prefer stable claims tied to stable artifacts (URLs, tags, filenames, commit SHAs).
 - Record meaningful changes in the public changelog:
-  - Process: `healtharchive-frontend/docs/changelog-process.md`
+  - Process: https://github.com/jerdaw/healtharchive-frontend/blob/main/docs/changelog-process.md
 
 ## Lifecycle (avoid drift)
 

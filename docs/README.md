@@ -3,6 +3,12 @@
 This folder contains the canonical documentation for the **HealthArchive backend**
 (`healtharchive-backend`).
 
+This docs portal is built from the backend repo only. Frontend and datasets
+docs are canonical in their repos and are linked-to from this site:
+
+- Frontend pointers: `frontend-external/README.md`
+- Datasets pointers: `datasets-external/README.md`
+
 ## Recommended reading order
 
 0. Project docs portal (multi-repo navigation)

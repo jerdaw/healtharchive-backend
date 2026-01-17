@@ -479,11 +479,11 @@ inside replay.
 
 Frontend-side details and verification are documented in:
 
-- `healtharchive-frontend/docs/deployment/verification.md`
+- https://github.com/jerdaw/healtharchive-frontend/blob/main/docs/deployment/verification.md
 
 Frontend verification (recommended):
 
-- See `healtharchive-frontend/docs/deployment/verification.md` for the end-to-end
+- See https://github.com/jerdaw/healtharchive-frontend/blob/main/docs/deployment/verification.md for the end-to-end
   checks that confirm:
   - snapshot pages embed replay correctly, and
   - `/browse/<snapshotId>` provides a full-screen browsing wrapper with a

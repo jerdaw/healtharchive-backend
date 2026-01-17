@@ -96,7 +96,7 @@ Where it runs:
 
 - Backend repo CI: `.github/workflows/backend-ci.yml` job `e2e-smoke`
   - Tests backend changes against latest frontend `main`.
-- Frontend repo CI: `healtharchive-frontend/.github/workflows/frontend-ci.yml` job `e2e-smoke`
+- Frontend repo CI: https://github.com/jerdaw/healtharchive-frontend/blob/main/.github/workflows/frontend-ci.yml (job: `e2e-smoke`)
   - Tests frontend changes against latest backend `main`.
 - If cross-repo checkout fails (private repo), set a repo secret:
   - `HEALTHARCHIVE_CI_READ_TOKEN` (PAT with read access)
@@ -133,9 +133,9 @@ Workflow (recommended):
        - `healtharchive-frontend: npm run check`
        - `healtharchive-datasets: make check`
    - Optional but recommended: install pre-push hooks so you can't forget:
-     - Backend: `healtharchive-backend/scripts/install-pre-push-hook.sh`
-     - Frontend: `healtharchive-frontend/scripts/install-pre-push-hook.sh`
-     - Datasets: `healtharchive-datasets/scripts/install-pre-push-hook.sh`
+     - Backend: `scripts/install-pre-push-hook.sh`
+     - Frontend: https://github.com/jerdaw/healtharchive-frontend/blob/main/scripts/install-pre-push-hook.sh
+     - Datasets: https://github.com/jerdaw/healtharchive-datasets/blob/main/scripts/install-pre-push-hook.sh
 1. Push to `main`.
 2. Wait for GitHub Actions to go green on that commit.
 3. Deploy on the VPS:
@@ -497,7 +497,7 @@ Tune these based on actual volumes and acceptable thresholds.
 Workflows live at:
 
 - Backend: `.github/workflows/backend-ci.yml`
-- Frontend: `healtharchive-frontend/.github/workflows/frontend-ci.yml`
+- Frontend: https://github.com/jerdaw/healtharchive-frontend/blob/main/.github/workflows/frontend-ci.yml
 
 Each should:
 
