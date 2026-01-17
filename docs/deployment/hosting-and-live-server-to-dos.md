@@ -48,7 +48,7 @@ links to the detailed checklist later in this file.
 - **In GitHub for both repos** – see §7:
   - [ ] Commit and push CI workflows:
         `.github/workflows/backend-ci.yml` and
-        `healtharchive-frontend/.github/workflows/frontend-ci.yml`.
+        https://github.com/jerdaw/healtharchive-frontend/blob/main/.github/workflows/frontend-ci.yml
   - [ ] Enable Actions in the GitHub UI if prompted.
   - [ ] Configure branch protection on `main` to require the CI checks before
         merging.
@@ -351,7 +351,7 @@ Still in Vercel:
 
 ### 3.3. Local development env (already mostly done)
 
-In `healtharchive-frontend/.env.local` (not committed):
+In the frontend repo `.env.local` (not committed):
 
 ```env
 NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8001
@@ -488,7 +488,7 @@ For a more detailed production rollout, see:
 For a more detailed Preview/Production verification of CSP, headers, CORS, and
 the snapshot viewer iframe behavior, see:
 
-- `healtharchive-frontend/docs/deployment/verification.md`
+- https://github.com/jerdaw/healtharchive-frontend/blob/main/docs/deployment/verification.md
 
 ---
 
@@ -583,7 +583,7 @@ To prevent merging changes that break tests or linting:
      - In the backend repo, select the check corresponding to
        `.github/workflows/backend-ci.yml` (e.g., `Backend CI`).
      - In the frontend repo, select the check corresponding to
-       `healtharchive-frontend/.github/workflows/frontend-ci.yml` (e.g., `Frontend CI`).
+       https://github.com/jerdaw/healtharchive-frontend/blob/main/.github/workflows/frontend-ci.yml (e.g., `Frontend CI`).
    - Optionally enable **Include administrators** so even admin users must
      wait for green CI.
 

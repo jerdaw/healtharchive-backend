@@ -21,7 +21,7 @@ For background, see:
 
 - `hosting-and-live-server-to-dos.md`
 - `environments-and-configuration.md`
-- `healtharchive-frontend/docs/deployment/verification.md`
+- https://github.com/jerdaw/healtharchive-frontend/blob/main/docs/deployment/verification.md
 
 ---
 
@@ -179,7 +179,7 @@ You will use this URL for the verification steps below.
 
 ## 3. Staging verification (browser)
 
-The following steps mirror `healtharchive-frontend/docs/deployment/verification.md`
+The following steps mirror https://github.com/jerdaw/healtharchive-frontend/blob/main/docs/deployment/verification.md
 but framed as a checklist.
 
 ### 3.1 Frontend security headers & CSP

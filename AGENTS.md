@@ -14,7 +14,7 @@
 
 Canonical docs to consult first:
 
-- **Documentation Site**: Run `make docs-serve` locally to view the unified docs site.
+- **Documentation Site**: Run `make docs-serve` locally to view the backend docs site (links out to other repos; does not mirror their docs).
 - **AI Context**: `docs/llms.txt` (Auto-generated context for agents).
 - `mkdocs.yml` – navigation source of truth.
 - `docs/architecture.md` – architecture & implementation details.
@@ -29,7 +29,7 @@ Canonical docs to consult first:
 - `docs/deployment/production-single-vps.md` – current production runbook (Hetzner + Tailscale-only SSH, nightly backups, NAS pull).
 - `docs/roadmaps/future-roadmap.md` – backlog of not-yet-implemented work.
 - `docs/roadmaps/implemented/` – historical implementation plans (executed).
-- Frontend bilingual/dev architecture: `docs/frontend/development/bilingual-dev-guide.md` (symlinked)
+- Frontend bilingual/dev architecture: `healtharchive-frontend/docs/development/bilingual-dev-guide.md`
 
 When you’re doing anything beyond tiny local changes, **open those docs and sync your mental model first**.
 
@@ -53,7 +53,7 @@ From the repo root (Python project):
 - **Documentation**:
 
   ```bash
-  make docs-serve  # View the unified site locally
+  make docs-serve  # View the docs site locally
   make docs-build  # Build static site to site/
   ```
 

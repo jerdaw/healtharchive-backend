@@ -1,4 +1,4 @@
-.PHONY: venv format format-check lint precommit typecheck test security audit check docs-serve docs-build
+.PHONY: venv format format-check lint precommit typecheck test security audit check docs-serve docs-build docs-refs docs-coverage
 
 VENV ?= .venv
 VENV_BIN := $(VENV)/bin
@@ -54,4 +54,10 @@ docs-build:
 	$(PYTHON_RUN) scripts/generate_llms_txt.py
 	$(MKDOCS) build --strict
 
-check: format-check lint precommit typecheck test security audit docs-build
+docs-refs:
+	$(PYTHON_RUN) scripts/check_docs_references.py
+
+docs-coverage:
+	$(PYTHON_RUN) scripts/check_docs_coverage.py --strict
+
+check: format-check lint precommit typecheck test security audit docs-refs docs-build docs-coverage
