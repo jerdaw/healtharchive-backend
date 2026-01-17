@@ -19,21 +19,21 @@ currently browsing.
 ## Where things live (source-of-truth map)
 
 - Backend ops, runbooks, and internal procedures:
-  - `healtharchive-backend/docs/deployment/**`
-  - `healtharchive-backend/docs/operations/**`
+  - Docs site: https://docs.healtharchive.ca
+  - GitHub: https://github.com/jerdaw/healtharchive-backend/tree/main/docs
 - Backend architecture and developer workflows:
-  - `healtharchive-backend/docs/architecture.md`
-  - `healtharchive-backend/docs/development/**`
+  - Architecture: https://docs.healtharchive.ca/architecture/
+  - Development: https://docs.healtharchive.ca/development/
 - Public reporting surfaces (status/impact/changelog) live in the frontend codebase:
-  - Changelog SOP: `healtharchive-frontend/docs/changelog-process.md`
-  - Status page: `healtharchive-frontend/src/app/[locale]/status/page.tsx`
-  - Impact page: `healtharchive-frontend/src/app/[locale]/impact/page.tsx`
+  - Changelog SOP: https://github.com/jerdaw/healtharchive-frontend/blob/main/docs/changelog-process.md
+  - Status page: https://github.com/jerdaw/healtharchive-frontend/blob/main/src/app/%5Blocale%5D/status/page.tsx
+  - Impact page: https://github.com/jerdaw/healtharchive-frontend/blob/main/src/app/%5Blocale%5D/impact/page.tsx
 - Dataset releases are published from the datasets repo (automation + integrity):
-  - `healtharchive-datasets/README.md`
+  - https://github.com/jerdaw/healtharchive-datasets/blob/main/README.md
 
 ## Local workspace note
 
 Some docs refer to sibling repos using paths like `healtharchive-frontend/...`.
 Those references assume a local “sibling repos” workspace (like
 `/home/jer/LocalSync/healtharchive/`). When browsing a single repo on GitHub,
-use the GitHub links above to navigate instead.
+prefer the repo links above.

@@ -50,7 +50,7 @@ Example:
 3) Add a timeline (UTC) as you work.
 4) After recovery, fill root cause + follow-ups.
 5) Link any follow-up playbooks/runbooks/roadmaps you touched.
-6) If this incident changes user expectations (outage/degradation, integrity risk, security posture, policy change), add a **public-safe** note in `/changelog` and/or `/status` (no sensitive details; changelog process: `healtharchive-frontend/docs/changelog-process.md`).
+6) If this incident changes user expectations (outage/degradation, integrity risk, security posture, policy change), add a **public-safe** note in `/changelog` and/or `/status` (no sensitive details; changelog process: https://github.com/jerdaw/healtharchive-frontend/blob/main/docs/changelog-process.md).
 
 The template includes an **Action items (TODOs)** section; use checkboxes so it’s obvious what work remains.
 

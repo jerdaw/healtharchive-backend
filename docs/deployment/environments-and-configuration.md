@@ -18,8 +18,8 @@ For deeper operational details, see:
 - `hosting-and-live-server-to-dos.md` (high-level deployment checklist)
 - `../operations/monitoring-and-ci-checklist.md` (uptime/monitoring guidance)
 - `../operations/baseline-drift.md` (production drift checks: policy vs observed)
-- Frontend docs: `healtharchive-frontend/docs/implementation-guide.md`
-- Frontend verification: `healtharchive-frontend/docs/deployment/verification.md`
+- Frontend docs: https://github.com/jerdaw/healtharchive-frontend/blob/main/docs/implementation-guide.md
+- Frontend verification: https://github.com/jerdaw/healtharchive-frontend/blob/main/docs/deployment/verification.md
 
 ---
 
@@ -184,7 +184,7 @@ The frontend reads env vars at **build time**.
 
 ### 3.1 Local development
 
-`healtharchive-frontend/.env.local` (git-ignored):
+Frontend repo `.env.local` (git-ignored):
 
 ```env
 NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8001

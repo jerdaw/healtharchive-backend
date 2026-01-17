@@ -19,13 +19,6 @@ jobs:
           path: healtharchive-backend
           fetch-depth: 0
 
-      - name: Checkout frontend
-        uses: actions/checkout@v6
-        with:
-          repository: jerdaw/healtharchive-frontend
-          path: healtharchive-frontend
-          fetch-depth: 0
-
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
@@ -45,7 +38,7 @@ jobs:
 
       - name: Build Documentation
         working-directory: healtharchive-backend
-        run: mkdocs build --strict
+        run: make docs-refs docs-coverage docs-build
 
       - name: Lychee Link Checker
         working-directory: healtharchive-backend

@@ -4,8 +4,9 @@ The HealthArchive frontend lives in the separate repository:
 
 - https://github.com/jerdaw/healtharchive-frontend
 
-This backend repo’s documentation site includes a minimal “Frontend” section so
-`mkdocs build --strict` succeeds in CI without requiring a second repo checkout.
+This backend repo’s documentation site includes a minimal “Frontend” section that
+links out to the canonical docs (we intentionally do not mirror frontend docs
+into this site).
 
 For the canonical, up-to-date frontend docs, see:
 
