@@ -92,7 +92,7 @@ Assumptions (adjust paths/user if your VPS differs):
   - Used to alert on stalled crawls without manual log tailing.
   - Prereq: node_exporter textfile collector is enabled (same as tiering metrics).
 - `healtharchive-crawl-auto-recover.service` + `.timer`
-  - Optional automation to recover stalled crawl jobs by restarting the worker and marking stale running jobs as retryable.
+  - Optional automation to recover stalled crawl jobs by marking stale running jobs as retryable (and restarting the worker when needed).
   - Gated by `ConditionPathExists=/etc/healtharchive/crawl-auto-recover-enabled`.
   - Disabled by default; enable only after you’re comfortable with the thresholds/caps in `scripts/vps-crawl-auto-recover.py`.
 - `healtharchive-storage-hotpath-auto-recover.service` + `.timer`
