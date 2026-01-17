@@ -32,9 +32,10 @@ jobs:
           python -m pip install -e ".[dev]"
 
       - name: Check
-        run: make check
+        run: make ci
 
   e2e-smoke:
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
 
     steps:
