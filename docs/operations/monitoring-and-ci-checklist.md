@@ -70,9 +70,11 @@ Verification:
 If/when you enable branch protection required checks, use the stable workflow/job check names shown
 in GitHub’s UI. Avoid renaming workflow/job IDs after you start requiring them.
 
-As of 2026-01-03, the core checks typically appear as:
+As of 2026-01-17, the checks typically appear as:
 
-- Backend repo: `Backend CI / test`, `Backend CI / e2e-smoke`
+- Backend repo:
+  - `Backend CI / test` (recommended required PR gate)
+  - `Backend CI / e2e-smoke` (post-merge / optional)
 - Frontend repo: `Frontend CI / lint-and-test`, `Frontend CI / e2e-smoke`
 - Datasets repo: `Datasets CI / lint`
 
@@ -96,6 +98,7 @@ Where it runs:
 
 - Backend repo CI: `.github/workflows/backend-ci.yml` job `e2e-smoke`
   - Tests backend changes against latest frontend `main`.
+  - Runs on `main` pushes / manual runs (kept out of the PR gate to avoid blocking development on flaky cross-repo or environment issues).
 - Frontend repo CI: https://github.com/jerdaw/healtharchive-frontend/blob/main/.github/workflows/frontend-ci.yml (job: `e2e-smoke`)
   - Tests frontend changes against latest backend `main`.
 - If cross-repo checkout fails (private repo), set a repo secret:
@@ -132,8 +135,9 @@ Workflow (recommended):
        - `healtharchive-backend: make check`
        - `healtharchive-frontend: npm run check`
        - `healtharchive-datasets: make check`
+     - Optional before deploys: `healtharchive-backend: make check-full`
    - Optional but recommended: install pre-push hooks so you can't forget:
-     - Backend: `scripts/install-pre-push-hook.sh`
+     - Backend: `scripts/install-pre-push-hook.sh` (set `HA_PRE_PUSH_FULL=1` for `make check-full`)
      - Frontend: https://github.com/jerdaw/healtharchive-frontend/blob/main/scripts/install-pre-push-hook.sh
      - Datasets: https://github.com/jerdaw/healtharchive-datasets/blob/main/scripts/install-pre-push-hook.sh
 1. Push to `main`.
