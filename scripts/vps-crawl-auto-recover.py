@@ -154,6 +154,23 @@ def main(argv: list[str] | None = None) -> int:
         ),
     )
     parser.add_argument(
+        "--soft-recover-when-guarded",
+        dest="soft_recover_when_guarded",
+        action="store_true",
+        default=True,
+        help=(
+            "If another running job has made progress within the guard window, avoid stopping/restarting "
+            "the worker but still mark the stalled job retryable. This cleans up zombie 'running' jobs "
+            "without interrupting a healthy crawl."
+        ),
+    )
+    parser.add_argument(
+        "--no-soft-recover-when-guarded",
+        dest="soft_recover_when_guarded",
+        action="store_false",
+        help="Disable soft recovery when another job is progressing.",
+    )
+    parser.add_argument(
         "--recover-older-than-minutes",
         type=int,
         default=5,
@@ -246,10 +263,67 @@ def main(argv: list[str] | None = None) -> int:
         ]
         if other_recent:
             jid, a = sorted(other_recent, key=lambda item: item[1])[0]
+            if not bool(args.soft_recover_when_guarded):
+                print(
+                    f"SKIP job_id={job.job_id} source={job.source_code}: stalled for {age:.0f}s, "
+                    f"but another running job_id={jid} made progress {a:.0f}s ago (<{guard_seconds}s guard)."
+                )
+                return 0
             print(
-                f"SKIP job_id={job.job_id} source={job.source_code}: stalled for {age:.0f}s, "
-                f"but another running job_id={jid} made progress {a:.0f}s ago (<{guard_seconds}s guard)."
+                f"{'APPLY' if args.apply else 'DRY-RUN'}: soft-recover stalled job_id={job.job_id} "
+                f"source={job.source_code} stalled_age_seconds={age:.0f} "
+                f"(another job_id={jid} made progress {a:.0f}s ago; not restarting worker)"
             )
+            if not args.apply:
+                return 0
+
+            recent_n = _count_recent_recoveries(state, job.job_id, since_utc=recent_cutoff)
+            if recent_n >= int(args.max_recoveries_per_job_per_day):
+                print(
+                    f"SKIP job_id={job.job_id} source={job.source_code}: stalled for {age:.0f}s, "
+                    f"but max recoveries reached ({recent_n}/{args.max_recoveries_per_job_per_day} in last 24h)."
+                )
+                return 0
+
+            # Soft-recover: mark stale running jobs retryable without stopping the worker.
+            # This avoids interrupting a healthy crawl (single-worker host), while cleaning up
+            # zombie 'running' jobs so they can be retried later.
+            try:
+                with get_session() as session:
+                    orm_job = session.get(ArchiveJob, job.job_id)
+                    if orm_job is not None:
+                        if _ensure_recovery_tool_options(orm_job):
+                            tool_opts = (orm_job.config or {}).get("tool_options") or {}
+                            try:
+                                max_restarts = int(tool_opts.get("max_container_restarts") or 0)
+                            except (TypeError, ValueError):
+                                max_restarts = 0
+                            print(
+                                "Updated job config before soft recovery: "
+                                f"enable_adaptive_restart={bool(tool_opts.get('enable_adaptive_restart'))} "
+                                f"max_container_restarts={max_restarts}"
+                            )
+            except Exception as exc:
+                print(f"WARNING: failed to update job config before soft recovery: {exc}")
+
+            _run(
+                [
+                    "/opt/healtharchive-backend/.venv/bin/ha-backend",
+                    "recover-stale-jobs",
+                    "--older-than-minutes",
+                    str(int(args.recover_older_than_minutes)),
+                    "--require-no-progress-seconds",
+                    str(int(args.stall_threshold_seconds)),
+                    "--apply",
+                    "--source",
+                    job.source_code,
+                    "--limit",
+                    "5",
+                ]
+            )
+
+            _record_recovery(state, job.job_id, when_utc=now)
+            _save_state(state_path, state)
             return 0
 
     recent_n = _count_recent_recoveries(state, job.job_id, since_utc=recent_cutoff)
