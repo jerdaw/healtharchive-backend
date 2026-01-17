@@ -44,10 +44,16 @@ From the repo root (Python project):
   make venv
   ```
 
-* Run checks (what CI runs):
+* Run checks (what CI blocks on):
 
   ```bash
-  make check
+  make ci
+  ```
+
+- Optional full suite (slower / stricter):
+
+  ```bash
+  make check-full
   ```
 
 - **Documentation**:
@@ -67,7 +73,7 @@ For how to:
 
 When you add/modify functionality, you should:
 
-- Keep checks passing (`make check`).
+- Keep checks passing (`make ci`).
 - Prefer adding/adjusting tests close to the code you touch (e.g., API route tests, indexing pipeline tests, worker tests).
 
 ---
@@ -80,7 +86,7 @@ Guidelines:
 
 - If asked to commit: prefer small, logically grouped commits over big “catch-all” commits.
 - Use the existing message style (e.g., `fix: ...`, `docs: ...`, `ops: ...`).
-- Run the closest relevant local checks before pushing (usually `make check`).
+- Run the closest relevant local checks before pushing (usually `make ci`; use `make check-full` before deploys).
 - Never commit secrets, `.env` files, or machine-specific artifacts.
 
 ---
