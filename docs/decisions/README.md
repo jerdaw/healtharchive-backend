@@ -45,7 +45,7 @@ If multiple decisions occur on one day, add a suffix:
 
 ## How to create a new decision record
 
-1) Copy the template: `decision-template.md`
+1) Copy the template: `../_templates/decision-template.md`
 2) Fill **Context** + **Decision** first.
 3) Record alternatives briefly (what you didn’t do, and why).
 4) Link to supporting artifacts (PRs, incident notes, runbooks, issues).

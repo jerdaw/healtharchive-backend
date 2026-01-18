@@ -1,7 +1,30 @@
-# Backend docs index
+# HealthArchive Documentation
 
-This folder contains the canonical documentation for the **HealthArchive backend**
-(`healtharchive-backend`).
+This documentation portal covers the **HealthArchive backend** and links to
+frontend and datasets documentation.
+
+## Quick Start by Role
+
+**Choose your path:**
+
+- **👤 Operators**: Start with [Operations Overview](operations/README.md) → [Operator Responsibilities](operations/playbooks/operator-responsibilities.md)
+- **💻 Developers**: Start with [Development Guide](development/README.md) → [Live Testing](development/live-testing.md)
+- **🔧 Deploying**: Start with [Production Runbook](deployment/production-single-vps.md)
+- **📊 API consumers**: Start with [API Documentation](api.md)
+- **📚 Researchers**: Start with [Project Overview](project.md) → [Datasets](datasets-external/README.md)
+
+## Key Resources
+
+| Need | Documentation |
+|------|---------------|
+| Architecture overview | [Architecture](architecture.md) |
+| Production deployment | [Production Runbook](deployment/production-single-vps.md) |
+| Local development setup | [Dev Setup](development/dev-environment-setup.md) |
+| Incident response | [Incident Response](operations/playbooks/incident-response.md) |
+| Search API | [API Documentation](api.md) |
+| Monitoring setup | [Monitoring](operations/monitoring-and-ci-checklist.md) |
+
+## Documentation Structure
 
 This docs portal is built from the backend repo only. Frontend and datasets
 docs are canonical in their repos and are linked-to from this site:

@@ -66,9 +66,24 @@ Keep this list short; prefer linking to the canonical doc that explains the item
 
 - Consider whether a separate staging backend is worth it (increases ops surface; only do if it buys real safety).
   - See: `../deployment/environments-and-configuration.md`
-- Tiering health alerting:
+- Tiering health alerting (active plan):
+  - `2026-01-17-ops-tiering-alerting-and-incident-followups.md`
   - Enable `healtharchive-tiering-metrics.timer` on the VPS and add alerts on `healtharchive_tiering_*` metrics.
-  - This closes the loop so `healtharchive-warc-tiering.service` failures are visible quickly (not just in `systemctl status`).
+
+### Operational documentation (active plans)
+
+- Disaster recovery and escalation procedures:
+  - `2026-01-17-disaster-recovery-and-escalation-procedures.md`
+  - RTO/RPO targets, VPS restoration, escalation paths, break-glass procedures.
+- SLA and service commitments:
+  - `2026-01-17-sla-and-service-commitments.md`
+  - Availability targets, response time SLOs, maintenance windows.
+
+### Test coverage improvements (active plan)
+
+- Critical business logic test coverage:
+  - `2026-01-17-test-coverage-critical-business-logic.md`
+  - Tests for: `diffing.py`, `changes.py`, `archive_storage.py`, `pages.py`, `archive_tool/strategies.py`.
 
 ### Repo governance (future)
 

@@ -24,10 +24,30 @@ This documentation site is built from the **backend repo only**.
 
 ## Cross-repo linking (avoid drift)
 
-When you reference another repo from docs in this repo:
+When referencing another repo from docs in this repo:
 
-- Prefer **GitHub links** (or `docs.healtharchive.ca` links for backend docs) over local workspace-relative paths.
+- **For documentation references**: Use GitHub URLs
+  ```markdown
+  # Good
+  See the [frontend i18n guide](https://github.com/jerdaw/healtharchive-frontend/blob/main/docs/i18n.md)
+
+  # Avoid
+  See `healtharchive-frontend/docs/i18n.md`
+  ```
+
+- **For command examples**: Workspace-relative paths are fine
+  ```bash
+  # This is appropriate in a development guide
+  cd ../healtharchive-frontend && npm ci
+  ```
+
+- **For project names in prose**: Use simple names
+  ```markdown
+  The healtharchive-frontend repository handles the public UI.
+  ```
+
 - Treat cross-repo references as pointers. Do not copy text across repos unless it is an intentional public-safe excerpt.
+- Links to backend docs can use relative paths within this repo or `docs.healtharchive.ca` URLs.
 
 ### External pointer pages
 
@@ -35,36 +55,120 @@ If you want another repo’s docs to be discoverable from the docs portal, add a
 small pointer page under `docs/*-external/` and add it to `mkdocs.yml` `nav`.
 Do not mirror the other repo’s docs into this site.
 
+## Navigation policy
+
+### What goes in mkdocs.yml nav
+
+- All README index pages
+- Docs that are frequently accessed or critical for operations
+- At least one representative doc from each major category
+- Core playbooks (operator responsibilities, deploy & verify, incident response)
+
+### What stays README-only
+
+- Detailed playbooks beyond the core set (discoverable via playbooks/README.md)
+- Historical/archived roadmaps (implemented/)
+- Log files and templates
+- Highly specialized procedures
+
+### Organizing new docs
+
+When adding new docs:
+
+1. Add to the appropriate directory
+2. Update the directory's `README.md` index
+3. If critical or frequently accessed, add to `mkdocs.yml` nav
+4. Ensure cross-links from related docs
+
+## Using templates
+
+Templates are stored in `docs/_templates/`. To use:
+
+1. Copy the template to the appropriate directory
+2. Rename with appropriate filename (remove `-template` suffix)
+3. Fill in all sections
+4. Add to directory README index
+5. Add to `mkdocs.yml` nav if appropriate
+
+Available templates:
+
+- `runbook-template.md` — For deployment procedures
+- `playbook-template.md` — For operational tasks
+- `incident-template.md` — For incident postmortems
+- `decision-template.md` — For architectural decisions
+- `restore-test-log-template.md` — For quarterly restore test logs
+- `adoption-signals-log-template.md` — For quarterly adoption signals
+- `mentions-log-template.md` — For mentions log entries
+- `ops-ui-friction-log-template.md` — For internal friction logging
+
 ## When adding or changing docs
 
 - Prefer one canonical source. Use pointers elsewhere instead of copying text.
 - Keep docs close to the code they describe.
-- **Registry**: New docs must be added to the `nav` section of `mkdocs.yml` to appear in the sidebar navigation.
+- **Registry**: New critical docs should be added to the `nav` section of `mkdocs.yml`. All docs should be added to their directory's `README.md` index.
 - Use MkDocs Material features like **Admonitions** (`!!! note`), **Tabs**, and **Mermaid** diagrams.
 - Documentation should be English-only; do not duplicate it in other languages.
 - Avoid "phase" labels or other implementation-ordering labels outside `docs/roadmaps` and explicit implementation plans. The order that something was implemented in is not something that needs documentation; rather documentation should focus on key elements of what was implemented, how it was implemented, and how it is to be used.
 - Keep public copy public-safe (no secrets, private emails, or internal IPs).
-- If you sync your workspace via Syncthing, treat `.stignore` as “sync ignore” (like `.gitignore`) and ensure it excludes build artifacts and machine-local dev artifacts (e.g., `.venv/`, `node_modules/`, `.dev-archive-root/`). Secrets may sync via Syncthing, but must remain git-ignored.
+- If you sync your workspace via Syncthing, treat `.stignore` as "sync ignore" (like `.gitignore`) and ensure it excludes build artifacts and machine-local dev artifacts (e.g., `.venv/`, `node_modules/`, `.dev-archive-root/`). Secrets may sync via Syncthing, but must remain git-ignored.
 
-## Document types (taxonomy)
+## Documentation framework (Diátaxis)
+
+HealthArchive documentation follows the **Diátaxis framework** for clarity and user-centered organization. Diátaxis divides documentation into four types based on user needs:
+
+### Four Documentation Types
+
+| Type | Purpose | User Action | Examples |
+|------|---------|-------------|----------|
+| **Tutorials** | Learning-oriented | Following steps to gain skills | First contribution guide, architecture walkthrough |
+| **How-To Guides** | Task-oriented | Solving specific problems | Playbooks, runbooks, checklists |
+| **Reference** | Information-oriented | Looking up details | API docs, CLI reference, data model |
+| **Explanation** | Understanding-oriented | Understanding concepts | Architecture, decisions, guidelines |
+
+**Key principle**: Keep these types separate. Don't mix tutorials with reference material, or how-to guides with explanations.
+
+**Learn more**: [diataxis.fr](https://diataxis.fr/)
+
+### Mapping to Our Taxonomy
+
+Our existing document types map to Diátaxis categories:
+
+**Tutorials** (Learning):
+- Lives under `docs/tutorials/`
+- Examples: `first-contribution.md`, `architecture-walkthrough.md`, `debug-crawl.md`
+- Characteristics: Step-by-step, hands-on, designed for learning
+
+**How-To Guides** (Tasks):
+- **Runbooks**: Deployment procedures in `docs/deployment/` (template: `runbook-template.md`)
+- **Playbooks**: Operational tasks in `docs/operations/playbooks/` or `docs/development/playbooks/` (template: `playbook-template.md`)
+- **Checklists**: Minimal verification lists
+- Characteristics: Goal-oriented, assume some knowledge, focused on results
+
+**Reference** (Information):
+- Lives under `docs/reference/` or specialized files (`api.md`, etc.)
+- Examples: `data-model.md`, `cli-commands.md`, `archive-tool.md`
+- Also: API documentation (`api.md`), Architecture sections
+- Characteristics: Factual, precise, structured for lookup
+
+**Explanation** (Understanding):
+- **Decision records**: In `docs/decisions/` (template: `decision-template.md`)
+- **Policies/contracts**: Invariants and boundaries
+- **Guidelines**: This file, `documentation-process-audit.md`
+- **Architecture**: `architecture.md` (blends reference and explanation)
+- Characteristics: Background, context, "why" not "how"
+
+### Additional Document Types
+
+These support but don't replace the four main types:
+
+- **Index (`README.md`)**: Navigation only; points to canonical docs
+- **Log/record**: Dated, append-only operational evidence (restore tests, adoption signals)
+- **Template**: Scaffolds in `docs/_templates/`
+- **Pointer**: Short files linking to canonical docs (e.g., `frontend-external/`)
+
+## Document types (detailed taxonomy)
 
 Use consistent doc types so people know what to expect:
-
-- **Index (`README.md`)**: navigation only; points to canonical docs.
-- **Runbook**: step-by-step operational procedure (deploy, restore, rebuild).
-  - Lives under `docs/deployment/`.
-  - Template: `docs/deployment/runbook-template.md`
-- **Playbook**: short, task-oriented checklist (“first 3 commands”).
-  - Lives under `docs/operations/playbooks/` (or `docs/development/playbooks/` for dev workflows).
-  - Template: `docs/operations/playbooks/playbook-template.md`
-- **Decision record (ADR-lite)**: high-stakes choices that should remain legible over time (security/privacy/public surface/invariants).
-  - Lives under `docs/decisions/`.
-  - Template: `docs/decisions/decision-template.md`
-- **Checklist**: a minimal verification list (often used by a runbook/playbook).
-- **Policy / contract**: invariants and boundaries that should not drift (security posture, public/private boundary, export immutability).
-- **Log / record**: dated, append-only operational evidence (restore tests, adoption signals, mentions).
-- **Template**: a scaffold used to create logs or incident notes.
-- **Pointer**: a short file that links to the canonical doc (avoid copying text).
 
 ## Quality bar (definition of done)
 
