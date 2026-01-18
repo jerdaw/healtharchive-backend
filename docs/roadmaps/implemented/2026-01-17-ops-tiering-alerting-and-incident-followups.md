@@ -1,6 +1,6 @@
 # Operational hardening: tiering alerting + incident follow-ups (v1) — implementation plan
 
-Status: **planned** (created 2026-01-17)
+Status: **implemented** (2026-01-18)
 
 ## Goal
 
@@ -175,28 +175,22 @@ Update `docs/operations/healtharchive-ops-roadmap.md`:
 
 Add to Prometheus alert rules (typically `/etc/prometheus/rules/healtharchive.yml`):
 
-```yaml
-groups:
-  - name: healtharchive-tiering
-    rules:
-      - alert: HealthArchiveTieringUnhealthy
-        expr: healtharchive_tiering_metrics_ok == 0
-        for: 5m
-        labels:
-          severity: warning
-        annotations:
-          summary: "HealthArchive WARC tiering is unhealthy"
-          description: "The tiering metrics service reports unhealthy state. Check sshfs mounts and tiering service logs."
-
       - alert: HealthArchiveTieringStale
-        expr: (time() - healtharchive_tiering_last_success_timestamp_seconds) > 7200
+        expr: (time() - healtharchive_tiering_metrics_timestamp_seconds) > 7200
         for: 10m
         labels:
           severity: warning
+          service: healtharchive
         annotations:
           summary: "HealthArchive tiering metrics are stale"
           description: "No successful tiering metrics update in over 2 hours. Timer may be failing."
-```
+          runbook_url: "https://github.com/jerdaw/healtharchive-backend/blob/main/docs/operations/playbooks/incident-response.md"
+
+      # Note: Instead of a summary 'Unhealthy' metric, we use granular metrics
+      # already present in healtharchive-alerts.yml templating:
+      # - healtharchive_storagebox_mount_ok
+      # - healtharchive_tiering_hot_path_ok
+      # - healtharchive_systemd_unit_failed{unit="healtharchive-warc-tiering.service"}
 
 ### 2.2 Reload Prometheus
 

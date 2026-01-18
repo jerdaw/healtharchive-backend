@@ -98,6 +98,17 @@ groups:
           description: "The tiering bind-mount service is in a failed state. Canonical WARC paths may not resolve after reboot. Check healtharchive-warc-tiering.service logs and /etc/healtharchive/warc-tiering.binds."
           runbook_url: "https://github.com/jerdaw/healtharchive-backend/blob/main/docs/operations/playbooks/warc-storage-tiering.md"
 
+      - alert: HealthArchiveTieringStale
+        expr: (time() - healtharchive_tiering_metrics_timestamp_seconds) > 7200
+        for: 10m
+        labels:
+          severity: warning
+          service: healtharchive
+        annotations:
+          summary: "HealthArchive tiering metrics are stale"
+          description: "No successful tiering metrics update in over 2 hours. Timer may be failing."
+          runbook_url: "https://github.com/jerdaw/healtharchive-backend/blob/main/docs/operations/playbooks/incident-response.md"
+
   - name: healtharchive.crawl
     rules:
       - alert: HealthArchiveCrawlMetricsMissing
