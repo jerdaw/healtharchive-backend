@@ -41,7 +41,6 @@ plugins:
   - search:
       lang: en
       separator: '[\s\-\.]+'
-      min_search_length: 2
   - tags
   - social
   - swagger-ui-tag
@@ -91,6 +90,7 @@ nav:
               - Operator Responsibilities: operations/playbooks/operator-responsibilities.md
               - Deploy & Verify: operations/playbooks/deploy-and-verify.md
               - Incident Response: operations/playbooks/incident-response.md
+              - Escalation Procedures: operations/escalation-procedures.md
           - Observability:
               - Check Logs: operations/playbooks/check-logs-api-worker-access.md
               - Verify Search Index: operations/playbooks/verify-search-index-coverage.md
@@ -101,14 +101,12 @@ nav:
               - Review Metrics: operations/playbooks/review-prometheus-metrics.md
           - Crawls & Archives:
               - Validate Export Integrity: operations/playbooks/validate-export-integrity.md
-              - Handle Failed Job: operations/playbooks/handle-failed-job.md
               - Reconcile Replay Collection: operations/playbooks/reconcile-replay-collection.md
               - Reindex Job WARCs: operations/playbooks/reindex-job-warcs.md
               - Trigger Manual Crawl: operations/playbooks/trigger-manual-crawl.md
           - Storage:
               - Check Storage Quotas: operations/playbooks/check-tailnet-storage-quota.md
               - Manage WARC Cleanup: operations/playbooks/manage-warc-cleanup.md
-              - Handle Low Disk: operations/playbooks/handle-low-disk.md
               - Verify WARC Tier Distribution: operations/playbooks/verify-warc-tier-distribution.md
           - Validation:
               - Restore Test: operations/playbooks/restore-test.md
@@ -134,6 +132,7 @@ nav:
           - Enable Search V2: deployment/search-rollout.md
           - Setup Pages Table: deployment/pages-table-rollout.md
           - Install Systemd Units: deployment/systemd/README.md
+          - Disaster Recovery: deployment/disaster-recovery.md
   - Reference:
       - API Documentation: api.md
       - Architecture: architecture.md

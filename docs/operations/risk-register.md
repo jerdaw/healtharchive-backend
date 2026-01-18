@@ -9,6 +9,6 @@ Track the top operational risks and mitigations.
 - **Proxy/CORS misuse risk**
   - Mitigation: keep the frontend same-origin report proxy narrow; do not turn it into a general proxy; keep backend CORS allowlist strict.
 - **Single-VPS availability risk**
-  - Mitigation: backups + restore tests; conservative automation caps; disk monitoring; clear rollback procedures.
+  - Mitigation: [Disaster Recovery Runbook](../deployment/disaster-recovery.md) (RTO/RPO); backups + restore tests; conservative automation caps; disk monitoring; clear rollback procedures.
 - **Export integrity / reproducibility risk**
   - Mitigation: checksums + manifest; stable ordering/pagination; version fields (`diff_version`, `normalization_version`); avoid rewriting releases.

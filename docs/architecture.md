@@ -309,7 +309,7 @@ Relationships:
 
 ---
 
-## 4. Job registry & creation (`ha_backend/job_registry.py`)
+## 4. Job registry & creation (`ha_backend/job_registry.py`) {: #4-job-registry--creation-ha_backendjob_registrypy }
 
 The job registry defines default behavior and seeds for each source code (`"hc"`, `"phac"`).
 
@@ -420,7 +420,7 @@ The CLI command `ha-backend create-job --source hc` is a thin wrapper around thi
 
 ---
 
-## 5. archive_tool integration & job runner (`ha_backend/jobs.py`)
+## 5. archive_tool integration & job runner (`ha_backend/jobs.py`) {: #5-archive_tool-integration--job-runner-ha_backendjobspy }
 
 ### 5.1 RuntimeArchiveJob
 
@@ -435,7 +435,7 @@ This path is used by:
 
 - `ha-backend run-job` – direct, non‑persistent jobs.
 
-### 5.2 run_persistent_job – DB‑backed jobs
+### 5.2 run_persistent_job – DB‑backed jobs {: #52-run_persistent_job--db-backed-jobs }
 
 ```python
 def run_persistent_job(job_id: int) -> int:
