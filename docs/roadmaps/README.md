@@ -9,7 +9,6 @@
 Implementation plans live directly under `docs/roadmaps/` while they are active.
 When complete, move them to `docs/roadmaps/implemented/` and date them.
 
-- Search ranking + snippet quality iteration (v3): `2026-01-03-search-ranking-and-snippets-v3.md`
 - Operational hardening: tiering alerting + incident follow-ups: `2026-01-17-ops-tiering-alerting-and-incident-followups.md`
 - Test coverage: critical business logic: `2026-01-17-test-coverage-critical-business-logic.md`
 - Disaster recovery and escalation procedures: `2026-01-17-disaster-recovery-and-escalation-procedures.md`
@@ -18,6 +17,7 @@ When complete, move them to `docs/roadmaps/implemented/` and date them.
 ## Implemented plans (history)
 
 - Implemented plans archive: `implemented/README.md`
+- Search ranking + snippet quality iteration (v3): `implemented/2026-01-18-search-ranking-and-snippets-v3.md`
 - Storage Box / sshfs stale mount recovery + integrity: `implemented/2026-01-08-storagebox-sshfs-stale-mount-recovery-and-integrity.md`
 
 ## Historical context
