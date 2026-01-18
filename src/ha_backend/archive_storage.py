@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import errno
+import hashlib
 import json
 import os
 import re
@@ -27,6 +28,7 @@ class WarcManifestEntry:
     stable_name: str
     link_type: str
     size_bytes: int
+    sha256: str
 
 
 @dataclass(frozen=True)
@@ -93,6 +95,15 @@ def _iter_stable_warc_paths(warcs_dir: Path) -> list[Path]:
             except OSError:
                 continue
     return sorted(warcs)
+
+
+def _compute_sha256(path: Path) -> str:
+    """Compute the SHA256 hash of a file."""
+    sha256 = hashlib.sha256()
+    with path.open("rb") as f:
+        while chunk := f.read(8192):
+            sha256.update(chunk)
+    return sha256.hexdigest()
 
 
 def _next_warc_index(existing_names: Iterable[str]) -> int:
@@ -226,12 +237,14 @@ def consolidate_warcs(
             dest = warcs_dir / stable_name
 
         link_type = "dry_run"
+        sha256_hash = "dry_run"
         if not dry_run:
             link_type = _safe_link_or_copy(
                 src,
                 dest,
                 allow_copy_fallback=allow_copy_fallback,
             )
+            sha256_hash = _compute_sha256(dest)
 
         created += 1
         stable_paths.append(dest.resolve())
@@ -241,6 +254,7 @@ def consolidate_warcs(
             "stable_name": stable_name,
             "link_type": link_type,
             "size_bytes": int(src.stat().st_size),
+            "sha256": sha256_hash,
         }
 
     def _entry_sort_key(entry: dict) -> tuple[int, int, str]:

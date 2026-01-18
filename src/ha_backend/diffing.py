@@ -4,7 +4,7 @@ import difflib
 import re
 from dataclasses import dataclass
 from html import escape
-from typing import List, Tuple
+from typing import List, Tuple, cast
 
 from bs4 import BeautifulSoup
 from bs4.element import NavigableString, Tag
@@ -47,6 +47,8 @@ def _normalize_whitespace(value: str) -> str:
 
 
 def _is_noise_tag(tag: Tag) -> bool:
+    if not hasattr(tag, "attrs") or tag.attrs is None:
+        return False
     tag_id = tag.get("id") or ""
     class_value = tag.get("class")
     class_tokens: list[str]
@@ -110,36 +112,55 @@ def _extract_sections(root: Tag) -> List[Tuple[str, str]]:
     return sections
 
 
+def _normalize_tree(root: Tag, in_pre: bool = False) -> List[str]:
+    lines: List[str] = []
+    stack: List[Tuple[Tag | NavigableString, bool]] = [(root, in_pre)]
+
+    while stack:
+        node, current_in_pre = stack.pop()
+
+        if isinstance(node, NavigableString):
+            text = str(node)
+            if current_in_pre:
+                for line in text.splitlines():
+                    lines.append(line)
+            else:
+                norm = _normalize_whitespace(text)
+                if norm:
+                    lines.append(norm)
+        else:
+            # Tag: check if PRE
+            is_pre = current_in_pre or node.name == "pre"
+            # Add children to stack in reverse order for depth-first traversal
+            children = list(node.children)
+            for child in reversed(children):
+                stack.append((cast("Tag | NavigableString", child), is_pre))
+
+    return [line for line in lines if line.strip() or any(c != " " for c in line)]
+
+
 def normalize_html_for_diff(html: str) -> DiffDocument:
     soup = BeautifulSoup(html, "html.parser")
     _strip_noise(soup, strip_chrome=True)
-
     root = soup.find("main") or soup.find(attrs={"role": "main"}) or soup.body or soup
 
-    raw_text = root.get_text(separator="\n", strip=True)
-    lines = [
-        _normalize_whitespace(line) for line in raw_text.splitlines() if _normalize_whitespace(line)
-    ]
-
+    final_lines = _normalize_tree(root)
     sections = _extract_sections(root)
+    text_content = " ".join(final_lines)
 
-    return DiffDocument(text=_normalize_whitespace(raw_text), lines=lines, sections=sections)
+    return DiffDocument(text=text_content, lines=final_lines, sections=sections)
 
 
 def normalize_html_for_diff_full_page(html: str) -> DiffDocument:
     soup = BeautifulSoup(html, "html.parser")
     _strip_noise(soup, strip_chrome=False)
-
     root = soup.body or soup
 
-    raw_text = root.get_text(separator="\n", strip=True)
-    lines = [
-        _normalize_whitespace(line) for line in raw_text.splitlines() if _normalize_whitespace(line)
-    ]
-
+    final_lines = _normalize_tree(root)
     sections = _extract_sections(root)
+    text_content = " ".join(final_lines)
 
-    return DiffDocument(text=_normalize_whitespace(raw_text), lines=lines, sections=sections)
+    return DiffDocument(text=text_content, lines=final_lines, sections=sections)
 
 
 def _render_diff_line(line: str) -> str:

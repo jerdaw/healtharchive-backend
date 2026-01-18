@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
-
 from ha_backend.indexing.text_extraction import (
     detect_is_archived,
     extract_content_text,

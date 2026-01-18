@@ -17,7 +17,7 @@ class PagesRebuildResult:
 
 def _strip_query_fragment_expr(url_expr: Any, dialect_name: str) -> Any:
     if dialect_name == "postgresql":
-        return func.regexp_replace(url_expr, r"[?#].*$", "")
+        return func.lower(func.regexp_replace(url_expr, r"[?#].*$", ""))
     if dialect_name == "sqlite":
         q_pos = func.instr(url_expr, "?")
         hash_pos = func.instr(url_expr, "#")
@@ -27,11 +27,12 @@ def _strip_query_fragment_expr(url_expr: Any, dialect_name: str) -> Any:
             (hash_pos > 0, hash_pos),
             else_=0,
         )
-        return case(
+        stripped = case(
             (cut_pos > 0, func.substr(url_expr, 1, cut_pos - 1)),
             else_=url_expr,
         )
-    return url_expr
+        return func.lower(stripped)
+    return func.lower(url_expr)
 
 
 def build_snapshot_page_group_key(*, dialect_name: str) -> Any:

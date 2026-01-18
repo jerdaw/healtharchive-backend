@@ -1,6 +1,6 @@
 # Test coverage: critical business logic (v1) — implementation plan
 
-Status: **planned** (created 2026-01-17)
+Status: **implemented** (completed 2026-01-18)
 
 ## Goal
 

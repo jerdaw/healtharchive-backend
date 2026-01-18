@@ -1656,7 +1656,11 @@ def _search_snapshots_inner(
     def build_title_boost() -> Any:
         if not rank_text:
             return 0.0
-        if ranking_version not in (RankingVersion.v2, RankingVersion.v3) or not query_tokens or ranking_cfg is None:
+        if (
+            ranking_version not in (RankingVersion.v2, RankingVersion.v3)
+            or not query_tokens
+            or ranking_cfg is None
+        ):
             return case(
                 (Snapshot.title.ilike(f"%{rank_text}%"), 0.2),
                 else_=0.0,
@@ -1691,9 +1695,10 @@ def _search_snapshots_inner(
             return 0.0  # Recency boost only on Postgres.
 
         # Calculate days since capture (use current_date for reference).
-        days_ago = func.extract(
-            "epoch", func.current_date() - func.date(Snapshot.capture_timestamp)
-        ) / 86400.0
+        days_ago = (
+            func.extract("epoch", func.current_date() - func.date(Snapshot.capture_timestamp))
+            / 86400.0
+        )
         # Clamp to minimum of 1 day.
         days_ago_clamped = case(
             (days_ago < 1, 1.0),
@@ -1727,7 +1732,10 @@ def _search_snapshots_inner(
             return None
         if score_override is not None:
             score = score_override
-            if ranking_version in (RankingVersion.v2, RankingVersion.v3) and ranking_cfg is not None:
+            if (
+                ranking_version in (RankingVersion.v2, RankingVersion.v3)
+                and ranking_cfg is not None
+            ):
                 score = score + build_archived_penalty() + build_depth_penalty(group_key)
                 if use_authority and inlink_count is not None:
                     score = score + build_authority_expr()
@@ -1753,7 +1761,10 @@ def _search_snapshots_inner(
                 rank = func.ts_rank_cd(vector_expr, tsquery)
             depth_basis = (
                 group_key
-                if (ranking_version in (RankingVersion.v2, RankingVersion.v3) and ranking_cfg is not None)
+                if (
+                    ranking_version in (RankingVersion.v2, RankingVersion.v3)
+                    and ranking_cfg is not None
+                )
                 else Snapshot.url
             )
             url_penalty_basis = (
