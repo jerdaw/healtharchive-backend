@@ -11,6 +11,7 @@ It is meant to complement:
 - `../deployment/hosting-and-live-server-to-dos.md`
 - `../deployment/staging-rollout-checklist.md`
 - `../deployment/production-rollout-checklist.md`
+- `service-levels.md` — for SLO targets and commitments
 
 ---
 

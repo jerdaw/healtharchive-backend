@@ -118,6 +118,7 @@ nav:
               - Adoption Signals: operations/playbooks/adoption-signals.md
               - Write Changelog Entry: operations/playbooks/write-changelog-entry.md
               - Handle User Issue Report: operations/playbooks/handle-user-issue-report.md
+          - Service Levels: operations/service-levels.md
       - Development:
           - Environment Setup: development/dev-environment-setup.md
           - Run Tests: development/testing-guidelines.md

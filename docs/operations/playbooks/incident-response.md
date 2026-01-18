@@ -6,6 +6,7 @@ Canonical references:
 
 - Production runbook: `../../deployment/production-single-vps.md`
 - Monitoring checklist: `../monitoring-and-ci-checklist.md`
+- Service levels: `../service-levels.md` — for communication commitments and SLOs
 - Escalation procedures: `../escalation-procedures.md`
 - Disaster recovery runbook: `../../deployment/disaster-recovery.md`
 - Baseline drift: `../baseline-drift.md`
