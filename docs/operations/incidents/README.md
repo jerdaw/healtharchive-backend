@@ -45,7 +45,7 @@ Example:
 
 ## How to write one
 
-1) Copy the template: `incident-template.md`
+1) Copy the template: `../../_templates/incident-template.md`
 2) Fill the top metadata and a short summary immediately.
 3) Add a timeline (UTC) as you work.
 4) After recovery, fill root cause + follow-ups.
