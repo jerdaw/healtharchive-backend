@@ -6,7 +6,7 @@ usage() {
 Capture /api/search JSON responses for a standard set of "golden queries".
 
 Usage:
-  ./scripts/search-eval-capture.sh [--base-url URL] [--out-dir DIR] [--run-id ID] [--page-size N] [--queries-file FILE] [--ranking (v1|v2)] [--generate-from-db ...]
+  ./scripts/search-eval-capture.sh [--base-url URL] [--out-dir DIR] [--run-id ID] [--page-size N] [--queries-file FILE] [--ranking (v1|v2|v3)] [--generate-from-db ...]
 
 Examples:
   ./scripts/search-eval-capture.sh
@@ -96,8 +96,8 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-if [[ -n "${RANKING}" && "${RANKING}" != "v1" && "${RANKING}" != "v2" ]]; then
-  echo "ERROR: --ranking must be 'v1' or 'v2' (got: ${RANKING})" >&2
+if [[ -n "${RANKING}" && "${RANKING}" != "v1" && "${RANKING}" != "v2" && "${RANKING}" != "v3" ]]; then
+  echo "ERROR: --ranking must be 'v1', 'v2', or 'v3' (got: ${RANKING})" >&2
   exit 2
 fi
 

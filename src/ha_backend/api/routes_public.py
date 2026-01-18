@@ -1070,13 +1070,13 @@ def _search_snapshots_inner(
     rank_text = q_filter or q_rank
 
     ranking_version = get_ranking_version(ranking)
-    # For v2 we use different blends depending on query "intent".
+    # For v2/v3 we use different blends depending on query "intent".
     query_mode = None
     query_tokens: list[str] = []
     ranking_cfg = None
-    if ranking_version == RankingVersion.v2 and rank_text:
+    if ranking_version in (RankingVersion.v2, RankingVersion.v3) and rank_text:
         query_mode = classify_query_mode(rank_text)
-        ranking_cfg = get_ranking_config(mode=query_mode)
+        ranking_cfg = get_ranking_config(mode=query_mode, version=ranking_version)
         query_tokens = tokenize_query(rank_text)
 
     match_tokens: list[str] = []
@@ -1526,7 +1526,7 @@ def _search_snapshots_inner(
     has_ps_pagerank = use_page_signals and _has_column(db, "page_signals", "pagerank")
 
     use_hubness = (
-        ranking_version == RankingVersion.v2
+        ranking_version in (RankingVersion.v2, RankingVersion.v3)
         and ranking_cfg is not None
         and query_mode == QueryMode.broad
         and effective_sort == SearchSort.relevance
@@ -1539,7 +1539,7 @@ def _search_snapshots_inner(
         inlink_count = func.coalesce(PageSignal.inlink_count, 0)
 
     use_pagerank = (
-        ranking_version == RankingVersion.v2
+        ranking_version in (RankingVersion.v2, RankingVersion.v3)
         and ranking_cfg is not None
         and query_mode == QueryMode.broad
         and effective_sort == SearchSort.relevance
@@ -1558,7 +1558,7 @@ def _search_snapshots_inner(
     def build_authority_expr() -> Any:
         if inlink_count is None:
             return 0.0
-        if ranking_version == RankingVersion.v2 and ranking_cfg is not None:
+        if ranking_version in (RankingVersion.v2, RankingVersion.v3) and ranking_cfg is not None:
             # Postgres and SQLite both support ln() inconsistently; keep ln-based
             # authority only for Postgres, and use tiering elsewhere.
             if use_postgres_fts:
@@ -1608,18 +1608,40 @@ def _search_snapshots_inner(
 
     def build_depth_penalty(url_expr: Any) -> Any:
         slash_count = func.length(url_expr) - func.length(func.replace(url_expr, "/", ""))
-        if ranking_version == RankingVersion.v2 and ranking_cfg is not None:
+        if ranking_version in (RankingVersion.v2, RankingVersion.v3) and ranking_cfg is not None:
             return float(ranking_cfg.depth_coef) * slash_count
         return (-0.01) * slash_count
 
+    # Check if is_archived column exists for v3 ranking.
+    has_is_archived = _has_column(db, "snapshots", "is_archived")
+
     def build_archived_penalty() -> Any:
-        if ranking_version != RankingVersion.v2 or ranking_cfg is None:
+        if ranking_version not in (RankingVersion.v2, RankingVersion.v3) or ranking_cfg is None:
             return 0.0
         if ranking_cfg.archived_penalty == 0:
             return 0.0
 
-        # Canada.ca often marks pages as archived via title prefixes *or* a banner
-        # in the rendered HTML that ends up in our snippet extraction.
+        # v3: Use is_archived column if available, with fallback to heuristics.
+        if ranking_version == RankingVersion.v3 and has_is_archived and use_postgres_fts:
+            snippet_text = func.coalesce(Snapshot.snippet, "")
+            fallback_match = or_(
+                Snapshot.title.ilike("archived%"),
+                snippet_text.ilike("%we have archived this page%"),
+                snippet_text.ilike("%this page has been archived%"),
+                snippet_text.ilike("%cette page a été archivée%"),
+            )
+            return case(
+                # is_archived = True -> apply penalty.
+                (Snapshot.is_archived == True, float(ranking_cfg.archived_penalty)),  # noqa: E712
+                # is_archived = False -> no penalty.
+                (Snapshot.is_archived == False, 0.0),  # noqa: E712
+                # is_archived IS NULL -> fall back to heuristics.
+                (fallback_match, float(ranking_cfg.archived_penalty)),
+                else_=0.0,
+            )
+
+        # v2 / fallback: Canada.ca often marks pages as archived via title prefixes
+        # or a banner in the rendered HTML that ends up in our snippet extraction.
         snippet_text = func.coalesce(Snapshot.snippet, "")
         archived_match = or_(
             Snapshot.title.ilike("archived%"),
@@ -1634,7 +1656,7 @@ def _search_snapshots_inner(
     def build_title_boost() -> Any:
         if not rank_text:
             return 0.0
-        if ranking_version != RankingVersion.v2 or not query_tokens or ranking_cfg is None:
+        if ranking_version not in (RankingVersion.v2, RankingVersion.v3) or not query_tokens or ranking_cfg is None:
             return case(
                 (Snapshot.title.ilike(f"%{rank_text}%"), 0.2),
                 else_=0.0,
@@ -1647,6 +1669,39 @@ def _search_snapshots_inner(
             (any_match, float(ranking_cfg.title_any_token_boost)),
             else_=0.0,
         )
+
+    def build_title_exact_match_boost() -> Any:
+        """v3: Bonus when query appears exactly as substring in title."""
+        if ranking_version != RankingVersion.v3 or ranking_cfg is None or not rank_text:
+            return 0.0
+        if ranking_cfg.title_exact_match_boost == 0:
+            return 0.0
+        return case(
+            (Snapshot.title.ilike(f"%{rank_text}%"), float(ranking_cfg.title_exact_match_boost)),
+            else_=0.0,
+        )
+
+    def build_recency_boost() -> Any:
+        """v3: Boost recent snapshots for broad/mixed queries."""
+        if ranking_version != RankingVersion.v3 or ranking_cfg is None:
+            return 0.0
+        if ranking_cfg.recency_coef == 0:
+            return 0.0
+        if not use_postgres_fts:
+            return 0.0  # Recency boost only on Postgres.
+
+        # Calculate days since capture (use current_date for reference).
+        days_ago = func.extract(
+            "epoch", func.current_date() - func.date(Snapshot.capture_timestamp)
+        ) / 86400.0
+        # Clamp to minimum of 1 day.
+        days_ago_clamped = case(
+            (days_ago < 1, 1.0),
+            else_=days_ago,
+        )
+        # Logarithmic decay: ln(1 + 365 / days_ago).
+        recency_score = func.ln(1.0 + 365.0 / days_ago_clamped)
+        return float(ranking_cfg.recency_coef) * recency_score
 
     def build_querystring_penalty(url_expr: Any) -> Any:
         return case(
@@ -1672,7 +1727,7 @@ def _search_snapshots_inner(
             return None
         if score_override is not None:
             score = score_override
-            if ranking_version == RankingVersion.v2 and ranking_cfg is not None:
+            if ranking_version in (RankingVersion.v2, RankingVersion.v3) and ranking_cfg is not None:
                 score = score + build_archived_penalty() + build_depth_penalty(group_key)
                 if use_authority and inlink_count is not None:
                     score = score + build_authority_expr()
@@ -1680,13 +1735,16 @@ def _search_snapshots_inner(
                     score = score + build_hubness_expr()
                 if use_pagerank and pagerank_value is not None:
                     score = score + build_pagerank_expr()
+                # v3 additions.
+                if ranking_version == RankingVersion.v3:
+                    score = score + build_title_exact_match_boost() + build_recency_boost()
             else:
                 if use_authority and inlink_count is not None:
                     score = score + build_authority_expr()
             return score
         if use_postgres_fts and tsquery is not None and vector_expr is not None:
             if (
-                ranking_version == RankingVersion.v2
+                ranking_version in (RankingVersion.v2, RankingVersion.v3)
                 and query_mode is not None
                 and query_mode != QueryMode.specific
             ):
@@ -1695,13 +1753,13 @@ def _search_snapshots_inner(
                 rank = func.ts_rank_cd(vector_expr, tsquery)
             depth_basis = (
                 group_key
-                if (ranking_version == RankingVersion.v2 and ranking_cfg is not None)
+                if (ranking_version in (RankingVersion.v2, RankingVersion.v3) and ranking_cfg is not None)
                 else Snapshot.url
             )
             url_penalty_basis = (
                 group_key
                 if (
-                    ranking_version == RankingVersion.v2
+                    ranking_version in (RankingVersion.v2, RankingVersion.v3)
                     and ranking_cfg is not None
                     and effective_view == SearchView.pages
                 )
@@ -1722,6 +1780,9 @@ def _search_snapshots_inner(
                 score = score + build_hubness_expr()
             if use_pagerank and pagerank_value is not None:
                 score = score + build_pagerank_expr()
+            # v3 additions.
+            if ranking_version == RankingVersion.v3:
+                score = score + build_title_exact_match_boost() + build_recency_boost()
             return score
 
         # DB-agnostic fallback: score by field match presence.
@@ -1743,7 +1804,7 @@ def _search_snapshots_inner(
         )
         score = 3 * title_hits + 2 * url_hits + snippet_hits + phrase_boost
 
-        if ranking_version == RankingVersion.v2 and ranking_cfg is not None:
+        if ranking_version in (RankingVersion.v2, RankingVersion.v3) and ranking_cfg is not None:
             score = score + build_archived_penalty() + build_depth_penalty(group_key)
             if use_authority and inlink_count is not None:
                 score = score + build_authority_expr()
@@ -1751,6 +1812,9 @@ def _search_snapshots_inner(
                 score = score + build_hubness_expr()
             if use_pagerank and pagerank_value is not None:
                 score = score + build_pagerank_expr()
+            # v3 additions.
+            if ranking_version == RankingVersion.v3:
+                score = score + build_title_exact_match_boost() + build_recency_boost()
         else:
             if use_authority and inlink_count is not None:
                 score = score + build_authority_expr()

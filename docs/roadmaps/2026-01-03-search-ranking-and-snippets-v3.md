@@ -1,6 +1,6 @@
 # Search ranking + snippet quality iteration (v3) — implementation plan
 
-Status: **planned** (created 2026-01-03)
+Status: **in-progress** (created 2026-01-03, implementation started 2026-01-18)
 
 Note: **Do not deploy/implement this plan on the production VPS until the annual scrape/crawl is finished and the campaign jobs are `indexed`.**
 

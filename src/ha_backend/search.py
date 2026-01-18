@@ -18,26 +18,40 @@ def build_search_vector(
     title: Any,
     snippet: Any,
     url: Any,
+    *,
+    content_text: Any = None,
 ) -> ColumnElement[Any]:
     """
     Return a weighted Postgres tsvector expression suitable for Snapshot.search_vector.
 
     This function is safe to call even when the inputs are plain Python strings;
     it returns a SQLAlchemy expression that Postgres can evaluate.
+
+    Args:
+        title: Page title (weight A - highest).
+        snippet: Short snippet for display (used if content_text is None).
+        url: Page URL (weight C - lowest).
+        content_text: Optional extended content text (~4KB) for FTS (weight B).
+                      If provided, this is used instead of snippet for better recall.
     """
     vector_title = func.setweight(
         func.to_tsvector(TS_CONFIG, func.coalesce(title, "")),
         WEIGHT_A,
     )
-    vector_snippet = func.setweight(
-        func.to_tsvector(TS_CONFIG, func.coalesce(snippet, "")),
+
+    # Use content_text for FTS if provided (v3), otherwise fall back to snippet.
+    body_text = content_text if content_text is not None else snippet
+    vector_body = func.setweight(
+        func.to_tsvector(TS_CONFIG, func.coalesce(body_text, "")),
         WEIGHT_B,
     )
+
     vector_url = func.setweight(
         func.to_tsvector(TS_CONFIG, func.coalesce(url, "")),
         WEIGHT_C,
     )
-    return vector_title.op("||")(vector_snippet.op("||")(vector_url))
+    return vector_title.op("||")(vector_body.op("||")(vector_url))
 
 
 __all__ = ["TS_CONFIG", "build_search_vector"]
+
