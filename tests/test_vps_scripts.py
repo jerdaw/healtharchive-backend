@@ -1,10 +1,6 @@
-
-import subprocess
 import sys
 from pathlib import Path
-from unittest.mock import MagicMock, patch
-
-import pytest
+from unittest.mock import patch
 
 # Import the script module.
 # Since it's a script in scripts/, we might need to add it to sys.path or import by path.
@@ -19,9 +15,10 @@ script_path = repo_root / "scripts" / "vps-tiering-metrics-textfile.py"
 sys.path.append(str(repo_root / "scripts"))
 
 # We import the module name. Since it has dashes, we must use importlib.
-import importlib.util
+import importlib.util  # noqa: E402
 
 spec = importlib.util.spec_from_file_location("vps_tiering_metrics", script_path)
+assert spec and spec.loader
 vps_script = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(vps_script)
 
@@ -74,27 +71,35 @@ class TestVpsTieringMetrics:
         # Create a dummy manifest
         manifest = tmp_path / "manifest"
         manifest.write_text("/src /dst\n")
-        
+
         # Output file
         out_file = "test.prom"
-        
+
         # Mocking external calls to avoid actual system interactions
-        with patch.object(vps_script, "_is_mountpoint", return_value=True), \
-             patch.object(vps_script, "_probe_readable_dir", return_value=(1, -1)), \
-             patch.object(vps_script, "_unit_ok", return_value=1), \
-             patch.object(vps_script, "_unit_failed", return_value=0):
-            
-            ret = vps_script.main([
-                "--out-dir", str(tmp_path),
-                "--out-file", out_file,
-                "--manifest", str(manifest),
-                "--storagebox-mount", str(tmp_path / "storagebox")
-            ])
-            
+        with (
+            patch.object(vps_script, "_is_mountpoint", return_value=True),
+            patch.object(vps_script, "_probe_readable_dir", return_value=(1, -1)),
+            patch.object(vps_script, "_unit_ok", return_value=1),
+            patch.object(vps_script, "_unit_failed", return_value=0),
+        ):
+            ret = vps_script.main(
+                [
+                    "--out-dir",
+                    str(tmp_path),
+                    "--out-file",
+                    out_file,
+                    "--manifest",
+                    str(manifest),
+                    "--storagebox-mount",
+                    str(tmp_path / "storagebox"),
+                ]
+            )
+
             assert ret == 0
             assert (tmp_path / out_file).exists()
             content = (tmp_path / out_file).read_text()
             assert "healtharchive_storagebox_mount_ok 1" in content
 
-from datetime import datetime, timezone
-import stat
+
+import stat  # noqa: E402
+from datetime import datetime, timezone  # noqa: E402

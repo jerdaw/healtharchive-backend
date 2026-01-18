@@ -54,4 +54,3 @@ def build_search_vector(
 
 
 __all__ = ["TS_CONFIG", "build_search_vector"]
-

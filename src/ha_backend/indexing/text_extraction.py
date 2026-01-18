@@ -8,7 +8,6 @@ from bs4 import BeautifulSoup, Tag
 
 from ha_backend.indexing.mapping import normalize_url_for_grouping
 
-
 # ---------------------------------------------------------------------------
 # Boilerplate phrase lists (bilingual EN/FR)
 # ---------------------------------------------------------------------------
@@ -446,4 +445,3 @@ __all__ = [
     "detect_is_archived",
     "extract_outlink_groups",
 ]
-

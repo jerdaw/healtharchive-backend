@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
-
 from ha_backend.search_ranking import (
     QueryMode,
     RankingConfig,

@@ -103,6 +103,8 @@ When you change behavior, do routine hygiene in the same series of commits:
   - Decision record: `docs/decisions/decision-template.md`
 - **Update Navigation**: When adding new files, add them to `mkdocs.yml` if you want them in the sidebar.
 - Add/adjust tests for new behavior and bug fixes to prevent regressions.
+  - Critical business logic modules require >80% line coverage.
+  - Use `pytest --cov=path/to/module tests/test_module.py` to verify locally.
 - Update `.gitignore` when you introduce new local artifacts, generated files, or caches.
 - Keep things tidy: remove dead code, unused imports, and accidental debug logging; keep scripts safe to re-run.
 - If you introduce new project conventions/workflows, update `AGENTS.md` to reflect them.

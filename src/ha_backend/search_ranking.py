@@ -108,7 +108,9 @@ def classify_query_mode(q_clean: str) -> QueryMode:
     return QueryMode.specific
 
 
-def get_ranking_config(*, mode: QueryMode, version: RankingVersion = RankingVersion.v2) -> RankingConfig:
+def get_ranking_config(
+    *, mode: QueryMode, version: RankingVersion = RankingVersion.v2
+) -> RankingConfig:
     """
     Get ranking coefficients based on query mode and ranking version.
 
@@ -439,5 +441,3 @@ __all__ = [
     "build_recency_boost_expr_postgres",
     "get_ts_rank_weights_array",
 ]
-
-
