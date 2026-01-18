@@ -21,11 +21,6 @@ Keep the two synced copies of this file aligned:
 
 ## Current ops tasks (implementation already exists; enable/verify)
 
-- Enable tiering health metrics + alerting (Ready for deployment):
-  - Script verified locally (`scripts/vps-tiering-metrics-textfile.py`).
-  - [ ] Enable on VPS: `sudo systemctl enable --now healtharchive-tiering-metrics.timer`
-  - [ ] Confirm metrics: `curl -s http://127.0.0.1:9100/metrics | rg '^healtharchive_tiering_'`
-  - [ ] Wire alerts (Prometheus/Alertmanager).
 
 ## IRL / external validation (pending)
 
