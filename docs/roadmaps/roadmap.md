@@ -63,18 +63,12 @@ Keep this list short; prefer linking to the canonical doc that explains the item
 
 - Consider whether a separate staging backend is worth it (increases ops surface; only do if it buys real safety).
   - See: `../deployment/environments-and-configuration.md`
-- Tiering health alerting (implemented):
-  - See `implemented/2026-01-17-ops-tiering-alerting-and-incident-followups.md`
-  - Enabled alerting on `healtharchive_storagebox_mount_ok`, `healtharchive_tiering_hot_path_ok`, etc.
 - Canary replay job (replay smoke independence):
   - Create a small, local-only replay job (no tiering) to use as a baseline smoke target.
   - Distinguishes "pywb is broken" from "storage tiering is broken".
 
 ### Operational documentation (active plans)
 
-- Disaster recovery and escalation procedures:
-  - `2026-01-17-disaster-recovery-and-escalation-procedures.md`
-  - RTO/RPO targets, VPS restoration, escalation paths, break-glass procedures.
 - SLA and service commitments:
   - `2026-01-17-sla-and-service-commitments.md`
   - Availability targets, response time SLOs, maintenance windows.
