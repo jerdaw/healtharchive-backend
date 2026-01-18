@@ -27,7 +27,7 @@ Canonical docs to consult first:
 - `docs/deployment/production-rollout-checklist.md` – production rollout steps.
 - `docs/operations/monitoring-and-ci-checklist.md` – monitoring, uptime, and CI guidance.
 - `docs/deployment/production-single-vps.md` – current production runbook (Hetzner + Tailscale-only SSH, nightly backups, NAS pull).
-- `docs/roadmaps/future-roadmap.md` – backlog of not-yet-implemented work.
+- `docs/roadmaps/roadmap.md` – backlog of not-yet-implemented work.
 - `docs/roadmaps/implemented/` – historical implementation plans (executed).
 - Frontend bilingual/dev architecture: `healtharchive-frontend/docs/development/bilingual-dev-guide.md`
 

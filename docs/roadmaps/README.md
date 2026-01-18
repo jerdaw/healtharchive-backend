@@ -2,7 +2,7 @@
 
 ## Current backlog
 
-- Future roadmap (what is *not* implemented yet): `future-roadmap.md`
+- Future roadmap (what is *not* implemented yet): `roadmap.md`
 
 ## Implementation plans (active)
 

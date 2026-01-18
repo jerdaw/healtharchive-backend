@@ -50,7 +50,7 @@ This is the set of documents that define *how* documentation is produced, mainta
 
 - Backlog and implementation plan workflow:
   - `healtharchive-backend/docs/roadmap-process.md`
-  - `healtharchive-backend/docs/roadmaps/future-roadmap.md`
+  - `healtharchive-backend/docs/roadmaps/roadmap.md`
   - `healtharchive-backend/docs/roadmaps/implemented/`
 
 ### Incidents and post-incident learning
@@ -116,7 +116,7 @@ Evidence:
 
 - Explicit canonical sources + pointer strategy.
 - Explicit separation:
-  - backlog (`roadmaps/future-roadmap.md`)
+  - backlog (`roadmaps/roadmap.md`)
   - active plans (`docs/roadmaps/*.md`)
   - canonical docs (deployment/ops/dev)
 

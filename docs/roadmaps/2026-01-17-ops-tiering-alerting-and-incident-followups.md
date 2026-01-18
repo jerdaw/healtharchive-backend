@@ -33,7 +33,7 @@ This is the highest-leverage operational work because:
    - File: `docs/roadmaps/2026-01-17-ops-tiering-alerting-and-incident-followups.md` (this document)
 
 2) **Backlog linkage**
-   - Update `docs/roadmaps/future-roadmap.md`:
+   - Update `docs/roadmaps/roadmap.md`:
      - Add link to this plan under "Ops surface / environments" section.
 
 3) **Roadmaps index**
@@ -256,7 +256,7 @@ to distinguish pywb failures from storage mount failures?
 Options:
 - **A) Implement canary replay now** — adds complexity but improves incident triage.
 - **B) Defer canary replay** — current tiering alerting + auto-recovery is sufficient for now.
-- **C) Document as backlog** — add to future-roadmap.md for later consideration.
+- **C) Document as backlog** — add to roadmap.md for later consideration.
 
 **Recommendation:** Option C (document as backlog). The tiering alerting and auto-recovery
 mechanisms are now in place, which reduces the urgency. Canary replay is a nice-to-have
@@ -270,7 +270,7 @@ Edit `docs/operations/incidents/2026-01-16-replay-smoke-503-and-warctieringfaile
 
 **Deliverables:**
 - Incident note updated with all action items addressed
-- Canary replay added to future-roadmap.md if deferred
+- Canary replay added to roadmap.md if deferred
 
 **Exit criteria:** Incident note shows all items complete or explicitly deferred.
 
@@ -347,7 +347,7 @@ Edit `docs/operations/healtharchive-ops-roadmap.md`:
 
 ### 5.2 Update future roadmap (if needed)
 
-If canary replay or per-job recovery were deferred, add them to `docs/roadmaps/future-roadmap.md`
+If canary replay or per-job recovery were deferred, add them to `docs/roadmaps/roadmap.md`
 under appropriate sections.
 
 ### 5.3 Archive this plan

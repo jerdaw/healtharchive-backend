@@ -14,7 +14,7 @@ If a step would impact production infrastructure (e.g., branch protection rules 
 
 ## Goal
 
-Deliver four roadmap items (selected from `docs/roadmaps/future-roadmap.md`) with minimal operational risk:
+Deliver four roadmap items (selected from `docs/roadmaps/roadmap.md`) with minimal operational risk:
 
 1) **Frontend archive “power controls” (URL-param based)**
 - Make advanced archive/search controls clearly discoverable and reliably shareable via URL parameters:
@@ -62,7 +62,7 @@ This repo separates backlog vs implementation plans vs canonical docs to avoid d
 - File: `docs/roadmaps/implemented/2026-01-03-crawl-safe-roadmap-batch.md` (this document)
 
 2) **Backlog linkage**
-- Update `docs/roadmaps/future-roadmap.md` to link the four selected backlog items to this plan, marked “active plan”.
+- Update `docs/roadmaps/roadmap.md` to link the four selected backlog items to this plan, marked “active plan”.
 
 3) **Roadmaps index**
 - Update `docs/roadmaps/README.md` to list this plan under “Implementation plans (active)”.
@@ -147,7 +147,7 @@ describing **what we will do and in what order**.
 
 ### 1) Frontend archive “power controls”
 
-Backlog reference: `docs/roadmaps/future-roadmap.md` (“Archive UX (frontend)”).
+Backlog reference: `docs/roadmaps/roadmap.md` (“Archive UX (frontend)”).
 
 Observed implementation (audit required):
 
@@ -166,7 +166,7 @@ Interpretation:
 
 ### 2) Dataset release pipeline hardening
 
-Backlog reference: `docs/roadmaps/future-roadmap.md` (“Dataset releases”).
+Backlog reference: `docs/roadmaps/roadmap.md` (“Dataset releases”).
 
 Current implementation:
 
@@ -193,7 +193,7 @@ Interpretation:
 
 ### 3) Repo governance / merge discipline
 
-Backlog reference: `docs/roadmaps/future-roadmap.md` (“Repo governance”).
+Backlog reference: `docs/roadmaps/roadmap.md` (“Repo governance”).
 
 Current scaffolding:
 
@@ -218,7 +218,7 @@ Interpretation:
 
 ### 4) External / IRL outreach + verification
 
-Backlog reference: `docs/roadmaps/future-roadmap.md` (“External / IRL work”).
+Backlog reference: `docs/roadmaps/roadmap.md` (“External / IRL work”).
 
 Existing docs/templates:
 
@@ -349,7 +349,7 @@ This plan is intentionally sequential. Complete each phase (and its verification
 Objective: confirm what already exists, define exact deltas, and avoid duplicate/phantom work.
 
 0.1 Inventory the exact backlog bullets covered
-- Source: `docs/roadmaps/future-roadmap.md`
+- Source: `docs/roadmaps/roadmap.md`
 - Record the four items and treat them as the only scope for this plan.
 
 0.2 Perform a reality-check audit for each item
@@ -838,7 +838,7 @@ Objective: ensure the roadmap reflects reality and the work is maintainable.
 - Ensure any modified behavior is documented in the canonical locations (frontend guide, ops runbooks, etc.).
 
 5.2 Update the backlog
-- In `docs/roadmaps/future-roadmap.md`:
+- In `docs/roadmaps/roadmap.md`:
   - remove completed items,
   - or rewrite them into a smaller “next” follow-up item if partial work remains.
 
@@ -853,5 +853,5 @@ Phase exit criteria:
 
 #### Phase 5 notes (completed 2026-01-03)
 
-- Updated backlog (`docs/roadmaps/future-roadmap.md`) so completed items are removed and ongoing operator-only work points to playbooks/logs instead of an “active plan”.
+- Updated backlog (`docs/roadmaps/roadmap.md`) so completed items are removed and ongoing operator-only work points to playbooks/logs instead of an “active plan”.
 - Archived this plan and updated roadmap indexes (`docs/roadmaps/README.md`, `docs/roadmaps/implemented/README.md`).

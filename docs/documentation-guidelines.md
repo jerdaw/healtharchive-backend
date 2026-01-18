@@ -9,7 +9,7 @@ Keep documentation accurate, minimal, and easy to maintain across repos.
 - Navigation config: `mkdocs.yml` (source of truth for sidebar structure).
 - Cross-repo environment wiring: `docs/deployment/environments-and-configuration.md`
 - Ops roadmap/todo: `docs/operations/healtharchive-ops-roadmap.md`
-- Future roadmap backlog (not-yet-implemented work): `docs/roadmaps/future-roadmap.md`
+- Future roadmap backlog (not-yet-implemented work): `docs/roadmaps/roadmap.md`
 - Implemented plans archive (historical records): `docs/roadmaps/implemented/`
 - Frontend documentation (canonical): https://github.com/jerdaw/healtharchive-frontend/tree/main/docs
 - Datasets documentation (canonical): https://github.com/jerdaw/healtharchive-datasets
@@ -208,7 +208,7 @@ Suggested cadence (keep it lightweight):
 This project separates **backlog** vs **implementation plans** vs **canonical docs** to reduce drift.
 
 - Short pointer (for new contributors): `roadmap-process.md`
-- `docs/roadmaps/future-roadmap.md` is the single backlog of not-yet-implemented items.
+- `docs/roadmaps/roadmap.md` is the single backlog of not-yet-implemented items.
 - When you start work, create a focused implementation plan under `docs/roadmaps/`.
 - When the work is done, update canonical docs (deployment/ops/dev) so the result is maintainable.
 - Then move the implementation plan into `docs/roadmaps/implemented/` with a dated filename.

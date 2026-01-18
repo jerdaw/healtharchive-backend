@@ -12,5 +12,5 @@ Canonical guidance:
 
 - Roadmap workflow: `documentation-guidelines.md`
 - Roadmaps index: `roadmaps/README.md`
-- Backlog: `roadmaps/future-roadmap.md`
+- Backlog: `roadmaps/roadmap.md`
 - Implemented plans archive: `roadmaps/implemented/README.md`
