@@ -17,7 +17,9 @@ from ha_backend.authority import recompute_page_signals
 from ha_backend.db import get_session
 from ha_backend.indexing.mapping import record_to_snapshot
 from ha_backend.indexing.text_extraction import (
+    detect_is_archived,
     detect_language,
+    extract_content_text,
     extract_outlink_groups,
     extract_text,
     extract_title,
@@ -236,6 +238,9 @@ def index_job(job_id: int) -> int:
                         snippet = make_snippet(text)
                         language = detect_language(text, rec.headers)
 
+                        # Compute is_archived flag for v3 ranking.
+                        is_archived = detect_is_archived(title, text)
+
                         snapshot = record_to_snapshot(
                             job=job,
                             source=job.source,
@@ -244,6 +249,7 @@ def index_job(job_id: int) -> int:
                             snippet=snippet,
                             language=language,
                         )
+                        snapshot.is_archived = is_archived
 
                         if has_pages:
                             group_key = snapshot.normalized_url_group
@@ -255,10 +261,13 @@ def index_job(job_id: int) -> int:
                         if use_postgres_fts:
                             from ha_backend.search import build_search_vector
 
+                            # Use extended content text (4KB) for better FTS recall.
+                            content_text = extract_content_text(html)
                             snapshot.search_vector = build_search_vector(
                                 title,
                                 snippet,
                                 rec.url,
+                                content_text=content_text,
                             )
 
                         if (

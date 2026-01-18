@@ -237,6 +237,12 @@ class Snapshot(TimestampMixin, Base):
     raw_snapshot_path: Mapped[Optional[str]] = mapped_column(Text)
     content_hash: Mapped[Optional[str]] = mapped_column(String(64))
 
+    # Archived detection flag computed at index time (v3 ranking).
+    # - NULL = unknown (legacy rows; fall back to heuristics)
+    # - True = archived page detected
+    # - False = not archived
+    is_archived: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True)
+
     job: Mapped[Optional[ArchiveJob]] = relationship(back_populates="snapshots")
     source: Mapped[Optional[Source]] = relationship(back_populates="snapshots")
     outlinks: Mapped[List["SnapshotOutlink"]] = relationship(
