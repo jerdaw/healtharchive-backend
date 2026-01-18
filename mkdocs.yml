@@ -168,7 +168,7 @@ nav:
               - Replay Smoke 503 (2026-01-16): operations/incidents/2026-01-16-replay-smoke-503-and-warctieringfailed.md
   - Planning & Roadmaps:
       - Active Work: roadmaps/README.md
-      - Future Roadmap: roadmaps/future-roadmap.md
+      - Future Roadmap: roadmaps/roadmap.md
       - Roadmap Process: roadmap-process.md
       - Implemented Plans: roadmaps/implemented/README.md
   - About:

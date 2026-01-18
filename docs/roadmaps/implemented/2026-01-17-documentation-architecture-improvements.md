@@ -245,7 +245,7 @@ nav:
   - Datasets: datasets-external/README.md
   - Roadmaps:
       - Overview: roadmaps/README.md
-      - Backlog: roadmaps/future-roadmap.md
+      - Backlog: roadmaps/roadmap.md
 ```
 
 **Deliverables:**
@@ -614,7 +614,7 @@ Move to `docs/roadmaps/implemented/` when complete.
 | Development | live-testing, dev-environment-setup, testing-guidelines |
 | Operations | monitoring-and-ci-checklist, ops-cadence-checklist, risk-register |
 | Playbooks | operator-responsibilities, deploy-and-verify, incident-response + category groupings |
-| Roadmaps | future-roadmap |
+| Roadmaps | roadmap |
 
 ### Documentation updates
 
@@ -680,7 +680,7 @@ nav:
   - Datasets: datasets-external/README.md
   - Roadmaps:
       - Overview: roadmaps/README.md
-      - Backlog: roadmaps/future-roadmap.md
+      - Backlog: roadmaps/roadmap.md
 ```
 
 This structure:

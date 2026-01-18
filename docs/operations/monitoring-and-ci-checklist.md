@@ -43,7 +43,7 @@ settings drift”.
      - CI still runs on every push to `main`.
      - Deploys are gated by “green main” + VPS verification steps (below).
    - **Mode B — Multi-committer (defer until needed): PR-only merges into `main`** with required
-     status checks + code owner review (track in `../roadmaps/future-roadmap.md`).
+     status checks + code owner review (track in `../roadmaps/roadmap.md`).
    - Switch to Mode B when there is more than one regular committer, or when you want stricter
      enforcement than “green main + local hooks”.
 
@@ -156,7 +156,7 @@ Verification:
 Future (tighten later):
 
 - When there are multiple committers or when you want stricter enforcement, switch to PR-only merges
-  and require the backend/frontend checks in branch protection (track in `../roadmaps/future-roadmap.md`).
+  and require the backend/frontend checks in branch protection (track in `../roadmaps/roadmap.md`).
 
 ### Step 3 — External uptime monitoring (operator; UptimeRobot settings)
 

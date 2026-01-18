@@ -30,4 +30,4 @@ Keep the two synced copies of this file aligned:
 
 Track external validation/outreach work (partner, verifier, mentions/citations log) in:
 
-- `../roadmaps/future-roadmap.md`
+- `../roadmaps/roadmap.md`
