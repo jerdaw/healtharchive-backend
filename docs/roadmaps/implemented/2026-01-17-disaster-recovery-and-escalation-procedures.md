@@ -1,6 +1,6 @@
 # Disaster recovery and escalation procedures (v1) — implementation plan
 
-Status: **planned** (created 2026-01-17)
+Status: **complete** (Implemented Jan 18, 2026)
 
 ## Goal
 
@@ -27,6 +27,9 @@ These documents are high priority because:
 - **Best practice** — any production service should have DR procedures documented.
 
 ## Docs setup (do first)
+
+**Status: Complete**
+
 
 1) **Create this plan doc**
    - File: `docs/roadmaps/2026-01-17-disaster-recovery-and-escalation-procedures.md` (this document)
@@ -135,6 +138,9 @@ These documents are high priority because:
 
 ## Phase 1 — Define RTO/RPO targets
 
+**Status: Complete**
+
+
 **Objective:** Establish and document recovery objectives with rationale.
 
 ### 1.1 Analyze service criticality
@@ -169,6 +175,8 @@ Create section in DR runbook explaining:
 ---
 
 ## Phase 2 — Document complete VPS restoration procedure
+
+**Status: Complete**
 
 **Objective:** Step-by-step procedure to restore HealthArchive from total VPS loss.
 
@@ -241,6 +249,8 @@ Post-recovery verification:
 
 ## Phase 3 — Document database restoration procedure
 
+**Status: Complete**
+
 **Objective:** Detailed procedure for PostgreSQL database restoration.
 
 ### 3.1 Document backup file location and format
@@ -292,20 +302,23 @@ After restoration:
 
 ## Phase 4 — Document archive root reconstruction
 
+**Status: Complete**
+
 **Objective:** Procedure for recovering WARC files and archive storage.
 
 ### 4.1 Document archive root structure
 
 ```
-/srv/healtharchive/archive/
-├── jobs/
-│   ├── hc-2026-01/
-│   │   ├── *.warc.gz
-│   │   └── .archive_state.json
-│   └── phac-2026-01/
-├── tiered/
-│   └── (storage box mount)
-└── manifests/
+/srv/healtharchive/jobs/
+├── <source_slug>-<year>-<month>/
+│   ├── warcs/
+│   │   ├── manifest.json
+│   │   └── warc-000001.warc.gz
+│   ├── provenance/
+│   │   ├── archive_state.json
+│   │   └── ...
+│   └── logs/
+└── tiered/ (mount point if active)
 ```
 
 ### 4.2 Document WARC recovery scenarios
@@ -347,6 +360,8 @@ If WARCs need to be re-tiered after recovery:
 ---
 
 ## Phase 5 — Document DR drill procedure and schedule
+
+**Status: Complete**
 
 **Objective:** Establish regular DR testing to validate procedures.
 
@@ -419,6 +434,8 @@ For each drill type:
 ---
 
 ## Phase 6 — Document escalation procedures
+
+**Status: Complete**
 
 **Objective:** Create escalation policy and contact management approach.
 
@@ -503,6 +520,8 @@ Contents to store:
 ---
 
 ## Phase 7 — Integration and finalization
+
+**Status: Complete**
 
 **Objective:** Integrate new docs into documentation structure and validate.
 

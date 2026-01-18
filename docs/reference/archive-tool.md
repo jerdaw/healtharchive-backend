@@ -54,7 +54,7 @@ The **archive_tool** is HealthArchive's internal crawler and orchestrator subpac
 
 ## Canonical Documentation
 
-**Full technical reference**: [`src/archive_tool/docs/documentation.md`](../../src/archive_tool/docs/documentation.md)
+**Full technical reference**: `src/archive_tool/docs/documentation.md`
 
 **1,508 lines covering**:
 - CLI interface and all flags
@@ -114,7 +114,7 @@ archive-tool automatically determines the run mode based on state:
 3. **New-with-Consolidation** - State complete, start new crawl but consolidate WARCs
 4. **Overwrite** - `--overwrite` flag set, delete everything and start fresh
 
-**See**: [`documentation.md` § Run Modes](../../src/archive_tool/docs/documentation.md) for decision tree
+**See**: `src/archive_tool/docs/documentation.md` (Run Modes) for decision tree
 
 ### Output Structure
 
@@ -274,7 +274,7 @@ pytest tests/test_warc_discovery.py
    - `tests/test_jobs_persistent.py` - CLI construction
    - `tests/test_archive_tool_*.py` - archive_tool behavior
 
-**See**: [`documentation.md` § Development](../../src/archive_tool/docs/documentation.md) for details
+**See**: `src/archive_tool/docs/documentation.md` (Development) for details
 
 ---
 
@@ -373,7 +373,7 @@ WARCs write continuously:
 
 ## Related Documentation
 
-- **Full archive_tool docs**: [`src/archive_tool/docs/documentation.md`](../../src/archive_tool/docs/documentation.md) (**Start here for details**)
+- **Full archive_tool docs**: `src/archive_tool/docs/documentation.md` (**Start here for details**)
 - **Backend integration**: [../architecture.md#5-archive_tool-integration](../architecture.md#5-archive_tool-integration--job-runner-ha_backendjobspy)
 - **Job execution**: [../architecture.md#52-run_persistent_job](../architecture.md#52-run_persistent_job--db-backed-jobs)
 - **CLI commands**: [cli-commands.md](cli-commands.md)

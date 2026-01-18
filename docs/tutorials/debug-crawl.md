@@ -146,7 +146,7 @@ ha-backend cleanup-job --id OLD_JOB_ID --mode temp
 rm -rf /mnt/nasd/nobak/healtharchive/jobs/hc/*/.tmp_*
 ```
 
-**See**: [Handle Low Disk](../operations/playbooks/handle-low-disk.md) playbook
+**See**: `operations/playbooks/manage-warc-cleanup.md`
 
 ---
 
@@ -447,7 +447,7 @@ cp docs/_templates/incident-template.md \
 
 If you discovered a new failure mode or solution:
 
-1. Update the relevant playbook (e.g., [Handle Failed Job](../operations/playbooks/handle-failed-job.md))
+1. Update the relevant playbook or this tutorial
 2. Add to troubleshooting FAQ
 3. Submit a PR
 
@@ -551,8 +551,8 @@ SELECT COUNT(*) FROM snapshots WHERE job_id = 42;
 
 If you're still stuck:
 
-1. **Check existing incidents**: [operations/incidents/](../operations/incidents/)
-2. **Review playbooks**: [operations/playbooks/](../operations/playbooks/)
+1. **Check existing incidents**: [operations/incidents/](../operations/incidents/README.md)
+2. **Review playbooks**: [operations/playbooks/](../operations/playbooks/README.md)
 3. **Search GitHub issues**: [github.com/jerdaw/healtharchive-backend/issues](https://github.com/jerdaw/healtharchive-backend/issues)
 4. **Ask for help**: Open a new issue with:
    - Job ID and status output
@@ -564,7 +564,6 @@ If you're still stuck:
 
 ## Related Resources
 
-- **Handle Failed Job Playbook**: [operations/playbooks/handle-failed-job.md](../operations/playbooks/handle-failed-job.md)
 - **Architecture Guide**: [architecture.md](../architecture.md)
 - **Archive Tool Documentation**: `src/archive_tool/docs/documentation.md`
 - **Incident Response**: [operations/playbooks/incident-response.md](../operations/playbooks/incident-response.md)

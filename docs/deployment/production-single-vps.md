@@ -8,6 +8,8 @@ SSH is private-only via **Tailscale**; the public internet only sees ports
 Use this as the canonical runbook for rebuilding the stack, auditing it, or
 explaining it to new operators.
 
+For recovery from total failure, see the [Disaster Recovery Runbook](disaster-recovery.md).
+
 ---
 
 ## 1) Hosting / topology
@@ -30,7 +32,7 @@ explaining it to new operators.
 
 ---
 
-## 2) Provision & OS hardening (Hetzner)
+## 2) Provision & OS hardening (Hetzner) {: #2-provision-os-hardening-hetzner }
 
 1) Create server:
    - Type: Cost-Optimized, x86, `cx33`
