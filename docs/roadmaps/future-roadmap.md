@@ -48,9 +48,6 @@ Keep this list short; prefer linking to the canonical doc that explains the item
 
 ### Search & relevance (backend)
 
-- Search ranking + snippet quality iteration (active plan):
-  - `2026-01-03-search-ranking-and-snippets-v3.md`
-  - Supporting docs/scripts: `../operations/search-quality.md`, `../operations/search-golden-queries.md`, `../../scripts/search-eval-run.sh`
 - Authority signals for relevance (optional): outlinks / page signals feeding into ranking and/or tie-breakers.
   - See: `../operations/search-quality.md` (“Backfill outlinks + authority signals”)
 
