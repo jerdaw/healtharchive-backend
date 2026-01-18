@@ -67,18 +67,6 @@ Keep this list short; prefer linking to the canonical doc that explains the item
   - Create a small, local-only replay job (no tiering) to use as a baseline smoke target.
   - Distinguishes "pywb is broken" from "storage tiering is broken".
 
-### Operational documentation (active plans)
-
-- SLA and service commitments:
-  - `2026-01-17-sla-and-service-commitments.md`
-  - Availability targets, response time SLOs, maintenance windows.
-
-### Test coverage improvements (active plan)
-
-- Critical business logic test coverage:
-  - `2026-01-17-test-coverage-critical-business-logic.md`
-  - Tests for: `diffing.py`, `changes.py`, `archive_storage.py`, `pages.py`, `archive_tool/strategies.py`.
-
 ### Repo governance (future)
 
 - Tighten GitHub merge discipline when there are multiple committers (PR-only + required checks).
