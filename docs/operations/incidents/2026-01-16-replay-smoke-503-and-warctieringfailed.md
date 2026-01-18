@@ -128,6 +128,7 @@ curl -s http://127.0.0.1:9100/metrics | rg '^healtharchive_replay_smoke_'
 ## Open questions (still unknown)
 
 - Can we make replay smoke targets independent of tiered-import mounts (e.g., keep a tiny always-local “canary replay” job) so storage tiering issues don’t mask replay regressions?
+  - **Decision:** Deferred to backlog. Tiering alerting (now implemented) addresses the immediate need for better detection. Canary replay is a future enhancement.
 - Should replay smoke include an explicit “WARC file exists + readable” check to disambiguate pywb failures vs storage failures?
 
 ## Action items (TODOs)
@@ -135,7 +136,7 @@ curl -s http://127.0.0.1:9100/metrics | rg '^healtharchive_replay_smoke_'
 - [x] Update playbooks to call out “restart replay after mount/tiering repairs” when smoke returns `503` but replay root is `200`. (owner=eng, priority=high, due=2026-01-16)
 - [x] Enable the storage hot-path auto-recover watchdog (`healtharchive-storage-hotpath-auto-recover.timer`) after validating thresholds. (owner=eng, priority=medium, due=2026-01-16)
 - [x] Document and apply `rshared` bind propagation for the replay service so nested mount repairs are visible without restarting pywb. (owner=eng, priority=high, due=2026-01-16)
-- [ ] Enable tiering health metrics + alerting so `healtharchive-warc-tiering.service` failures are visible quickly. (owner=eng, priority=medium, due=)
+- [x] Enable tiering health metrics + alerting so `healtharchive-warc-tiering.service` failures are visible quickly. (owner=eng, priority=medium, due=2026-01-18)
 
 ## Automation opportunities
 

@@ -60,6 +60,10 @@ As of 2026-01-16, the job showed many `net::ERR_HTTP2_PROTOCOL_ERROR` failures o
 - Many canada.ca pages timed out (90s navigation timeouts), increasing the chance of long “pending page” windows.
 - `hc` and `cihr` were both running; the safest recovery approach (stopping the worker) would interrupt both.
 
+## Decision: Manual Recovery (Option C)
+
+We elected to stick with the manual recover-stale-jobs procedure (documented in `../playbooks/crawl-stalls.md`) rather than automating granular per-job stops. The risk of interrupting a healthy concurrent job is acceptable given the rarity of stalls, and stopping the worker is the safest way to ensure no partial state corruption.
+
 ## Resolution / Recovery
 
 Performed on 2026-01-16 (VPS):
@@ -83,9 +87,10 @@ TBD (once recovered).
 
 ## Action items (TODOs)
 
-- [ ] After `cihr` completes (or during a maintenance window), perform the planned recovery steps and update this note with outcomes. (priority=high)
-- [ ] If the stall repeats, capture the specific repeated URL(s) and assess whether scope/timeout tuning is warranted. (priority=medium)
-- [ ] Consider tightening/clarifying automation boundaries: per-job recovery without stopping unrelated active crawls (if feasible). (priority=low)
+- [x] After `cihr` completes (or during a maintenance window), perform the planned recovery steps and update this note with outcomes. (priority=high)
+- [ ] (Pending Operator Check) If the stall repeats, capture the specific repeated URL(s) and assess whether scope/timeout tuning is warranted. (owner=ops, priority=medium)
+- [x] Consider tightening/clarifying automation boundaries: per-job recovery without stopping unrelated active crawls.
+  - **Decision:** Explicitly deferred/rejected in favor of manual "stop worker + recover" procedure (Option C) to minimize complexity.
 
 ## Automation opportunities
 

@@ -119,6 +119,8 @@ Installed rules (minimal, high-signal):
 - Job failures increased (failed/index_failed count delta > 0 over 30m)
 - Storage Box mount down (if tiering is enabled and metrics are present)
 - WARC tiering bind-mount service failed (if tiering is enabled and metrics are present)
+- Tiering metrics stale (if metrics timer fails for >2 hours)
+- Tiering hot path unreadable (stale sshfs mount)
 - Annual campaign sentinel failed or did not run (Jan 01 UTC; if enabled)
 
 ## Rollback

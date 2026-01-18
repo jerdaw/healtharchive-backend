@@ -15,7 +15,8 @@ Implemented plans:
 - `2026-01-03-ops-automation-verifier-improvements.md`
 - `2026-01-08-storagebox-sshfs-stale-mount-recovery-and-integrity.md`
 - `2026-01-17-documentation-architecture-improvements.md`
-- `2026-01-18-search-ranking-and-snippets-v3.md`
+- `2026-01-17-ops-tiering-alerting-and-incident-followups.md`
+- `2026-01-03-search-ranking-and-snippets-v3.md`
 
 Rules:
 
