@@ -12,6 +12,10 @@ fi
 echo "Start Phase 2: Code Deployment"
 echo "------------------------------"
 
+LOGFILE="/tmp/ha-phase2-deploy-$(date +%s).log"
+echo "Starting Phase 2 Deployment at $(date)" | tee -a "$LOGFILE"
+echo "Log file: $LOGFILE"
+
 # Ensure we are in the repo root
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
@@ -61,12 +65,20 @@ fi
 # 4. Update Dependencies
 if [[ -f ".venv/bin/pip" ]]; then
     echo "Updating python dependencies..."
-    # Suppress output unless error
-    if .venv/bin/pip install -q -e ".[dev]" 2> /tmp/pip_deploy_err.log; then
-        echo "  [OK] Dependencies synced"
+    # Match production requirements from vps-deploy.sh
+    if .venv/bin/pip install -q -e ".[dev]" "psycopg[binary]" 2> /tmp/pip_deploy_err.log; then
+        echo "  [OK] Dependencies synced (including psycopg[binary])"
     else
         echo "  [FAIL] Dependency install failed. See /tmp/pip_deploy_err.log"
         cat /tmp/pip_deploy_err.log
+        exit 1
+    fi
+    # 4b. Sanity check: can we import the code?
+    echo "Verifying python environment sanity..."
+    if .venv/bin/python3 -c "from ha_backend import job_registry; print('Import OK')" >> "$LOGFILE" 2>&1; then
+        echo "  [OK] ha_backend import verified"
+    else
+        echo "  [FAIL] ha_backend import FAILED. Check .venv and installation."
         exit 1
     fi
 else
