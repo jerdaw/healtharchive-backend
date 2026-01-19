@@ -57,5 +57,37 @@ echo "6. Checking Job Completion Hooks in jobs.py..."
 # Quick grep to see if we can find on_complete
 grep -n "def on_complete" src/ha_backend/jobs.py >> "$LOGFILE" 2>&1 || echo "No on_complete method found" >> "$LOGFILE"
 
+echo "7. Checking Runtime DB Configuration..."
+if [[ -f ".venv/bin/activate" ]]; then
+    source .venv/bin/activate
+    # Use python to check DB manually
+    python3 -c "
+import json
+from ha_backend.db import get_session
+from ha_backend.models import ArchiveJob
+with get_session() as session:
+    job = session.query(ArchiveJob).filter(ArchiveJob.id == 6).first()
+    if job:
+        print(f'Job 6 Tool Options: {json.dumps(job.tool_options, default=str)}')
+    else:
+        print('Job 6 not found in DB')
+" >> "$LOGFILE" 2>&1
+else
+    echo "  [WARN] .venv not found, skipping DB check" >> "$LOGFILE"
+fi
+
+echo "8. Checking Text Extraction Module Health..."
+if [[ -f ".venv/bin/activate" ]]; then
+    python3 -c "
+try:
+    from ha_backend.indexing import text_extraction
+    print('Text extraction module import: OK')
+except Exception as e:
+    print(f'Text extraction module import: FAIL ({e})')
+" >> "$LOGFILE" 2>&1
+else
+    echo "  [WARN] .venv not found, skipping module check" >> "$LOGFILE"
+fi
+
 echo "" | tee -a "$LOGFILE"
 echo "Phase 5 Investigation Complete. Review $LOGFILE for clues." | tee -a "$LOGFILE"
