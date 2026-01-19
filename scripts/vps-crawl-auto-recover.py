@@ -95,7 +95,7 @@ def _ensure_recovery_tool_options(job: ArchiveJob) -> bool:
     This is intentionally conservative:
     - enables monitoring (required for adaptive restart)
     - enables adaptive restart (container restart on stall)
-    - sets a small max restart cap if missing/zero
+    - ensures annual jobs have non-trivial restart + monitoring thresholds
     - preserves any existing explicit operator overrides
 
     Returns True if the job config was modified.
@@ -104,6 +104,9 @@ def _ensure_recovery_tool_options(job: ArchiveJob) -> bool:
     tool = dict(cfg.get("tool_options") or {})
 
     changed = False
+
+    campaign_kind = str(cfg.get("campaign_kind") or "").strip().lower()
+    is_annual = campaign_kind == "annual"
 
     # Required for any monitor-driven recovery strategies.
     if not bool(tool.get("enable_monitoring", False)):
@@ -118,12 +121,26 @@ def _ensure_recovery_tool_options(job: ArchiveJob) -> bool:
         max_restarts = int(tool.get("max_container_restarts") or 0)
     except (TypeError, ValueError):
         max_restarts = 0
-    if max_restarts <= 0:
-        # Long crawls (e.g., canada.ca) can exhaust a tiny restart budget early,
-        # leading to repeated manual intervention. Keep this conservative but
-        # non-trivial to improve self-healing.
-        tool["max_container_restarts"] = 6
+    min_restarts = 20 if is_annual else 6
+    if max_restarts < min_restarts:
+        # Long annual crawls can exhaust a tiny restart budget early, leading to
+        # repeated manual intervention. When recovering, bump low/missing values
+        # to a non-trivial minimum.
+        tool["max_container_restarts"] = min_restarts
         changed = True
+
+    if is_annual:
+        # For annual jobs, prefer tolerating "noisy but progressing" sites to
+        # avoid thrashing (restart loops + long idle backoffs).
+        if tool.get("error_threshold_timeout") is None:
+            tool["error_threshold_timeout"] = 50
+            changed = True
+        if tool.get("error_threshold_http") is None:
+            tool["error_threshold_http"] = 50
+            changed = True
+        if tool.get("backoff_delay_minutes") is None:
+            tool["backoff_delay_minutes"] = 2
+            changed = True
 
     if changed:
         cfg["tool_options"] = tool

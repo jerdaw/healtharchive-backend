@@ -2,12 +2,14 @@
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import stat
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
+from archive_tool.constants import STATE_FILE_NAME
 from ha_backend.crawl_stats import parse_crawl_log_progress
 from ha_backend.db import get_session
 from ha_backend.models import ArchiveJob, Source
@@ -238,6 +240,52 @@ def main(argv: list[str] | None = None) -> int:
     )
     _emit(lines, "# TYPE healtharchive_crawl_running_job_log_probe_errno gauge")
 
+    _emit(
+        lines,
+        "# HELP healtharchive_crawl_running_job_state_file_ok 1 if .archive_state.json exists and is a regular file.",
+    )
+    _emit(lines, "# TYPE healtharchive_crawl_running_job_state_file_ok gauge")
+    _emit(
+        lines,
+        "# HELP healtharchive_crawl_running_job_state_file_errno Errno observed when probing .archive_state.json, or -1 when OK.",
+    )
+    _emit(lines, "# TYPE healtharchive_crawl_running_job_state_file_errno gauge")
+    _emit(
+        lines,
+        "# HELP healtharchive_crawl_running_job_state_parse_ok 1 if .archive_state.json was parsed successfully.",
+    )
+    _emit(lines, "# TYPE healtharchive_crawl_running_job_state_parse_ok gauge")
+    _emit(
+        lines,
+        "# HELP healtharchive_crawl_running_job_state_mtime_age_seconds Seconds since .archive_state.json mtime, or -1 when unknown.",
+    )
+    _emit(lines, "# TYPE healtharchive_crawl_running_job_state_mtime_age_seconds gauge")
+    _emit(
+        lines,
+        "# HELP healtharchive_crawl_running_job_current_workers Current worker count from .archive_state.json, or -1 when unknown.",
+    )
+    _emit(lines, "# TYPE healtharchive_crawl_running_job_current_workers gauge")
+    _emit(
+        lines,
+        "# HELP healtharchive_crawl_running_job_worker_reductions_done Worker reductions done from .archive_state.json, or -1 when unknown.",
+    )
+    _emit(lines, "# TYPE healtharchive_crawl_running_job_worker_reductions_done gauge")
+    _emit(
+        lines,
+        "# HELP healtharchive_crawl_running_job_container_restarts_done Container restarts done from .archive_state.json, or -1 when unknown.",
+    )
+    _emit(lines, "# TYPE healtharchive_crawl_running_job_container_restarts_done gauge")
+    _emit(
+        lines,
+        "# HELP healtharchive_crawl_running_job_vpn_rotations_done VPN rotations done from .archive_state.json, or -1 when unknown.",
+    )
+    _emit(lines, "# TYPE healtharchive_crawl_running_job_vpn_rotations_done gauge")
+    _emit(
+        lines,
+        "# HELP healtharchive_crawl_running_job_temp_dirs_count Temp dir count tracked in .archive_state.json, or -1 when unknown.",
+    )
+    _emit(lines, "# TYPE healtharchive_crawl_running_job_temp_dirs_count gauge")
+
     for job, source_code in jobs:
         labels = f'job_id="{int(job.job_id)}",source="{source_code}"'
 
@@ -307,6 +355,54 @@ def main(argv: list[str] | None = None) -> int:
                     age_seconds = progress.last_progress_age_seconds(now_utc=now)
                     stalled = 1 if age_seconds >= float(args.stall_threshold_seconds) else 0
 
+        state_file_ok = 0
+        state_file_errno = 0
+        state_parse_ok = 0
+        state_mtime_age_seconds = -1.0
+        current_workers = -1
+        worker_reductions_done = -1
+        container_restarts_done = -1
+        vpn_rotations_done = -1
+        temp_dirs_count = -1
+
+        if output_dir_path and output_dir_ok:
+            state_path = output_dir_path / STATE_FILE_NAME
+            state_file_ok, state_file_errno = _probe_readable_file(state_path)
+            if state_file_ok:
+                try:
+                    st = state_path.stat()
+                except OSError as exc:
+                    state_file_ok = 0
+                    state_file_errno = int(exc.errno or -1)
+                else:
+                    state_mtime_age_seconds = max(0.0, now.timestamp() - float(st.st_mtime))
+                    try:
+                        raw = state_path.read_text(encoding="utf-8")
+                        data = json.loads(raw)
+                    except Exception:
+                        state_parse_ok = 0
+                    else:
+                        state_parse_ok = 1
+                        try:
+                            current_workers = int(data.get("current_workers"))
+                        except Exception:
+                            current_workers = -1
+                        try:
+                            worker_reductions_done = int(data.get("worker_reductions_done"))
+                        except Exception:
+                            worker_reductions_done = -1
+                        try:
+                            container_restarts_done = int(data.get("container_restarts_done"))
+                        except Exception:
+                            container_restarts_done = -1
+                        try:
+                            vpn_rotations_done = int(data.get("vpn_rotations_done"))
+                        except Exception:
+                            vpn_rotations_done = -1
+                        temp_dirs = data.get("temp_dirs_host_paths")
+                        if isinstance(temp_dirs, list):
+                            temp_dirs_count = len(temp_dirs)
+
         _emit(lines, f"healtharchive_crawl_running_job_progress_known{{{labels}}} {progress_known}")
         _emit(
             lines,
@@ -321,6 +417,35 @@ def main(argv: list[str] | None = None) -> int:
         _emit(lines, f"healtharchive_crawl_running_job_log_probe_ok{{{labels}}} {log_probe_ok}")
         _emit(
             lines, f"healtharchive_crawl_running_job_log_probe_errno{{{labels}}} {log_probe_errno}"
+        )
+        _emit(lines, f"healtharchive_crawl_running_job_state_file_ok{{{labels}}} {state_file_ok}")
+        _emit(
+            lines,
+            f"healtharchive_crawl_running_job_state_file_errno{{{labels}}} {state_file_errno}",
+        )
+        _emit(lines, f"healtharchive_crawl_running_job_state_parse_ok{{{labels}}} {state_parse_ok}")
+        _emit(
+            lines,
+            f"healtharchive_crawl_running_job_state_mtime_age_seconds{{{labels}}} {state_mtime_age_seconds:.0f}",
+        )
+        _emit(
+            lines, f"healtharchive_crawl_running_job_current_workers{{{labels}}} {current_workers}"
+        )
+        _emit(
+            lines,
+            f"healtharchive_crawl_running_job_worker_reductions_done{{{labels}}} {worker_reductions_done}",
+        )
+        _emit(
+            lines,
+            f"healtharchive_crawl_running_job_container_restarts_done{{{labels}}} {container_restarts_done}",
+        )
+        _emit(
+            lines,
+            f"healtharchive_crawl_running_job_vpn_rotations_done{{{labels}}} {vpn_rotations_done}",
+        )
+        _emit(
+            lines,
+            f"healtharchive_crawl_running_job_temp_dirs_count{{{labels}}} {temp_dirs_count}",
         )
 
     out_dir.mkdir(parents=True, exist_ok=True)
