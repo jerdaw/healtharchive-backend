@@ -59,6 +59,17 @@ Keep this list short; prefer linking to the canonical doc that explains the item
 - Storage/retention upgrades (only with a designed replay retention policy).
   - See: `../operations/growth-constraints.md`, `../deployment/replay-service-pywb.md`
 
+### Crawling & indexing reliability (backend)
+
+- Ensure WARC discovery and “WARC files” reporting are consistent across:
+  - operator status output (`ha-backend show-job`, `scripts/vps-crawl-status.sh`)
+  - indexing pipeline discovery (`ha_backend/indexing/warc_discovery.py`)
+  - cleanup semantics (`ha-backend cleanup-job`)
+  - See: `../architecture.md` (indexing + archive-tool integration)
+- Add a guardrail for “crawl completed but indexing never starts”:
+  - metrics + alerting + a short ops checklist (completion → indexing → indexed pages > 0).
+  - See: `../operations/monitoring-and-ci-checklist.md`
+
 ### Ops surface / environments (optional)
 
 - Consider whether a separate staging backend is worth it (increases ops surface; only do if it buys real safety).

@@ -154,6 +154,16 @@ ha-backend check-env           # shows archive root and checks writability
 ha-backend check-archive-tool  # runs 'archive-tool --help'
 ```
 
+### 5. Optional Git hooks
+
+This repo uses [pre-commit](https://pre-commit.com) and provides an optional
+pre-push hook helper:
+
+```bash
+pre-commit install
+bash scripts/install-pre-push-hook.sh
+```
+
 ---
 
 ## Running the API
