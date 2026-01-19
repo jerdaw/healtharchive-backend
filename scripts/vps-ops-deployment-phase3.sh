@@ -52,8 +52,12 @@ else
 fi
 
 # 2. Restart Timers
-echo "Restarting healtharchive-crawl-auto-recover.timer..."
+echo "Ensuring systemd is reloaded..."
+sudo systemctl daemon-reload
+
+echo "Restarting watchdog timers..."
 sudo systemctl restart healtharchive-crawl-auto-recover.timer
+sudo systemctl restart healtharchive-storage-hotpath-auto-recover.timer
 
 echo "Enabling and starting healtharchive-crawl-metrics.timer (NEW)..."
 sudo systemctl enable --now healtharchive-crawl-metrics.timer
