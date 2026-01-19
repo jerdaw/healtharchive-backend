@@ -1439,6 +1439,7 @@ def cmd_show_job(args: argparse.Namespace) -> None:
     """
     from .models import ArchiveJob as ORMArchiveJob
 
+    discovered_warc_count: int | None = None
     with get_session() as session:
         job = session.get(ORMArchiveJob, args.id)
         if job is None:
@@ -1467,6 +1468,16 @@ def cmd_show_job(args: argparse.Namespace) -> None:
         tool_opts = config.get("tool_options") or {}
         zimit_args = config.get("zimit_passthrough_args") or []
 
+        # Best-effort, on-demand WARC discovery to avoid misleading "0" counts
+        # for long-running crawls (job.warc_file_count is primarily updated by
+        # the indexing pipeline).
+        try:
+            from .indexing.warc_discovery import discover_warcs_for_job
+
+            discovered_warc_count = len(discover_warcs_for_job(job))
+        except Exception:
+            discovered_warc_count = None
+
     print(f"ID:              {job_id}")
     print(f"Source:          {source_code} ({source_name})")
     print(f"Name:            {name}")
@@ -1480,6 +1491,10 @@ def cmd_show_job(args: argparse.Namespace) -> None:
     print(f"Crawler RC:      {crawler_exit_code}")
     print(f"Crawler status:  {crawler_status}")
     print(f"WARC files:      {warc_file_count}")
+    if discovered_warc_count is None:
+        print("WARC files (discovered): (unknown)")
+    else:
+        print(f"WARC files (discovered): {discovered_warc_count}")
     print(f"Indexed pages:   {indexed_page_count}")
     print("")
     print("Config:")

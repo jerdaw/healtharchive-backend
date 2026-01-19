@@ -89,3 +89,32 @@ def test_metrics_emits_archive_state_counters(tmp_path, monkeypatch) -> None:
     assert f"healtharchive_crawl_running_job_container_restarts_done{{{labels}}} 3" in content
     assert f"healtharchive_crawl_running_job_vpn_rotations_done{{{labels}}} 0" in content
     assert f"healtharchive_crawl_running_job_temp_dirs_count{{{labels}}} 2" in content
+
+
+def test_metrics_emits_indexing_pending_job_age(tmp_path, monkeypatch) -> None:
+    _init_test_db(tmp_path, monkeypatch)
+
+    out_dir = tmp_path / "textfile"
+    out_file = "healtharchive_crawl.prom"
+
+    with get_session() as session:
+        seed_sources(session)
+        session.flush()
+        source = session.query(Source).filter_by(code="hc").one()
+        job = ArchiveJob(
+            source=source,
+            name="hc-completed",
+            output_dir=str(tmp_path / "jobdir"),
+            status="completed",
+            finished_at=datetime.now(timezone.utc),
+        )
+        session.add(job)
+        session.commit()
+
+    module = _load_script_module()
+    rc = int(module.main(["--out-dir", str(out_dir), "--out-file", out_file]))
+    assert rc == 0
+
+    content = (out_dir / out_file).read_text(encoding="utf-8")
+    assert "healtharchive_indexing_pending_jobs 1" in content
+    assert 'healtharchive_indexing_pending_jobs_by_source{source="hc"} 1' in content
