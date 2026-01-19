@@ -26,6 +26,7 @@ Canonical docs to consult first:
 - `docs/deployment/staging-rollout-checklist.md` – staging rollout steps.
 - `docs/deployment/production-rollout-checklist.md` – production rollout steps.
 - `docs/operations/monitoring-and-ci-checklist.md` – monitoring, uptime, and CI guidance.
+- `docs/operations/monitoring-and-alerting.md` – **NEW (2026):** Critical crawl metrics and alert thresholds strategies.
 - `docs/deployment/production-single-vps.md` – current production runbook (Hetzner + Tailscale-only SSH, nightly backups, NAS pull).
 - `docs/roadmaps/roadmap.md` – backlog of not-yet-implemented work.
 - `docs/roadmaps/implemented/` – historical implementation plans (executed).
@@ -40,11 +41,12 @@ When you’re doing anything beyond tiny local changes, **open those docs and sy
 From the repo root (Python project):
 
 - Create venv (if not already done) – adjust to my actual workflow:
+
   ```bash
   make venv
   ```
 
-* Run checks (what CI blocks on):
+- Run checks (what CI blocks on):
 
   ```bash
   make ci

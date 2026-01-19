@@ -66,11 +66,6 @@ Keep this list short; prefer linking to the canonical doc that explains the item
   - indexing pipeline discovery (`ha_backend/indexing/warc_discovery.py`)
   - cleanup semantics (`ha-backend cleanup-job`)
   - See: `../architecture.md` (indexing + archive-tool integration)
-- Add a guardrail for “crawl completed but indexing never starts”:
-  - metrics + alerting + a short ops checklist (completion → indexing → indexed pages > 0).
-  - See: `../operations/monitoring-and-ci-checklist.md`
-
-### Ops surface / environments (optional)
 
 - Consider whether a separate staging backend is worth it (increases ops surface; only do if it buys real safety).
   - See: `../deployment/environments-and-configuration.md`
