@@ -15,6 +15,9 @@ build/
 dist/
 *.egg-info/
 
+# Tool caches (local)
+.cache/
+
 # Editor / OS
 .idea/
 .vscode/

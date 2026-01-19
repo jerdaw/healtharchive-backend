@@ -1431,12 +1431,16 @@ Given `--output-dir /data/archive` and `--name example`, you’ll see:
   -- \
   --profile my-zimit-profile \
   --scope-page \
-  --max-pages 500000
+  --pageLimit 500000
 ```
 
 * First run: `initial_run_mode = "Fresh Crawl"`.
 * If stable and finishes → final ZIM built and temp dirs cleaned.
 * If unstable, it can:
+
+Note: `--pageLimit` is for development / bounded test runs. HealthArchive’s
+annual campaign policy uses no page/depth limits; rely on explicit scope rules
+instead.
 
   * Reduce `--workers` down (within limits).
   * Rotate VPN (within limits and frequency).

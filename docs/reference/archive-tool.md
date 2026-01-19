@@ -140,13 +140,12 @@ output_dir/
 **`.archive_state.json`**:
 ```json
 {
-  "run_mode": "Fresh",
-  "temp_dir_counter": 1,
-  "temp_dirs": [".tmp_1"],
-  "current_stage": "crawl",
-  "is_complete": false,
-  "created_at": "2026-01-18T20:00:00Z",
-  "updated_at": "2026-01-18T20:30:00Z"
+  "current_workers": 4,
+  "initial_workers": 4,
+  "temp_dirs_host_paths": ["/some/output/.tmp123", "..."],
+  "vpn_rotations_done": 1,
+  "worker_reductions_done": 1,
+  "container_restarts_done": 1
 }
 ```
 

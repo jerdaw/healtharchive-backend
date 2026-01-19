@@ -217,6 +217,8 @@ Look for:
 - `crawlStatus` counters increasing over time (`crawled` ticks up).
 - `healtharchive_crawl_running_job_stalled == 0`
 - `last_progress_age_seconds` small (tens of seconds to a few minutes).
+- `healtharchive_crawl_running_job_state_parse_ok == 1` (state file readable; no sshfs weirdness)
+- `healtharchive_crawl_running_job_container_restarts_done` not climbing rapidly (avoid restart thrash)
 - new `.warc.gz` files appearing under the job’s active temp dir.
 
 ### 3) Metrics writers are healthy

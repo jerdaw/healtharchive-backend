@@ -335,10 +335,15 @@ Examples:
   - `default_tool_options`:
     - `cleanup = False`
     - `overwrite = False`
-    - `enable_monitoring = False` (can be changed per environment)
-    - `enable_adaptive_workers = False`
-    - `enable_vpn_rotation = False`
+    - `enable_monitoring = True` (required for adaptive strategies)
+    - `enable_adaptive_workers = True`
+    - `enable_adaptive_restart = True`
+    - `enable_vpn_rotation = False` (disabled by default)
     - `initial_workers = 1`
+    - `error_threshold_timeout = 50`
+    - `error_threshold_http = 50`
+    - `backoff_delay_minutes = 2`
+    - `max_container_restarts = 20`
     - `log_level = "INFO"`
 
 - `phac` (Public Health Agency of Canada) is similar with a PHAC home page seed.
@@ -386,10 +391,15 @@ Result structure:
   "tool_options": {
     "cleanup": false,
     "overwrite": false,
-    "enable_monitoring": false,
-    "enable_adaptive_workers": false,
+    "enable_monitoring": true,
+    "enable_adaptive_workers": true,
+    "enable_adaptive_restart": true,
     "enable_vpn_rotation": false,
     "initial_workers": 1,
+    "error_threshold_timeout": 50,
+    "error_threshold_http": 50,
+    "backoff_delay_minutes": 2,
+    "max_container_restarts": 20,
     "log_level": "INFO"
   }
 }
@@ -515,13 +525,16 @@ Responsibilities:
 
    - Zimit passthrough:
 
-     - `zimit_passthrough_args` are appended **after** a literal `"--"` so
-       `archive_tool` passes them directly to `zimit`.
+     - `zimit_passthrough_args` are appended directly (no explicit `"--"`
+       separator is required): `archive_tool` uses `argparse.parse_known_args()`
+       and passes unknown args through to `zimit`.
+     - For `ha-backend run-job`, a leading `"--"` is accepted and stripped for
+       convenience when passing through flags interactively.
 
    - The final `extra_args` passed to `RuntimeArchiveJob.run(...)` look like:
 
      ```bash
-     [archive_tool_flags..., "--", zimit_passthrough_args...]
+     [archive_tool_flags..., zimit_passthrough_args...]
      ```
 
 3. **Execute archive_tool**:
@@ -550,10 +563,13 @@ Responsibilities:
 
      - `crawler_exit_code = rc`
      - `finished_at = now`
+     - `combined_log_path` is recorded best-effort (newest `archive_*.combined.log`)
      - `status = "completed"` and `crawler_status = "success"` if `rc == 0`
      - Otherwise:
-       - `status = "failed"`
-       - `crawler_status = "failed"`
+       - `status = "retryable"`, `crawler_status = "infra_error"` for storage/mount failures
+       - `status = "failed"`, `crawler_status = "infra_error_config"` for CLI/config/runtime errors
+         (e.g., invalid `zimit_passthrough_args`)
+       - `status = "failed"`, `crawler_status = "failed"` for normal crawl failures
 
 The worker uses `run_persistent_job(job_id)` for each queued job.
 
@@ -569,26 +585,21 @@ The backend and ``archive_tool`` share a small but important contract:
     ```json
     {
       "seeds": ["https://...", "..."],
-      "zimit_passthrough_args": ["--pageLimit", "10"],
+      "zimit_passthrough_args": ["--scopeType", "host"],
       "tool_options": {
         "cleanup": false,
         "overwrite": false,
-        "enable_monitoring": false,
-        "enable_adaptive_workers": false,
+        "enable_monitoring": true,
+        "enable_adaptive_workers": true,
+        "enable_adaptive_restart": true,
         "enable_vpn_rotation": false,
         "initial_workers": 1,
         "log_level": "INFO",
         "relax_perms": true,
-        "monitor_interval_seconds": 30,
-        "stall_timeout_minutes": 30,
-        "error_threshold_timeout": 10,
-        "error_threshold_http": 10,
-        "min_workers": 1,
-        "max_worker_reductions": 2,
-        "vpn_connect_command": "vpn connect ca",
-        "max_vpn_rotations": 3,
-        "vpn_rotation_frequency_minutes": 60,
-        "backoff_delay_minutes": 15
+        "error_threshold_timeout": 50,
+        "error_threshold_http": 50,
+        "max_container_restarts": 20,
+        "backoff_delay_minutes": 2
       }
     }
     ```

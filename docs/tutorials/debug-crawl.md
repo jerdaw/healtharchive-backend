@@ -370,7 +370,10 @@ ha-backend create-job --source hc \
 - `initial_workers: 2` → More parallelism (or `1` if resource-constrained)
 - `enable_monitoring: true` → Enable stall detection
 - `stall_timeout_minutes: 60` → Abort if no progress for 60 mins
-- `page_limit: 1000` → Limit crawl scope (via `zimit_passthrough_args`)
+- `error_threshold_timeout: 50` → Tolerate more timeouts before adaptations
+- `error_threshold_http: 50` → Tolerate more HTTP/network errors before adaptations
+- `backoff_delay_minutes: 2` → Shorten post-adaptation sleep on single-worker hosts
+- `page_limit: 1000` → Limit crawl scope for development/testing (avoid for annual campaign completeness)
 
 ### Resume Existing Crawl
 
