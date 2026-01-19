@@ -20,6 +20,59 @@ from .models import ArchiveJob as ORMArchiveJob
 
 logger = logging.getLogger("healtharchive.jobs")
 
+_LOG_CONFIG_ERROR_MARKERS = (
+    "unrecognized arguments",
+    "unknown option",
+)
+
+
+def _find_latest_combined_log(output_dir: Path) -> Path | None:
+    try:
+        st = output_dir.stat()
+    except OSError:
+        return None
+    if not stat.S_ISDIR(st.st_mode):
+        return None
+
+    try:
+        candidates = list(output_dir.glob("archive_*.combined.log"))
+    except OSError:
+        return None
+    if not candidates:
+        return None
+
+    latest: Path | None = None
+    latest_mtime: float | None = None
+    for p in candidates:
+        try:
+            mtime = float(p.stat().st_mtime)
+        except OSError:
+            continue
+        if latest_mtime is None or mtime > latest_mtime:
+            latest = p
+            latest_mtime = mtime
+    return latest
+
+
+def _read_log_tail(path: Path, *, max_bytes: int = 64 * 1024) -> str:
+    if max_bytes <= 0:
+        return ""
+    try:
+        size = path.stat().st_size
+    except OSError:
+        return ""
+    try:
+        with open(path, "rb") as f:
+            f.seek(max(0, int(size) - int(max_bytes)))
+            return f.read().decode("utf-8", errors="replace")
+    except Exception:
+        return ""
+
+
+def _looks_like_config_error_from_log(tail: str) -> bool:
+    lower = tail.lower()
+    return any(marker in lower for marker in _LOG_CONFIG_ERROR_MARKERS)
+
 
 @dataclass
 class RuntimeArchiveJob:
@@ -352,6 +405,10 @@ def run_persistent_job(job_id: int) -> int:
         job_row = _load_job_for_update(session, job_id)
         job_row.finished_at = finished
 
+        combined_log_path = _find_latest_combined_log(Path(job_row.output_dir))
+        if combined_log_path is not None:
+            job_row.combined_log_path = str(combined_log_path)
+
         if run_exc is not None:
             if is_storage_infra_error(run_exc):
                 job_row.status = "retryable"
@@ -390,6 +447,18 @@ def run_persistent_job(job_id: int) -> int:
                 job_row.status = "retryable"
                 job_row.crawler_status = "infra_error"
             else:
+                # Classify common CLI/runtime errors (e.g. invalid Zimit args) as
+                # infra_error_config so the worker doesn't churn retry budget.
+                #
+                # Note: we keep this heuristic intentionally narrow and only
+                # inspect the combined log tail to avoid reading large logs.
+                if combined_log_path is not None:
+                    tail = _read_log_tail(combined_log_path)
+                    if _looks_like_config_error_from_log(tail):
+                        job_row.status = "failed"
+                        job_row.crawler_status = "infra_error_config"
+                        job_row.crawler_exit_code = rc
+                        return int(rc)
                 job_row.status = "failed"
                 job_row.crawler_status = "failed"
 

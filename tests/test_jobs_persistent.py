@@ -162,7 +162,7 @@ def test_run_persistent_job_builds_monitoring_and_vpn_args(tmp_path, monkeypatch
         "60",
         "--enable-adaptive-restart",
         "--max-container-restarts",
-        "6",
+        "20",
         "--backoff-delay-minutes",
         "15",
         "--relax-perms",
@@ -214,3 +214,56 @@ def test_run_persistent_job_marks_storage_infra_errors_retryable(tmp_path, monke
         assert stored.crawler_exit_code is None
         assert stored.started_at is not None
         assert stored.finished_at is not None
+
+
+def test_run_persistent_job_marks_cli_usage_errors_as_infra_error_config(
+    tmp_path, monkeypatch
+) -> None:
+    """
+    If the underlying crawler exits quickly with a CLI usage/config error, the
+    job should be marked as infra_error_config so the worker doesn't churn the
+    retry budget.
+    """
+    _init_test_db(tmp_path, monkeypatch)
+    monkeypatch.setenv("HEALTHARCHIVE_ARCHIVE_ROOT", str(tmp_path / "jobs"))
+
+    with get_session() as session:
+        seed_sources(session)
+
+    with get_session() as session:
+        job_row = create_job_for_source("cihr", session=session)
+        job_id = job_row.id
+
+    class UsageErrorRuntime:
+        def __init__(self, name, seeds):
+            self.name = name
+            self.seeds = list(seeds)
+
+        def run(self, **kwargs):
+            output_dir = Path(str(kwargs["output_dir_override"]))
+            output_dir.mkdir(parents=True, exist_ok=True)
+            log_path = output_dir / "archive_new_crawl_phase_-_attempt_1_test.combined.log"
+            log_path.write_text(
+                "\n".join(
+                    [
+                        "[zimit::2026-01-19 12:29:14,718] INFO:Running: warc2zim --name cihr --max-pages 20000",
+                        "zimit: error: unrecognized arguments: --max-pages",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            return 1
+
+    monkeypatch.setattr("ha_backend.jobs.RuntimeArchiveJob", UsageErrorRuntime)
+
+    rc = run_persistent_job(job_id)
+    assert rc == 1
+
+    with get_session() as session:
+        stored = session.get(ArchiveJob, job_id)
+        assert stored is not None
+        assert stored.status == "failed"
+        assert stored.crawler_status == "infra_error_config"
+        assert stored.crawler_exit_code == 1
+        assert stored.combined_log_path is not None

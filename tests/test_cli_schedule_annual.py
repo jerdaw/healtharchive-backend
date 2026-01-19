@@ -78,6 +78,10 @@ def test_schedule_annual_apply_creates_jobs_ordered_and_labeled(tmp_path, monkey
         ]
         assert all(job.status == "queued" for job in jobs)
         assert all(job.queued_at is not None for job in jobs)
+        assert jobs[0].queued_at is not None
+        assert jobs[1].queued_at is not None
+        assert jobs[2].queued_at is not None
+        assert jobs[0].queued_at < jobs[1].queued_at < jobs[2].queued_at
 
         for job in jobs:
             cfg = job.config or {}
