@@ -24,6 +24,13 @@ class RunningJob:
     combined_log_path: str | None
 
 
+@dataclass(frozen=True)
+class PendingIndexJob:
+    job_id: int
+    source_code: str
+    finished_at: datetime | None
+
+
 def _dt_to_epoch_seconds(dt: datetime) -> int:
     return int(dt.astimezone(timezone.utc).timestamp())
 
@@ -147,6 +154,7 @@ def main(argv: list[str] | None = None) -> int:
 
     metrics_ok = 1
     jobs: list[tuple[RunningJob, str]] = []
+    pending_index_jobs: list[PendingIndexJob] = []
     try:
         with get_session() as session:
             rows = (
@@ -175,9 +183,26 @@ def main(argv: list[str] | None = None) -> int:
                 )
                 for job_id, source_code, started_at, output_dir, combined_log_path in rows
             ]
+
+            pending_rows = (
+                session.query(ArchiveJob.id, Source.code, ArchiveJob.finished_at)
+                .join(Source, ArchiveJob.source_id == Source.id)
+                .filter(ArchiveJob.status == "completed")
+                .order_by(ArchiveJob.finished_at.asc().nullsfirst(), ArchiveJob.id.asc())
+                .all()
+            )
+            pending_index_jobs = [
+                PendingIndexJob(
+                    job_id=int(job_id),
+                    source_code=str(source_code),
+                    finished_at=finished_at,
+                )
+                for job_id, source_code, finished_at in pending_rows
+            ]
     except Exception:
         metrics_ok = 0
         jobs = []
+        pending_index_jobs = []
 
     lines: list[str] = []
     _emit(
@@ -198,6 +223,56 @@ def main(argv: list[str] | None = None) -> int:
     )
     _emit(lines, "# TYPE healtharchive_crawl_running_jobs gauge")
     _emit(lines, f"healtharchive_crawl_running_jobs {len(jobs)}")
+
+    _emit(
+        lines,
+        "# HELP healtharchive_indexing_pending_jobs Number of jobs currently in status=completed (crawl done, indexing not done).",
+    )
+    _emit(lines, "# TYPE healtharchive_indexing_pending_jobs gauge")
+    _emit(lines, f"healtharchive_indexing_pending_jobs {len(pending_index_jobs)}")
+
+    _emit(
+        lines,
+        "# HELP healtharchive_indexing_pending_job_max_age_seconds Max age (seconds) since finished_at among status=completed jobs, or 0 when none.",
+    )
+    _emit(lines, "# TYPE healtharchive_indexing_pending_job_max_age_seconds gauge")
+
+    max_pending_age_seconds = 0.0
+    pending_by_source: dict[str, list[PendingIndexJob]] = {}
+    for j in pending_index_jobs:
+        pending_by_source.setdefault(j.source_code, []).append(j)
+        if j.finished_at is not None:
+            max_pending_age_seconds = max(
+                max_pending_age_seconds, _age_seconds(j.finished_at, now_utc=now)
+            )
+    _emit(
+        lines, f"healtharchive_indexing_pending_job_max_age_seconds {max_pending_age_seconds:.0f}"
+    )
+
+    _emit(
+        lines,
+        "# HELP healtharchive_indexing_pending_jobs_by_source Number of status=completed jobs grouped by source.",
+    )
+    _emit(lines, "# TYPE healtharchive_indexing_pending_jobs_by_source gauge")
+    _emit(
+        lines,
+        "# HELP healtharchive_indexing_pending_job_max_age_seconds_by_source Max age (seconds) since finished_at for status=completed jobs, by source.",
+    )
+    _emit(lines, "# TYPE healtharchive_indexing_pending_job_max_age_seconds_by_source gauge")
+
+    for source_code, source_jobs in sorted(pending_by_source.items(), key=lambda kv: kv[0]):
+        max_age_source = 0.0
+        for j in source_jobs:
+            if j.finished_at is not None:
+                max_age_source = max(max_age_source, _age_seconds(j.finished_at, now_utc=now))
+        labels = f'source="{source_code}"'
+        _emit(
+            lines, f"healtharchive_indexing_pending_jobs_by_source{{{labels}}} {len(source_jobs)}"
+        )
+        _emit(
+            lines,
+            f"healtharchive_indexing_pending_job_max_age_seconds_by_source{{{labels}}} {max_age_source:.0f}",
+        )
 
     _emit(
         lines,

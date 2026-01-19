@@ -63,6 +63,65 @@ groups:
           description: "The number of jobs in failed/index_failed increased in the last 30m. Check admin jobs list for the most recent failures and error messages."
           runbook_url: "https://github.com/jerdaw/healtharchive-backend/blob/main/docs/operations/playbooks/incident-response.md"
 
+  - name: healtharchive.crawl
+    rules:
+      - alert: HealthArchiveCrawlMetricsMissing
+        expr: healtharchive_crawl_metrics_ok == 0
+        for: 15m
+        labels:
+          severity: warning
+          service: healtharchive
+        annotations:
+          summary: "Crawl metrics textfile writer failing"
+          description: "The crawl metrics textfile script is failing (healtharchive_crawl_metrics_ok==0). Check healtharchive-crawl-metrics.service logs and storage mount health."
+          runbook_url: "https://github.com/jerdaw/healtharchive-backend/blob/main/docs/tutorials/debug-crawl.md"
+
+      - alert: HealthArchiveCrawlStateFileParseFailed
+        expr: |
+          healtharchive_crawl_running_job_state_file_ok == 1
+          and healtharchive_crawl_running_job_state_parse_ok == 0
+        for: 10m
+        labels:
+          severity: warning
+          service: healtharchive
+        annotations:
+          summary: "Running job state file unreadable/unparseable"
+          description: "A running job has a .archive_state.json file but it is failing to parse. This can indicate partial writes, storage errors, or unexpected schema changes. job_id={{ $labels.job_id }} source={{ $labels.source }}."
+          runbook_url: "https://github.com/jerdaw/healtharchive-backend/blob/main/docs/tutorials/debug-crawl.md"
+
+      - alert: HealthArchiveCrawlStalled
+        expr: healtharchive_crawl_running_job_stalled == 1
+        for: 30m
+        labels:
+          severity: warning
+          service: healtharchive
+        annotations:
+          summary: "Crawl appears stalled (no crawlStatus progress)"
+          description: "A running job has not increased its crawled count for the configured stall threshold. job_id={{ $labels.job_id }} source={{ $labels.source }}."
+          runbook_url: "https://github.com/jerdaw/healtharchive-backend/blob/main/docs/tutorials/debug-crawl.md"
+
+      - alert: HealthArchiveCrawlContainerRestartsHigh
+        expr: healtharchive_crawl_running_job_container_restarts_done >= 10
+        for: 15m
+        labels:
+          severity: warning
+          service: healtharchive
+        annotations:
+          summary: "High container restart count during crawl"
+          description: "A running job has performed many container restarts (adaptive restart). job_id={{ $labels.job_id }} source={{ $labels.source }} restarts={{ $value }}."
+          runbook_url: "https://github.com/jerdaw/healtharchive-backend/blob/main/docs/tutorials/debug-crawl.md"
+
+      - alert: HealthArchiveIndexingNotStarted
+        expr: healtharchive_indexing_pending_job_max_age_seconds > 3600
+        for: 15m
+        labels:
+          severity: warning
+          service: healtharchive
+        annotations:
+          summary: "Crawl completed but indexing not starting"
+          description: "At least one job has status=completed for over an hour (crawl done, indexing not done). Check healtharchive-worker.service and worker logs."
+          runbook_url: "https://github.com/jerdaw/healtharchive-backend/blob/main/docs/operations/playbooks/annual-campaign.md"
+
   - name: healtharchive.tiering
     rules:
       - alert: HealthArchiveStorageBoxMountDown

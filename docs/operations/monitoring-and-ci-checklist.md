@@ -476,6 +476,19 @@ The metrics endpoint exposes, among others:
 
 These are **examples**, not full rules, but can guide what you set up:
 
+- Crawl state file unhealthy:
+
+  - Alert if `healtharchive_crawl_running_job_state_file_ok==1` but
+    `healtharchive_crawl_running_job_state_parse_ok==0` for >10m.
+
+- Crawl stalled:
+
+  - Alert if `healtharchive_crawl_running_job_stalled==1` for >30m.
+
+- Crawl completed but indexing not starting:
+
+  - Alert if `healtharchive_indexing_pending_job_max_age_seconds` exceeds your SLA (e.g., >1h).
+
 - High job failure rate:
 
   - Alert if `healtharchive_jobs_total{status="failed"}` jumps unexpectedly
