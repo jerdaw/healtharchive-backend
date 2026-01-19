@@ -55,13 +55,19 @@ fi
 
 echo "4. Verifying WARC Accumulation (Hot Path)..."
 # Check for very recent WARCs (last 10 mins) to confirm active crawling
-RECENT_WARCS=$(find /srv/healtharchive/jobs/hc -name "*.warc.gz" -type f -mmin -10 | wc -l)
-echo "Recent WARCs (last 10m): $RECENT_WARCS" | tee -a "$LOGFILE"
+# Dynamically find the job directory if possible, or fallback to known path
+JOB_DIR="/srv/healtharchive/jobs/hc"
+if [[ -d "/srv/healtharchive/jobs/hc" ]]; then
+    RECENT_WARCS=$(find "$JOB_DIR" -name "*.warc.gz" -type f -mmin -10 | wc -l)
+    echo "Recent WARCs (last 10m) in $JOB_DIR: $RECENT_WARCS" | tee -a "$LOGFILE"
 
-if [[ "$RECENT_WARCS" -gt 0 ]]; then
-    echo "  [OK] WARCs are accumulating" | tee -a "$LOGFILE"
+    if [[ "$RECENT_WARCS" -gt 0 ]]; then
+        echo "  [OK] WARCs are accumulating" | tee -a "$LOGFILE"
+    else
+        echo "  [WARN] No WARCs written in last 10m (monitor closely)" | tee -a "$LOGFILE"
+    fi
 else
-    echo "  [WARN] No WARCs written in last 10m (monitor closely)" | tee -a "$LOGFILE"
+    echo "  [WARN] Job directory $JOB_DIR not found, skipping WARC check" | tee -a "$LOGFILE"
 fi
 
 echo "" | tee -a "$LOGFILE"
