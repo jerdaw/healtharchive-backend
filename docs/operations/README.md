@@ -1,16 +1,18 @@
-# Operations docs
+# Operations Documentation
 
 ## Start Here
 
 **New operator?**
+
 - **First:** [Operator Responsibilities](playbooks/operator-responsibilities.md) — Core duties
 - **Deploy:** [Deploy & Verify](playbooks/deploy-and-verify.md) — Deployment workflow
 - **Monitor:** [Monitoring Checklist](monitoring-and-ci-checklist.md) — Monitoring setup
 - **Respond:** [Incident Response](playbooks/incident-response.md) — When something breaks
 
 **Quick reference:**
+
 | Task | Documentation |
-|------|---------------|
+| :--- | :--- |
 | Daily checks | [Ops Cadence](ops-cadence-checklist.md) |
 | Deploy changes | [Deploy & Verify](playbooks/deploy-and-verify.md) |
 | Investigate issues | [Incident Response](playbooks/incident-response.md) |
@@ -25,6 +27,7 @@
 - Annual capture campaign (scope + seeds): `annual-campaign.md`
 - Automation implementation plan (phased, production-only): `automation-implementation-plan.md`
 - Monitoring + uptime + CI checklist: `monitoring-and-ci-checklist.md`
+- Annual Crawl Alerting Strategy: `monitoring-and-alerting.md`
 - Agent handoff guidelines (internal rules): `agent-handoff-guidelines.md`
 - Claims registry (proof artifacts): `claims-registry.md`
 - Data handling & retention (internal contract): `data-handling-retention.md`
@@ -53,3 +56,8 @@
 - Golden queries + expected results (living checklist): `search-golden-queries.md`
 - Replay + preview automation plan (design + guardrails; includes `replay-reconcile`): `replay-and-preview-automation-plan.md`
 - Production baseline drift checks (policy + snapshot + compare): `baseline-drift.md`
+
+## Mission Reports & Logs
+
+- **2026-01-19**: [Annual Crawl Hardening Shipment](reports/2026-01-19-deployment-log.md)
+- **2026-01-19**: [Investigation: Indexing Delay / Zero Indexed Pages](reports/2026-01-19-indexing-investigation.md)
