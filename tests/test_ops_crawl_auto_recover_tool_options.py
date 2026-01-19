@@ -27,6 +27,7 @@ def test_ensure_recovery_tool_options_adds_defaults() -> None:
         status="running",
         config={
             "seeds": ["https://example.com/"],
+            "campaign_kind": "annual",
             "tool_options": {
                 "initial_workers": 1,
             },
@@ -41,7 +42,10 @@ def test_ensure_recovery_tool_options_adds_defaults() -> None:
     assert tool["initial_workers"] == 1
     assert tool["enable_monitoring"] is True
     assert tool["enable_adaptive_restart"] is True
-    assert tool["max_container_restarts"] == 6
+    assert tool["max_container_restarts"] == 20
+    assert tool["error_threshold_timeout"] == 50
+    assert tool["error_threshold_http"] == 50
+    assert tool["backoff_delay_minutes"] == 2
 
 
 def test_ensure_recovery_tool_options_preserves_existing_values() -> None:
@@ -50,12 +54,16 @@ def test_ensure_recovery_tool_options_preserves_existing_values() -> None:
     job = ArchiveJob(
         status="running",
         config={
+            "campaign_kind": "annual",
             "tool_options": {
                 "enable_monitoring": True,
                 "enable_adaptive_restart": True,
-                "max_container_restarts": 5,
+                "max_container_restarts": 25,
+                "error_threshold_timeout": 60,
+                "error_threshold_http": 60,
+                "backoff_delay_minutes": 1,
                 "initial_workers": 1,
-            }
+            },
         },
     )
 
@@ -66,7 +74,7 @@ def test_ensure_recovery_tool_options_preserves_existing_values() -> None:
     tool = job.config["tool_options"]
     assert tool["enable_monitoring"] is True
     assert tool["enable_adaptive_restart"] is True
-    assert tool["max_container_restarts"] == 5
+    assert tool["max_container_restarts"] == 25
     assert tool["initial_workers"] == 1
 
 
@@ -76,15 +84,16 @@ def test_ensure_recovery_tool_options_fixes_bad_max_container_restarts() -> None
     job = ArchiveJob(
         status="running",
         config={
+            "campaign_kind": "annual",
             "tool_options": {
                 "enable_monitoring": True,
                 "enable_adaptive_restart": True,
                 "max_container_restarts": "not-an-int",
-            }
+            },
         },
     )
 
     changed = module._ensure_recovery_tool_options(job)
     assert changed is True
     assert job.config is not None
-    assert job.config["tool_options"]["max_container_restarts"] == 6
+    assert job.config["tool_options"]["max_container_restarts"] == 20
