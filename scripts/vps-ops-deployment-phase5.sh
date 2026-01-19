@@ -89,5 +89,27 @@ else
     echo "  [WARN] .venv not found, skipping module check" >> "$LOGFILE"
 fi
 
+echo "9. Checking Snapshot Count for Job 6..."
+if [[ -f ".venv/bin/activate" ]]; then
+    python3 -c "
+from ha_backend.db import get_session
+from ha_backend.models import Snapshot
+with get_session() as session:
+    count = session.query(Snapshot).filter(Snapshot.job_id == 6).count()
+    print(f'Snapshot records in DB for Job 6: {count}')
+" >> "$LOGFILE" 2>&1
+else
+    echo "  [WARN] .venv not found, skipping snapshot check" >> "$LOGFILE"
+fi
+
+echo "10. Checking Filesystem for WARC Consolidation..."
+JOB_DIR="/srv/healtharchive/jobs/hc"
+if [[ -d "$JOB_DIR" ]]; then
+    echo "Checking for stable warcs directory..." >> "$LOGFILE"
+    ls -R "$JOB_DIR/warcs" >> "$LOGFILE" 2>&1 || echo "warcs/ directory missing" >> "$LOGFILE"
+    echo "Checking for .tmp directories..." >> "$LOGFILE"
+    ls -d "$JOB_DIR"/.tmp* >> "$LOGFILE" 2>&1 || echo "No .tmp* directories found" >> "$LOGFILE"
+fi
+
 echo "" | tee -a "$LOGFILE"
 echo "Phase 5 Investigation Complete. Review $LOGFILE for clues." | tee -a "$LOGFILE"
