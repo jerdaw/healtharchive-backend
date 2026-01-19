@@ -26,6 +26,12 @@ check_cmd() {
 # 1.1 Capture Campaign Status
 if [[ -f ".venv/bin/activate" ]]; then
     source .venv/bin/activate
+    # Source production env for DB access/credentials
+    ENV_FILE="/etc/healtharchive/backend.env"
+    if [[ -f "${ENV_FILE}" ]]; then
+        echo "Sourcing ${ENV_FILE} for ha-backend access..." | tee -a "$LOGFILE"
+        set -a; source "${ENV_FILE}"; set +a
+    fi
     check_cmd "ha-backend show-campaign 2026"
 else
     echo "WARN: .venv not found, skipping ha-backend commands" | tee -a "$LOGFILE"
@@ -40,6 +46,10 @@ check_cmd "git remote -v"
 check_cmd "sudo systemctl status healtharchive-worker.service --no-pager -l"
 check_cmd "sudo systemctl status healtharchive-crawl-auto-recover.timer --no-pager"
 check_cmd "sudo systemctl status healtharchive-crawl-metrics-textfile.timer --no-pager"
+
+# 1.3b Storage & Mounts (Critical for SSHFS)
+check_cmd "findmnt -T /srv/healtharchive/jobs"
+check_cmd "df -h /srv/healtharchive/jobs"
 
 # 1.4 Job 6 Progress & WARCs
 if [[ -x "./scripts/vps-crawl-status.sh" ]]; then
