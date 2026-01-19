@@ -21,7 +21,7 @@ check_cmd() {
 
 echo "1. Triggering Metrics Collection..."
 # Ensure we have fresh data
-if sudo systemctl start healtharchive-crawl-metrics-textfile.service; then
+if sudo systemctl start healtharchive-crawl-metrics.service; then
     echo "  [OK] Metrics collection triggered" | tee -a "$LOGFILE"
 else
     echo "  [FAIL] Failed to trigger metrics collection" | tee -a "$LOGFILE"
@@ -31,8 +31,8 @@ echo "2. Verifying Metrics File Content..."
 METRICS_FILE="/var/lib/node_exporter/textfile_collector/healtharchive_crawl.prom"
 if [[ -f "$METRICS_FILE" ]]; then
     # Check for new state-file metrics
-    if grep -q "healtharchive_job_state_file_probe_ok" "$METRICS_FILE"; then
-        echo "  [OK] New state-file metrics found (healtharchive_job_state_file_probe_ok)" | tee -a "$LOGFILE"
+    if grep -q "healtharchive_crawl_running_job_state_file_ok" "$METRICS_FILE"; then
+        echo "  [OK] New state-file metrics found (healtharchive_crawl_running_job_state_file_ok)" | tee -a "$LOGFILE"
     else
         echo "  [FAIL] New state-file metrics MISSING in $METRICS_FILE" | tee -a "$LOGFILE"
     fi
@@ -54,17 +54,17 @@ if [[ -x "./scripts/vps-crawl-status.sh" ]]; then
 fi
 
 echo "4. Verifying WARC Accumulation (Hot Path)..."
-# Check for very recent WARCs (last 10 mins) to confirm active crawling
+# Check for recent WARCs (last 60 mins) to confirm active crawling
 # Dynamically find the job directory if possible, or fallback to known path
 JOB_DIR="/srv/healtharchive/jobs/hc"
-if [[ -d "/srv/healtharchive/jobs/hc" ]]; then
-    RECENT_WARCS=$(find "$JOB_DIR" -name "*.warc.gz" -type f -mmin -10 | wc -l)
-    echo "Recent WARCs (last 10m) in $JOB_DIR: $RECENT_WARCS" | tee -a "$LOGFILE"
+if [[ -d "$JOB_DIR" ]]; then
+    RECENT_WARCS=$(find "$JOB_DIR" -name "*.warc.gz" -type f -mmin -60 | wc -l)
+    echo "Recent WARCs (last 60m) in $JOB_DIR: $RECENT_WARCS" | tee -a "$LOGFILE"
 
     if [[ "$RECENT_WARCS" -gt 0 ]]; then
         echo "  [OK] WARCs are accumulating" | tee -a "$LOGFILE"
     else
-        echo "  [WARN] No WARCs written in last 10m (monitor closely)" | tee -a "$LOGFILE"
+        echo "  [WARN] No WARCs written in last 60m (monitor closely)" | tee -a "$LOGFILE"
     fi
 else
     echo "  [WARN] Job directory $JOB_DIR not found, skipping WARC check" | tee -a "$LOGFILE"
