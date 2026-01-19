@@ -86,10 +86,16 @@ SOURCE_JOB_CONFIGS: Dict[str, SourceJobConfig] = {
             "enable_adaptive_restart": True,
             "enable_vpn_rotation": False,
             "initial_workers": 1,
-            # canada.ca is noisy (HTTP2/protocol errors + long tail timeouts). A
-            # small restart budget is often exhausted early on long annual runs,
-            # leaving the crawl unable to self-heal without manual intervention.
-            "max_container_restarts": 6,
+            # canada.ca is noisy (HTTP2/protocol errors + long tail timeouts).
+            # Keep the monitor-driven restart budget non-trivial to avoid
+            # repeated manual intervention on long annual runs.
+            "max_container_restarts": 20,
+            # The default adaptive thresholds are tuned for small crawls; for
+            # canada.ca annual runs we need to tolerate long-tail slowness
+            # without thrashing (restart loops + long backoffs).
+            "error_threshold_timeout": 50,
+            "error_threshold_http": 50,
+            "backoff_delay_minutes": 2,
             "log_level": "INFO",
             "relax_perms": True,  # ensure WARCs are readable on host in dev
         },
@@ -117,7 +123,10 @@ SOURCE_JOB_CONFIGS: Dict[str, SourceJobConfig] = {
             "enable_vpn_rotation": False,
             "initial_workers": 1,
             # canada.ca is noisy (HTTP2/protocol errors + long tail timeouts).
-            "max_container_restarts": 6,
+            "max_container_restarts": 20,
+            "error_threshold_timeout": 50,
+            "error_threshold_http": 50,
+            "backoff_delay_minutes": 2,
             "log_level": "INFO",
             "relax_perms": True,
         },
@@ -142,7 +151,10 @@ SOURCE_JOB_CONFIGS: Dict[str, SourceJobConfig] = {
             "enable_adaptive_restart": True,
             "enable_vpn_rotation": False,
             "initial_workers": 1,
-            "max_container_restarts": 6,
+            "max_container_restarts": 20,
+            "error_threshold_timeout": 50,
+            "error_threshold_http": 50,
+            "backoff_delay_minutes": 2,
             "log_level": "INFO",
             "relax_perms": True,
         },

@@ -260,7 +260,7 @@ def cmd_schedule_annual(args: argparse.Namespace) -> None:
       job (queued/running/completed/indexing/index_failed/retryable) that is not
       indexed yet
     """
-    from datetime import datetime, timezone
+    from datetime import datetime, timedelta, timezone
 
     from .job_registry import (
         build_job_config,
@@ -321,7 +321,14 @@ def cmd_schedule_annual(args: argparse.Namespace) -> None:
         sys.exit(1)
 
     tool_cfg = get_archive_tool_config()
-    scheduled_at = now
+    # We intentionally stagger queued_at by a few seconds across sources so the
+    # single-worker queue pick order is deterministic (hc → phac → cihr) even if
+    # all jobs are scheduled in the same command invocation.
+    scheduled_at = now.replace(microsecond=0)
+    queued_at_by_source = {
+        source_code: scheduled_at + timedelta(seconds=i)
+        for i, source_code in enumerate(sources_in_order)
+    }
 
     blocking_statuses = {
         "queued",
@@ -449,6 +456,7 @@ def cmd_schedule_annual(args: argparse.Namespace) -> None:
                     "action": "create",
                     "job_name": job_name,
                     "output_dir": str(output_dir),
+                    "queued_at": queued_at_by_source[source_code],
                     "job_config": job_config,
                     "source_id": source.id,
                 }
@@ -519,7 +527,7 @@ def cmd_schedule_annual(args: argparse.Namespace) -> None:
                 name=str(item["job_name"]),
                 output_dir=str(item["output_dir"]),
                 status="queued",
-                queued_at=scheduled_at,
+                queued_at=cast(datetime, item["queued_at"]),
                 config=job_config,
             )
             session.add(job)
