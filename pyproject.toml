@@ -32,6 +32,7 @@ dev = [
   "pip-audit",
   "pre-commit",
   "mkdocs-material[imaging]",
+  "mkdocs-minify-plugin",
   "mkdocs-monorepo-plugin",
   "mkdocs-swagger-ui-tag",
   "cairosvg",

@@ -1,4 +1,4 @@
-.PHONY: venv format format-check lint precommit typecheck test security audit check check-full ci docs-serve docs-build docs-refs docs-coverage docs-coverage-strict docs-check
+.PHONY: venv format format-check lint precommit typecheck test security audit check check-full ci docs-serve docs-build docs-build-strict docs-refs docs-coverage docs-coverage-strict docs-check
 
 VENV ?= .venv
 VENV_BIN := $(VENV)/bin
@@ -52,6 +52,11 @@ docs-serve:
 docs-build:
 	PYTHONPATH=src $(PYTHON_RUN) scripts/export_openapi.py
 	$(PYTHON_RUN) scripts/generate_llms_txt.py
+	$(MKDOCS) build
+
+docs-build-strict:
+	PYTHONPATH=src $(PYTHON_RUN) scripts/export_openapi.py
+	$(PYTHON_RUN) scripts/generate_llms_txt.py
 	$(MKDOCS) build --strict
 
 docs-refs:
@@ -63,7 +68,7 @@ docs-coverage:
 docs-coverage-strict:
 	$(PYTHON_RUN) scripts/check_docs_coverage.py --strict
 
-docs-check: docs-refs docs-coverage-strict docs-build
+docs-check: docs-refs docs-coverage-strict docs-build-strict
 
 # CI guardrail: fast + reliable (should not block day-to-day development).
 check: format-check lint typecheck test
