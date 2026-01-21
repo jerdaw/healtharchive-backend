@@ -1,0 +1,122 @@
+---
+groups:
+  - name: healtharchive_crawl
+    interval: 60s
+    rules:
+      # State file probe failures
+      - alert: CrawlStateFileProbeFailure
+        expr: healtharchive_crawl_running_job_state_file_ok == 0
+        for: 5m
+        labels:
+          severity: warning
+          component: crawl_monitoring
+        annotations:
+          summary: "Job {{ $labels.job_id }} state file probe failed"
+          description: >
+            Cannot read .archive_state.json for job {{ $labels.job_id }} on
+            {{ $labels.instance }}. Check SSHFS mount and file permissions.
+
+      # State file parse failures
+      - alert: CrawlStateFileParseFailure
+        expr: healtharchive_crawl_running_job_state_parse_ok == 0
+        for: 5m
+        labels:
+          severity: warning
+          component: crawl_monitoring
+        annotations:
+          summary: "Job {{ $labels.job_id }} state file parse failed"
+          description: >
+            Cannot parse .archive_state.json for job {{ $labels.job_id }} on
+            {{ $labels.instance }}. File may be corrupted or incomplete.
+
+      # High container restart rate
+      - alert: CrawlContainerRestartRateHigh
+        expr: rate(healtharchive_crawl_running_job_container_restarts_done[10m]) > 0.5
+        for: 15m
+        labels:
+          severity: warning
+          component: crawl_reliability
+        annotations:
+          summary: "Job {{ $labels.job_id }} container restart rate high"
+          description: >
+            Job {{ $labels.job_id }} is restarting containers frequently
+            (>0.5/min). Check for timeout/error thrashing.
+
+      # Restart budget exhaustion approaching
+      - alert: CrawlRestartBudgetLow
+        expr: healtharchive_crawl_running_job_container_restarts_done > 15
+        for: 30m
+        labels:
+          severity: warning
+          component: crawl_reliability
+        annotations:
+          summary: "Job {{ $labels.job_id }} restart budget running low"
+          description: >
+            Job {{ $labels.job_id }} has {{ $value }} restarts (limit 20).
+            Monitor for potential exhaustion.
+
+      # Stale state file (progress stalled)
+      - alert: CrawlProgressStalled
+        expr: healtharchive_crawl_running_job_last_progress_age_seconds > 3600
+        for: 30m
+        labels:
+          severity: warning
+          component: crawl_progress
+        annotations:
+          summary: "Job {{ $labels.job_id }} progress appears stalled"
+          description: >
+            State file for job {{ $labels.job_id }} hasn't been updated in
+            {{ $value }}s. Crawl may be stuck.
+
+      # Worker reductions (potential SSHFS or resource issues)
+      - alert: CrawlWorkerReductionsFrequent
+        expr: rate(healtharchive_crawl_running_job_worker_reductions_done[1h]) > 0.1
+        for: 30m
+        labels:
+          severity: info
+          component: crawl_performance
+        annotations:
+          summary: "Job {{ $labels.job_id }} experiencing frequent worker reductions"
+          description: >
+            Zimit is reducing workers frequently (>0.1/min) for job
+            {{ $labels.job_id }} on {{ $labels.instance }}.
+            May indicate I/O issues or resource constraints.
+
+      # Output directory probe failures
+      - alert: CrawlOutputDirProbeFailure
+        expr: healtharchive_crawl_running_job_output_dir_ok == 0
+        for: 5m
+        labels:
+          severity: warning
+          component: crawl_monitoring
+        annotations:
+          summary: "Job {{ $labels.job_id }} output directory probe failed"
+          description: >
+            Job output directory is missing or unreadable for job
+            {{ $labels.job_id }} on {{ $labels.instance }}. Check SSHFS mount.
+
+      # Log probe failures
+      - alert: CrawlLogProbeFailure
+        expr: healtharchive_crawl_running_job_log_probe_ok == 0
+        for: 15m
+        labels:
+          severity: warning
+          component: crawl_monitoring
+        annotations:
+          summary: "Job {{ $labels.job_id }} log probe failed"
+          description: >
+            Cannot find or read combined log for job {{ $labels.job_id }} on
+            {{ $labels.instance }}.
+
+      # Indexing delay (Critical failure)
+      - alert: IndexingNotStartedAfterCrawl
+        expr: healtharchive_indexing_pending_job_max_age_seconds > 3600
+        for: 15m
+        labels:
+          severity: critical
+          component: indexing
+        annotations:
+          summary: "Indexing delay exceeded (1 hour)"
+          description: >
+            One or more crawl jobs have been in 'completed' status for over
+            an hour without being indexed.
