@@ -217,7 +217,7 @@ It uses `parse_known_args()` to split:
     * Allows recreating an existing ZIM.
     * Resets persistent state (workers, VPN counters, temp dir list) to behave as a fresh crawl from the tool’s POV.
 
-* `--docker-image` (default = `DOCKER_IMAGE` from constants = `"ghcr.io/openzim/zimit"`)
+* `--docker-image` (default = `DOCKER_IMAGE` from constants = env `HEALTHARCHIVE_ZIMIT_DOCKER_IMAGE` or `"ghcr.io/openzim/zimit"`)
 
   * Lets you override which Zimit image to run.
 

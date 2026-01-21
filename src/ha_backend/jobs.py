@@ -235,6 +235,10 @@ def _build_tool_extra_args(tool_options: ArchiveToolOptions) -> list[str]:
     """
     extra_tool_args: list[str] = []
 
+    docker_image = (tool_options.docker_image or "").strip()
+    if docker_image:
+        extra_tool_args.extend(["--docker-image", docker_image])
+
     enable_monitoring = bool(tool_options.enable_monitoring)
     if enable_monitoring:
         extra_tool_args.append("--enable-monitoring")

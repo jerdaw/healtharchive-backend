@@ -1,8 +1,19 @@
-# archive_tool/constants.py
-import re  # Add import re
+from __future__ import annotations
+
+import os
+import re
 from pathlib import Path
 
-DOCKER_IMAGE = "ghcr.io/openzim/zimit"
+DEFAULT_DOCKER_IMAGE = "ghcr.io/openzim/zimit"
+
+
+def _default_docker_image() -> str:
+    raw = os.environ.get("HEALTHARCHIVE_ZIMIT_DOCKER_IMAGE", "")
+    docker_image = raw.strip()
+    return docker_image or DEFAULT_DOCKER_IMAGE
+
+
+DOCKER_IMAGE = _default_docker_image()
 CONTAINER_OUTPUT_DIR = Path("/output")
 TEMP_DIR_PREFIX = ".tmp"
 LOG_FORMAT = "%(asctime)s - %(levelname)s - [%(threadName)s] %(message)s"

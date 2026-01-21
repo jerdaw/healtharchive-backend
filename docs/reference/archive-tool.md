@@ -17,7 +17,7 @@ The **archive_tool** is HealthArchive's internal crawler and orchestrator subpac
 
 **Technology**:
 - Python 3.11+
-- Docker (runs `ghcr.io/openzim/zimit` container)
+- Docker (runs `ghcr.io/openzim/zimit` container; override/pin via `HEALTHARCHIVE_ZIMIT_DOCKER_IMAGE`)
 - State persistence (`.archive_state.json`)
 
 ---

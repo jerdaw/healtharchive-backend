@@ -89,6 +89,7 @@ Example shell setup (or via `.env.example` → `.env`, git-ignored):
 export HEALTHARCHIVE_ENV=development
 export HEALTHARCHIVE_DATABASE_URL=sqlite:///$(pwd)/.dev-healtharchive.db
 export HEALTHARCHIVE_ARCHIVE_ROOT=$(pwd)/.dev-archive-root
+export HEALTHARCHIVE_ZIMIT_DOCKER_IMAGE=ghcr.io/openzim/zimit  # optional override (pin by tag or digest)
 export HEALTHARCHIVE_ADMIN_TOKEN=localdev-admin
 export HEALTHARCHIVE_LOG_LEVEL=DEBUG
 export HA_SEARCH_RANKING_VERSION=v2
@@ -108,6 +109,7 @@ On the production backend host (systemd env file / Docker env / PaaS env):
 export HEALTHARCHIVE_ENV=production
 export HEALTHARCHIVE_DATABASE_URL=postgresql+psycopg://healtharchive:<DB_PASSWORD>@127.0.0.1:5432/healtharchive
 export HEALTHARCHIVE_ARCHIVE_ROOT=/srv/healtharchive/jobs
+export HEALTHARCHIVE_ZIMIT_DOCKER_IMAGE=ghcr.io/openzim/zimit@sha256:<PINNED_DIGEST>
 export HEALTHARCHIVE_ADMIN_TOKEN=<LONG_RANDOM_SECRET>
 export HEALTHARCHIVE_CORS_ORIGINS=https://healtharchive.ca,https://www.healtharchive.ca,https://healtharchive.vercel.app,https://replay.healtharchive.ca
 export HEALTHARCHIVE_LOG_LEVEL=INFO
@@ -128,6 +130,8 @@ Notes:
 
 - `HEALTHARCHIVE_ADMIN_TOKEN` should be a long random secret stored in a secret
   manager (e.g., Bitwarden + server env), **never committed**.
+- `HEALTHARCHIVE_ZIMIT_DOCKER_IMAGE` pins the crawler container image used by `archive_tool`.
+  Use a digest (`...@sha256:...`) in production to avoid upstream `latest` changes breaking crawls.
 - `HEALTHARCHIVE_REPLAY_BASE_URL` enables `browseUrl` fields in `/api/search`
   and `/api/snapshot/{id}` so the frontend can embed the replay service.
 - `HEALTHARCHIVE_USAGE_METRICS_ENABLED` controls whether aggregated daily usage

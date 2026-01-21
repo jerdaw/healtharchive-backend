@@ -22,6 +22,7 @@ class ArchiveToolOptions:
     enable_vpn_rotation: bool = False
     initial_workers: int = 1
     log_level: str = "INFO"
+    docker_image: Optional[str] = None
 
     # Optional monitoring/adaptive fields.
     monitor_interval_seconds: Optional[int] = None
@@ -60,6 +61,10 @@ class ArchiveToolOptions:
 
         # Only include optional fields when they are set to a non-None value
         # to keep the stored JSON compact and backwards-compatible.
+        if self.docker_image is not None:
+            docker_image = str(self.docker_image).strip()
+            if docker_image:
+                data["docker_image"] = docker_image
         if self.monitor_interval_seconds is not None:
             data["monitor_interval_seconds"] = self.monitor_interval_seconds
         if self.stall_timeout_minutes is not None:
@@ -101,6 +106,7 @@ class ArchiveToolOptions:
             enable_vpn_rotation=bool(data.get("enable_vpn_rotation", False)),
             initial_workers=int(data.get("initial_workers", 1)),
             log_level=str(data.get("log_level", "INFO")),
+            docker_image=data.get("docker_image"),
             monitor_interval_seconds=data.get("monitor_interval_seconds"),
             stall_timeout_minutes=data.get("stall_timeout_minutes"),
             error_threshold_timeout=data.get("error_threshold_timeout"),
@@ -167,6 +173,9 @@ def validate_tool_options(opts: ArchiveToolOptions) -> None:
 
     if opts.enable_vpn_rotation and not (opts.vpn_connect_command or "").strip():
         raise ValueError("tool_options.enable_vpn_rotation requires vpn_connect_command to be set")
+
+    if opts.docker_image is not None and not str(opts.docker_image).strip():
+        raise ValueError("tool_options.docker_image cannot be blank when set")
 
 
 __all__ = ["ArchiveToolOptions", "ArchiveJobConfig", "validate_tool_options"]

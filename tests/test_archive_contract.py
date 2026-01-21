@@ -21,6 +21,7 @@ def test_archive_tool_options_round_trip_defaults() -> None:
     assert data["relax_perms"] is False
 
     # Optional fields should be omitted when None.
+    assert "docker_image" not in data
     assert "monitor_interval_seconds" not in data
     assert "stall_timeout_minutes" not in data
     assert "error_threshold_timeout" not in data
@@ -49,6 +50,7 @@ def test_archive_tool_options_round_trip_with_optional_fields() -> None:
         enable_vpn_rotation=True,
         initial_workers=3,
         log_level="DEBUG",
+        docker_image="ghcr.io/openzim/zimit:stable",
         monitor_interval_seconds=10,
         stall_timeout_minutes=5,
         error_threshold_timeout=3,
@@ -64,6 +66,7 @@ def test_archive_tool_options_round_trip_with_optional_fields() -> None:
 
     data = opts.to_dict()
     # Ensure optional fields are serialized.
+    assert data["docker_image"] == "ghcr.io/openzim/zimit:stable"
     assert data["monitor_interval_seconds"] == 10
     assert data["stall_timeout_minutes"] == 5
     assert data["error_threshold_timeout"] == 3
