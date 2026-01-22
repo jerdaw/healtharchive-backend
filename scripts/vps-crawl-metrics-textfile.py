@@ -67,17 +67,36 @@ def _find_latest_combined_log(output_dir: Path) -> Path | None:
 
 
 def _find_job_log(job: RunningJob) -> Path | None:
+    """
+    Find the most relevant combined log file for a running job.
+
+    Important: running jobs often have a stale `combined_log_path` (last finished run),
+    so we prefer the newest log on disk under `output_dir` when available.
+    """
+    by_path: Path | None = None
+    by_output: Path | None = None
+
     if job.combined_log_path:
         p = Path(job.combined_log_path)
         try:
             if p.is_file():
-                return p
+                by_path = p
         except OSError:
-            # Treat as best-effort and fall back to output_dir globbing.
-            pass
+            by_path = None
+
     if job.output_dir:
-        return _find_latest_combined_log(Path(job.output_dir))
-    return None
+        by_output = _find_latest_combined_log(Path(job.output_dir))
+
+    if by_path is None:
+        return by_output
+    if by_output is None:
+        return by_path
+
+    try:
+        return by_output if by_output.stat().st_mtime >= by_path.stat().st_mtime else by_path
+    except OSError:
+        # Fall back to the output-dir candidate; it's usually the freshest signal for running jobs.
+        return by_output or by_path
 
 
 def _emit(lines: list[str], line: str) -> None:
