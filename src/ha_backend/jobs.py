@@ -239,6 +239,10 @@ def _build_tool_extra_args(tool_options: ArchiveToolOptions) -> list[str]:
     if docker_image:
         extra_tool_args.extend(["--docker-image", docker_image])
 
+    docker_shm_size = (getattr(tool_options, "docker_shm_size", None) or "").strip()
+    if docker_shm_size:
+        extra_tool_args.extend(["--docker-shm-size", docker_shm_size])
+
     enable_monitoring = bool(tool_options.enable_monitoring)
     if enable_monitoring:
         extra_tool_args.append("--enable-monitoring")
@@ -312,6 +316,9 @@ def _build_tool_extra_args(tool_options: ArchiveToolOptions) -> list[str]:
 
     if bool(tool_options.relax_perms):
         extra_tool_args.append("--relax-perms")
+
+    if bool(getattr(tool_options, "skip_final_build", False)):
+        extra_tool_args.append("--skip-final-build")
 
     return extra_tool_args
 

@@ -40,6 +40,9 @@ def test_ensure_recovery_tool_options_adds_defaults() -> None:
 
     tool = job.config["tool_options"]
     assert tool["initial_workers"] == 1
+    assert tool["skip_final_build"] is True
+    assert tool["docker_shm_size"] == "1g"
+    assert tool["stall_timeout_minutes"] == 60
     assert tool["enable_monitoring"] is True
     assert tool["enable_adaptive_restart"] is True
     assert tool["max_container_restarts"] == 20
@@ -63,6 +66,9 @@ def test_ensure_recovery_tool_options_preserves_existing_values() -> None:
                 "error_threshold_http": 60,
                 "backoff_delay_minutes": 1,
                 "initial_workers": 1,
+                "skip_final_build": True,
+                "docker_shm_size": "1g",
+                "stall_timeout_minutes": 60,
             },
         },
     )
@@ -76,6 +82,9 @@ def test_ensure_recovery_tool_options_preserves_existing_values() -> None:
     assert tool["enable_adaptive_restart"] is True
     assert tool["max_container_restarts"] == 25
     assert tool["initial_workers"] == 1
+    assert tool["skip_final_build"] is True
+    assert tool["docker_shm_size"] == "1g"
+    assert tool["stall_timeout_minutes"] == 60
 
 
 def test_ensure_recovery_tool_options_fixes_bad_max_container_restarts() -> None:

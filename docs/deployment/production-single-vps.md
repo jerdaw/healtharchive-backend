@@ -22,6 +22,7 @@ For recovery from total failure, see the [Disaster Recovery Runbook](disaster-re
 - **Storage:**
   - `/srv/healtharchive/jobs` – archive root (WARCs / job outputs)
   - `/srv/healtharchive/backups` – DB dumps
+  - (Optional) StorageBox mount (cold storage / tiering; **not** a crawl hot-path)
 - **Database:** Local Postgres on the VPS
 - **Monitoring/alerts:**
   - Healthchecks.io pings for DB backup success/failure
@@ -61,6 +62,21 @@ sudo apt -y install docker.io \
   python3 python3-venv python3-pip \
   git curl build-essential pkg-config unzip
 sudo systemctl enable --now docker postgresql
+```
+
+### Swap (recommended on cx33)
+
+Annual crawls are long-running and browser-driven; having a small swap file helps avoid OOM-driven churn and reduces time lost to restarts.
+
+Recommended on `cx33` (8GB RAM): add a `4G` swapfile on the local SSD:
+
+```bash
+sudo fallocate -l 4G /swapfile
+sudo chmod 600 /swapfile
+sudo mkswap /swapfile
+sudo swapon /swapfile
+echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
+swapon --show
 ```
 
 Notes:
@@ -135,6 +151,7 @@ sudo install -d -m 750 -o root -g healtharchive /etc/healtharchive
 sudo tee /etc/healtharchive/backend.env >/dev/null <<'EOF'
 HEALTHARCHIVE_ENV=production
 HEALTHARCHIVE_DATABASE_URL=postgresql+psycopg://healtharchive:<DB_PASSWORD>@127.0.0.1:5432/healtharchive
+# Keep the crawl hot-path on the local SSD for throughput; use the StorageBox only for cold storage/tiering.
 HEALTHARCHIVE_ARCHIVE_ROOT=/srv/healtharchive/jobs
 HEALTHARCHIVE_ADMIN_TOKEN=<LONG_RANDOM_TOKEN>
 HEALTHARCHIVE_CORS_ORIGINS=https://healtharchive.ca,https://www.healtharchive.ca,https://healtharchive.vercel.app,https://replay.healtharchive.ca

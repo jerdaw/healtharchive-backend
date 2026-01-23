@@ -251,8 +251,11 @@ def run_final_build_stage_sync(
         "--rm",
         "-v",
         f"{host_output_dir.resolve()}:{constants.CONTAINER_OUTPUT_DIR}",
-        docker_image,
     ]
+    docker_shm_size = getattr(script_args, "docker_shm_size", None)
+    if docker_shm_size:
+        docker_cmd.extend(["--shm-size", str(docker_shm_size)])
+    docker_cmd.append(docker_image)
     docker_cmd.extend(zimit_args)  # Add zimit command and its args
 
     logger.info(f"Executing Final Build Docker command:\n{' '.join(docker_cmd)}")
@@ -553,6 +556,9 @@ def main():
     final_zim_path = host_output_dir / f"{script_args.name}.zim"
     final_zim_exists = final_zim_path.exists()
     logger.debug(f"Checking for final ZIM file: {final_zim_path} (Exists: {final_zim_exists})")
+    if getattr(script_args, "skip_final_build", False) and final_zim_exists:
+        logger.info("skip-final-build enabled; ignoring existing ZIM file at: %s", final_zim_path)
+        final_zim_exists = False
 
     logger.info("--- Initial Run Status Determination ---")
     last_status_str = ""
@@ -701,7 +707,11 @@ def main():
         start_container_time = time.monotonic()
         try:
             docker_process, container_id = docker_runner.start_docker_container(
-                script_args.docker_image, host_output_dir, zimit_args, script_args.name
+                script_args.docker_image,
+                host_output_dir,
+                zimit_args,
+                script_args.name,
+                docker_shm_size=getattr(script_args, "docker_shm_size", None),
             )
             call_duration = time.monotonic() - start_container_time
             logger.info(f"Call to start_docker_container completed in {call_duration:.2f} seconds.")
@@ -1274,75 +1284,105 @@ def main():
     # --- Stage 3: Final WARC Consolidation ---
     logger.info("Step 5: Checking if Final WARC Consolidation is needed")
     if final_status == "pending_final_build" and not stop_event.is_set():
-        logger.info("Crawl/Resume phase successful. Proceeding to final WARC consolidation stage.")
-
-        # If Docker/Zimit wrote temp dirs with root-only permissions, the host
-        # process may not be able to discover WARCs for the final build. When
-        # enabled, relax permissions before scanning so WARC discovery works.
-        if script_args.relax_perms:
-            try:
-                utils.relax_permissions(host_output_dir, crawl_state.get_temp_dir_paths())
-            except Exception as exc:
-                logger.warning(f"Failed to relax permissions before WARC discovery: {exc}")
-
-        logger.info("Finding all WARC files from all tracked temporary directories...")
-        warc_host_paths = utils.find_all_warc_files(crawl_state.get_temp_dir_paths())
-        if not warc_host_paths:
-            logger.error(
-                "CRITICAL: No WARC files found in any tracked temp directories. Cannot perform final build."
+        if getattr(script_args, "skip_final_build", False):
+            logger.info(
+                "Crawl/Resume phase successful. Final build is disabled (--skip-final-build)."
             )
-            final_status = "failed_no_warcs"
-        else:
-            logger.info(f"Found {len(warc_host_paths)} WARC files to consolidate.")
-            logger.debug(f"Host paths: {[str(p) for p in warc_host_paths]}")
 
-            logger.info("Converting WARC host paths to container paths...")
-            container_warc_paths = []
-            conversion_failed = False
-            for p in warc_host_paths:
-                cp = utils.host_to_container_path(p, host_output_dir)
-                if cp is None:
-                    logger.error(
-                        f"Failed to convert WARC host path '{p}' to container path. Aborting final build."
-                    )
-                    conversion_failed = True
-                    break
-                logger.debug(f"Converted '{p}' -> '{cp}'")
-                container_warc_paths.append(cp)
+            if script_args.relax_perms:
+                try:
+                    utils.relax_permissions(host_output_dir, crawl_state.get_temp_dir_paths())
+                except Exception as exc:
+                    logger.warning(f"Failed to relax permissions before WARC discovery: {exc}")
 
-            if conversion_failed:
-                final_status = "failed_warc_path_conversion"
-            else:
-                container_warc_paths_str = ",".join(container_warc_paths)
-                logger.debug(f"Comma-separated container WARC paths: {container_warc_paths_str}")
-
-                logger.info("Filtering passthrough arguments for final build...")
-                final_build_base_args = utils.filter_args_for_final_run(zimit_passthrough_args)
-                logger.debug(f"Filtered base args for final build: {final_build_base_args}")
-
-                extra_args_final = ["--warcs", container_warc_paths_str]
-                # Required args for the build stage function are just 'name'
-                final_required_args = {"name": script_args.name}
-
-                # Run the synchronous final build stage
-                build_status, final_build_temp_dir = run_final_build_stage_sync(
-                    stage_name="Final Build from WARCs",
-                    docker_image=script_args.docker_image,
-                    host_output_dir=host_output_dir,
-                    crawl_state=crawl_state,
-                    script_args=script_args,  # Needed for seed workaround
-                    passthrough_args=final_build_base_args,  # Pass filtered args
-                    required_args=final_required_args,  # Pass just name
-                    extra_args=extra_args_final,  # Pass --warcs list
+            logger.info("Verifying WARCs exist for successful crawl output...")
+            warc_host_paths = utils.find_all_warc_files(crawl_state.get_temp_dir_paths())
+            if not warc_host_paths:
+                logger.error(
+                    "CRITICAL: No WARC files found in any tracked temp directories. Cannot mark job successful."
                 )
-                final_status = build_status  # Update overall status based on build result
+                final_status = "failed_no_warcs"
+            else:
+                logger.info(
+                    "Final build skipped. WARCs discovered: %s (job will rely on WARCs for downstream indexing).",
+                    len(warc_host_paths),
+                )
+                final_status = "success"
+        else:
+            logger.info(
+                "Crawl/Resume phase successful. Proceeding to final WARC consolidation stage."
+            )
 
-                # Add the temp dir from the final build stage to state for potential cleanup
-                if final_build_temp_dir:
-                    logger.info(
-                        f"Adding temp directory from final build stage to state: {final_build_temp_dir}"
+            # If Docker/Zimit wrote temp dirs with root-only permissions, the host
+            # process may not be able to discover WARCs for the final build. When
+            # enabled, relax permissions before scanning so WARC discovery works.
+            if script_args.relax_perms:
+                try:
+                    utils.relax_permissions(host_output_dir, crawl_state.get_temp_dir_paths())
+                except Exception as exc:
+                    logger.warning(f"Failed to relax permissions before WARC discovery: {exc}")
+
+            logger.info("Finding all WARC files from all tracked temporary directories...")
+            warc_host_paths = utils.find_all_warc_files(crawl_state.get_temp_dir_paths())
+            if not warc_host_paths:
+                logger.error(
+                    "CRITICAL: No WARC files found in any tracked temp directories. Cannot perform final build."
+                )
+                final_status = "failed_no_warcs"
+            else:
+                logger.info(f"Found {len(warc_host_paths)} WARC files to consolidate.")
+                logger.debug(f"Host paths: {[str(p) for p in warc_host_paths]}")
+
+                logger.info("Converting WARC host paths to container paths...")
+                container_warc_paths = []
+                conversion_failed = False
+                for p in warc_host_paths:
+                    cp = utils.host_to_container_path(p, host_output_dir)
+                    if cp is None:
+                        logger.error(
+                            f"Failed to convert WARC host path '{p}' to container path. Aborting final build."
+                        )
+                        conversion_failed = True
+                        break
+                    logger.debug(f"Converted '{p}' -> '{cp}'")
+                    container_warc_paths.append(cp)
+
+                if conversion_failed:
+                    final_status = "failed_warc_path_conversion"
+                else:
+                    container_warc_paths_str = ",".join(container_warc_paths)
+                    logger.debug(
+                        f"Comma-separated container WARC paths: {container_warc_paths_str}"
                     )
-                    crawl_state.add_temp_dir(final_build_temp_dir)
+
+                    logger.info("Filtering passthrough arguments for final build...")
+                    final_build_base_args = utils.filter_args_for_final_run(zimit_passthrough_args)
+                    logger.debug(f"Filtered base args for final build: {final_build_base_args}")
+
+                    extra_args_final = ["--warcs", container_warc_paths_str]
+                    # Required args for the build stage function are just 'name'
+                    final_required_args = {"name": script_args.name}
+
+                    # Run the synchronous final build stage
+                    build_status, final_build_temp_dir = run_final_build_stage_sync(
+                        stage_name="Final Build from WARCs",
+                        docker_image=script_args.docker_image,
+                        host_output_dir=host_output_dir,
+                        crawl_state=crawl_state,
+                        script_args=script_args,  # Needed for seed workaround
+                        passthrough_args=final_build_base_args,  # Pass filtered args
+                        required_args=final_required_args,  # Pass just name
+                        extra_args=extra_args_final,  # Pass --warcs list
+                    )
+                    final_status = build_status  # Update overall status based on build result
+
+                    # Add the temp dir from the final build stage to state for potential cleanup
+                    if final_build_temp_dir:
+                        logger.info(
+                            "Adding temp directory from final build stage to state: %s",
+                            final_build_temp_dir,
+                        )
+                        crawl_state.add_temp_dir(final_build_temp_dir)
 
     elif stop_event.is_set():
         logger.warning("Skipping final build stage because stop event was set.")
@@ -1374,16 +1414,19 @@ def main():
     if final_status == "success":
         final_zim_path = host_output_dir / f"{script_args.name}.zim"
         logger.info("Overall process SUCCEEDED.")
-        if final_zim_path.exists():
-            logger.info(f"Final ZIM file should be available at: {final_zim_path}")
-            try:
-                logger.info(
-                    f"ZIM File Size: {final_zim_path.stat().st_size / (1024 * 1024):.2f} MB"
-                )
-            except Exception:
-                pass
+        if getattr(script_args, "skip_final_build", False):
+            logger.info("Final build was skipped; no ZIM was produced.")
         else:
-            logger.warning("Success reported, but final ZIM file check failed post-build!")
+            if final_zim_path.exists():
+                logger.info(f"Final ZIM file should be available at: {final_zim_path}")
+                try:
+                    logger.info(
+                        f"ZIM File Size: {final_zim_path.stat().st_size / (1024 * 1024):.2f} MB"
+                    )
+                except Exception:
+                    pass
+            else:
+                logger.warning("Success reported, but final ZIM file check failed post-build!")
 
         if script_args.cleanup:
             logger.info(

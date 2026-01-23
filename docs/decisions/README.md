@@ -52,3 +52,13 @@ If multiple decisions occur on one day, add a suffix:
 5) Mark status as `accepted` once you commit to it.
 
 If a decision changes later, create a new decision record and mark the old one as `superseded` (link both directions).
+
+---
+
+## Decision records
+
+- `2026-01-23-annual-crawl-throughput-and-artifacts.md`
+- `2026-01-19-annual-crawl-resiliency-and-queue-order.md`
+- `2026-01-19-ops-first-monitoring.md`
+- `2026-01-18-search-ranking-v3.md`
+- `2026-01-09-public-incident-disclosure-posture.md`

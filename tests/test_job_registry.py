@@ -120,8 +120,12 @@ def test_canada_ca_scope_regexes_match_expected_urls() -> None:
     assert hc_rx.match("https://www.canada.ca/en/health-canada.html")
     assert hc_rx.match("https://www.canada.ca/fr/sante-canada.html")
     assert hc_rx.match("https://www.canada.ca/en/health-canada/services/drugs-health-products.html")
+    assert not hc_rx.match(
+        "https://www.canada.ca/en/health-canada/services/drugs-health-products.html?utm_source=x"
+    )
     assert hc_rx.match("https://www.canada.ca/content/dam/hc-sc/images/corporate/example.jpg")
     assert hc_rx.match("https://www.canada.ca/etc/designs/canada/wet-boew/js/theme.min.js")
+    assert hc_rx.match("https://www.canada.ca/etc/designs/canada/wet-boew/js/theme.min.js?v=1")
     assert not hc_rx.match("https://www.canada.ca/en/services/benefits.html")
     assert not hc_rx.match("https://www.canada.ca/en/public-health.html")
     assert not hc_rx.match("https://www.canada.ca/content/dam/phac-aspc/example.jpg")
@@ -129,8 +133,12 @@ def test_canada_ca_scope_regexes_match_expected_urls() -> None:
     assert phac_rx.match("https://www.canada.ca/en/public-health.html")
     assert phac_rx.match("https://www.canada.ca/fr/sante-publique.html")
     assert phac_rx.match("https://www.canada.ca/en/public-health/services/diseases/measles.html")
+    assert not phac_rx.match(
+        "https://www.canada.ca/en/public-health/services/diseases/measles.html?utm_source=x"
+    )
     assert phac_rx.match("https://www.canada.ca/content/dam/phac-aspc/images/corporate/example.jpg")
     assert phac_rx.match("https://www.canada.ca/etc/designs/canada/wet-boew/css/theme.min.css")
+    assert phac_rx.match("https://www.canada.ca/etc/designs/canada/wet-boew/css/theme.min.css?v=1")
     assert not phac_rx.match("https://www.canada.ca/en/services/benefits.html")
     assert not phac_rx.match("https://www.canada.ca/en/health-canada.html")
     assert not phac_rx.match("https://www.canada.ca/content/dam/hc-sc/example.jpg")

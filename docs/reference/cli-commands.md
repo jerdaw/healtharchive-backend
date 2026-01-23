@@ -123,6 +123,9 @@ ha-backend create-job --source hc
 # Create with custom worker count
 ha-backend create-job --source hc --override '{"tool_options": {"initial_workers": 2}}'
 
+# Create a "search-first" crawl (skip optional .zim build) with a larger Docker /dev/shm
+ha-backend create-job --source hc --override '{"tool_options": {"initial_workers": 2, "skip_final_build": true, "docker_shm_size": "1g"}}'
+
 # Enable monitoring and stall detection
 ha-backend create-job --source phac --override '{
   "tool_options": {

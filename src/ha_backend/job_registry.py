@@ -17,8 +17,10 @@ HC_CANADA_CA_SCOPE_INCLUDE_RX = (
     r"(?:"
     r"en/health-canada[.]html"
     r"|fr/sante-canada[.]html"
-    r"|en/health-canada/.*"
-    r"|fr/sante-canada/.*"
+    # Exclude query-string and fragment variants of content pages to avoid
+    # duplicate/trap-like expansions under a completeness-first crawl.
+    r"|en/health-canada/[^?#]*"
+    r"|fr/sante-canada/[^?#]*"
     r"|etc/designs/canada/wet-boew/.*"
     r"|content/dam/canada/sitemenu/.*"
     r"|content/dam/themes/health/.*"
@@ -31,8 +33,8 @@ PHAC_CANADA_CA_SCOPE_INCLUDE_RX = (
     r"(?:"
     r"en/public-health[.]html"
     r"|fr/sante-publique[.]html"
-    r"|en/public-health/.*"
-    r"|fr/sante-publique/.*"
+    r"|en/public-health/[^?#]*"
+    r"|fr/sante-publique/[^?#]*"
     r"|etc/designs/canada/wet-boew/.*"
     r"|content/dam/canada/sitemenu/.*"
     r"|content/dam/themes/health/.*"
@@ -81,11 +83,14 @@ SOURCE_JOB_CONFIGS: Dict[str, SourceJobConfig] = {
         default_tool_options={
             "cleanup": False,
             "overwrite": False,
+            "skip_final_build": True,
             "enable_monitoring": True,
             "enable_adaptive_workers": True,
             "enable_adaptive_restart": True,
             "enable_vpn_rotation": False,
-            "initial_workers": 1,
+            "initial_workers": 2,
+            "stall_timeout_minutes": 60,
+            "docker_shm_size": "1g",
             # canada.ca is noisy (HTTP2/protocol errors + long tail timeouts).
             # Keep the monitor-driven restart budget non-trivial to avoid
             # repeated manual intervention on long annual runs.
@@ -117,11 +122,14 @@ SOURCE_JOB_CONFIGS: Dict[str, SourceJobConfig] = {
         default_tool_options={
             "cleanup": False,
             "overwrite": False,
+            "skip_final_build": True,
             "enable_monitoring": True,
             "enable_adaptive_workers": True,
             "enable_adaptive_restart": True,
             "enable_vpn_rotation": False,
-            "initial_workers": 1,
+            "initial_workers": 2,
+            "stall_timeout_minutes": 60,
+            "docker_shm_size": "1g",
             # canada.ca is noisy (HTTP2/protocol errors + long tail timeouts).
             "max_container_restarts": 20,
             "error_threshold_timeout": 50,
@@ -146,11 +154,13 @@ SOURCE_JOB_CONFIGS: Dict[str, SourceJobConfig] = {
         default_tool_options={
             "cleanup": False,
             "overwrite": False,
+            "skip_final_build": True,
             "enable_monitoring": True,
             "enable_adaptive_workers": True,
             "enable_adaptive_restart": True,
             "enable_vpn_rotation": False,
-            "initial_workers": 1,
+            "initial_workers": 2,
+            "docker_shm_size": "1g",
             "max_container_restarts": 20,
             "error_threshold_timeout": 50,
             "error_threshold_http": 50,

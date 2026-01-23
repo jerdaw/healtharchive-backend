@@ -233,10 +233,11 @@ Key fields:
       "tool_options": {
         "cleanup": false,
         "overwrite": false,
+        "skip_final_build": false,
         "enable_monitoring": false,
         "enable_adaptive_workers": false,
         "enable_vpn_rotation": false,
-        "initial_workers": 1,
+        "initial_workers": 2,
         "log_level": "INFO",
         "...": "..."
       }
@@ -339,7 +340,10 @@ Examples:
     - `enable_adaptive_workers = True`
     - `enable_adaptive_restart = True`
     - `enable_vpn_rotation = False` (disabled by default)
-    - `initial_workers = 1`
+    - `initial_workers = 2`
+    - `stall_timeout_minutes = 60`
+    - `docker_shm_size = "1g"`
+    - `skip_final_build = True` (annual campaign: search/indexing uses WARCs)
     - `error_threshold_timeout = 50`
     - `error_threshold_http = 50`
     - `backoff_delay_minutes = 2`
@@ -391,11 +395,14 @@ Result structure:
   "tool_options": {
     "cleanup": false,
     "overwrite": false,
+    "skip_final_build": true,
     "enable_monitoring": true,
     "enable_adaptive_workers": true,
     "enable_adaptive_restart": true,
     "enable_vpn_rotation": false,
-    "initial_workers": 1,
+    "initial_workers": 2,
+    "stall_timeout_minutes": 60,
+    "docker_shm_size": "1g",
     "error_threshold_timeout": 50,
     "error_threshold_http": 50,
     "backoff_delay_minutes": 2,
@@ -589,13 +596,16 @@ The backend and ``archive_tool`` share a small but important contract:
       "tool_options": {
         "cleanup": false,
         "overwrite": false,
+        "skip_final_build": true,
         "enable_monitoring": true,
         "enable_adaptive_workers": true,
         "enable_adaptive_restart": true,
         "enable_vpn_rotation": false,
-        "initial_workers": 1,
+        "initial_workers": 2,
         "log_level": "INFO",
         "relax_perms": true,
+        "stall_timeout_minutes": 60,
+        "docker_shm_size": "1g",
         "error_threshold_timeout": 50,
         "error_threshold_http": 50,
         "max_container_restarts": 20,
