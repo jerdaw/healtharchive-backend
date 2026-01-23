@@ -1,29 +1,29 @@
 from __future__ import annotations
 
-from archive_tool.constants import CONTAINER_OUTPUT_DIR
-from archive_tool.docker_runner import build_zimit_args
+from pathlib import Path
+
+from archive_tool.docker_runner import build_docker_run_cmd
 
 
-def test_build_zimit_args_multiple_seeds_uses_single_csv_seeds_flag() -> None:
-    args = build_zimit_args(
-        base_zimit_args=[],
-        required_args={
-            "seeds": ["https://example.org/en", "https://example.org/fr"],
-            "name": "test-job",
-        },
-        current_workers=3,
-        is_final_build=False,
-        extra_args=[],
+def test_build_docker_run_cmd_includes_shm_size_before_image(tmp_path: Path) -> None:
+    cmd = build_docker_run_cmd(
+        docker_image="ghcr.io/openzim/zimit:stable",
+        host_output_dir=tmp_path,
+        zimit_args=["zimit", "--name", "example"],
+        docker_shm_size="1g",
     )
 
-    assert args[0] == "zimit"
+    assert "--shm-size" in cmd
+    assert cmd[cmd.index("--shm-size") + 1] == "1g"
+    assert cmd.index("--shm-size") < cmd.index("ghcr.io/openzim/zimit:stable")
 
-    assert args.count("--seeds") == 1
-    seeds_idx = args.index("--seeds")
-    assert args[seeds_idx + 1] == "https://example.org/en,https://example.org/fr"
 
-    assert args.count("--workers") == 1
-    workers_idx = args.index("--workers")
-    assert args[workers_idx + 1] == "3"
-
-    assert args[-2:] == ["--output", str(CONTAINER_OUTPUT_DIR)]
+def test_build_docker_run_cmd_includes_label_when_set(tmp_path: Path) -> None:
+    cmd = build_docker_run_cmd(
+        docker_image="ghcr.io/openzim/zimit:stable",
+        host_output_dir=tmp_path,
+        zimit_args=["zimit", "--name", "example"],
+        label="archive_job=abc123",
+    )
+    assert "--label" in cmd
+    assert cmd[cmd.index("--label") + 1] == "archive_job=abc123"

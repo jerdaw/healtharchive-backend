@@ -245,18 +245,12 @@ def run_final_build_stage_sync(
     logger.debug(f"Final zimit arguments list: {zimit_args}")
 
     # Build the full docker command list
-    docker_cmd = [
-        "docker",
-        "run",
-        "--rm",
-        "-v",
-        f"{host_output_dir.resolve()}:{constants.CONTAINER_OUTPUT_DIR}",
-    ]
-    docker_shm_size = getattr(script_args, "docker_shm_size", None)
-    if docker_shm_size:
-        docker_cmd.extend(["--shm-size", str(docker_shm_size)])
-    docker_cmd.append(docker_image)
-    docker_cmd.extend(zimit_args)  # Add zimit command and its args
+    docker_cmd = docker_runner.build_docker_run_cmd(
+        docker_image=docker_image,
+        host_output_dir=host_output_dir,
+        zimit_args=zimit_args,
+        docker_shm_size=getattr(script_args, "docker_shm_size", None),
+    )
 
     logger.info(f"Executing Final Build Docker command:\n{' '.join(docker_cmd)}")
 
