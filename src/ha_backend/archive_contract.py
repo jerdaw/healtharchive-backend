@@ -23,6 +23,8 @@ class ArchiveToolOptions:
     initial_workers: int = 1
     log_level: str = "INFO"
     docker_image: Optional[str] = None
+    docker_shm_size: Optional[str] = None
+    skip_final_build: bool = False
 
     # Optional monitoring/adaptive fields.
     monitor_interval_seconds: Optional[int] = None
@@ -50,6 +52,7 @@ class ArchiveToolOptions:
         data: Dict[str, Any] = {
             "cleanup": self.cleanup,
             "overwrite": self.overwrite,
+            "skip_final_build": self.skip_final_build,
             "enable_monitoring": self.enable_monitoring,
             "enable_adaptive_workers": self.enable_adaptive_workers,
             "enable_adaptive_restart": self.enable_adaptive_restart,
@@ -65,6 +68,10 @@ class ArchiveToolOptions:
             docker_image = str(self.docker_image).strip()
             if docker_image:
                 data["docker_image"] = docker_image
+        if self.docker_shm_size is not None:
+            docker_shm_size = str(self.docker_shm_size).strip()
+            if docker_shm_size:
+                data["docker_shm_size"] = docker_shm_size
         if self.monitor_interval_seconds is not None:
             data["monitor_interval_seconds"] = self.monitor_interval_seconds
         if self.stall_timeout_minutes is not None:
@@ -100,6 +107,7 @@ class ArchiveToolOptions:
         return cls(
             cleanup=bool(data.get("cleanup", False)),
             overwrite=bool(data.get("overwrite", False)),
+            skip_final_build=bool(data.get("skip_final_build", False)),
             enable_monitoring=bool(data.get("enable_monitoring", False)),
             enable_adaptive_workers=bool(data.get("enable_adaptive_workers", False)),
             enable_adaptive_restart=bool(data.get("enable_adaptive_restart", False)),
@@ -107,6 +115,7 @@ class ArchiveToolOptions:
             initial_workers=int(data.get("initial_workers", 1)),
             log_level=str(data.get("log_level", "INFO")),
             docker_image=data.get("docker_image"),
+            docker_shm_size=data.get("docker_shm_size"),
             monitor_interval_seconds=data.get("monitor_interval_seconds"),
             stall_timeout_minutes=data.get("stall_timeout_minutes"),
             error_threshold_timeout=data.get("error_threshold_timeout"),
@@ -176,6 +185,9 @@ def validate_tool_options(opts: ArchiveToolOptions) -> None:
 
     if opts.docker_image is not None and not str(opts.docker_image).strip():
         raise ValueError("tool_options.docker_image cannot be blank when set")
+
+    if opts.docker_shm_size is not None and not str(opts.docker_shm_size).strip():
+        raise ValueError("tool_options.docker_shm_size cannot be blank when set")
 
 
 __all__ = ["ArchiveToolOptions", "ArchiveJobConfig", "validate_tool_options"]

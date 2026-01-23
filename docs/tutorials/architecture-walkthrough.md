@@ -101,9 +101,10 @@ sequenceDiagram
    {
      "seeds": ["https://www.canada.ca/en/health-canada.html"],
      "tool_options": {
-       "initial_workers": 1,
+       "initial_workers": 2,
        "cleanup": false,
-       "enable_monitoring": false
+       "enable_monitoring": false,
+       "skip_final_build": true
      }
    }
    ```
@@ -113,7 +114,7 @@ sequenceDiagram
    archive-tool \
      --name hc-20260118 \
      --output-dir /mnt/.../20260118T...hc-20260118 \
-     --initial-workers 1 \
+     --initial-workers 2 \
      https://www.canada.ca/en/health-canada.html
    ```
 

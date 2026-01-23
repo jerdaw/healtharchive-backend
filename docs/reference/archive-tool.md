@@ -20,6 +20,8 @@ The **archive_tool** is HealthArchive's internal crawler and orchestrator subpac
 - Docker (runs `ghcr.io/openzim/zimit` container; override/pin via `HEALTHARCHIVE_ZIMIT_DOCKER_IMAGE`)
 - State persistence (`.archive_state.json`)
 
+Note: the HealthArchive backend indexes **WARCs** into `Snapshot` rows; it does not read `.zim` files. ZIM output is an optional artifact and can be skipped with `--skip-final-build`.
+
 ---
 
 ## Architecture
@@ -95,13 +97,15 @@ archive-tool \
 
 | Flag | Purpose |
 |------|---------|
-| `--name` | Crawl name (used in ZIM filename) |
+| `--name` | Crawl name (used in output naming; ZIM is optional) |
 | `--output-dir` | Output directory path |
 | `--initial-workers` | Number of parallel workers (default: 1) |
 | `--enable-monitoring` | Enable stall/error detection |
 | `--stall-timeout-minutes` | Abort if no progress (requires monitoring) |
 | `--enable-adaptive-workers` | Reduce workers on errors (requires monitoring) |
 | `--enable-vpn-rotation` | Rotate VPN on stalls (requires monitoring) |
+| `--docker-shm-size` | Increase container `/dev/shm` (can improve stability) |
+| `--skip-final-build` | Skip the final `.zim` build stage (WARCs still produced) |
 | `--cleanup` | Delete temp dirs after successful crawl |
 | `--overwrite` | Delete existing output before starting |
 

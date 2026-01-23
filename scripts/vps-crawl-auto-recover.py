@@ -132,6 +132,15 @@ def _ensure_recovery_tool_options(job: ArchiveJob) -> bool:
     if is_annual:
         # For annual jobs, prefer tolerating "noisy but progressing" sites to
         # avoid thrashing (restart loops + long idle backoffs).
+        if tool.get("skip_final_build") is None:
+            tool["skip_final_build"] = True
+            changed = True
+        if tool.get("docker_shm_size") is None:
+            tool["docker_shm_size"] = "1g"
+            changed = True
+        if tool.get("stall_timeout_minutes") is None:
+            tool["stall_timeout_minutes"] = 60
+            changed = True
         if tool.get("error_threshold_timeout") is None:
             tool["error_threshold_timeout"] = 50
             changed = True

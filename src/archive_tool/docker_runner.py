@@ -69,6 +69,7 @@ def start_docker_container(
     run_name: str,  # Add run_name for label
     *,
     relax_perms: bool = False,
+    docker_shm_size: str | None = None,
 ) -> Tuple[Optional[subprocess.Popen], Optional[str]]:
     """Starts the Docker container asynchronously using Popen and a unique label."""
     global current_docker_process, current_container_id
@@ -85,8 +86,10 @@ def start_docker_container(
         f"{host_output_dir.resolve()}:{CONTAINER_OUTPUT_DIR}",
         "--label",
         f"archive_job={job_id}",
-        docker_image,
     ]
+    if docker_shm_size:
+        docker_cmd.extend(["--shm-size", str(docker_shm_size)])
+    docker_cmd.append(docker_image)
     if relax_perms:
         docker_cmd.extend(["--user", "0:0"])
     docker_cmd.extend(zimit_args)
