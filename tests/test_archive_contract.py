@@ -13,8 +13,10 @@ def test_archive_tool_options_round_trip_defaults() -> None:
     # Core defaults should be present.
     assert data["cleanup"] is False
     assert data["overwrite"] is False
+    assert data["skip_final_build"] is False
     assert data["enable_monitoring"] is False
     assert data["enable_adaptive_workers"] is False
+    assert data["enable_adaptive_restart"] is False
     assert data["enable_vpn_rotation"] is False
     assert data["initial_workers"] == 1
     assert data["log_level"] == "INFO"
@@ -22,6 +24,7 @@ def test_archive_tool_options_round_trip_defaults() -> None:
 
     # Optional fields should be omitted when None.
     assert "docker_image" not in data
+    assert "docker_shm_size" not in data
     assert "monitor_interval_seconds" not in data
     assert "stall_timeout_minutes" not in data
     assert "error_threshold_timeout" not in data
@@ -45,12 +48,15 @@ def test_archive_tool_options_round_trip_with_optional_fields() -> None:
     opts = ArchiveToolOptions(
         cleanup=True,
         overwrite=True,
+        skip_final_build=True,
         enable_monitoring=True,
         enable_adaptive_workers=True,
+        enable_adaptive_restart=True,
         enable_vpn_rotation=True,
         initial_workers=3,
         log_level="DEBUG",
         docker_image="ghcr.io/openzim/zimit:stable",
+        docker_shm_size="1g",
         monitor_interval_seconds=10,
         stall_timeout_minutes=5,
         error_threshold_timeout=3,
@@ -67,6 +73,7 @@ def test_archive_tool_options_round_trip_with_optional_fields() -> None:
     data = opts.to_dict()
     # Ensure optional fields are serialized.
     assert data["docker_image"] == "ghcr.io/openzim/zimit:stable"
+    assert data["docker_shm_size"] == "1g"
     assert data["monitor_interval_seconds"] == 10
     assert data["stall_timeout_minutes"] == 5
     assert data["error_threshold_timeout"] == 3
@@ -122,6 +129,15 @@ def test_validate_tool_options_enforces_invariants() -> None:
     else:
         assert False, "Expected ValueError for adaptive without monitoring"
 
+    # enable_adaptive_restart requires enable_monitoring.
+    opts = ArchiveToolOptions(enable_adaptive_restart=True, enable_monitoring=False)
+    try:
+        validate_tool_options(opts)
+    except ValueError as exc:
+        assert "enable_adaptive_restart" in str(exc)
+    else:
+        assert False, "Expected ValueError for adaptive restart without monitoring"
+
     # enable_vpn_rotation requires enable_monitoring.
     opts = ArchiveToolOptions(enable_vpn_rotation=True, enable_monitoring=False)
     try:
@@ -147,3 +163,21 @@ def test_validate_tool_options_enforces_invariants() -> None:
         vpn_connect_command="vpn connect",
     )
     validate_tool_options(opts)
+
+    # docker_image cannot be blank when set.
+    opts = ArchiveToolOptions(docker_image=" ")
+    try:
+        validate_tool_options(opts)
+    except ValueError as exc:
+        assert "docker_image" in str(exc)
+    else:
+        assert False, "Expected ValueError for blank docker_image"
+
+    # docker_shm_size cannot be blank when set.
+    opts = ArchiveToolOptions(docker_shm_size=" ")
+    try:
+        validate_tool_options(opts)
+    except ValueError as exc:
+        assert "docker_shm_size" in str(exc)
+    else:
+        assert False, "Expected ValueError for blank docker_shm_size"
