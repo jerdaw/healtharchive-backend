@@ -32,15 +32,16 @@
     end</code></pre> <hr> <h2 id=step-3-running-the-crawler>Step 3: Running the Crawler</h2> <p><strong>Job Execution</strong> (<code>ha_backend/jobs.py:439-560</code>):</p> <ol> <li> <p><strong>Load job config</strong> from database: <div class=highlight><pre><span></span><code><a id=__codelineno-3-1 name=__codelineno-3-1 href=#__codelineno-3-1></a><span class=p>{</span>
 <a id=__codelineno-3-2 name=__codelineno-3-2 href=#__codelineno-3-2></a><span class=w>  </span><span class=nt>&quot;seeds&quot;</span><span class=p>:</span><span class=w> </span><span class=p>[</span><span class=s2>&quot;https://www.canada.ca/en/health-canada.html&quot;</span><span class=p>],</span>
 <a id=__codelineno-3-3 name=__codelineno-3-3 href=#__codelineno-3-3></a><span class=w>  </span><span class=nt>&quot;tool_options&quot;</span><span class=p>:</span><span class=w> </span><span class=p>{</span>
-<a id=__codelineno-3-4 name=__codelineno-3-4 href=#__codelineno-3-4></a><span class=w>    </span><span class=nt>&quot;initial_workers&quot;</span><span class=p>:</span><span class=w> </span><span class=mi>1</span><span class=p>,</span>
+<a id=__codelineno-3-4 name=__codelineno-3-4 href=#__codelineno-3-4></a><span class=w>    </span><span class=nt>&quot;initial_workers&quot;</span><span class=p>:</span><span class=w> </span><span class=mi>2</span><span class=p>,</span>
 <a id=__codelineno-3-5 name=__codelineno-3-5 href=#__codelineno-3-5></a><span class=w>    </span><span class=nt>&quot;cleanup&quot;</span><span class=p>:</span><span class=w> </span><span class=kc>false</span><span class=p>,</span>
-<a id=__codelineno-3-6 name=__codelineno-3-6 href=#__codelineno-3-6></a><span class=w>    </span><span class=nt>&quot;enable_monitoring&quot;</span><span class=p>:</span><span class=w> </span><span class=kc>false</span>
-<a id=__codelineno-3-7 name=__codelineno-3-7 href=#__codelineno-3-7></a><span class=w>  </span><span class=p>}</span>
-<a id=__codelineno-3-8 name=__codelineno-3-8 href=#__codelineno-3-8></a><span class=p>}</span>
+<a id=__codelineno-3-6 name=__codelineno-3-6 href=#__codelineno-3-6></a><span class=w>    </span><span class=nt>&quot;enable_monitoring&quot;</span><span class=p>:</span><span class=w> </span><span class=kc>false</span><span class=p>,</span>
+<a id=__codelineno-3-7 name=__codelineno-3-7 href=#__codelineno-3-7></a><span class=w>    </span><span class=nt>&quot;skip_final_build&quot;</span><span class=p>:</span><span class=w> </span><span class=kc>true</span>
+<a id=__codelineno-3-8 name=__codelineno-3-8 href=#__codelineno-3-8></a><span class=w>  </span><span class=p>}</span>
+<a id=__codelineno-3-9 name=__codelineno-3-9 href=#__codelineno-3-9></a><span class=p>}</span>
 </code></pre></div></p> </li> <li> <p><strong>Build CLI command</strong>: <div class=highlight><pre><span></span><code><a id=__codelineno-4-1 name=__codelineno-4-1 href=#__codelineno-4-1></a>archive-tool<span class=w> </span><span class=se>\</span>
 <a id=__codelineno-4-2 name=__codelineno-4-2 href=#__codelineno-4-2></a><span class=w>  </span>--name<span class=w> </span>hc-20260118<span class=w> </span><span class=se>\</span>
 <a id=__codelineno-4-3 name=__codelineno-4-3 href=#__codelineno-4-3></a><span class=w>  </span>--output-dir<span class=w> </span>/mnt/.../20260118T...hc-20260118<span class=w> </span><span class=se>\</span>
-<a id=__codelineno-4-4 name=__codelineno-4-4 href=#__codelineno-4-4></a><span class=w>  </span>--initial-workers<span class=w> </span><span class=m>1</span><span class=w> </span><span class=se>\</span>
+<a id=__codelineno-4-4 name=__codelineno-4-4 href=#__codelineno-4-4></a><span class=w>  </span>--initial-workers<span class=w> </span><span class=m>2</span><span class=w> </span><span class=se>\</span>
 <a id=__codelineno-4-5 name=__codelineno-4-5 href=#__codelineno-4-5></a><span class=w>  </span>https://www.canada.ca/en/health-canada.html
 </code></pre></div></p> </li> <li> <p><strong>Execute as subprocess</strong> (<code>jobs.py:529-542</code>):</p> </li> <li>Spawns <code>archive-tool</code> process</li> <li>Streams output to logs</li> <li>Waits for completion</li> </ol> <hr> <h2 id=step-4-archive-tool-crawls>Step 4: Archive Tool Crawls</h2> <p>The <strong>archive_tool</strong> (separate subpackage) orchestrates Docker:</p> <pre class=mermaid><code>graph TD
     AT[archive-tool] --&gt;|Spawns| D[Docker Container]

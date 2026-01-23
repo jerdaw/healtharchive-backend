@@ -16,13 +16,16 @@
 <a id=__codelineno-8-4 name=__codelineno-8-4 href=#__codelineno-8-4></a><span class=c1># Create with custom worker count</span>
 <a id=__codelineno-8-5 name=__codelineno-8-5 href=#__codelineno-8-5></a>ha-backend<span class=w> </span>create-job<span class=w> </span>--source<span class=w> </span>hc<span class=w> </span>--override<span class=w> </span><span class=s1>&#39;{&quot;tool_options&quot;: {&quot;initial_workers&quot;: 2}}&#39;</span>
 <a id=__codelineno-8-6 name=__codelineno-8-6 href=#__codelineno-8-6></a>
-<a id=__codelineno-8-7 name=__codelineno-8-7 href=#__codelineno-8-7></a><span class=c1># Enable monitoring and stall detection</span>
-<a id=__codelineno-8-8 name=__codelineno-8-8 href=#__codelineno-8-8></a>ha-backend<span class=w> </span>create-job<span class=w> </span>--source<span class=w> </span>phac<span class=w> </span>--override<span class=w> </span><span class=s1>&#39;{</span>
-<a id=__codelineno-8-9 name=__codelineno-8-9 href=#__codelineno-8-9></a><span class=s1>  &quot;tool_options&quot;: {</span>
-<a id=__codelineno-8-10 name=__codelineno-8-10 href=#__codelineno-8-10></a><span class=s1>    &quot;enable_monitoring&quot;: true,</span>
-<a id=__codelineno-8-11 name=__codelineno-8-11 href=#__codelineno-8-11></a><span class=s1>    &quot;stall_timeout_minutes&quot;: 60</span>
-<a id=__codelineno-8-12 name=__codelineno-8-12 href=#__codelineno-8-12></a><span class=s1>  }</span>
-<a id=__codelineno-8-13 name=__codelineno-8-13 href=#__codelineno-8-13></a><span class=s1>}&#39;</span>
+<a id=__codelineno-8-7 name=__codelineno-8-7 href=#__codelineno-8-7></a><span class=c1># Create a &quot;search-first&quot; crawl (skip optional .zim build) with a larger Docker /dev/shm</span>
+<a id=__codelineno-8-8 name=__codelineno-8-8 href=#__codelineno-8-8></a>ha-backend<span class=w> </span>create-job<span class=w> </span>--source<span class=w> </span>hc<span class=w> </span>--override<span class=w> </span><span class=s1>&#39;{&quot;tool_options&quot;: {&quot;initial_workers&quot;: 2, &quot;skip_final_build&quot;: true, &quot;docker_shm_size&quot;: &quot;1g&quot;}}&#39;</span>
+<a id=__codelineno-8-9 name=__codelineno-8-9 href=#__codelineno-8-9></a>
+<a id=__codelineno-8-10 name=__codelineno-8-10 href=#__codelineno-8-10></a><span class=c1># Enable monitoring and stall detection</span>
+<a id=__codelineno-8-11 name=__codelineno-8-11 href=#__codelineno-8-11></a>ha-backend<span class=w> </span>create-job<span class=w> </span>--source<span class=w> </span>phac<span class=w> </span>--override<span class=w> </span><span class=s1>&#39;{</span>
+<a id=__codelineno-8-12 name=__codelineno-8-12 href=#__codelineno-8-12></a><span class=s1>  &quot;tool_options&quot;: {</span>
+<a id=__codelineno-8-13 name=__codelineno-8-13 href=#__codelineno-8-13></a><span class=s1>    &quot;enable_monitoring&quot;: true,</span>
+<a id=__codelineno-8-14 name=__codelineno-8-14 href=#__codelineno-8-14></a><span class=s1>    &quot;stall_timeout_minutes&quot;: 60</span>
+<a id=__codelineno-8-15 name=__codelineno-8-15 href=#__codelineno-8-15></a><span class=s1>  }</span>
+<a id=__codelineno-8-16 name=__codelineno-8-16 href=#__codelineno-8-16></a><span class=s1>}&#39;</span>
 </code></pre></div> <p><strong>Output</strong>: <div class=highlight><pre><span></span><code><a id=__codelineno-9-1 name=__codelineno-9-1 href=#__codelineno-9-1></a>Created job ID: 42
 <a id=__codelineno-9-2 name=__codelineno-9-2 href=#__codelineno-9-2></a>Name: hc-20260118
 <a id=__codelineno-9-3 name=__codelineno-9-3 href=#__codelineno-9-3></a>Output directory: /mnt/nasd/nobak/healtharchive/jobs/hc/20260118T210911Z__hc-20260118
