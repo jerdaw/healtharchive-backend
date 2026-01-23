@@ -15,6 +15,33 @@ current_docker_process: Optional[subprocess.Popen] = None
 current_container_id: Optional[str] = None
 
 
+def build_docker_run_cmd(
+    *,
+    docker_image: str,
+    host_output_dir: Path,
+    zimit_args: List[str],
+    label: str | None = None,
+    docker_shm_size: str | None = None,
+    user: str | None = None,
+) -> List[str]:
+    cmd = [
+        "docker",
+        "run",
+        "--rm",
+        "-v",
+        f"{host_output_dir.resolve()}:{CONTAINER_OUTPUT_DIR}",
+    ]
+    if label:
+        cmd.extend(["--label", str(label)])
+    if docker_shm_size:
+        cmd.extend(["--shm-size", str(docker_shm_size)])
+    if user:
+        cmd.extend(["--user", str(user)])
+    cmd.append(docker_image)
+    cmd.extend(zimit_args)
+    return cmd
+
+
 def build_zimit_args(
     base_zimit_args: List[str],
     required_args: Dict[str, Any],
@@ -77,22 +104,14 @@ def start_docker_container(
     current_container_id = None
 
     job_id = f"archive-{run_name}-{uuid.uuid4().hex[:8]}"
-
-    docker_cmd = [
-        "docker",
-        "run",
-        "--rm",
-        "-v",
-        f"{host_output_dir.resolve()}:{CONTAINER_OUTPUT_DIR}",
-        "--label",
-        f"archive_job={job_id}",
-    ]
-    if docker_shm_size:
-        docker_cmd.extend(["--shm-size", str(docker_shm_size)])
-    docker_cmd.append(docker_image)
-    if relax_perms:
-        docker_cmd.extend(["--user", "0:0"])
-    docker_cmd.extend(zimit_args)
+    docker_cmd = build_docker_run_cmd(
+        docker_image=docker_image,
+        host_output_dir=host_output_dir,
+        zimit_args=zimit_args,
+        label=f"archive_job={job_id}",
+        docker_shm_size=docker_shm_size,
+        user="0:0" if relax_perms else None,
+    )
 
     logger.info(f"Executing Docker command (Job ID: {job_id}):\n{' '.join(docker_cmd)}")
     try:
