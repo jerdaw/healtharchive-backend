@@ -29,6 +29,7 @@ Implementation details (scheduler, timers, reconciler, monitoring) live in:
     broad coverage of each source, even if crawls take days.
 -   **Search-first readiness:** once a crawl finishes, indexing should run next so
     results become searchable as quickly as possible on production hardware.
+-   **WARC-first pipeline:** WARCs are the canonical input to search indexing; `.zim` outputs are optional artifacts and are not required for annual “done”.
 -   **Stable scope:** only include sources we can realistically crawl and operate
     with minimal ongoing tweaking.
 
@@ -39,6 +40,7 @@ Implementation details (scheduler, timers, reconciler, monitoring) live in:
     VPS + limited concurrency makes this unrealistic).
 -   Automating cleanup/retention that could delete WARCs (explicitly deferred).
 -   Building a separate staging environment.
+-   Full-text indexing of non-HTML content (e.g. PDFs) — captured for completeness, but not searchable in v1.
 
 ---
 
