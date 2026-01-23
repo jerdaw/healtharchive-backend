@@ -52,6 +52,20 @@ def test_get_config_for_source_known_sources() -> None:
     assert hc_cfg.default_seeds
     assert phac_cfg.default_seeds
     assert cihr_cfg.default_seeds
+    # Annual defaults are tuned for search-first throughput on the single VPS.
+    assert hc_cfg.default_tool_options["skip_final_build"] is True
+    assert hc_cfg.default_tool_options["docker_shm_size"] == "1g"
+    assert hc_cfg.default_tool_options["initial_workers"] == 2
+    assert hc_cfg.default_tool_options["stall_timeout_minutes"] == 60
+
+    assert phac_cfg.default_tool_options["skip_final_build"] is True
+    assert phac_cfg.default_tool_options["docker_shm_size"] == "1g"
+    assert phac_cfg.default_tool_options["initial_workers"] == 2
+    assert phac_cfg.default_tool_options["stall_timeout_minutes"] == 60
+
+    assert cihr_cfg.default_tool_options["skip_final_build"] is True
+    assert cihr_cfg.default_tool_options["docker_shm_size"] == "1g"
+    assert cihr_cfg.default_tool_options["initial_workers"] == 2
 
 
 def test_get_config_for_source_unknown() -> None:
