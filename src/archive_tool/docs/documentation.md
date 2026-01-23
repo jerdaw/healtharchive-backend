@@ -15,14 +15,14 @@ This project is an **orchestrator around Zimit** (the `ghcr.io/openzim/zimit` Do
    * Restart the container on stalls (last-resort), if configured.
    * Rotate VPN / IP without stopping the container, if configured.
 4. **Tracks temporary output directories** and **WARCs** across runs.
-5. **Builds the final ZIM from WARCs** as a separate, synchronous stage.
+5. **Optionally builds the final ZIM from WARCs** as a separate, synchronous stage.
 6. Provides a **cleaned-up surface**: state file, temp dirs, and logs with predictable naming.
 
 You invoke a single script with seeds + name + output dir, and it tries to:
 
 * Decide whether to **do a fresh run**, **resume**, or **do a new crawl phase + consolidate existing WARCs**.
 * **Automatically generate and run the correct `docker run zimit ...` commands** across multiple attempts.
-* **End with `<name>.zim` in your chosen `--output-dir`**.
+* Optionally **end with `<name>.zim` in your chosen `--output-dir`** (unless `--skip-final-build` is set).
 
 ---
 
@@ -96,6 +96,8 @@ When called from the HealthArchive backend, the following expectations apply:
       - `--seeds`, `--name`, `--output-dir`, `--initial-workers`, `--log-level`.
       - `--cleanup` when `cleanup=True`.
       - `--overwrite` when `overwrite=True`.
+      - `--skip-final-build` when `skip_final_build=True`.
+      - `docker_shm_size` → `--docker-shm-size <value>`.
 
     - Monitoring/adaptive flags:
 
@@ -187,13 +189,13 @@ It uses `parse_known_args()` to split:
 
 * `--name` (required)
 
-  * Base name for the ZIM and the “job”. Final ZIM will be `<name>.zim` in `--output-dir`.
+  * Base name for the job. If the final build stage runs, the ZIM output will be `<name>.zim` in `--output-dir`.
 
 * `--output-dir` (required)
 
   * **Host directory** where:
 
-    * ZIM is stored.
+    * ZIM is stored (if final build is enabled).
     * Logs are written.
     * Temp dirs (mirror of `/output` inside container) live.
     * `.archive_state.json` lives.
@@ -217,9 +219,19 @@ It uses `parse_known_args()` to split:
     * Allows recreating an existing ZIM.
     * Resets persistent state (workers, VPN counters, temp dir list) to behave as a fresh crawl from the tool’s POV.
 
+* `--skip-final-build`
+
+  * If set, skip the final `--warcs` stage that produces `<name>.zim`.
+  * WARCs and `.archive_state.json` are still written under `--output-dir` for downstream indexing.
+
 * `--docker-image` (default = `DOCKER_IMAGE` from constants = env `HEALTHARCHIVE_ZIMIT_DOCKER_IMAGE` or `"ghcr.io/openzim/zimit"`)
 
   * Lets you override which Zimit image to run.
+
+* `--docker-shm-size`
+
+  * If set, passes `--shm-size <value>` to `docker run` (e.g., `512m`, `1g`).
+  * Useful for stability on browser-driven crawls (fewer timeouts/stalls).
 
 * `--log-level` (`DEBUG`, `INFO` (default), `WARNING`, `ERROR`, `CRITICAL`)
 
@@ -658,7 +670,7 @@ This ensures that worker count is **controlled centrally** by `CrawlState.curren
 
 ### 6.3 Starting the Docker container
 
-**Function:** `start_docker_container(docker_image, host_output_dir, zimit_args, run_name)`
+**Function:** `start_docker_container(docker_image, host_output_dir, zimit_args, run_name, *, docker_shm_size=None)`
 
 * Compose:
 
@@ -666,6 +678,7 @@ This ensures that worker count is **controlled centrally** by `CrawlState.curren
   docker run --rm \
     -v /host/output:/output \
     --label archive_job=archive-<run_name>-<uuid8> \
+    [--shm-size 1g] \
     <docker_image> \
     zimit ...
   ```

@@ -34,7 +34,23 @@ def parse_arguments() -> Tuple[argparse.Namespace, List[str]]:
         action="store_true",
         help="Allow overwriting an existing ZIM file in the output directory.",
     )  # <-- NEW
+    tool_opts_group.add_argument(
+        "--skip-final-build",
+        action="store_true",
+        help=(
+            "Skip the final '--warcs' consolidation stage that produces a .zim file. "
+            "WARCs and state are still written under --output-dir."
+        ),
+    )
     tool_opts_group.add_argument("--docker-image", default=DOCKER_IMAGE, help="Zimit Docker image.")
+    tool_opts_group.add_argument(
+        "--docker-shm-size",
+        default=None,
+        help=(
+            "If set, pass '--shm-size <value>' to 'docker run' for the Zimit container "
+            "(e.g., '512m', '1g'). Can improve stability for browser-driven crawls."
+        ),
+    )
     tool_opts_group.add_argument(
         "--log-level",
         default="INFO",

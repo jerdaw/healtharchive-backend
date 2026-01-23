@@ -139,6 +139,8 @@ def test_run_persistent_job_builds_monitoring_and_vpn_args(tmp_path, monkeypatch
     assert rc == 0
 
     expected_extra_args = (
+        "--docker-shm-size",
+        "1g",
         "--enable-monitoring",
         "--monitor-interval-seconds",
         "10",
@@ -166,6 +168,7 @@ def test_run_persistent_job_builds_monitoring_and_vpn_args(tmp_path, monkeypatch
         "--backoff-delay-minutes",
         "15",
         "--relax-perms",
+        "--skip-final-build",
         *tuple(SOURCE_JOB_CONFIGS["hc"].default_zimit_passthrough_args),
         "--pageLimit",
         "5",
@@ -173,7 +176,7 @@ def test_run_persistent_job_builds_monitoring_and_vpn_args(tmp_path, monkeypatch
 
     assert captured["run_kwargs"]["extra_args"] == expected_extra_args
     # Basic sanity on other args
-    assert captured["run_kwargs"]["initial_workers"] == 1
+    assert captured["run_kwargs"]["initial_workers"] == 2
     assert captured["run_kwargs"]["cleanup"] is False
     assert captured["run_kwargs"]["overwrite"] is False
     assert captured["run_kwargs"]["log_level"] == "INFO"
