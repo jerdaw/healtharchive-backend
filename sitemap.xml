@@ -333,6 +333,10 @@
          <lastmod>2026-01-24</lastmod>
     </url>
     <url>
+         <loc>https://docs.healtharchive.ca/operations/incidents/2026-01-24-infra-error-107-hotpath-thrash-and-worker-stop/</loc>
+         <lastmod>2026-01-24</lastmod>
+    </url>
+    <url>
          <loc>https://docs.healtharchive.ca/operations/incidents/severity/</loc>
          <lastmod>2026-01-24</lastmod>
     </url>
@@ -497,10 +501,6 @@
          <lastmod>2026-01-24</lastmod>
     </url>
     <url>
-         <loc>https://docs.healtharchive.ca/roadmaps/2026-01-24-infra-error-and-storage-hotpath-hardening/</loc>
-         <lastmod>2026-01-24</lastmod>
-    </url>
-    <url>
          <loc>https://docs.healtharchive.ca/roadmaps/roadmap/</loc>
          <lastmod>2026-01-24</lastmod>
     </url>
@@ -578,6 +578,10 @@
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/roadmaps/implemented/2026-01-23-annual-crawl-throughput-and-artifacts/</loc>
+         <lastmod>2026-01-24</lastmod>
+    </url>
+    <url>
+         <loc>https://docs.healtharchive.ca/roadmaps/implemented/2026-01-24-infra-error-and-storage-hotpath-hardening/</loc>
          <lastmod>2026-01-24</lastmod>
     </url>
     <url>
