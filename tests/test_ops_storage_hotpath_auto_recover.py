@@ -37,6 +37,26 @@ def _init_test_db(tmp_path: Path, monkeypatch, name: str) -> None:
     Base.metadata.create_all(engine)
 
 
+def test_deploy_lock_probe_works_when_lock_file_is_readonly(tmp_path, monkeypatch) -> None:
+    mod = _load_script_module(
+        "vps-storage-hotpath-auto-recover.py",
+        module_name="ha_test_vps_storage_hotpath_auto_recover_lock_probe_readonly",
+    )
+    _init_test_db(tmp_path, monkeypatch, "hotpath_lock_probe_readonly.db")
+
+    lock_file = tmp_path / "deploy.lock"
+    lock_file.write_text("pid=123\nstarted_at_utc=20260101T000000Z\n", encoding="utf-8")
+    lock_file.chmod(0o444)
+
+    active, age_seconds = mod._deploy_lock_is_active(
+        lock_file,
+        now_utc=datetime.now(timezone.utc),
+        deploy_lock_max_age_seconds=9999,
+    )
+    assert active == 0
+    assert age_seconds is not None
+
+
 def test_storage_hotpath_watchdog_requires_confirm_runs(tmp_path, monkeypatch, capsys) -> None:
     mod = _load_script_module(
         "vps-storage-hotpath-auto-recover.py",
