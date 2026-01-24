@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib.util
 import subprocess
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 from types import ModuleType
 
@@ -62,6 +63,26 @@ def test_worker_auto_start_disabled_without_sentinel(tmp_path, monkeypatch) -> N
     prom = (out_dir / "worker.prom").read_text(encoding="utf-8")
     assert "healtharchive_worker_auto_start_enabled 0" in prom
     assert 'healtharchive_worker_auto_start_last_result{result="skip",reason="disabled"} 1' in prom
+
+
+def test_deploy_lock_probe_works_when_lock_file_is_readonly(tmp_path, monkeypatch) -> None:
+    mod = _load_script_module(
+        "vps-worker-auto-start.py",
+        module_name="ha_test_vps_worker_auto_start_lock_probe_readonly",
+    )
+    _init_test_db(tmp_path, monkeypatch, "worker_lock_probe_readonly.db")
+
+    lock_file = tmp_path / "deploy.lock"
+    lock_file.write_text("pid=123\nstarted_at_utc=20260101T000000Z\n", encoding="utf-8")
+    lock_file.chmod(0o444)
+
+    active, age_seconds = mod._deploy_lock_is_active(
+        lock_file,
+        now_utc=datetime.now(timezone.utc),
+        deploy_lock_max_age_seconds=9999,
+    )
+    assert active == 0
+    assert age_seconds is not None
 
 
 def test_worker_auto_start_refuses_during_deploy_lock(tmp_path, monkeypatch) -> None:
