@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+from datetime import datetime, timedelta, timezone
 import logging
 import time
 from typing import Optional
 
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from ha_backend.db import get_session
@@ -15,16 +17,29 @@ logger = logging.getLogger("healtharchive.worker")
 
 MAX_CRAWL_RETRIES = 2
 DEFAULT_POLL_INTERVAL = 30
+INFRA_ERROR_RETRY_COOLDOWN_MINUTES = 10
 
 
-def _select_next_crawl_job(session: Session) -> Optional[ArchiveJob]:
+def _select_next_crawl_job(session: Session, *, now_utc: datetime) -> Optional[ArchiveJob]:
     """
     Select the next job that needs a crawl phase.
+
+    To avoid alert storms and tight retry loops when infrastructure is unhealthy
+    (e.g. Errno 107 stale SSHFS mountpoints), we temporarily skip jobs that most
+    recently ended in crawler_status=infra_error.
     """
+    infra_error_cutoff = now_utc - timedelta(minutes=INFRA_ERROR_RETRY_COOLDOWN_MINUTES)
     return (
         session.query(ArchiveJob)
         .join(Source)
-        .filter(ArchiveJob.status.in_(["queued", "retryable"]))
+        .filter(
+            ArchiveJob.status.in_(["queued", "retryable"]),
+            or_(
+                ArchiveJob.crawler_status.is_(None),
+                ArchiveJob.crawler_status != "infra_error",
+                ArchiveJob.updated_at <= infra_error_cutoff,
+            ),
+        )
         .order_by(ArchiveJob.queued_at.asc().nullsfirst(), ArchiveJob.created_at.asc())
         .first()
     )
@@ -40,8 +55,9 @@ def _process_single_job() -> bool:
     job_id: Optional[int] = None
 
     # Select a job that needs crawling.
+    now_utc = datetime.now(timezone.utc)
     with get_session() as session:
-        job = _select_next_crawl_job(session)
+        job = _select_next_crawl_job(session, now_utc=now_utc)
         if job is None:
             return False
         job_id = job.id
