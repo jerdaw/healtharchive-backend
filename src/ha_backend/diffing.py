@@ -146,7 +146,8 @@ def normalize_html_for_diff(html: str) -> DiffDocument:
     root = soup.find("main") or soup.find(attrs={"role": "main"}) or soup.body or soup
     if isinstance(root, NavigableString):
         root = root.parent or soup
-    root_tag = cast(Tag, root)
+    assert isinstance(root, Tag)
+    root_tag = root
 
     final_lines = _normalize_tree(root_tag)
     sections = _extract_sections(root_tag)
