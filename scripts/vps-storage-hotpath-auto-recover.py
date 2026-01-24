@@ -256,7 +256,9 @@ def _deploy_lock_is_active(
         return 0, None
 
     try:
-        f = deploy_lock_file.open("a", encoding="utf-8")
+        # Open read-only so root can probe locks on user-owned files in sticky
+        # directories like /tmp (some systems restrict write opens here).
+        f = deploy_lock_file.open("rb")
     except OSError:
         return (
             1 if age_seconds <= float(deploy_lock_max_age_seconds) else 0,
