@@ -61,6 +61,57 @@ def _file_age_seconds(path: Path, *, now_utc: datetime) -> float | None:
     return max(0.0, (now_utc - mtime).total_seconds())
 
 
+def _deploy_lock_is_active(
+    deploy_lock_file: Path,
+    *,
+    now_utc: datetime,
+    deploy_lock_max_age_seconds: float,
+) -> tuple[int, float | None]:
+    """
+    Return (active, age_seconds) for the deploy lock.
+
+    The deploy helper uses `flock` on a persistent file. That means the file can
+    exist even when no deploy is running. We therefore prefer probing whether
+    the lock is *currently held* by another process.
+
+    If the lock state can't be probed (unexpected), we fall back to an mtime age
+    heuristic (backwards compatible with older behavior).
+    """
+    age_seconds = _file_age_seconds(deploy_lock_file, now_utc=now_utc)
+    if age_seconds is None:
+        return 0, None
+
+    try:
+        f = deploy_lock_file.open("a", encoding="utf-8")
+    except OSError:
+        # Best-effort fallback to the prior "exists and is not stale" heuristic.
+        return (
+            1 if age_seconds <= float(deploy_lock_max_age_seconds) else 0,
+            age_seconds,
+        )
+    try:
+        try:
+            fcntl.flock(f.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            return 1, age_seconds
+        except OSError:
+            return (
+                1 if age_seconds <= float(deploy_lock_max_age_seconds) else 0,
+                age_seconds,
+            )
+        else:
+            try:
+                fcntl.flock(f.fileno(), fcntl.LOCK_UN)
+            except OSError:
+                pass
+            return 0, age_seconds
+    finally:
+        try:
+            f.close()
+        except Exception:
+            pass
+
+
 def _write_textfile_metrics(
     *,
     out_dir: Path,
@@ -135,7 +186,7 @@ def _write_textfile_metrics(
     emit(f"healtharchive_worker_auto_start_storagebox_mount_errno {int(storagebox_errno)}")
 
     emit(
-        "# HELP healtharchive_worker_auto_start_deploy_lock_present 1 if deploy lock file exists and is not stale."
+        "# HELP healtharchive_worker_auto_start_deploy_lock_present 1 if deploy lock appears active (held by another process)."
     )
     emit("# TYPE healtharchive_worker_auto_start_deploy_lock_present gauge")
     emit(f"healtharchive_worker_auto_start_deploy_lock_present {int(deploy_lock_present)}")
@@ -252,12 +303,12 @@ def main(argv: list[str] | None = None) -> int:
     reason = "no_action"
     worker_active = int(_systemctl_is_active(str(args.worker_unit)))
 
-    # Deploy lock gate.
+    # Deploy lock gate: prefer probing whether the lock is currently held.
     deploy_lock_file = Path(str(args.deploy_lock_file))
-    deploy_lock_age_seconds = _file_age_seconds(deploy_lock_file, now_utc=now)
-    deploy_lock_present = int(
-        deploy_lock_age_seconds is not None
-        and deploy_lock_age_seconds <= float(args.deploy_lock_max_age_seconds)
+    deploy_lock_present, _deploy_lock_age_seconds = _deploy_lock_is_active(
+        deploy_lock_file,
+        now_utc=now,
+        deploy_lock_max_age_seconds=float(args.deploy_lock_max_age_seconds),
     )
     if deploy_lock_present == 1:
         reason = "deploy_lock"

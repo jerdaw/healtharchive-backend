@@ -145,7 +145,7 @@ matches your operational readiness.
   - Recommended; low-risk and catches “silent” ops drift.
 - **Storage hot-path auto-recover** (`healtharchive-storage-hotpath-auto-recover.timer`)
   - Dangerous if misconfigured; only enable after you’ve validated Phase 1 alerts and run the watchdog in dry-run mode.
-  - The unit is gated by a venv presence check and the watchdog skips runs while `/tmp/healtharchive-backend-deploy.lock` exists (to avoid flapping during deploys).
+  - The unit is gated by a venv presence check and the watchdog skips runs while the deploy lock is *held* (to avoid flapping during active deploys).
 - **Worker auto-start watchdog** (`healtharchive-worker-auto-start.timer`)
   - Recommended once you’re confident in the single-VPS production automation stack.
   - The unit is sentinel-gated and refuses to start the worker if the Storage Box mount is unreadable or if the DB indicates a `status=running` job while the worker is down.

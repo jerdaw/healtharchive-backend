@@ -76,7 +76,12 @@ def test_worker_auto_start_refuses_during_deploy_lock(tmp_path, monkeypatch) -> 
 
     monkeypatch.setattr(mod, "_systemctl_is_active", lambda _u: False)
     monkeypatch.setattr(mod, "_probe_readable_dir", lambda _p: (1, -1))
-    monkeypatch.setattr(mod, "_file_age_seconds", lambda _p, now_utc: 10.0)
+
+    def fake_deploy_lock_is_active(_p: Path, *, now_utc, deploy_lock_max_age_seconds: float):
+        del now_utc, deploy_lock_max_age_seconds
+        return 1, 10.0
+
+    monkeypatch.setattr(mod, "_deploy_lock_is_active", fake_deploy_lock_is_active)
 
     out_dir = tmp_path / "out"
     rc = mod.main(
