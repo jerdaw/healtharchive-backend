@@ -1,6 +1,6 @@
 # Monitoring & Alerting Strategy - Annual Crawl Campaign
 
-**Last Updated:** 2026-01-19
+**Last Updated:** 2026-01-24
 
 ## Overview
 
@@ -8,16 +8,31 @@ This document defines the monitoring strategy for the HealthArchive annual crawl
 
 ## Metric Sources
 
-All custom metrics are written to:
-`/var/lib/node_exporter/textfile_collector/healtharchive_crawl.prom`
+Custom metrics are written to the node_exporter textfile collector directory:
 
-The collector script `vps-crawl-metrics-textfile.py` is triggered every **1 minute** by `healtharchive-crawl-metrics.timer`.
+- `/var/lib/node_exporter/textfile_collector/`
+
+Primary files (single-VPS annual campaign):
+
+- `healtharchive_crawl.prom`
+  - Written by `scripts/vps-crawl-metrics-textfile.py`
+  - Triggered every **1 minute** by `healtharchive-crawl-metrics.timer`
+- `healtharchive_storage_hotpath_auto_recover.prom`
+  - Written by `scripts/vps-storage-hotpath-auto-recover.py`
+  - Triggered every **1 minute** by `healtharchive-storage-hotpath-auto-recover.timer` (sentinel-gated)
+- `healtharchive_worker_auto_start.prom`
+  - Written by `scripts/vps-worker-auto-start.py`
+  - Triggered every **2 minutes** by `healtharchive-worker-auto-start.timer` (sentinel-gated)
 
 ### Key Metric Families
 
 | Metric Name | Type | Description |
 | :--- | :--- | :--- |
 | `healtharchive_crawl_running_jobs` | Gauge | Count of currently active jobs in the DB. |
+| `healtharchive_worker_active` | Gauge | 1 = worker systemd unit is active. |
+| `healtharchive_jobs_pending_crawl` | Gauge | Count of jobs in `status in (queued, retryable)`. |
+| `healtharchive_jobs_infra_error_recent_total{minutes="10"}` | Gauge | Count of jobs recently failing due to infra errors (windowed). |
+| `healtharchive_worker_should_be_running` | Gauge | 1 = pending crawl jobs exist and Storage Box mount is readable. |
 | `healtharchive_crawl_running_job_state_file_ok` | Gauge | 1 = `.archive_state.json` is readable and valid. 0 = Probe failed (SSHFS/Permissions issue). |
 | `healtharchive_crawl_running_job_container_restarts_done` | Gauge | Cumulative count of Zimit container restarts for the current job. |
 | `healtharchive_crawl_running_job_last_progress_age_seconds` | Gauge | Time since the last "pages crawled" increment in the logs. |
@@ -27,28 +42,45 @@ The collector script `vps-crawl-metrics-textfile.py` is triggered every **1 minu
 
 ## Alerting Thresholds
 
-### 1. SSHFS/Mount Stability
+Alerts are defined in:
 
-**Alert:** `CrawlStateFileProbeFailure`
+- `ops/observability/alerting/healtharchive-alerts.yml`
 
-- **Threshold:** `healtharchive_crawl_running_job_state_file_ok == 0` for 5m.
-- **Meaning:** The monitoring script cannot read the job's state file. This usually means the SSHFS mount to the storagebox has dropped or permissions are broken.
-- **Action:** Check `findmnt`, re-mount SSHFS.
-- **Aggregator:** Also monitors `CrawlOutputDirProbeFailure` and `CrawlLogProbeFailure` for deeper infra visibility.
+### 1) Worker availability (high-signal)
 
-### 2. Restart Budget Stability
+**Alert:** `HealthArchiveWorkerDownWhileJobsPending`
 
-**Alert:** `CrawlRestartBudgetLow`
+- **Threshold:** `healtharchive_worker_should_be_running == 1 and healtharchive_worker_active == 0` for 10m.
+- **Meaning:** There is pending crawl work and storage appears usable, but the worker service is down.
+- **Action:** Check `healtharchive-worker.service` logs and Storage Box hot-path health. If automation is enabled, check `healtharchive-storage-hotpath-auto-recover.timer` + state.
 
-- **Threshold:** `healtharchive_crawl_running_job_container_restarts_done > 15` (for 30m).
-- **Meaning:** The annual job (limit 20 restarts) is nearing exhaustion.
-- **Action:** Review worker logs. If restarts are due to "timeout" or "http errors", the adaptive system is working. If restarts are rapid (thrashing), manual intervention might be needed to pause the job.
+### 2) SSHFS/Mount Stability
 
-### 3. Progress Stalls
+**Alert:** `HealthArchiveCrawlOutputDirUnreadable` (and related probe alerts)
 
-**Alert:** `CrawlProgressStalled`
+- **Threshold:** `healtharchive_crawl_running_job_output_dir_ok == 0` for 2m.
+- **Meaning:** A running crawl job cannot access its output directory. Errno 107 typically means a stale SSHFS/FUSE mount.
+- **Action:** Follow the Storage Box stale mount recovery playbook and/or ensure hot-path auto-recover is enabled and succeeding.
 
-- **Threshold:** `healtharchive_crawl_running_job_last_progress_age_seconds > 3600` (1 hour).
+**Alert:** `HealthArchiveStorageHotpathStaleUnrecovered`
+
+- **Threshold:** `healtharchive_storage_hotpath_auto_recover_detected_targets > 0` for 10m (when the automation is enabled).
+- **Meaning:** Hot-path auto-recover still sees stale/unreadable paths after 10 minutes.
+- **Action:** Inspect `/srv/healtharchive/ops/watchdog/storage-hotpath-auto-recover.json` and consider manual unmount + tiering re-apply.
+
+### 3) Restart stability
+
+**Alert:** `HealthArchiveCrawlContainerRestartsHigh`
+
+- **Threshold:** `healtharchive_crawl_running_job_container_restarts_done >= 10` (for 15m).
+- **Meaning:** The crawler is requiring many adaptive container restarts; this can be a normal resiliency mechanism, but sustained growth can indicate timeouts or I/O instability.
+- **Action:** Review worker logs and combined logs around restarts; check for repeated timeouts on the same URL or storage errors.
+
+### 4) Progress Stalls
+
+**Alert:** `HealthArchiveCrawlStalled`
+
+- **Threshold:** `healtharchive_crawl_running_job_stalled == 1` (for 30m).
 - **Meaning:** The crawler is running but hasn't archived a new page in over an hour.
 - **Action:** Check if the crawler is stuck on a massive PDF or looped trap.
 

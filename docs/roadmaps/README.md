@@ -11,12 +11,13 @@ When complete, move them to `docs/roadmaps/implemented/` and date them.
 
 Active plans:
 
-- Infra-error retry storms + Storage Box hot-path resilience (2026-01-24): `2026-01-24-infra-error-and-storage-hotpath-hardening.md`
+- (none currently)
 
 ## Implemented plans (history)
 
 - Implemented plans archive: `implemented/README.md`
 - Annual crawl throughput and WARC-first artifacts: `implemented/2026-01-23-annual-crawl-throughput-and-artifacts.md`
+- Infra-error retry storms + Storage Box hot-path resilience: `implemented/2026-01-24-infra-error-and-storage-hotpath-hardening.md`
 - SLA and service commitments (v1): `implemented/2026-01-17-sla-and-service-commitments.md`
 - Test coverage: critical business logic: `implemented/2026-01-17-test-coverage-critical-business-logic.md`
 - Disaster recovery and escalation procedures: `implemented/2026-01-17-disaster-recovery-and-escalation-procedures.md`

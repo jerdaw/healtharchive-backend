@@ -1,0 +1,10 @@
+[Unit]
+Description=Run HealthArchive worker auto-start watchdog (every 2 minutes)
+
+[Timer]
+OnCalendar=*-*-* *:0/2:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+

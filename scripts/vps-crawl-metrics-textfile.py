@@ -5,8 +5,9 @@ import argparse
 import json
 import os
 import stat
+import subprocess
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from archive_tool.constants import STATE_FILE_NAME
@@ -137,6 +138,19 @@ def _probe_readable_file(path: Path) -> tuple[int, int]:
     return 1, -1
 
 
+def _systemctl_is_active(unit: str) -> int:
+    try:
+        r = subprocess.run(  # nosec: B603
+            ["systemctl", "is-active", unit],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+    except FileNotFoundError:
+        return 0
+    return 1 if r.stdout.strip() == "active" else 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description=(
@@ -165,6 +179,22 @@ def main(argv: list[str] | None = None) -> int:
         default=1024 * 1024,
         help="Max bytes to read from the tail of each combined log.",
     )
+    parser.add_argument(
+        "--worker-unit",
+        default="healtharchive-worker.service",
+        help="Worker systemd unit name (used only for metrics).",
+    )
+    parser.add_argument(
+        "--storagebox-mount",
+        default="/srv/healtharchive/storagebox",
+        help="Storage Box mountpoint on the VPS (used only for metrics).",
+    )
+    parser.add_argument(
+        "--infra-error-window-minutes",
+        type=int,
+        default=10,
+        help="Window for 'recent infra_error jobs' metrics (default: 10 minutes).",
+    )
     args = parser.parse_args(argv)
 
     out_dir = Path(args.out_dir)
@@ -174,6 +204,8 @@ def main(argv: list[str] | None = None) -> int:
     metrics_ok = 1
     jobs: list[tuple[RunningJob, str]] = []
     pending_index_jobs: list[PendingIndexJob] = []
+    pending_crawl_jobs = 0
+    recent_infra_error_jobs = 0
     try:
         with get_session() as session:
             rows = (
@@ -218,10 +250,31 @@ def main(argv: list[str] | None = None) -> int:
                 )
                 for job_id, source_code, finished_at in pending_rows
             ]
+
+            pending_crawl_jobs = (
+                session.query(ArchiveJob)
+                .filter(ArchiveJob.status.in_(["queued", "retryable"]))
+                .count()
+            )
+
+            window_minutes = max(1, int(args.infra_error_window_minutes))
+            infra_cutoff = now - timedelta(minutes=window_minutes)
+            recent_infra_error_jobs = (
+                session.query(ArchiveJob)
+                .filter(ArchiveJob.crawler_status == "infra_error")
+                .filter(ArchiveJob.updated_at >= infra_cutoff)
+                .count()
+            )
     except Exception:
         metrics_ok = 0
         jobs = []
         pending_index_jobs = []
+        pending_crawl_jobs = 0
+        recent_infra_error_jobs = 0
+
+    worker_active = _systemctl_is_active(str(args.worker_unit))
+    storagebox_ok, _storagebox_errno = _probe_readable_dir(Path(str(args.storagebox_mount)))
+    worker_should_be_running = 1 if (pending_crawl_jobs > 0 and storagebox_ok == 1) else 0
 
     lines: list[str] = []
     _emit(
@@ -242,6 +295,35 @@ def main(argv: list[str] | None = None) -> int:
     )
     _emit(lines, "# TYPE healtharchive_crawl_running_jobs gauge")
     _emit(lines, f"healtharchive_crawl_running_jobs {len(jobs)}")
+
+    _emit(lines, "# HELP healtharchive_worker_active 1 if the worker systemd unit is active.")
+    _emit(lines, "# TYPE healtharchive_worker_active gauge")
+    _emit(lines, f"healtharchive_worker_active {worker_active}")
+
+    _emit(
+        lines,
+        "# HELP healtharchive_jobs_pending_crawl Number of jobs currently in status=queued or retryable.",
+    )
+    _emit(lines, "# TYPE healtharchive_jobs_pending_crawl gauge")
+    _emit(lines, f"healtharchive_jobs_pending_crawl {pending_crawl_jobs}")
+
+    window_minutes = max(1, int(args.infra_error_window_minutes))
+    _emit(
+        lines,
+        "# HELP healtharchive_jobs_infra_error_recent_total Number of jobs with crawler_status=infra_error updated within the recent window.",
+    )
+    _emit(lines, "# TYPE healtharchive_jobs_infra_error_recent_total gauge")
+    _emit(
+        lines,
+        f'healtharchive_jobs_infra_error_recent_total{{minutes="{window_minutes}"}} {recent_infra_error_jobs}',
+    )
+
+    _emit(
+        lines,
+        "# HELP healtharchive_worker_should_be_running 1 if there are pending crawl jobs and the Storage Box mount is readable.",
+    )
+    _emit(lines, "# TYPE healtharchive_worker_should_be_running gauge")
+    _emit(lines, f"healtharchive_worker_should_be_running {worker_should_be_running}")
 
     _emit(
         lines,

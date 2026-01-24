@@ -6,6 +6,10 @@ Use this playbook when HealthArchive crawls/indexing/metrics start failing with:
 
 This typically indicates a **stale FUSE mount** (often `sshfs`) where the mountpoint still exists, but basic filesystem operations (`stat`, `ls`, `is_dir`) fail.
 
+Operational note:
+
+- The worker skips jobs that recently failed with `crawler_status=infra_error` for a short cooldown window to prevent retry storms. This reduces alert noise but does not fix the underlying mount issue; use this playbook (or the hot-path auto-recover automation) to repair the stale mountpoint.
+
 For background and the full implementation plan (prevention + automation + integrity), see:
 
 - `../../roadmaps/implemented/2026-01-08-storagebox-sshfs-stale-mount-recovery-and-integrity.md`
@@ -30,6 +34,14 @@ attempting recovery (it is disabled-by-default unless the sentinel exists):
 systemctl status healtharchive-storage-hotpath-auto-recover.timer --no-pager -l || true
 ls -la /etc/healtharchive/storage-hotpath-auto-recover-enabled 2>/dev/null || true
 cat /srv/healtharchive/ops/watchdog/storage-hotpath-auto-recover.json 2>/dev/null || true
+```
+
+If the worker auto-start watchdog is enabled (optional), check it too:
+
+```bash
+systemctl status healtharchive-worker-auto-start.timer --no-pager -l || true
+ls -la /etc/healtharchive/worker-auto-start-enabled 2>/dev/null || true
+cat /srv/healtharchive/ops/watchdog/worker-auto-start.json 2>/dev/null || true
 ```
 
 2) Confirm Storage Box base mount health:
@@ -59,6 +71,13 @@ Stop the worker first to prevent repeated filesystem touches while mounts are br
 ```bash
 sudo systemctl stop healtharchive-worker.service
 ```
+
+Note: if `healtharchive-worker-auto-start.timer` is enabled, it may restart the worker while you are mid-repair. Either:
+
+- temporarily disable the timer, or
+- temporarily remove `/etc/healtharchive/worker-auto-start-enabled`,
+
+then re-enable after recovery.
 
 Optional: if you suspect a crawler container is still running and stuck on IO, inspect it:
 

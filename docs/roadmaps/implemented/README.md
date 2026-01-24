@@ -20,6 +20,7 @@ Implemented plans:
 - `2026-01-03-search-ranking-and-snippets-v3.md`
 - `2026-01-19-annual-crawl-resiliency-hardening.md`
 - `2026-01-23-annual-crawl-throughput-and-artifacts.md`
+- `2026-01-24-infra-error-and-storage-hotpath-hardening.md`
 
 Rules:
 

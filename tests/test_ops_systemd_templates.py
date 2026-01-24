@@ -47,3 +47,17 @@ def test_storage_hotpath_auto_recover_script_has_no_top_level_backend_imports() 
         )
     ]
     assert top_level_imports == []
+
+
+def test_worker_auto_start_systemd_template_requires_venv() -> None:
+    repo_root = Path(__file__).resolve().parents[1]
+    unit_path = (
+        repo_root / "docs" / "deployment" / "systemd" / "healtharchive-worker-auto-start.service"
+    )
+    text = unit_path.read_text(encoding="utf-8")
+    assert "ConditionPathExists=/etc/healtharchive/worker-auto-start-enabled" in text
+    assert "ConditionPathExists=/opt/healtharchive-backend/.venv/bin/python3" in text
+    assert (
+        "ExecStart=/opt/healtharchive-backend/.venv/bin/python3 "
+        "/opt/healtharchive-backend/scripts/vps-worker-auto-start.py --apply"
+    ) in text
