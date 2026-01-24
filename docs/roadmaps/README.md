@@ -9,6 +9,10 @@
 Implementation plans live directly under `docs/roadmaps/` while they are active.
 When complete, move them to `docs/roadmaps/implemented/` and date them.
 
+Active plans:
+
+- Infra-error retry storms + Storage Box hot-path resilience (2026-01-24): `2026-01-24-infra-error-and-storage-hotpath-hardening.md`
+
 ## Implemented plans (history)
 
 - Implemented plans archive: `implemented/README.md`
