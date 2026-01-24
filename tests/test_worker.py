@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from ha_backend import db as db_module
@@ -254,3 +255,87 @@ def test_worker_does_not_auto_retry_config_errors(monkeypatch, tmp_path) -> None
         assert loaded_job is not None
         assert loaded_job.status == "failed"
         assert loaded_job.retry_count == 0
+
+
+def test_worker_skips_recent_infra_error_jobs(monkeypatch, tmp_path) -> None:
+    """
+    The worker should avoid immediately re-processing jobs that most recently
+    failed due to infra_error, so it does not tight-loop and spam alerts.
+    """
+    _init_test_db(tmp_path, monkeypatch)
+
+    archive_root = tmp_path / "jobs"
+    monkeypatch.setenv("HEALTHARCHIVE_ARCHIVE_ROOT", str(archive_root))
+    monkeypatch.setenv("HEALTHARCHIVE_TOOL_CMD", "echo")
+
+    now = datetime.now(timezone.utc)
+
+    with get_session() as session:
+        source = Source(
+            code="hc",
+            name="Health Canada",
+            base_url="https://www.canada.ca/en/health-canada.html",
+            description="HC",
+            enabled=True,
+        )
+        session.add(source)
+        session.flush()
+
+        # This job would normally be picked first (earlier queued_at), but it is
+        # in crawler_status=infra_error and updated recently.
+        infra_job = ArchiveJob(
+            source_id=source.id,
+            name="worker-infra-recent",
+            output_dir=str(archive_root / "hc" / "infra"),
+            status="retryable",
+            retry_count=0,
+            queued_at=now - timedelta(hours=1),
+            crawler_status="infra_error",
+            updated_at=now,
+            created_at=now - timedelta(hours=2),
+        )
+        session.add(infra_job)
+        session.flush()
+        infra_id = infra_job.id
+
+        ok_job = ArchiveJob(
+            source_id=source.id,
+            name="worker-ok",
+            output_dir=str(archive_root / "hc" / "ok"),
+            status="queued",
+            queued_at=now - timedelta(minutes=1),
+        )
+        session.add(ok_job)
+        session.flush()
+        ok_id = ok_job.id
+
+    def fake_run_persistent_job(jid: int) -> int:
+        with get_session() as session:
+            j = session.get(ArchiveJob, jid)
+            assert j is not None
+            j.status = "completed"
+            j.crawler_exit_code = 0
+            j.crawler_status = None
+        return 0
+
+    def fake_index_job(jid: int) -> int:
+        with get_session() as session:
+            j = session.get(ArchiveJob, jid)
+            assert j is not None
+            j.status = "indexed"
+        return 0
+
+    monkeypatch.setattr("ha_backend.worker.main.run_persistent_job", fake_run_persistent_job)
+    monkeypatch.setattr("ha_backend.worker.main.index_job", fake_index_job)
+
+    run_worker_loop(poll_interval=1, run_once=True)
+
+    with get_session() as session:
+        loaded_ok = session.get(ArchiveJob, ok_id)
+        assert loaded_ok is not None
+        assert loaded_ok.status == "indexed"
+
+        loaded_infra = session.get(ArchiveJob, infra_id)
+        assert loaded_infra is not None
+        assert loaded_infra.status == "retryable"
+        assert loaded_infra.crawler_status == "infra_error"
