@@ -236,6 +236,55 @@ def _file_age_seconds(path: Path, *, now_utc: datetime) -> float | None:
     return max(0.0, (now_utc - mtime).total_seconds())
 
 
+def _deploy_lock_is_active(
+    deploy_lock_file: Path,
+    *,
+    now_utc: datetime,
+    deploy_lock_max_age_seconds: float,
+) -> tuple[int, float | None]:
+    """
+    Return (active, age_seconds) for the deploy lock.
+
+    The deploy helper uses `flock` on a persistent file, so the file may exist
+    even when no deploy is running. Prefer probing whether the lock is *held*.
+
+    If probing fails unexpectedly, fall back to an mtime-based heuristic
+    (backwards compatible with the initial implementation).
+    """
+    age_seconds = _file_age_seconds(deploy_lock_file, now_utc=now_utc)
+    if age_seconds is None:
+        return 0, None
+
+    try:
+        f = deploy_lock_file.open("a", encoding="utf-8")
+    except OSError:
+        return (
+            1 if age_seconds <= float(deploy_lock_max_age_seconds) else 0,
+            age_seconds,
+        )
+    try:
+        try:
+            fcntl.flock(f.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            return 1, age_seconds
+        except OSError:
+            return (
+                1 if age_seconds <= float(deploy_lock_max_age_seconds) else 0,
+                age_seconds,
+            )
+        else:
+            try:
+                fcntl.flock(f.fileno(), fcntl.LOCK_UN)
+            except OSError:
+                pass
+            return 0, age_seconds
+    finally:
+        try:
+            f.close()
+        except Exception:
+            pass
+
+
 def _write_metrics(
     *,
     out_dir: Path,
@@ -533,14 +582,19 @@ def main(argv: list[str] | None = None) -> int:
     manifest_path = Path(args.manifest)
 
     deploy_lock_file = Path(str(args.deploy_lock_file))
-    deploy_lock_age_seconds = _file_age_seconds(deploy_lock_file, now_utc=now)
-    if deploy_lock_age_seconds is not None and deploy_lock_age_seconds <= float(
-        args.deploy_lock_max_age_seconds
-    ):
+    deploy_lock_active, deploy_lock_age_seconds = _deploy_lock_is_active(
+        deploy_lock_file,
+        now_utc=now,
+        deploy_lock_max_age_seconds=float(args.deploy_lock_max_age_seconds),
+    )
+    if deploy_lock_active == 1:
         state["last_skip_utc"] = now.replace(microsecond=0).isoformat()
         state["last_skip_reason"] = "deploy_lock"
         state["last_skip_deploy_lock_file"] = str(deploy_lock_file)
-        state["last_skip_deploy_lock_age_seconds"] = int(deploy_lock_age_seconds)
+        if deploy_lock_age_seconds is None:
+            state["last_skip_deploy_lock_age_seconds"] = None
+        else:
+            state["last_skip_deploy_lock_age_seconds"] = int(deploy_lock_age_seconds)
         try:
             _write_metrics(
                 out_dir=Path(str(args.textfile_out_dir)),
