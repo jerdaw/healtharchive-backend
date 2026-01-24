@@ -72,7 +72,8 @@ def _strip_noise(soup: BeautifulSoup, *, strip_chrome: bool = True) -> None:
             tag.decompose()
 
     for tag in soup.find_all(True):
-        if _is_noise_tag(tag):
+        # BeautifulSoup stubs can treat find_all(True) as PageElement; guard for mypy.
+        if isinstance(tag, Tag) and _is_noise_tag(tag):
             tag.decompose()
 
 
@@ -143,9 +144,12 @@ def normalize_html_for_diff(html: str) -> DiffDocument:
     soup = BeautifulSoup(html, "html.parser")
     _strip_noise(soup, strip_chrome=True)
     root = soup.find("main") or soup.find(attrs={"role": "main"}) or soup.body or soup
+    if isinstance(root, NavigableString):
+        root = root.parent or soup
+    root_tag = cast(Tag, root)
 
-    final_lines = _normalize_tree(root)
-    sections = _extract_sections(root)
+    final_lines = _normalize_tree(root_tag)
+    sections = _extract_sections(root_tag)
     text_content = " ".join(final_lines)
 
     return DiffDocument(text=text_content, lines=final_lines, sections=sections)
@@ -155,9 +159,12 @@ def normalize_html_for_diff_full_page(html: str) -> DiffDocument:
     soup = BeautifulSoup(html, "html.parser")
     _strip_noise(soup, strip_chrome=False)
     root = soup.body or soup
+    if isinstance(root, NavigableString):
+        root = root.parent or soup
+    root_tag = root
 
-    final_lines = _normalize_tree(root)
-    sections = _extract_sections(root)
+    final_lines = _normalize_tree(root_tag)
+    sections = _extract_sections(root_tag)
     text_content = " ".join(final_lines)
 
     return DiffDocument(text=text_content, lines=final_lines, sections=sections)

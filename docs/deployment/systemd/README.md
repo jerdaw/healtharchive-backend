@@ -95,6 +95,10 @@ Assumptions (adjust paths/user if your VPS differs):
   - Optional automation to recover stalled crawl jobs by marking stale running jobs as retryable (and restarting the worker when needed).
   - Gated by `ConditionPathExists=/etc/healtharchive/crawl-auto-recover-enabled`.
   - Disabled by default; enable only after you’re comfortable with the thresholds/caps in `scripts/vps-crawl-auto-recover.py`.
+- `healtharchive-worker-auto-start.service` + `.timer`
+  - Optional automation to ensure the worker is running when it should be (jobs pending + storage OK).
+  - Gated by `ConditionPathExists=/etc/healtharchive/worker-auto-start-enabled`.
+  - Conservative by default; prefers a “do nothing” skip over unsafe starts.
 - `healtharchive-storage-hotpath-auto-recover.service` + `.timer`
   - Optional automation to recover **stale/unreadable hot paths** caused by `sshfs`/FUSE mount failures (Errno 107).
   - Gated by `ConditionPathExists=/etc/healtharchive/storage-hotpath-auto-recover-enabled`.
@@ -142,6 +146,9 @@ matches your operational readiness.
 - **Storage hot-path auto-recover** (`healtharchive-storage-hotpath-auto-recover.timer`)
   - Dangerous if misconfigured; only enable after you’ve validated Phase 1 alerts and run the watchdog in dry-run mode.
   - The unit is gated by a venv presence check and the watchdog skips runs while `/tmp/healtharchive-backend-deploy.lock` exists (to avoid flapping during deploys).
+- **Worker auto-start watchdog** (`healtharchive-worker-auto-start.timer`)
+  - Recommended once you’re confident in the single-VPS production automation stack.
+  - The unit is sentinel-gated and refuses to start the worker if the Storage Box mount is unreadable or if the DB indicates a `status=running` job while the worker is down.
 
 If a timer is enabled, also ensure its sentinel file exists under
 `/etc/healtharchive/` (see the enablement sections below).
@@ -540,10 +547,17 @@ class:
 - `OSError: [Errno 107] Transport endpoint is not connected`
 
 It can unmount stale hot paths and re-apply tiering. It will only stop the
-worker if a **running job output directory** is detected as stale (Errno 107);
-for stale import/tiering hot paths, it keeps the worker running. It also
-restarts replay (best-effort) after successful mount recovery so replay sees a
-clean view of `/srv/healtharchive/jobs`.
+worker when either:
+
+- a **running job output directory** is detected as stale (Errno 107), or
+- there are **no running jobs** (to prevent races while repairing mountpoints for the next jobs).
+
+It also probes the output dirs of the next queued/retryable jobs to prevent
+infra-error retry storms (a stale mountpoint for a retryable job should be
+repaired before the worker selects it).
+
+After successful mount recovery it restarts replay (best-effort) so replay sees
+a clean view of `/srv/healtharchive/jobs`.
 
 Keep it **disabled by default** and enable only after:
 
@@ -577,6 +591,50 @@ The watchdog writes state under:
 and emits node_exporter textfile metrics via:
 
 - `healtharchive_storage_hotpath_auto_recover.prom`
+
+---
+
+## Enable worker auto-start watchdog (optional; conservative)
+
+This automation exists to prevent “everything stopped” failures where the
+system is healthy enough to run, but `healtharchive-worker.service` is down and
+jobs are pending.
+
+It will only start the worker when all of these are true:
+
+- the worker unit is inactive,
+- there are pending crawl jobs (`status in (queued, retryable)`),
+- the Storage Box mount is readable,
+- the deploy lock is not present (or is stale),
+- **and** there are **no** DB jobs in `status=running` (conservative safety gate).
+
+Create the sentinel file:
+
+```bash
+sudo install -m 0644 -o root -g root /dev/null /etc/healtharchive/worker-auto-start-enabled
+```
+
+Enable the timer:
+
+```bash
+sudo systemctl enable --now healtharchive-worker-auto-start.timer
+systemctl list-timers | rg healtharchive-worker-auto-start || systemctl list-timers | grep healtharchive-worker-auto-start
+```
+
+Rollback:
+
+```bash
+sudo systemctl disable --now healtharchive-worker-auto-start.timer
+sudo rm -f /etc/healtharchive/worker-auto-start-enabled
+```
+
+The watchdog writes state under:
+
+- `/srv/healtharchive/ops/watchdog/worker-auto-start.json`
+
+and emits node_exporter textfile metrics via:
+
+- `healtharchive_worker_auto_start.prom`
 
 ---
 

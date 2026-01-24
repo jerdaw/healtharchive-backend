@@ -245,7 +245,126 @@ def test_storage_hotpath_watchdog_apply_stops_and_restarts_worker_when_active(
     assert any(c.startswith("systemctl stop healtharchive-worker.service") for c in flattened)
     assert any(c.startswith("umount ") and str(output_dir) in c for c in flattened)
     assert any(c.startswith(str(tiering_script)) for c in flattened)
+    assert any(
+        c.startswith(f"/opt/healtharchive-backend/.venv/bin/python3 {annual_script}")
+        and "--repair-stale-mounts" in c
+        for c in flattened
+    )
     assert any("recover-stale-jobs" in c and "--source" in c and "hc" in c for c in flattened)
+    assert any(c.startswith("systemctl start healtharchive-worker.service") for c in flattened)
+
+    prom = (out_dir / "hotpath.prom").read_text(encoding="utf-8")
+    assert "healtharchive_storage_hotpath_auto_recover_last_apply_ok 1" in prom
+
+
+def test_storage_hotpath_watchdog_starts_worker_even_if_annual_tiering_fails_when_mounts_ok(
+    tmp_path, monkeypatch
+) -> None:
+    mod = _load_script_module(
+        "vps-storage-hotpath-auto-recover.py",
+        module_name="ha_test_vps_storage_hotpath_auto_recover_annual_fail_ok",
+    )
+    _init_test_db(tmp_path, monkeypatch, "hotpath_annual_fail_ok.db")
+
+    jobs_root = tmp_path / "jobs"
+    output_dir = jobs_root / "hc" / "jobdir"
+    storagebox_mount = tmp_path / "storagebox"
+    storagebox_mount.mkdir(parents=True)
+
+    with get_session() as session:
+        seed_sources(session)
+        session.flush()
+        hc = session.query(Source).filter_by(code="hc").one()
+        session.add(
+            ArchiveJob(
+                source=hc,
+                name="hc-20260101",
+                status="running",
+                started_at=datetime.now(timezone.utc),
+                output_dir=str(output_dir),
+                config={},
+            )
+        )
+        session.flush()
+
+    calls: list[list[str]] = []
+    repaired = {"ok": False}
+
+    tiering_script = tmp_path / "tiering.sh"
+    tiering_script.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+    annual_script = tmp_path / "annual.py"
+    annual_script.write_text("raise SystemExit(1)\n", encoding="utf-8")
+
+    def fake_run_apply(cmd: list[str], *, timeout_seconds: float | None = None):
+        del timeout_seconds
+        calls.append(cmd)
+        if cmd and cmd[0] == str(tiering_script):
+            repaired["ok"] = True
+        if cmd[:2] == ["/opt/healtharchive-backend/.venv/bin/python3", str(annual_script)]:
+            return subprocess.CompletedProcess(cmd, 1, stdout="", stderr="boom")
+        return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
+
+    monkeypatch.setattr(mod, "_run_apply", fake_run_apply)
+    monkeypatch.setattr(mod, "_is_unit_present", lambda _u: False)
+    monkeypatch.setattr(mod, "_systemctl_is_active", lambda _u: True)
+    monkeypatch.setattr(
+        mod,
+        "_get_mount_info",
+        lambda _p: {"source": "dummy", "target": str(output_dir), "fstype": "fuse.sshfs"},
+    )
+
+    def fake_probe(path: Path) -> tuple[int, int]:
+        s = str(path)
+        if s == str(output_dir):
+            return (1, -1) if repaired["ok"] else (0, 107)
+        if s == str(storagebox_mount):
+            return 1, -1
+        return 1, -1
+
+    monkeypatch.setattr(mod, "_probe_readable_dir", fake_probe)
+
+    state_file = tmp_path / "state.json"
+    lock_file = tmp_path / "lock"
+    out_dir = tmp_path / "out"
+    sentinel = tmp_path / "sentinel"
+    manifest = tmp_path / "warc-tiering.binds"
+    manifest.write_text(f"{tmp_path / 'cold'} {tmp_path / 'hot'}\n", encoding="utf-8")
+
+    rc = mod.main(
+        [
+            "--apply",
+            "--jobs-root",
+            str(jobs_root),
+            "--storagebox-mount",
+            str(storagebox_mount),
+            "--manifest",
+            str(manifest),
+            "--state-file",
+            str(state_file),
+            "--lock-file",
+            str(lock_file),
+            "--sentinel-file",
+            str(sentinel),
+            "--tiering-apply-script",
+            str(tiering_script),
+            "--annual-output-tiering-script",
+            str(annual_script),
+            "--ha-backend",
+            str(tmp_path / "ha-backend"),
+            "--textfile-out-dir",
+            str(out_dir),
+            "--textfile-out-file",
+            "hotpath.prom",
+            "--confirm-runs",
+            "1",
+            "--min-failure-age-seconds",
+            "0",
+        ]
+    )
+    assert rc == 0
+
+    flattened = [" ".join(c) for c in calls]
+    assert any(c.startswith("systemctl stop healtharchive-worker.service") for c in flattened)
     assert any(c.startswith("systemctl start healtharchive-worker.service") for c in flattened)
 
     prom = (out_dir / "hotpath.prom").read_text(encoding="utf-8")
@@ -358,6 +477,148 @@ def test_storage_hotpath_watchdog_apply_does_not_start_worker_if_inactive(
     flattened = [" ".join(c) for c in calls]
     assert not any(c.startswith("systemctl stop healtharchive-worker.service") for c in flattened)
     assert not any(c.startswith("systemctl start healtharchive-worker.service") for c in flattened)
+
+
+def test_storage_hotpath_watchdog_repairs_next_job_output_dir_without_stopping_worker_when_crawl_healthy(
+    tmp_path, monkeypatch
+) -> None:
+    mod = _load_script_module(
+        "vps-storage-hotpath-auto-recover.py",
+        module_name="ha_test_vps_storage_hotpath_auto_recover_next_jobs",
+    )
+    _init_test_db(tmp_path, monkeypatch, "hotpath_next_jobs.db")
+
+    jobs_root = tmp_path / "jobs"
+    storagebox_mount = tmp_path / "storagebox"
+    storagebox_mount.mkdir(parents=True)
+
+    hc_out = jobs_root / "hc" / "hc-jobdir"
+    phac_out = jobs_root / "phac" / "phac-jobdir"
+
+    with get_session() as session:
+        seed_sources(session)
+        session.flush()
+        hc = session.query(Source).filter_by(code="hc").one()
+        phac = session.query(Source).filter_by(code="phac").one()
+
+        # Running crawl is healthy (output dir readable).
+        session.add(
+            ArchiveJob(
+                source=hc,
+                name="hc-20260101",
+                status="running",
+                started_at=datetime.now(timezone.utc),
+                output_dir=str(hc_out),
+                config={},
+            )
+        )
+        # Next job is retryable but its output dir is stale (Errno 107).
+        session.add(
+            ArchiveJob(
+                source=phac,
+                name="phac-20260101",
+                status="retryable",
+                queued_at=datetime.now(timezone.utc),
+                output_dir=str(phac_out),
+                config={},
+            )
+        )
+        session.flush()
+
+    calls: list[list[str]] = []
+    repaired = {"ok": False}
+
+    tiering_script = tmp_path / "tiering.sh"
+    tiering_script.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+    annual_script = tmp_path / "annual.py"
+    annual_script.write_text("print('ok')\n", encoding="utf-8")
+
+    def fake_run_apply(cmd: list[str], *, timeout_seconds: float | None = None):
+        del timeout_seconds
+        calls.append(cmd)
+        if cmd[:2] == ["umount", str(phac_out)]:
+            repaired["ok"] = True
+        return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
+
+    monkeypatch.setattr(mod, "_run_apply", fake_run_apply)
+    monkeypatch.setattr(mod, "_is_unit_present", lambda _u: False)
+    monkeypatch.setattr(mod, "_systemctl_is_active", lambda _u: True)
+    monkeypatch.setattr(
+        mod,
+        "_get_mount_info",
+        lambda p: {"source": "dummy", "target": str(p), "fstype": "fuse.sshfs"},
+    )
+
+    def fake_probe(path: Path) -> tuple[int, int]:
+        s = str(path)
+        if s == str(hc_out):
+            return 1, -1
+        if s == str(phac_out):
+            return (1, -1) if repaired["ok"] else (0, 107)
+        if s == str(storagebox_mount):
+            return 1, -1
+        return 1, -1
+
+    monkeypatch.setattr(mod, "_probe_readable_dir", fake_probe)
+
+    state_file = tmp_path / "state.json"
+    lock_file = tmp_path / "lock"
+    out_dir = tmp_path / "out"
+    sentinel = tmp_path / "sentinel"
+    manifest = tmp_path / "warc-tiering.binds"
+    manifest.write_text(f"{tmp_path / 'cold'} {tmp_path / 'hot'}\n", encoding="utf-8")
+
+    rc = mod.main(
+        [
+            "--apply",
+            "--jobs-root",
+            str(jobs_root),
+            "--storagebox-mount",
+            str(storagebox_mount),
+            "--manifest",
+            str(manifest),
+            "--state-file",
+            str(state_file),
+            "--lock-file",
+            str(lock_file),
+            "--sentinel-file",
+            str(sentinel),
+            "--tiering-apply-script",
+            str(tiering_script),
+            "--annual-output-tiering-script",
+            str(annual_script),
+            "--ha-backend",
+            str(tmp_path / "ha-backend"),
+            "--textfile-out-dir",
+            str(out_dir),
+            "--textfile-out-file",
+            "hotpath.prom",
+            "--confirm-runs",
+            "1",
+            "--min-failure-age-seconds",
+            "0",
+            "--next-jobs-limit",
+            "10",
+        ]
+    )
+    assert rc == 0
+
+    flattened = [" ".join(c) for c in calls]
+    assert not any(c.startswith("systemctl stop healtharchive-worker.service") for c in flattened)
+    assert any(c.startswith("umount ") and str(phac_out) in c for c in flattened)
+    assert not any("recover-stale-jobs" in c for c in flattened)
+
+    # Safety: do not run annual output tiering with repair while a crawl is running and healthy.
+    annual_calls = [
+        c
+        for c in flattened
+        if c.startswith(f"/opt/healtharchive-backend/.venv/bin/python3 {annual_script}")
+    ]
+    assert annual_calls
+    assert not any("--repair-stale-mounts" in c for c in annual_calls)
+
+    prom = (out_dir / "hotpath.prom").read_text(encoding="utf-8")
+    assert "healtharchive_storage_hotpath_auto_recover_last_apply_ok 1" in prom
 
 
 def test_storage_hotpath_watchdog_simulate_broken_path_dry_run_drill(

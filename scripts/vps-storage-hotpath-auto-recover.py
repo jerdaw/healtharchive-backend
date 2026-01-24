@@ -24,6 +24,15 @@ class RunningJob:
     output_dir: str | None
 
 
+@dataclass(frozen=True)
+class NextJob:
+    job_id: int
+    source_code: str
+    status: str
+    queued_at: datetime | None
+    output_dir: str | None
+
+
 def _utc_now() -> datetime:
     return datetime.now(timezone.utc)
 
@@ -370,6 +379,12 @@ def main(argv: list[str] | None = None) -> int:
         help="WARC tiering bind-mount manifest (for hot path checks).",
     )
     p.add_argument(
+        "--next-jobs-limit",
+        type=int,
+        default=10,
+        help="Probe the output dirs of the next N queued/retryable jobs (default: 10).",
+    )
+    p.add_argument(
         "--simulate-broken-path",
         action="append",
         default=[],
@@ -544,6 +559,8 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     running_jobs: list[RunningJob] = []
+    next_jobs: list[NextJob] = []
+    running_jobs_query_ok = True
     impacted_sources: set[str] = set()
 
     # Discovery: running jobs (DB) is best-effort; manifest hot paths are independent.
@@ -573,7 +590,33 @@ def main(argv: list[str] | None = None) -> int:
                 )
                 for job_id, source_code, started_at, output_dir in rows
             ]
+
+            next_rows = (
+                session.query(
+                    ArchiveJob.id,
+                    Source.code,
+                    ArchiveJob.status,
+                    ArchiveJob.queued_at,
+                    ArchiveJob.output_dir,
+                )
+                .join(Source, ArchiveJob.source_id == Source.id)
+                .filter(ArchiveJob.status.in_(["queued", "retryable"]))
+                .order_by(ArchiveJob.queued_at.asc().nullsfirst(), ArchiveJob.created_at.asc())
+                .limit(max(0, int(args.next_jobs_limit)))
+                .all()
+            )
+            next_jobs = [
+                NextJob(
+                    job_id=int(job_id),
+                    source_code=str(source_code),
+                    status=str(status),
+                    queued_at=queued_at,
+                    output_dir=str(output_dir) if output_dir is not None else None,
+                )
+                for job_id, source_code, status, queued_at, output_dir in next_rows
+            ]
     except Exception as exc:
+        running_jobs_query_ok = False
         msg = str(exc)
         if "no such table" in msg and "archive_jobs" in msg:
             print("ERROR: database schema is missing required tables (archive_jobs).")
@@ -612,6 +655,24 @@ def main(argv: list[str] | None = None) -> int:
                 "mount": _get_mount_info(str(out_dir)) or {},
             }
             impacted_sources.add(job.source_code)
+
+    # Probe output dirs for the next queued/retryable jobs (secondary signal; prevents retry storms).
+    for job in next_jobs:
+        if not job.output_dir:
+            continue
+        out_dir = Path(job.output_dir)
+        ok, errno = _probe_readable_dir(out_dir)
+        if ok == 0 and errno == 107:
+            key = f"next_job:{job.job_id}"
+            detected[key] = {
+                "kind": "next_job_output_dir",
+                "job_id": job.job_id,
+                "source": job.source_code,
+                "status": job.status,
+                "path": str(out_dir),
+                "errno": errno,
+                "mount": _get_mount_info(str(out_dir)) or {},
+            }
 
     # Probe manifest hot paths (secondary signal; catches imports/etc).
     for hot in hot_paths:
@@ -839,19 +900,24 @@ def main(argv: list[str] | None = None) -> int:
         tiering_script = Path(str(args.tiering_apply_script))
         annual_tiering_script = Path(str(args.annual_output_tiering_script))
 
+        allow_annual_repair = bool(worker_was_active and impacted_sources) or (
+            running_jobs_query_ok and (not running_jobs)
+        )
+
         print("")
         print("Planned actions (dry-run):")
-        if worker_was_active and impacted_sources:
+        if worker_was_active and (
+            impacted_sources or (running_jobs_query_ok and (not running_jobs))
+        ):
             print(
-                f"  1) systemctl stop {args.worker_unit} (only if a running job output dir is stale)"
+                f"  1) systemctl stop {args.worker_unit} "
+                "(if a running job output dir is stale, or when there are no running jobs to prevent mount-repair races)"
             )
         else:
             if not worker_was_active:
                 print(f"  1) (skip) worker not active: {args.worker_unit}")
             else:
-                print(
-                    f"  1) (skip) no running job output dirs impacted; keep worker running: {args.worker_unit}"
-                )
+                print(f"  1) (skip) keep worker running (crawl healthy): {args.worker_unit}")
 
         if stale_mountpoints:
             print(f"  2) unmount stale mountpoints ({len(stale_mountpoints)}):")
@@ -882,9 +948,11 @@ def main(argv: list[str] | None = None) -> int:
             print(f"  4) (blocked) tiering apply script not found: {tiering_script}")
 
         if annual_tiering_script.is_file():
-            print(
-                f"  5) /opt/healtharchive-backend/.venv/bin/python3 {annual_tiering_script} --apply --year {now.year}"
+            cmd = (
+                f"  5) /opt/healtharchive-backend/.venv/bin/python3 {annual_tiering_script} "
+                f"--apply {'--repair-stale-mounts ' if allow_annual_repair else ''}--year {now.year}"
             )
+            print(cmd)
         else:
             print(f"  5) (blocked) annual output tiering script not found: {annual_tiering_script}")
 
@@ -924,25 +992,36 @@ def main(argv: list[str] | None = None) -> int:
     for job_id in sorted(impacted_job_ids):
         _record_job_recovery(state, job_id, when_utc=now)
 
-    errors: list[str] = []
+    critical_errors: list[str] = []
+    warnings: list[str] = []
 
-    def note_err(label: str, cp: subprocess.CompletedProcess[str]) -> None:
+    def note_err(
+        label: str, cp: subprocess.CompletedProcess[str], *, critical: bool = True
+    ) -> None:
         s = f"{label}: rc={cp.returncode}"
         if cp.stdout:
             s += f" stdout={cp.stdout.strip()[:400]}"
         if cp.stderr:
             s += f" stderr={cp.stderr.strip()[:400]}"
-        errors.append(s)
+        if critical:
+            critical_errors.append(s)
+        else:
+            warnings.append(s)
 
     worker_was_active = _systemctl_is_active(str(args.worker_unit))
     worker_stopped = False
-    should_quiesce_worker = worker_was_active and bool(impacted_sources)
+    should_quiesce_worker = worker_was_active and (
+        bool(impacted_sources) or (running_jobs_query_ok and (not running_jobs))
+    )
     if should_quiesce_worker:
         cp = _run_apply(["systemctl", "stop", str(args.worker_unit)], timeout_seconds=30)
         if cp.returncode != 0:
-            note_err("systemctl stop worker failed", cp)
-        else:
-            worker_stopped = True
+            note_err("systemctl stop worker failed", cp, critical=True)
+            state["last_apply_ok"] = 0
+            state["last_apply_errors"] = critical_errors
+            state["last_apply_warnings"] = warnings
+            return finish(1)
+        worker_stopped = True
 
     stale_mountpoints: list[dict] = []
     for info in eligible:
@@ -977,7 +1056,7 @@ def main(argv: list[str] | None = None) -> int:
             continue
         cp2 = _run_apply(["umount", "-l", path], timeout_seconds=10)
         if cp2.returncode != 0:
-            note_err(f"umount failed path={path}", cp2)
+            note_err(f"umount failed path={path}", cp2, critical=True)
         else:
             did_unmount = True
 
@@ -988,7 +1067,7 @@ def main(argv: list[str] | None = None) -> int:
         if _is_unit_present(str(args.storagebox_unit)):
             cp = _run_apply(["systemctl", "restart", str(args.storagebox_unit)], timeout_seconds=60)
             if cp.returncode != 0:
-                note_err("systemctl restart storagebox failed", cp)
+                note_err("systemctl restart storagebox failed", cp, critical=True)
             else:
                 did_restart_storagebox = True
                 deadline = time.monotonic() + float(args.restart_wait_seconds)
@@ -1000,11 +1079,11 @@ def main(argv: list[str] | None = None) -> int:
                         break
                     time.sleep(float(args.restart_probe_interval_seconds))
                 if storage_ok == 0:
-                    errors.append(
+                    critical_errors.append(
                         f"storagebox mount still unreadable after restart: errno={storage_errno}"
                     )
         else:
-            errors.append(
+            critical_errors.append(
                 f"storagebox mount unhealthy (errno={storage_errno}) and unit missing: {args.storagebox_unit}"
             )
 
@@ -1023,28 +1102,31 @@ def main(argv: list[str] | None = None) -> int:
                 timeout_seconds=120,
             )
             if cp.returncode != 0:
-                note_err("tiering bind mounts apply failed", cp)
+                note_err("tiering bind mounts apply failed", cp, critical=False)
             else:
                 did_apply_tiering = True
         else:
-            errors.append(f"tiering apply script not found: {tiering_script}")
+            warnings.append(f"tiering apply script not found: {tiering_script}")
 
         annual_tiering_script = str(args.annual_output_tiering_script)
         if Path(annual_tiering_script).is_file():
+            allow_annual_repair = worker_stopped or (running_jobs_query_ok and (not running_jobs))
             cp = _run_apply(
                 [
                     "/opt/healtharchive-backend/.venv/bin/python3",
                     annual_tiering_script,
                     "--apply",
+                    *(["--repair-stale-mounts"] if allow_annual_repair else []),
                     "--year",
                     str(now.year),
                 ],
                 timeout_seconds=300,
             )
             if cp.returncode != 0:
-                note_err("annual output tiering failed", cp)
+                # Treat as a warning; the post-check below is the source of truth for whether mounts were repaired.
+                note_err("annual output tiering failed", cp, critical=False)
         else:
-            errors.append(f"annual output tiering script not found: {annual_tiering_script}")
+            warnings.append(f"annual output tiering script not found: {annual_tiering_script}")
 
     # Recover stale jobs for impacted sources only.
     for source_code in sorted(impacted_sources):
@@ -1063,7 +1145,7 @@ def main(argv: list[str] | None = None) -> int:
             timeout_seconds=120,
         )
         if cp.returncode != 0:
-            note_err(f"recover-stale-jobs failed source={source_code}", cp)
+            note_err(f"recover-stale-jobs failed source={source_code}", cp, critical=False)
 
     # Post-check: ensure previously-stale mountpoints are readable again.
     post_ok = True
@@ -1073,14 +1155,18 @@ def main(argv: list[str] | None = None) -> int:
         target = str(mount.get("target") or "")
         if target != path:
             post_ok = False
-            errors.append(f"mountpoint not restored for path={path} (target={target or '??'})")
+            critical_errors.append(
+                f"mountpoint not restored for path={path} (target={target or '??'})"
+            )
             continue
         ok, errno = _probe_readable_dir(Path(path))
         if ok != 1:
             post_ok = False
-            errors.append(f"path still unreadable after recovery: path={path} errno={errno}")
+            critical_errors.append(
+                f"path still unreadable after recovery: path={path} errno={errno}"
+            )
 
-    if errors:
+    if critical_errors:
         post_ok = False
 
     # If we changed mounts, restart replay so it sees a clean view of /srv/healtharchive/jobs.
@@ -1088,8 +1174,7 @@ def main(argv: list[str] | None = None) -> int:
         if _is_unit_present(str(args.replay_unit)):
             cp = _run_apply(["systemctl", "restart", str(args.replay_unit)], timeout_seconds=60)
             if cp.returncode != 0:
-                note_err("systemctl restart replay failed", cp)
-                post_ok = False
+                note_err("systemctl restart replay failed", cp, critical=False)
         if _is_unit_present(str(args.replay_smoke_unit)):
             # Best-effort: a missing sentinel (ConditionPathExists) will cause the unit to skip.
             _run_apply(["systemctl", "start", str(args.replay_smoke_unit)], timeout_seconds=60)
@@ -1097,11 +1182,12 @@ def main(argv: list[str] | None = None) -> int:
     if post_ok and worker_stopped:
         cp = _run_apply(["systemctl", "start", str(args.worker_unit)], timeout_seconds=30)
         if cp.returncode != 0:
-            note_err("systemctl start worker failed", cp)
+            note_err("systemctl start worker failed", cp, critical=True)
             post_ok = False
 
     state["last_apply_ok"] = 1 if post_ok else 0
-    state["last_apply_errors"] = errors
+    state["last_apply_errors"] = critical_errors
+    state["last_apply_warnings"] = warnings
 
     return finish(0 if post_ok else 1)
 

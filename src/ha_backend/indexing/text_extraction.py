@@ -125,14 +125,14 @@ def _find_content_root(soup: BeautifulSoup) -> Tag | BeautifulSoup:
     """
     # Prefer <main> or [role=main].
     main = soup.find("main") or soup.find(attrs={"role": "main"})
-    if main is not None:
+    if isinstance(main, Tag):
         text = main.get_text(separator=" ", strip=True)
         if len(text) >= 100:
             return main
 
     # Prefer <article>.
     article = soup.find("article")
-    if article is not None:
+    if isinstance(article, Tag):
         text = article.get_text(separator=" ", strip=True)
         if len(text) >= 100:
             return article
@@ -403,6 +403,8 @@ def extract_outlink_groups(
     groups: set[str] = set()
 
     for a in root.find_all("a", href=True):
+        if not isinstance(a, Tag):
+            continue
         href_value = a.get("href")
         if not isinstance(href_value, str):
             continue

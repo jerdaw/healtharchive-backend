@@ -1,6 +1,6 @@
-# Infra-error retry storms + Storage Box hot-path resilience (active plan) — 2026-01-24
+# Infra-error retry storms + Storage Box hot-path resilience — 2026-01-24
 
-Status: **active plan** (created 2026-01-24)
+Status: **implemented** (completed 2026-01-24)
 
 This plan targets a specific failure mode observed during the 2026 annual campaign on the
 single-VPS deployment: a Storage Box / `sshfs`-backed mount (or bind mount onto it) became
@@ -156,7 +156,7 @@ The incident showed two gaps:
 
 #### B1) Detect stale mountpoints for “next jobs” (queued/retryable), not only running jobs
 
-Status: **not implemented** (required).
+Status: **implemented**.
 
 Add to `vps-storage-hotpath-auto-recover.py`:
 
@@ -184,7 +184,7 @@ Tests:
 
 #### B2) Make annual output tiering repairable during recovery runs
 
-Status: **not implemented** (required).
+Status: **implemented**.
 
 Problem:
 
@@ -213,7 +213,7 @@ Tests:
 
 #### B3) Don’t stop the worker for “cold-only” issues when a crawl is running and healthy
 
-Status: **not implemented** (required).
+Status: **implemented**.
 
 Refine quiesce logic:
 
@@ -229,9 +229,15 @@ Acceptance criteria:
 - If `hc` crawl is running and healthy, recovery can still fix a stale `phac` mountpoint without
   stopping the `hc` crawl.
 
+Implementation note (small plan deviation, safety improvement):
+
+- When the DB query succeeds and there are **no running jobs**, the hot-path recovery script now
+  stops the worker before mount repairs to prevent a race where the worker could start a crawl
+  mid-repair.
+
 #### B4) Post-failure safety: ensure “worker stopped” cannot become a long-lived state
 
-Status: **not implemented** (required).
+Status: **implemented**.
 
 Two complementary changes:
 
@@ -248,7 +254,7 @@ Acceptance criteria:
 
 ### C) Worker “resurrection” watchdog (safe auto-start)
 
-Status: **not implemented** (required).
+Status: **implemented**.
 
 Add a lightweight, production-only automation that ensures the worker is running when it should be.
 
@@ -291,7 +297,7 @@ Tests:
 
 ### D) Alerting + metrics (reduce noisy notifications, increase signal)
 
-Status: **partially implemented** (existing metrics), improvements required.
+Status: **implemented**.
 
 Add/adjust alerting so:
 
@@ -311,7 +317,7 @@ Acceptance criteria:
 
 ### E) Documentation + operator UX
 
-Status: **partially implemented**.
+Status: **implemented**.
 
 Required updates when workstreams B/C/D ship:
 
@@ -342,12 +348,12 @@ Required updates when workstreams B/C/D ship:
 ## Definition of done (this plan)
 
 - [x] Worker has an infra_error cooldown (prevents tight retry loops).
-- [ ] Storage hot-path recovery detects stale mountpoints for “next jobs” (queued/retryable).
-- [ ] Storage hot-path recovery can repair annual output tiering stale mounts (`--repair-stale-mounts`) safely.
-- [ ] Worker is not stopped to fix unrelated cold paths when a crawl is healthy.
-- [ ] Worker can be auto-started safely when it is down and jobs are pending (sentinel-gated).
-- [ ] High-signal alerts exist for “worker down while jobs pending” and “hot path stale too long”.
-- [ ] Playbooks/systemd docs updated to reflect the new behavior.
+- [x] Storage hot-path recovery detects stale mountpoints for “next jobs” (queued/retryable).
+- [x] Storage hot-path recovery can repair annual output tiering stale mounts (`--repair-stale-mounts`) safely.
+- [x] Worker is not stopped to fix unrelated cold paths when a crawl is healthy.
+- [x] Worker can be auto-started safely when it is down and jobs are pending (sentinel-gated).
+- [x] High-signal alerts exist for “worker down while jobs pending” and “hot path stale too long”.
+- [x] Playbooks/systemd docs updated to reflect the new behavior.
 
 ---
 
@@ -356,3 +362,4 @@ Required updates when workstreams B/C/D ship:
 - Storage Box stale mount recovery baseline (implemented): `roadmaps/implemented/2026-01-08-storagebox-sshfs-stale-mount-recovery-and-integrity.md`
 - Annual crawl resiliency hardening (implemented): `roadmaps/implemented/2026-01-19-annual-crawl-resiliency-hardening.md`
 - Ops automation plan (active): `operations/automation-implementation-plan.md`
+- Incident note: `operations/incidents/2026-01-24-infra-error-107-hotpath-thrash-and-worker-stop.md`

@@ -76,6 +76,30 @@ groups:
           description: "The crawl metrics textfile script is failing (healtharchive_crawl_metrics_ok==0). Check healtharchive-crawl-metrics.service logs and storage mount health."
           runbook_url: "https://github.com/jerdaw/healtharchive-backend/blob/main/docs/tutorials/debug-crawl.md"
 
+      - alert: HealthArchiveWorkerDownWhileJobsPending
+        expr: |
+          healtharchive_worker_should_be_running == 1
+          and healtharchive_worker_active == 0
+        for: 10m
+        labels:
+          severity: critical
+          service: healtharchive
+        annotations:
+          summary: "Worker is down while crawl jobs are pending"
+          description: "There are pending crawl jobs (queued/retryable) and Storage Box appears readable, but healtharchive-worker.service is not active. Check worker logs, Storage Box hot-path health, and recent deploy activity."
+          runbook_url: "https://github.com/jerdaw/healtharchive-backend/blob/main/docs/operations/playbooks/storagebox-sshfs-stale-mount-recovery.md"
+
+      - alert: HealthArchiveCrawlOutputDirUnreadable
+        expr: healtharchive_crawl_running_job_output_dir_ok == 0
+        for: 2m
+        labels:
+          severity: critical
+          service: healtharchive
+        annotations:
+          summary: "Running job output dir unreadable"
+          description: "A running crawl job has an unreadable output_dir: source={{ $labels.source }} job_id={{ $labels.job_id }}. Check healtharchive_crawl_running_job_output_dir_errno (Errno 107 usually indicates a stale sshfs mount)."
+          runbook_url: "https://github.com/jerdaw/healtharchive-backend/blob/main/docs/operations/playbooks/storagebox-sshfs-stale-mount-recovery.md"
+
       - alert: HealthArchiveCrawlStateFileParseFailed
         expr: |
           healtharchive_crawl_running_job_state_file_ok == 1
@@ -96,9 +120,9 @@ groups:
           severity: warning
           service: healtharchive
         annotations:
-          summary: "Crawl appears stalled (no crawlStatus progress)"
-          description: "A running job has not increased its crawled count for the configured stall threshold. job_id={{ $labels.job_id }} source={{ $labels.source }}."
-          runbook_url: "https://github.com/jerdaw/healtharchive-backend/blob/main/docs/tutorials/debug-crawl.md"
+          summary: "Crawl progress stalled (no crawled-count increase)"
+          description: "A running crawl job appears stalled: source={{ $labels.source }} job_id={{ $labels.job_id }}. Check healtharchive-worker.service logs and the job's archive_*.combined.log; consider recovering the job if it remains stalled."
+          runbook_url: "https://github.com/jerdaw/healtharchive-backend/blob/main/docs/operations/playbooks/crawl-stalls.md"
 
       - alert: HealthArchiveCrawlContainerRestartsHigh
         expr: healtharchive_crawl_running_job_container_restarts_done >= 10
@@ -135,6 +159,19 @@ groups:
           description: "The Storage Box mount is missing or unreadable. Replay and/or crawls that rely on cold WARCs may fail. Check healtharchive-storagebox-sshfs.service and the sshfs mount."
           runbook_url: "https://github.com/jerdaw/healtharchive-backend/blob/main/docs/operations/playbooks/warc-storage-tiering.md"
 
+      - alert: HealthArchiveStorageHotpathStaleUnrecovered
+        expr: |
+          healtharchive_storage_hotpath_auto_recover_enabled == 1
+          and healtharchive_storage_hotpath_auto_recover_detected_targets > 0
+        for: 10m
+        labels:
+          severity: critical
+          service: healtharchive
+        annotations:
+          summary: "Storage hot path stale/unrecovered (Errno 107 likely)"
+          description: "The Storage Box hot-path auto-recover script is enabled but still detects stale/unreadable hot paths (Errno 107) after 10m. Check /srv/healtharchive/ops/watchdog/storage-hotpath-auto-recover.json and consider manual unmount + tiering re-apply."
+          runbook_url: "https://github.com/jerdaw/healtharchive-backend/blob/main/docs/operations/playbooks/storagebox-sshfs-stale-mount-recovery.md"
+
       - alert: HealthArchiveTieringHotPathUnreadable
         expr: healtharchive_tiering_hot_path_ok == 0
         for: 2m
@@ -167,41 +204,6 @@ groups:
           summary: "HealthArchive tiering metrics are stale"
           description: "No successful tiering metrics update in over 2 hours. Timer may be failing."
           runbook_url: "https://github.com/jerdaw/healtharchive-backend/blob/main/docs/operations/playbooks/incident-response.md"
-
-  - name: healtharchive.crawl
-    rules:
-      - alert: HealthArchiveCrawlMetricsMissing
-        expr: healtharchive_crawl_metrics_ok == 0
-        for: 5m
-        labels:
-          severity: warning
-          service: healtharchive
-        annotations:
-          summary: "Crawl metrics writer failing"
-          description: "The crawl metrics writer is reporting failure. Check healtharchive-crawl-metrics.service logs and confirm node_exporter textfile collector is working."
-          runbook_url: "https://github.com/jerdaw/healtharchive-backend/blob/main/docs/operations/playbooks/incident-response.md"
-
-      - alert: HealthArchiveCrawlOutputDirUnreadable
-        expr: healtharchive_crawl_running_job_output_dir_ok == 0
-        for: 2m
-        labels:
-          severity: critical
-          service: healtharchive
-        annotations:
-          summary: "Running job output dir unreadable"
-          description: "A running crawl job has an unreadable output_dir: source={{ $labels.source }} job_id={{ $labels.job_id }}. Check healtharchive_crawl_running_job_output_dir_errno (Errno 107 usually indicates a stale sshfs mount)."
-          runbook_url: "https://github.com/jerdaw/healtharchive-backend/blob/main/docs/operations/playbooks/storagebox-sshfs-stale-mount-recovery.md"
-
-      - alert: HealthArchiveCrawlStalled
-        expr: healtharchive_crawl_running_job_stalled == 1
-        for: 15m
-        labels:
-          severity: warning
-          service: healtharchive
-        annotations:
-          summary: "Crawl progress stalled (no crawled-count increase)"
-          description: "A running crawl job appears stalled: source={{ $labels.source }} job_id={{ $labels.job_id }}. Check healtharchive-worker.service logs and the job's archive_*.combined.log; consider recovering the job if it remains stalled."
-          runbook_url: "https://github.com/jerdaw/healtharchive-backend/blob/main/docs/operations/playbooks/crawl-stalls.md"
 
   - name: healtharchive.campaign
     rules:
