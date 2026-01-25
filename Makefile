@@ -1,4 +1,4 @@
-.PHONY: venv format format-check lint precommit typecheck test security audit check check-full ci docs-serve docs-build docs-build-strict docs-refs docs-coverage docs-coverage-strict docs-check
+.PHONY: venv format format-check lint precommit typecheck test-fast test-all test security audit check check-full ci docs-serve docs-build docs-build-strict docs-refs docs-coverage docs-coverage-strict docs-check
 
 VENV ?= .venv
 VENV_BIN := $(VENV)/bin
@@ -35,8 +35,21 @@ precommit:
 typecheck:
 	$(MYPY) src tests
 
-test:
+test-fast:
+	$(PYTEST) -q \
+		tests/test_archive_tool_*.py \
+		tests/test_cli_*.py \
+		tests/test_db_models_and_seeds.py \
+		tests/test_diffing.py \
+		tests/test_jobs*.py \
+		tests/test_ops_*.py \
+		tests/test_worker.py \
+		tests/test_api_health_and_sources.py
+
+test-all:
 	$(PYTEST) -q
+
+test: test-all
 
 security:
 	$(BANDIT) -r src/ha_backend -q
@@ -71,9 +84,9 @@ docs-coverage-strict:
 docs-check: docs-refs docs-coverage-strict docs-build-strict
 
 # CI guardrail: fast + reliable (should not block day-to-day development).
-check: format-check lint typecheck test
+check: format-check lint typecheck test-fast
 
 ci: check
 
 # Full suite: deeper / slower / more opinionated checks (run before deploys or when tightening quality).
-check-full: check precommit security audit docs-check
+check-full: format-check lint typecheck test-all precommit security audit docs-check

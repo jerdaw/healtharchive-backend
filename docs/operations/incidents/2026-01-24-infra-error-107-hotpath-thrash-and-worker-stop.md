@@ -108,6 +108,13 @@ sudo systemctl --no-pager --full status healtharchive-worker.service
 
 Observed outcome: job 6 (HC) restarted at ~12:31Z and began writing new crawl temp dirs/WARCs under the existing job output directory.
 
+### Additional recovery work (2026-01-25)
+
+- Reset the retry budget for jobs 7 (PHAC) and 8 (CIHR) by writing `retry_count=0` directly via the backend ORM so the re-runs behaved like fresh attempts.
+- Fixed the output-directory permissions (`chown -R haadmin:haadmin`, `chmod 755`) and confirmed writability by touching `.writable_test_manual` inside each job dir as `haadmin`.
+- Launched the jobs through the transient `systemd-run`-based helper (`scripts/vps-run-db-job-detached.py / systemd-run … run-db-job --id …`) so the crawls kept running while our SSH sessions closed.
+- Relaxed permissions on the existing `.tmpt*` directories (`docker run --rm -v "…:/output" alpine sh -c 'chmod -R a+rX /output/.tmp*'`) so the hot-path watchdog/ops scripts could read the WARCs without manual chmods.
+
 ## Post-incident verification
 
 - Worker/job health checks:
@@ -131,6 +138,13 @@ Observed outcome: job 6 (HC) restarted at ~12:31Z and began writing new crawl te
 - [ ] Investigate underlying cause of the hot-path staleness (Storage Box/sshfs/network/FUSE). (owner=eng, priority=high, due=2026-02-01)
 - [x] Add a worker-side guardrail to prevent tight “pick same job instantly” loops on infra errors (cooldown + metric). (owner=eng, priority=high, due=2026-02-01)
 - [x] Add a playbook section for “CLI shows sqlite/no such table” (env export reminder) to reduce operator confusion. (owner=ops, priority=low, due=2026-02-01)
+
+## Follow-up implementation details
+
+- Added `scripts/vps-run-db-job-detached.py` and updated `docs/deployment/systemd/README.md` to point operators at this helper so specific jobs can be re-run within transient `systemd-run` units without keeping a shell session attached.
+- Extended `scripts/vps-storage-hotpath-auto-recover.py` to probe the output directories of queued/retryable jobs (not just the currently running ones) so stale hot paths can be detected before the worker picks them; detection still strictly unmounts only the specific stale targets.
+- Extended the archive tool to discover `.tmp*` temp directories immediately after the container starts and periodically throughout the crawl. When `--relax-perms` is enabled the helper now runs during the crawl (configurable interval) so host commands can read WARCs without manual `chmod`, not just after the job finishes.
+- Added a `last_healthy_*` timestamp to the storage hot-path watchdog state and Prometheus textfile metrics, while continuing to gate actual recovery attempts via the existing `last_apply_*` cooldown/cap fields. This gives dashboards a clearer signal when the watchdog has seen no stale targets.
 
 ## Automation opportunities
 

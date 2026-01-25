@@ -37,6 +37,10 @@ def _init_test_db(tmp_path: Path, monkeypatch, name: str) -> None:
     Base.metadata.create_all(engine)
 
 
+def _assert_prom_contains_last_healthy(prom: str) -> None:
+    assert "healtharchive_storage_hotpath_auto_recover_last_healthy_timestamp_seconds" in prom
+
+
 def test_deploy_lock_probe_works_when_lock_file_is_readonly(tmp_path, monkeypatch) -> None:
     mod = _load_script_module(
         "vps-storage-hotpath-auto-recover.py",
@@ -275,6 +279,7 @@ def test_storage_hotpath_watchdog_apply_stops_and_restarts_worker_when_active(
 
     prom = (out_dir / "hotpath.prom").read_text(encoding="utf-8")
     assert "healtharchive_storage_hotpath_auto_recover_last_apply_ok 1" in prom
+    _assert_prom_contains_last_healthy(prom)
 
 
 def test_storage_hotpath_watchdog_starts_worker_even_if_annual_tiering_fails_when_mounts_ok(
@@ -722,6 +727,7 @@ def test_storage_hotpath_watchdog_simulate_broken_path_dry_run_drill(
 
     prom = (out_dir / "hotpath.prom").read_text(encoding="utf-8")
     assert "healtharchive_storage_hotpath_auto_recover_detected_targets 1" in prom
+    _assert_prom_contains_last_healthy(prom)
 
     # Safety: simulation should never be allowed in apply mode.
     rc_apply = mod.main(

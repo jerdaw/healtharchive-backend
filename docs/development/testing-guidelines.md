@@ -16,6 +16,11 @@ From the repo root:
 `make check` is intentionally kept low-friction so it can run constantly without blocking development.
 Use `make check-full` before deploys or when you want stricter validation.
 
+Notes:
+
+- `make check` runs `make test-fast` (a curated subset).
+- `make test-all` runs the full test suite.
+
 ## End-to-end smoke (public surface)
 
 CI also runs a fast end-to-end smoke check that starts the backend + frontend

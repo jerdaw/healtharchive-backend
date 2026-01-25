@@ -2,7 +2,7 @@
 
 This document covers setting up **full‑fidelity web replay** (HTML + CSS/JS/images/fonts) for HealthArchive using a dedicated **pywb** service behind Caddy.
 
-It is intentionally written so a future operator (or LLM) can follow it without needing additional context.
+It is intentionally written so a future operator can follow it without needing additional context.
 
 ## 0) What this is (and is not)
 

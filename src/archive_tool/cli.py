@@ -160,8 +160,17 @@ def parse_arguments() -> Tuple[argparse.Namespace, List[str]]:
         action="store_true",
         default=False,
         help=(
-            "After a crawl, relax permissions on temp output (chmod a+rX) so host users "
-            "can read WARCs without sudo. Intended for dev."
+            "Relax permissions on temp output (chmod a+rX) so host users can read WARCs without sudo. "
+            "When enabled, this runs periodically during the crawl and again at the end."
+        ),
+    )
+    adapt_group.add_argument(
+        "--relax-perms-interval-seconds",
+        type=int,
+        default=180,
+        help=(
+            "How often to run the permission relax step while a crawl is running. "
+            "Only used when --relax-perms is enabled."
         ),
     )
     # ... (backoff arg remains the same) ...

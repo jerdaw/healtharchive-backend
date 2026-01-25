@@ -164,6 +164,18 @@ cd /opt/healtharchive-backend
 sudo ./scripts/vps-install-systemd-units.sh --apply --restart-worker
 ```
 
+## Run a crawl job detached (optional)
+
+If you need to run a specific DB-backed crawl job manually (for debugging or
+recovery), prefer launching it as a transient systemd unit so your SSH session
+doesn’t need to stay open:
+
+```bash
+sudo /opt/healtharchive-backend/scripts/vps-run-db-job-detached.py --id 7 --retry-first
+```
+
+Follow the printed `journalctl -u <unit>.service -f` command to tail logs.
+
 If you are using WARC tiering with a Storage Box, also create these files on the VPS:
 
 - `/etc/healtharchive/storagebox.env`

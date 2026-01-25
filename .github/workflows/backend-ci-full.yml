@@ -1,0 +1,32 @@
+name: Backend CI (Full)
+
+on:
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch: {}
+
+jobs:
+  test-full:
+    runs-on: ubuntu-latest
+    env:
+      HEALTHARCHIVE_DATABASE_URL: sqlite:///./ci-healtharchive.db
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev]"
+
+      - name: Check (full)
+        run: make check-full
+
