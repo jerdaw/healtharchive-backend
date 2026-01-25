@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import errno as errno_module
+from pathlib import Path
 from typing import Iterator
 
 STORAGE_INFRA_ERRNOS: frozenset[int] = frozenset(
@@ -46,5 +47,49 @@ def is_storage_infra_error(exc: BaseException) -> bool:
     """
     for item in iter_exception_chain(exc):
         if isinstance(item, OSError) and is_storage_infra_errno(item.errno):
+            return True
+    return False
+
+
+def _path_is_within(candidate: Path, base: Path) -> bool:
+    """
+    Return True if candidate is base or a descendant of base.
+    """
+    try:
+        c = candidate.resolve()
+    except Exception:
+        c = candidate
+    try:
+        b = base.resolve()
+    except Exception:
+        b = base
+    return c == b or b in c.parents
+
+
+def is_output_dir_write_infra_error(exc: BaseException, *, output_dir: Path) -> bool:
+    """
+    Return True if the exception indicates the job output directory is not writable
+    due to infrastructure or filesystem state (e.g. permissions/ownership on a
+    tiered SSHFS mount).
+
+    We intentionally keep this heuristic narrow:
+    - Only EACCES/EPERM
+    - Only when the failing path is within the configured output_dir
+    """
+    for item in iter_exception_chain(exc):
+        if not isinstance(item, OSError):
+            continue
+        if item.errno not in {errno_module.EACCES, errno_module.EPERM}:
+            continue
+
+        raw_path = getattr(item, "filename", None)
+        if not raw_path:
+            continue
+        try:
+            path = Path(str(raw_path))
+        except Exception:
+            continue
+
+        if _path_is_within(path, output_dir):
             return True
     return False

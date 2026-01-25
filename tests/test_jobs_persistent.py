@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import errno
 from pathlib import Path
 
 from ha_backend import db as db_module
@@ -217,6 +218,49 @@ def test_run_persistent_job_marks_storage_infra_errors_retryable(tmp_path, monke
         assert stored.crawler_exit_code is None
         assert stored.started_at is not None
         assert stored.finished_at is not None
+
+
+def test_run_persistent_job_marks_output_dir_permission_errors_retryable(
+    tmp_path, monkeypatch
+) -> None:
+    """
+    If archive_tool fails because the job output directory isn't writable (e.g. a
+    tiered SSHFS mount owned by root), treat it as infra_error so we don't burn
+    crawl retry budget.
+    """
+    _init_test_db(tmp_path, monkeypatch)
+
+    with get_session() as session:
+        seed_sources(session)
+
+    with get_session() as session:
+        job_row = create_job_for_source("hc", session=session)
+        job_id = job_row.id
+
+    class PermissionDeniedRuntime:
+        def __init__(self, name, seeds):
+            self.name = name
+            self.seeds = list(seeds)
+
+        def run(self, **kwargs):
+            output_dir = Path(str(kwargs["output_dir_override"]))
+            raise PermissionError(
+                errno.EACCES,
+                "Permission denied",
+                str(output_dir / ".writable_test_123"),
+            )
+
+    monkeypatch.setattr("ha_backend.jobs.RuntimeArchiveJob", PermissionDeniedRuntime)
+
+    rc = run_persistent_job(job_id)
+    assert rc != 0
+
+    with get_session() as session:
+        stored = session.get(ArchiveJob, job_id)
+        assert stored is not None
+        assert stored.status == "retryable"
+        assert stored.crawler_status == "infra_error"
+        assert stored.crawler_exit_code is None
 
 
 def test_run_persistent_job_marks_cli_usage_errors_as_infra_error_config(
