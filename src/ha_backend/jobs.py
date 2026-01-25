@@ -15,7 +15,11 @@ from .archive_contract import ArchiveJobConfig, ArchiveToolOptions
 from .config import get_archive_tool_config
 from .crawl_stats import update_job_stats_from_logs
 from .db import get_session
-from .infra_errors import is_storage_infra_errno, is_storage_infra_error
+from .infra_errors import (
+    is_output_dir_write_infra_error,
+    is_storage_infra_errno,
+    is_storage_infra_error,
+)
 from .models import ArchiveJob as ORMArchiveJob
 
 logger = logging.getLogger("healtharchive.jobs")
@@ -421,7 +425,9 @@ def run_persistent_job(job_id: int) -> int:
             job_row.combined_log_path = str(combined_log_path)
 
         if run_exc is not None:
-            if is_storage_infra_error(run_exc):
+            if is_storage_infra_error(run_exc) or is_output_dir_write_infra_error(
+                run_exc, output_dir=output_dir
+            ):
                 job_row.status = "retryable"
                 job_row.crawler_status = "infra_error"
             else:
@@ -452,7 +458,9 @@ def run_persistent_job(job_id: int) -> int:
                     job_row.crawler_exit_code = rc
                     return rc
             except OSError as exc:
-                infra = is_storage_infra_errno(exc.errno)
+                infra = is_storage_infra_errno(exc.errno) or is_output_dir_write_infra_error(
+                    exc, output_dir=Path(job_row.output_dir)
+                )
 
             if infra:
                 job_row.status = "retryable"
