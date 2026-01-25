@@ -456,21 +456,42 @@ def cleanup_temp_dirs(temp_dir_paths: List[Path], state_file_path: Path):
     logger.info(f"Cleanup finished. Deleted {deleted_count} director(y/ies).")
 
 
-def relax_permissions(host_output_dir: Path, temp_dirs: List[Path]) -> None:
+def relax_permissions(host_output_dir: Path, temp_dirs: List[Path] | None = None) -> None:
     """
     Make crawl artifacts world-readable so host users can index WARCs without sudo.
+
     Runs chmod inside a root container to avoid host-side sudo.
     """
-    if not temp_dirs:
-        logger.info("relax_permissions: no temp dirs to adjust.")
+    if not host_output_dir.exists():
+        logger.warning(
+            "relax_permissions: output dir %s does not exist; skipping.", host_output_dir
+        )
         return
 
-    if not host_output_dir.exists():
-        logger.warning(f"relax_permissions: output dir {host_output_dir} does not exist; skipping.")
+    # Avoid spawning a container if there are no temp dirs at all (common early in a crawl).
+    try:
+        has_tmp = any(host_output_dir.glob(f"{constants.TEMP_DIR_PREFIX}*"))
+    except OSError as exc:
+        logger.warning(
+            "relax_permissions: failed scanning for temp dirs under %s: %s", host_output_dir, exc
+        )
+        has_tmp = True
+    if not has_tmp:
+        logger.debug(
+            "relax_permissions: no %s* directories found under %s.",
+            constants.TEMP_DIR_PREFIX,
+            host_output_dir,
+        )
         return
+
+    if temp_dirs is None:
+        temp_dirs = discover_temp_dirs(host_output_dir)
 
     try:
-        logger.info("relax_permissions: ensuring WARCs are readable (chmod a+rX) ...")
+        logger.info(
+            "relax_permissions: ensuring crawl artifacts are readable (chmod a+rX) [temp_dirs=%s] ...",
+            len(temp_dirs),
+        )
         cmd = [
             "docker",
             "run",
@@ -486,7 +507,7 @@ def relax_permissions(host_output_dir: Path, temp_dirs: List[Path]) -> None:
     except FileNotFoundError:
         logger.warning("relax_permissions: docker not available; cannot adjust permissions.")
     except Exception as exc:
-        logger.warning(f"relax_permissions: unexpected error: {exc}")
+        logger.warning("relax_permissions: unexpected error: %s", exc)
 
 
 def filter_args_for_final_run(passthrough_args: List[str]) -> List[str]:

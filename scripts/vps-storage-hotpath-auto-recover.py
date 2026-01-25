@@ -327,6 +327,17 @@ def _write_metrics(
         f"healtharchive_storage_hotpath_auto_recover_last_run_timestamp_seconds {_dt_to_epoch_seconds(now_utc)}"
     )
 
+    last_healthy_epoch = int(state.get("last_healthy_epoch") or 0)
+    lines.append(
+        "# HELP healtharchive_storage_hotpath_auto_recover_last_healthy_timestamp_seconds UNIX timestamp of the last run that observed no stale targets."
+    )
+    lines.append(
+        "# TYPE healtharchive_storage_hotpath_auto_recover_last_healthy_timestamp_seconds gauge"
+    )
+    lines.append(
+        f"healtharchive_storage_hotpath_auto_recover_last_healthy_timestamp_seconds {last_healthy_epoch}"
+    )
+
     lines.append(
         "# HELP healtharchive_storage_hotpath_auto_recover_enabled 1 if the sentinel file exists (automation enabled)."
     )
@@ -855,6 +866,9 @@ def main(argv: list[str] | None = None) -> int:
         return rc
 
     if not eligible:
+        if not simulate_mode and (len(detected) + len(simulated)) == 0:
+            state["last_healthy_utc"] = now.replace(microsecond=0).isoformat()
+            state["last_healthy_epoch"] = _dt_to_epoch_seconds(now)
         return finish(0)
 
     # Rate limiting (bypassed in drill simulation mode).
