@@ -486,6 +486,12 @@ def main():
         if missing:
             existing_temp_dirs = crawl_state.get_temp_dir_paths()
 
+    if script_args.relax_perms:
+        try:
+            utils.relax_permissions(host_output_dir, discovered_temp_dirs or existing_temp_dirs)
+        except Exception as exc:
+            logger.warning("Failed to relax permissions before resume/WARC discovery: %s", exc)
+
     logger.debug(f"Temp directories managed by state: {existing_temp_dirs}")
     latest_temp_dir = existing_temp_dirs[-1] if existing_temp_dirs else None
     logger.debug(f"Latest temp directory from state (if any): {latest_temp_dir}")
@@ -800,6 +806,42 @@ def main():
         elif not container_id:
             logger.warning("Cannot start monitor: Container ID was not identified.")
 
+        # Best-effort: discover temp dirs early and relax perms while the crawl is running
+        # so host-side status/indexing tools can read WARCs without sudo.
+        relax_perms_enabled = bool(getattr(script_args, "relax_perms", False))
+        relax_perms_interval_seconds = max(
+            10, int(getattr(script_args, "relax_perms_interval_seconds", 180))
+        )
+        last_relax_perms_time = -1e9
+
+        def _maybe_discover_and_relax(*, reason: str) -> None:
+            nonlocal last_relax_perms_time
+            if not relax_perms_enabled:
+                return
+            now_mono = time.monotonic()
+            if (now_mono - last_relax_perms_time) < float(relax_perms_interval_seconds):
+                return
+
+            try:
+                discovered = utils.discover_temp_dirs(host_output_dir)
+                for p in discovered:
+                    try:
+                        crawl_state.add_temp_dir(p)
+                    except Exception:
+                        pass
+                utils.relax_permissions(host_output_dir, discovered)
+                last_relax_perms_time = now_mono
+                logger.debug(
+                    "relax-perms: applied during crawl (%s) [interval=%ss]",
+                    reason,
+                    relax_perms_interval_seconds,
+                )
+            except Exception as exc:
+                logger.warning("relax-perms: failed during crawl (%s): %s", reason, exc)
+
+        # Run once shortly after container start (does nothing if no .tmp* dirs exist yet).
+        _maybe_discover_and_relax(reason="post_container_start")
+
         # --- Inner Monitoring Loop (Runs while Docker process is alive) ---
         logger.debug(f"Entering inner monitoring loop for stage '{stage_name_with_attempt}'...")
         last_print_time = 0
@@ -836,6 +878,8 @@ def main():
             else:  # No active monitor, sleep briefly to avoid busy-waiting
                 logger.log(5, "Inner loop: No active monitor, sleeping.")  # Trace level
                 time.sleep(queue_check_timeout)
+
+            _maybe_discover_and_relax(reason="periodic")
 
             # Process monitor message if received
             if monitor_message:
