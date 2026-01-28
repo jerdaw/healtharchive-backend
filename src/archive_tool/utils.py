@@ -3,6 +3,8 @@ import json
 import logging
 import os
 import re
+import shlex
+import shutil
 import subprocess
 from pathlib import Path
 from typing import (
@@ -433,8 +435,6 @@ def parse_last_stats_from_log(log_file_path: Path) -> Optional[Dict[str, Any]]:
 
 def cleanup_temp_dirs(temp_dir_paths: List[Path], state_file_path: Path):
     """Deletes temporary directories and the state file."""
-    import shutil
-
     logger.info("--- Starting Cleanup ---")
     deleted_count = 0
     for temp_dir in temp_dir_paths:
@@ -546,8 +546,6 @@ def filter_args_for_final_run(passthrough_args: List[str]) -> List[str]:
 
 def execute_external_command(command: str, description: str) -> bool:
     """Executes an external command, logs output, returns success."""
-    import shlex
-
     logger.info(f"Executing {description} command: {command}")
     try:
         args = shlex.split(command)

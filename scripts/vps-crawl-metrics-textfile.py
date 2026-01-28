@@ -461,6 +461,26 @@ def main(argv: list[str] | None = None) -> int:
         "# HELP healtharchive_crawl_running_job_temp_dirs_count Temp dir count tracked in .archive_state.json, or -1 when unknown.",
     )
     _emit(lines, "# TYPE healtharchive_crawl_running_job_temp_dirs_count gauge")
+    _emit(
+        lines,
+        "# HELP healtharchive_crawl_running_job_crawl_rate_ppm Crawl rate in pages per minute (from log window), or -1 when unknown.",
+    )
+    _emit(lines, "# TYPE healtharchive_crawl_running_job_crawl_rate_ppm gauge")
+    _emit(
+        lines,
+        "# HELP healtharchive_crawl_running_job_errors_timeout Timeout error count from .archive_state.json, or -1 when unknown.",
+    )
+    _emit(lines, "# TYPE healtharchive_crawl_running_job_errors_timeout gauge")
+    _emit(
+        lines,
+        "# HELP healtharchive_crawl_running_job_errors_http HTTP error count from .archive_state.json, or -1 when unknown.",
+    )
+    _emit(lines, "# TYPE healtharchive_crawl_running_job_errors_http gauge")
+    _emit(
+        lines,
+        "# HELP healtharchive_crawl_running_job_errors_other Other error count from .archive_state.json, or -1 when unknown.",
+    )
+    _emit(lines, "# TYPE healtharchive_crawl_running_job_errors_other gauge")
 
     for job, source_code in jobs:
         labels = f'job_id="{int(job.job_id)}",source="{source_code}"'
@@ -514,6 +534,7 @@ def main(argv: list[str] | None = None) -> int:
         progress_known = 0
         age_seconds = -1.0
         stalled = 0
+        crawl_rate_ppm = -1.0
         if log_path is not None:
             try:
                 progress = parse_crawl_log_progress(log_path, max_bytes=int(args.max_log_bytes))
@@ -530,6 +551,7 @@ def main(argv: list[str] | None = None) -> int:
                     progress_known = 1
                     age_seconds = progress.last_progress_age_seconds(now_utc=now)
                     stalled = 1 if age_seconds >= float(args.stall_threshold_seconds) else 0
+                    crawl_rate_ppm = progress.crawl_rate_ppm
 
         state_file_ok = 0
         state_file_errno = 0
@@ -540,6 +562,9 @@ def main(argv: list[str] | None = None) -> int:
         container_restarts_done = -1
         vpn_rotations_done = -1
         temp_dirs_count = -1
+        errors_timeout = -1
+        errors_http = -1
+        errors_other = -1
 
         if output_dir_path and output_dir_ok:
             state_path = output_dir_path / STATE_FILE_NAME
@@ -578,6 +603,21 @@ def main(argv: list[str] | None = None) -> int:
                         temp_dirs = data.get("temp_dirs_host_paths")
                         if isinstance(temp_dirs, list):
                             temp_dirs_count = len(temp_dirs)
+                        # Extract error counts for per-error-type visibility
+                        error_counts = data.get("error_counts")
+                        if isinstance(error_counts, dict):
+                            try:
+                                errors_timeout = int(error_counts.get("timeout", -1))
+                            except (TypeError, ValueError):
+                                errors_timeout = -1
+                            try:
+                                errors_http = int(error_counts.get("http", -1))
+                            except (TypeError, ValueError):
+                                errors_http = -1
+                            try:
+                                errors_other = int(error_counts.get("other", -1))
+                            except (TypeError, ValueError):
+                                errors_other = -1
 
         _emit(lines, f"healtharchive_crawl_running_job_progress_known{{{labels}}} {progress_known}")
         _emit(
@@ -585,6 +625,10 @@ def main(argv: list[str] | None = None) -> int:
             f"healtharchive_crawl_running_job_last_progress_age_seconds{{{labels}}} {age_seconds:.0f}",
         )
         _emit(lines, f"healtharchive_crawl_running_job_stalled{{{labels}}} {stalled}")
+        _emit(
+            lines,
+            f"healtharchive_crawl_running_job_crawl_rate_ppm{{{labels}}} {crawl_rate_ppm:.1f}",
+        )
         _emit(lines, f"healtharchive_crawl_running_job_output_dir_ok{{{labels}}} {output_dir_ok}")
         _emit(
             lines,
@@ -622,6 +666,18 @@ def main(argv: list[str] | None = None) -> int:
         _emit(
             lines,
             f"healtharchive_crawl_running_job_temp_dirs_count{{{labels}}} {temp_dirs_count}",
+        )
+        _emit(
+            lines,
+            f"healtharchive_crawl_running_job_errors_timeout{{{labels}}} {errors_timeout}",
+        )
+        _emit(
+            lines,
+            f"healtharchive_crawl_running_job_errors_http{{{labels}}} {errors_http}",
+        )
+        _emit(
+            lines,
+            f"healtharchive_crawl_running_job_errors_other{{{labels}}} {errors_other}",
         )
 
     out_dir.mkdir(parents=True, exist_ok=True)

@@ -6,7 +6,18 @@ import uuid
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-from .constants import CONTAINER_OUTPUT_DIR
+from .constants import (
+    CONTAINER_OUTPUT_DIR,
+    DEFAULT_DOCKER_CPU_LIMIT,
+    DEFAULT_DOCKER_MEMORY_LIMIT,
+    DOCKER_COMMUNICATE_TIMEOUT_SEC,
+    DOCKER_CONTAINER_ID_MAX_RETRIES,
+    DOCKER_CONTAINER_ID_RETRY_DELAY_SEC,
+    DOCKER_FORCE_KILL_TIMEOUT_SEC,
+    DOCKER_PS_TIMEOUT_SEC,
+    DOCKER_STOP_COMMAND_TIMEOUT_SEC,
+    DOCKER_STOP_GRACE_PERIOD_SEC,
+)
 
 logger = logging.getLogger("website_archiver.docker")
 
@@ -23,7 +34,31 @@ def build_docker_run_cmd(
     label: str | None = None,
     docker_shm_size: str | None = None,
     user: str | None = None,
+    memory_limit: str | None = None,
+    cpu_limit: str | None = None,
 ) -> List[str]:
+    """
+    Build the `docker run` command for executing zimit in a container.
+
+    Args:
+        docker_image: Docker image name/tag to run (e.g., "ghcr.io/openzim/zimit")
+        host_output_dir: Host directory to mount as /output in the container
+        zimit_args: List of arguments to pass to the zimit command inside the container
+        label: Optional Docker label for tracking the container (format: "key=value")
+        docker_shm_size: Optional shared memory size (e.g., "512m", "1g") for browser stability
+        user: Optional user:group to run as (e.g., "0:0" for root when relax_perms is needed)
+        memory_limit: Optional memory limit (e.g., "4g") to prevent OOM-killing host
+        cpu_limit: Optional CPU limit (e.g., "1.5") to prevent CPU saturation
+
+    Returns:
+        Complete command list ready for subprocess execution.
+
+    Resource limits (when set):
+        --memory: Hard memory limit
+        --memory-swap: Set equal to memory to disable swap
+        --memory-swappiness: Set to 10 to minimize I/O thrash
+        --cpus: CPU quota limit
+    """
     cmd = [
         "docker",
         "run",
@@ -37,6 +72,15 @@ def build_docker_run_cmd(
         cmd.extend(["--shm-size", str(docker_shm_size)])
     if user:
         cmd.extend(["--user", str(user)])
+    # Resource limits to prevent runaway crawlers from OOM-killing or CPU-saturating the host
+    if memory_limit:
+        cmd.extend(["--memory", str(memory_limit)])
+        # Set swap equal to memory to prevent thrashing (effectively disabling swap)
+        cmd.extend(["--memory-swap", str(memory_limit)])
+        # Reduce swappiness to minimize I/O thrash
+        cmd.extend(["--memory-swappiness", "10"])
+    if cpu_limit:
+        cmd.extend(["--cpus", str(cpu_limit)])
     cmd.append(docker_image)
     cmd.extend(zimit_args)
     return cmd
@@ -49,7 +93,28 @@ def build_zimit_args(
     is_final_build: bool,
     extra_args: List[str] = [],
 ) -> List[str]:
-    """Constructs the argument list specifically for the zimit command."""
+    """
+    Construct the argument list for the zimit command inside the container.
+
+    This function assembles zimit arguments from multiple sources while handling
+    special cases like worker count management and final build mode.
+
+    Args:
+        base_zimit_args: User-provided passthrough arguments from CLI
+        required_args: Dict with required args like "seeds" and "name"
+        current_workers: Current worker count (may be reduced by adaptive strategies)
+        is_final_build: True if building final ZIM from WARCs (skips seeds, workers)
+        extra_args: Additional args like ["--config", path] for resume or ["--warcs", paths]
+
+    Returns:
+        Complete zimit command list starting with "zimit".
+
+    Special handling:
+        - Seeds: Joined with comma for zimit's --seeds format (skipped in final build)
+        - Workers: Extracted from base_args and replaced with current_workers (skipped in final build)
+        - --keep: Always added if not present (preserves temp artifacts for resume)
+        - --output: Always set to CONTAINER_OUTPUT_DIR, removing any user-provided value
+    """
     # (Keep existing implementation)
     zimit_args = ["zimit"]
     if "seeds" in required_args and not is_final_build:
@@ -97,8 +162,35 @@ def start_docker_container(
     *,
     relax_perms: bool = False,
     docker_shm_size: str | None = None,
+    docker_memory_limit: str | None = DEFAULT_DOCKER_MEMORY_LIMIT,
+    docker_cpu_limit: str | None = DEFAULT_DOCKER_CPU_LIMIT,
 ) -> Tuple[Optional[subprocess.Popen], Optional[str]]:
-    """Starts the Docker container asynchronously using Popen and a unique label."""
+    """
+    Start a Docker container running zimit asynchronously.
+
+    Creates a unique job label for container identification, starts the container
+    with Popen for non-blocking operation, and retrieves the container ID via
+    docker ps (with retries).
+
+    Args:
+        docker_image: Docker image to run
+        host_output_dir: Host directory to mount as /output
+        zimit_args: Complete zimit command arguments
+        run_name: Base name for the job label (combined with UUID for uniqueness)
+        relax_perms: If True, run container as root (0:0) for permission relaxation
+        docker_shm_size: Optional shared memory size for browser stability
+        docker_memory_limit: Memory limit (default from env or "4g")
+        docker_cpu_limit: CPU limit (default from env or "1.5")
+
+    Returns:
+        Tuple of (Popen process, container_id or None).
+        If container start fails completely, returns (None, None).
+        If container starts but ID cannot be determined, returns (process, None).
+
+    Side effects:
+        Sets module-level current_docker_process and current_container_id globals
+        for signal handler access during graceful shutdown.
+    """
     global current_docker_process, current_container_id
     current_docker_process = None
     current_container_id = None
@@ -111,6 +203,8 @@ def start_docker_container(
         label=f"archive_job={job_id}",
         docker_shm_size=docker_shm_size,
         user="0:0" if relax_perms else None,
+        memory_limit=docker_memory_limit,
+        cpu_limit=docker_cpu_limit,
     )
 
     logger.info(f"Executing Docker command (Job ID: {job_id}):\n{' '.join(docker_cmd)}")
@@ -128,8 +222,8 @@ def start_docker_container(
 
         # Retry getting container ID
         container_id = None
-        for attempt in range(5):
-            time.sleep(2)
+        for attempt in range(DOCKER_CONTAINER_ID_MAX_RETRIES):
+            time.sleep(DOCKER_CONTAINER_ID_RETRY_DELAY_SEC)
             container_id = get_container_id_by_label(job_id)
             if container_id:
                 break
@@ -148,7 +242,9 @@ def start_docker_container(
                     f"Docker process exited prematurely with code {process.returncode}. Check Docker setup or image."
                 )
                 try:  # Try to get output if it exited fast
-                    stdout_quick, stderr_quick = process.communicate(timeout=1)
+                    stdout_quick, stderr_quick = process.communicate(
+                        timeout=DOCKER_COMMUNICATE_TIMEOUT_SEC
+                    )
                     logger.error(f"Quick Exit STDOUT: {stdout_quick}")
                     logger.error(
                         f"Quick Exit STDERR: {stderr_quick}"
@@ -169,11 +265,30 @@ def start_docker_container(
 
 
 def get_container_id_by_label(job_id: str) -> Optional[str]:
-    """Tries to find the container ID based on the unique job label."""
+    """
+    Find a running container's ID using its unique job label.
+
+    Uses `docker ps -q --filter label=archive_job={job_id}` to locate the
+    container. This is more reliable than parsing Popen output since docker run
+    with --rm doesn't print the container ID.
+
+    Args:
+        job_id: The unique job identifier set as the archive_job label value
+
+    Returns:
+        Container ID string if found, None otherwise.
+
+    Note:
+        Returns only the first container ID if multiple match (shouldn't happen
+        with UUID-based job IDs). Handles CalledProcessError gracefully since
+        the container may not exist yet during startup.
+    """
     try:
         ps_cmd = ["docker", "ps", "-q", "--filter", f"label=archive_job={job_id}"]
         logger.debug(f"Running command to find container: {' '.join(ps_cmd)}")
-        process = subprocess.run(ps_cmd, capture_output=True, text=True, check=True, timeout=10)
+        process = subprocess.run(
+            ps_cmd, capture_output=True, text=True, check=True, timeout=DOCKER_PS_TIMEOUT_SEC
+        )
         container_id = process.stdout.strip()
         if container_id:
             first_id = container_id.split("\n")[0].strip()
@@ -197,23 +312,37 @@ def get_container_id_by_label(job_id: str) -> Optional[str]:
 
 
 def stop_docker_container(container_id: Optional[str]):
-    """Attempts to gracefully stop a Docker container with increased timeout."""
+    """
+    Gracefully stop a Docker container, with fallback to force kill.
+
+    Issues `docker stop -t {grace_period}` and waits for clean shutdown.
+    If stop fails or times out, escalates to _force_kill_container().
+
+    Args:
+        container_id: Container ID to stop. If None, uses current_container_id global.
+
+    The grace period (DOCKER_STOP_GRACE_PERIOD_SEC, default 90s) allows zimit
+    to complete in-progress page captures and flush WARC data before SIGKILL.
+
+    Side effects:
+        Clears current_container_id global if the stopped container matches it.
+    """
     global current_container_id
     target_id = container_id or current_container_id
     if not target_id:
         logger.warning("No container ID available to stop.")
         return
 
-    logger.info(f"Attempting to stop Docker container {target_id} (will wait up to 90s)...")
-    stop_timeout_seconds = "90"  # Increased grace period
-    stop_command_timeout = 100  # Slightly longer than stop timeout
+    logger.info(
+        f"Attempting to stop Docker container {target_id} (will wait up to {DOCKER_STOP_GRACE_PERIOD_SEC}s)..."
+    )
     try:
         # Use -t flag for stop timeout
         subprocess.run(
-            ["docker", "stop", "-t", stop_timeout_seconds, target_id],
+            ["docker", "stop", "-t", str(DOCKER_STOP_GRACE_PERIOD_SEC), target_id],
             check=True,
             capture_output=True,
-            timeout=stop_command_timeout,
+            timeout=DOCKER_STOP_COMMAND_TIMEOUT_SEC,
         )
         logger.info(f"Successfully stopped container {target_id}.")
     except subprocess.CalledProcessError as e:
@@ -249,7 +378,7 @@ def _force_kill_container(container_id: str) -> None:
             ["docker", "kill", container_id],
             check=True,
             capture_output=True,
-            timeout=15,
+            timeout=DOCKER_FORCE_KILL_TIMEOUT_SEC,
         )
         logger.warning(f"Force-killed container {container_id}.")
     except subprocess.CalledProcessError as e:
