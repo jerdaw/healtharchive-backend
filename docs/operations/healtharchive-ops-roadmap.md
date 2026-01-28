@@ -21,12 +21,18 @@ Keep the two synced copies of this file aligned:
 
 ## Current ops tasks (implementation already exists; enable/verify)
 
-- Deploy the backend changes that improve annual crawl throughput (WARC-first, workers=2, docker shm sizing) and restart the worker.
+- Verify the new Docker resource limit environment variables are set appropriately on VPS if defaults need adjustment:
+  - `HEALTHARCHIVE_DOCKER_MEMORY_LIMIT` (default: 4g)
+  - `HEALTHARCHIVE_DOCKER_CPU_LIMIT` (default: 1.5)
 - For already-created annual jobs, decide whether to patch `ArchiveJob.config.tool_options` to adopt:
   - `skip_final_build=true`
   - `docker_shm_size="1g"`
   - `stall_timeout_minutes=60` (canada.ca sources)
   - `initial_workers=2` (if you want it to take effect on retry/recovery)
+- Verify the new alerts are firing correctly in Grafana:
+  - `HealthArchiveCrawlRateSlow`
+  - `HealthArchiveInfraErrorsHigh`
+  - `HealthArchiveCrawlMetricsStale`
 
 ## IRL / external validation (pending)
 
