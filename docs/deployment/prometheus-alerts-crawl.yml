@@ -56,17 +56,34 @@ groups:
             Monitor for potential exhaustion.
 
       # Stale state file (progress stalled)
+      # Lowered from 3600s (1h) to 1800s (30m) for earlier detection
       - alert: CrawlProgressStalled
-        expr: healtharchive_crawl_running_job_last_progress_age_seconds > 3600
-        for: 30m
+        expr: healtharchive_crawl_running_job_last_progress_age_seconds > 1800
+        for: 15m
         labels:
           severity: warning
           component: crawl_progress
         annotations:
           summary: "Job {{ $labels.job_id }} progress appears stalled"
           description: >
-            State file for job {{ $labels.job_id }} hasn't been updated in
-            {{ $value }}s. Crawl may be stuck.
+            No crawl progress for job {{ $labels.job_id }} in {{ $value }}s.
+            Crawl may be stuck. Check logs and container status.
+
+      # Slow crawl rate detection
+      # Alert when rate is below 1 page per minute for an extended period
+      # (excludes jobs where rate is unknown, i.e., -1)
+      - alert: CrawlRateSlow
+        expr: healtharchive_crawl_running_job_crawl_rate_ppm >= 0 and healtharchive_crawl_running_job_crawl_rate_ppm < 1
+        for: 30m
+        labels:
+          severity: info
+          component: crawl_performance
+        annotations:
+          summary: "Job {{ $labels.job_id }} crawl rate is slow"
+          description: >
+            Crawl rate for job {{ $labels.job_id }} is {{ $value | printf "%.1f" }} pages/min.
+            This is below the expected rate. Check for network issues, site
+            throttling, or resource constraints.
 
       # Worker reductions (potential SSHFS or resource issues)
       - alert: CrawlWorkerReductionsFrequent

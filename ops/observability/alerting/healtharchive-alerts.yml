@@ -146,6 +146,42 @@ groups:
           description: "At least one job has status=completed for over an hour (crawl done, indexing not done). Check healtharchive-worker.service and worker logs."
           runbook_url: "https://github.com/jerdaw/healtharchive-backend/blob/main/docs/operations/playbooks/annual-campaign.md"
 
+      - alert: HealthArchiveCrawlRateSlow
+        expr: |
+          healtharchive_crawl_running_job_progress_known == 1
+          and healtharchive_crawl_running_job_crawl_rate_ppm >= 0
+          and healtharchive_crawl_running_job_crawl_rate_ppm < 5
+        for: 30m
+        labels:
+          severity: warning
+          service: healtharchive
+        annotations:
+          summary: "Crawl rate is very slow"
+          description: "A running crawl job has a very low crawl rate (<5 pages/min): source={{ $labels.source }} job_id={{ $labels.job_id }} rate={{ $value }}ppm. This may indicate network issues, VPN problems, or site-specific crawling difficulties."
+          runbook_url: "https://github.com/jerdaw/healtharchive-backend/blob/main/docs/tutorials/debug-crawl.md"
+
+      - alert: HealthArchiveInfraErrorsHigh
+        expr: healtharchive_jobs_infra_error_recent_total{window="10m"} >= 3
+        for: 5m
+        labels:
+          severity: warning
+          service: healtharchive
+        annotations:
+          summary: "High rate of infrastructure errors"
+          description: "Multiple jobs (>=3) have failed with infra_error in the last 10 minutes. This typically indicates Storage Box mount issues, network problems, or storage capacity issues. Check mount health and storage connectivity."
+          runbook_url: "https://github.com/jerdaw/healtharchive-backend/blob/main/docs/operations/playbooks/storagebox-sshfs-stale-mount-recovery.md"
+
+      - alert: HealthArchiveCrawlMetricsStale
+        expr: (time() - healtharchive_crawl_metrics_timestamp_seconds) > 600
+        for: 5m
+        labels:
+          severity: warning
+          service: healtharchive
+        annotations:
+          summary: "Crawl metrics are stale"
+          description: "No crawl metrics update in over 10 minutes. The healtharchive-crawl-metrics.timer may be failing or the textfile collector may not be running. Check healtharchive-crawl-metrics.service logs."
+          runbook_url: "https://github.com/jerdaw/healtharchive-backend/blob/main/docs/tutorials/debug-crawl.md"
+
   - name: healtharchive.tiering
     rules:
       - alert: HealthArchiveStorageBoxMountDown

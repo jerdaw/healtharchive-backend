@@ -272,3 +272,34 @@ sudo systemctl restart healtharchive-storagebox-sshfs.service
 If this becomes a recurring pattern, treat it as an infrastructure incident and follow:
 
 - `incident-response.md`
+
+---
+
+## sshfs tuning options
+
+The `healtharchive-storagebox-sshfs.service` uses these sshfs options:
+
+```
+-o reconnect,ServerAliveInterval=15,ServerAliveCountMax=3,kernel_cache
+```
+
+These defaults are tuned for reliability:
+
+- `reconnect` - automatically reconnect when the SSH connection drops
+- `ServerAliveInterval=15` - send SSH keepalives every 15 seconds
+- `ServerAliveCountMax=3` - disconnect after 3 missed keepalives (~45s)
+- `kernel_cache` - use kernel caching for better performance
+
+If you experience frequent Errno 107 issues, consider these additional options in
+`/etc/healtharchive/storagebox.env` (requires service restart):
+
+| Option | Description | When to use |
+|--------|-------------|-------------|
+| `ServerAliveCountMax=5` | Increase from 3 to tolerate more keepalive misses | Unreliable network with brief dropouts |
+| `ConnectTimeout=30` | Limit initial connection wait | Slow network, avoids long hangs |
+| `max_write=65536` | Smaller write chunks | Large file writes cause timeouts |
+| `workaround=rename` | Better rename handling | If file moves fail intermittently |
+| `auto_cache` | Smarter caching based on mtime | If you see stale data |
+
+Note: Changing sshfs options can have unintended effects on performance and behavior.
+Test changes in a non-production environment first.

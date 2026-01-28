@@ -24,9 +24,26 @@ from .models import ArchiveJob as ORMArchiveJob
 
 logger = logging.getLogger("healtharchive.jobs")
 
+# Maximum number of retries for infra errors before giving up.
+# This should match the value in worker/main.py to maintain consistent behavior.
+# Note: normal failures are handled by worker/main.py; this cap is for infra_error
+# jobs which otherwise bypass the retry budget.
+MAX_INFRA_ERROR_RETRIES = 5
+
 _LOG_CONFIG_ERROR_MARKERS = (
     "unrecognized arguments",
     "unknown option",
+)
+
+# Markers indicating infrastructure/permission failures that should be
+# classified as infra_error (retryable) rather than permanent failure.
+_LOG_INFRA_ERROR_MARKERS = (
+    "is invalid or not writable",
+    "permission denied",
+    "transport endpoint is not connected",
+    "[errno 107]",  # ENOTCONN
+    "[errno 13]",  # EACCES
+    "[errno 1]",  # EPERM
 )
 
 
@@ -76,6 +93,15 @@ def _read_log_tail(path: Path, *, max_bytes: int = 64 * 1024) -> str:
 def _looks_like_config_error_from_log(tail: str) -> bool:
     lower = tail.lower()
     return any(marker in lower for marker in _LOG_CONFIG_ERROR_MARKERS)
+
+
+def _looks_like_infra_error_from_log(tail: str) -> bool:
+    """
+    Check if the log tail indicates an infrastructure/permission error
+    that should be classified as infra_error (retryable).
+    """
+    lower = tail.lower()
+    return any(marker in lower for marker in _LOG_INFRA_ERROR_MARKERS)
 
 
 @dataclass
@@ -428,8 +454,18 @@ def run_persistent_job(job_id: int) -> int:
             if is_storage_infra_error(run_exc) or is_output_dir_write_infra_error(
                 run_exc, output_dir=output_dir
             ):
-                job_row.status = "retryable"
-                job_row.crawler_status = "infra_error"
+                # Check retry cap to prevent infinite infra_error retries
+                if job_row.retry_count < MAX_INFRA_ERROR_RETRIES:
+                    job_row.status = "retryable"
+                    job_row.crawler_status = "infra_error"
+                else:
+                    logger.warning(
+                        "Job %s exceeded max infra error retries (%d); marking as failed.",
+                        job_id,
+                        MAX_INFRA_ERROR_RETRIES,
+                    )
+                    job_row.status = "failed"
+                    job_row.crawler_status = "infra_error"
             else:
                 job_row.status = "failed"
                 job_row.crawler_status = "infra_error_config"
@@ -463,8 +499,18 @@ def run_persistent_job(job_id: int) -> int:
                 )
 
             if infra:
-                job_row.status = "retryable"
-                job_row.crawler_status = "infra_error"
+                # Check retry cap to prevent infinite infra_error retries
+                if job_row.retry_count < MAX_INFRA_ERROR_RETRIES:
+                    job_row.status = "retryable"
+                    job_row.crawler_status = "infra_error"
+                else:
+                    logger.warning(
+                        "Job %s exceeded max infra error retries (%d); marking as failed.",
+                        job_id,
+                        MAX_INFRA_ERROR_RETRIES,
+                    )
+                    job_row.status = "failed"
+                    job_row.crawler_status = "infra_error"
             else:
                 # Classify common CLI/runtime errors (e.g. invalid Zimit args) as
                 # infra_error_config so the worker doesn't churn retry budget.
@@ -473,6 +519,24 @@ def run_persistent_job(job_id: int) -> int:
                 # inspect the combined log tail to avoid reading large logs.
                 if combined_log_path is not None:
                     tail = _read_log_tail(combined_log_path)
+                    # Check for infra errors from log (e.g. permission denied,
+                    # transport endpoint not connected) before config errors.
+                    # These are retryable since the underlying storage may recover.
+                    if _looks_like_infra_error_from_log(tail):
+                        # Check retry cap to prevent infinite infra_error retries
+                        if job_row.retry_count < MAX_INFRA_ERROR_RETRIES:
+                            job_row.status = "retryable"
+                            job_row.crawler_status = "infra_error"
+                        else:
+                            logger.warning(
+                                "Job %s exceeded max infra error retries (%d); marking as failed.",
+                                job_id,
+                                MAX_INFRA_ERROR_RETRIES,
+                            )
+                            job_row.status = "failed"
+                            job_row.crawler_status = "infra_error"
+                        job_row.crawler_exit_code = rc
+                        return int(rc)
                     if _looks_like_config_error_from_log(tail):
                         job_row.status = "failed"
                         job_row.crawler_status = "infra_error_config"

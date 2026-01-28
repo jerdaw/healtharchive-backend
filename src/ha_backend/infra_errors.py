@@ -11,6 +11,14 @@ STORAGE_INFRA_ERRNOS: frozenset[int] = frozenset(
         # Broad "I/O error" signals where treating as infra is usually correct.
         errno_module.EIO,
         errno_module.ETIMEDOUT,
+        # Network errors that indicate infrastructure/connectivity issues.
+        101,  # ENETUNREACH: "Network is unreachable"
+        111,  # ECONNREFUSED: "Connection refused"
+        113,  # EHOSTUNREACH: "No route to host"
+        # Storage capacity errors.
+        errno_module.ENOSPC,  # 28: "No space left on device"
+        # Stale NFS handles (common on network filesystems).
+        116,  # ESTALE: "Stale file handle"
     }
 )
 
