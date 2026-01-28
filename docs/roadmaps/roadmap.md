@@ -61,10 +61,6 @@ Keep this list short; prefer linking to the canonical doc that explains the item
 
 ### Crawling & indexing reliability (backend)
 
-- Add integration tests for archive_tool main.py stage loop (deferred from 2026-01-27 hardening work).
-  - Test stage transitions, adaptive strategy triggers, and state persistence.
-  - See: `src/archive_tool/main.py` (main crawl/resume loop)
-
 - Ensure WARC discovery and "WARC files" reporting are consistent across:
   - operator status output (`ha-backend show-job`, `scripts/vps-crawl-status.sh`)
   - indexing pipeline discovery (`ha_backend/indexing/warc_discovery.py`)
