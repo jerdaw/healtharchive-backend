@@ -1792,6 +1792,152 @@ def cmd_validate_job_config(args: argparse.Namespace) -> None:
         sys.exit(rc)
 
 
+def _parse_tool_option_value(value_str: str) -> bool | int | str:
+    """
+    Parse a string value into an appropriate Python type for ArchiveToolOptions.
+
+    Type coercion rules:
+    - "true"/"false" (case-insensitive) -> bool
+    - Numeric strings (including negative) -> int
+    - Everything else -> str
+    """
+    lower = value_str.lower()
+    if lower == "true":
+        return True
+    if lower == "false":
+        return False
+
+    # Try integer conversion
+    try:
+        return int(value_str)
+    except ValueError:
+        pass
+
+    return value_str
+
+
+def _format_tool_option_value(value: object) -> str:
+    """Format a tool option value for display."""
+    if value is None:
+        return "(unset)"
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    return str(value)
+
+
+def cmd_patch_job_config(args: argparse.Namespace) -> None:
+    """
+    Patch tool_options on an existing ArchiveJob.
+
+    This command allows modifying tool_options fields (like skip_final_build,
+    docker_shm_size, stall_timeout_minutes, initial_workers) on jobs that
+    haven't started running yet.
+
+    Only jobs in status 'queued', 'retryable', or 'failed' can be patched.
+    """
+    from dataclasses import fields as dataclass_fields
+
+    from .archive_contract import ArchiveJobConfig, ArchiveToolOptions, validate_tool_options
+    from .models import ArchiveJob as ORMArchiveJob
+
+    job_id = args.id
+    dry_run = not args.apply
+    patches = args.set_tool_option or []
+
+    if not patches:
+        print("ERROR: At least one --set-tool-option KEY=VALUE is required.", file=sys.stderr)
+        sys.exit(1)
+
+    # Get valid field names from ArchiveToolOptions dataclass
+    valid_fields = {f.name for f in dataclass_fields(ArchiveToolOptions)}
+
+    # Parse patches into key-value pairs
+    parsed_patches: list[tuple[str, bool | int | str]] = []
+    for patch in patches:
+        if "=" not in patch:
+            print(
+                f"ERROR: Invalid format for --set-tool-option: {patch!r}. Expected KEY=VALUE.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+
+        key, _, raw_value = patch.partition("=")
+        key = key.strip()
+
+        if key not in valid_fields:
+            print(
+                f"ERROR: Unknown tool_option key: {key!r}. "
+                f"Valid keys: {', '.join(sorted(valid_fields))}",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+
+        value = _parse_tool_option_value(raw_value)
+        parsed_patches.append((key, value))
+
+    with get_session() as session:
+        job = session.get(ORMArchiveJob, job_id)
+        if job is None:
+            print(f"ERROR: Job {job_id} not found.", file=sys.stderr)
+            sys.exit(1)
+
+        # Only allow patching jobs that haven't started
+        allowed_statuses = ("queued", "retryable", "failed")
+        if job.status not in allowed_statuses:
+            print(
+                f"ERROR: Cannot patch job in status '{job.status}'. "
+                f"Only jobs in status {allowed_statuses} can be patched.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+
+        config = ArchiveJobConfig.from_dict(job.config or {})
+        old_opts = config.tool_options.to_dict()
+
+        # Apply patches
+        for key, value in parsed_patches:
+            setattr(config.tool_options, key, value)
+
+        # Validate the new config
+        try:
+            validate_tool_options(config.tool_options)
+        except ValueError as exc:
+            print(f"ERROR: Validation failed: {exc}", file=sys.stderr)
+            sys.exit(1)
+
+        new_opts = config.tool_options.to_dict()
+
+        # Show diff
+        print(f"Job ID: {job_id}")
+        print(f"Job name: {job.name}")
+        print(f"Status: {job.status}")
+        print("")
+        print("Config changes:")
+
+        any_changes = False
+        all_keys = sorted(set(old_opts.keys()) | set(new_opts.keys()))
+        for key in all_keys:
+            old_val = old_opts.get(key)
+            new_val = new_opts.get(key)
+            if old_val != new_val:
+                any_changes = True
+                print(
+                    f"  {key}: {_format_tool_option_value(old_val)} "
+                    f"-> {_format_tool_option_value(new_val)}"
+                )
+
+        if not any_changes:
+            print("  (no changes)")
+
+        print("")
+        if dry_run:
+            print("[DRY RUN] No changes applied. Use --apply to save changes.")
+        else:
+            job.config = config.to_dict()
+            session.commit()
+            print(f"[APPLIED] Job {job_id} config updated.")
+
+
 def cmd_cleanup_job(args: argparse.Namespace) -> None:
     """
     Cleanup temporary directories and state for a completed/indexed job.
@@ -4086,6 +4232,38 @@ def build_parser() -> argparse.ArgumentParser:
         help="ArchiveJob ID whose config should be validated.",
     )
     p_validate.set_defaults(func=cmd_validate_job_config)
+
+    # patch-job-config
+    p_patch = subparsers.add_parser(
+        "patch-job-config",
+        help=(
+            "Patch tool_options on an existing ArchiveJob. "
+            "Only works for jobs in queued/retryable/failed status."
+        ),
+    )
+    p_patch.add_argument(
+        "--id",
+        type=int,
+        required=True,
+        help="ArchiveJob ID to patch.",
+    )
+    p_patch.add_argument(
+        "--set-tool-option",
+        action="append",
+        metavar="KEY=VALUE",
+        help=(
+            "Set a tool_option key to a value. Can be specified multiple times. "
+            "Example: --set-tool-option skip_final_build=true "
+            "--set-tool-option initial_workers=2"
+        ),
+    )
+    p_patch.add_argument(
+        "--apply",
+        action="store_true",
+        default=False,
+        help="Apply changes (default is dry-run).",
+    )
+    p_patch.set_defaults(func=cmd_patch_job_config)
 
     # cleanup-job
     p_cleanup = subparsers.add_parser(
