@@ -1,6 +1,6 @@
 # Monitoring & Alerting Strategy - Annual Crawl Campaign
 
-**Last Updated:** 2026-01-24
+**Last Updated:** 2026-01-27
 
 ## Overview
 
@@ -39,6 +39,10 @@ Primary files (single-VPS annual campaign):
 | `healtharchive_crawl_running_job_stalled` | Gauge | 1 = Progress stalled > 1 hour. |
 | `healtharchive_crawl_running_job_output_dir_ok` | Gauge | 1 = Output directory is accessible. |
 | `healtharchive_crawl_running_job_log_probe_ok` | Gauge | 1 = Combined log file is readable. |
+| `healtharchive_crawl_running_job_crawl_rate_ppm` | Gauge | Pages per minute crawl rate (from state file). |
+| `healtharchive_crawl_running_job_progress_known` | Gauge | 1 = Progress metrics available from state file. |
+| `healtharchive_crawl_metrics_timestamp_seconds` | Gauge | Unix timestamp when metrics were last written. |
+| `healtharchive_jobs_infra_error_recent_total{window="10m"}` | Gauge | Count of jobs with infra errors in rolling window. |
 
 ## Alerting Thresholds
 
@@ -83,6 +87,30 @@ Alerts are defined in:
 - **Threshold:** `healtharchive_crawl_running_job_stalled == 1` (for 30m).
 - **Meaning:** The crawler is running but hasn't archived a new page in over an hour.
 - **Action:** Check if the crawler is stuck on a massive PDF or looped trap.
+
+### 5) Crawl Rate (throughput)
+
+**Alert:** `HealthArchiveCrawlRateSlow`
+
+- **Threshold:** `healtharchive_crawl_running_job_crawl_rate_ppm < 5` (for 30m, when progress is known).
+- **Meaning:** The crawler is running but archiving fewer than 5 pages per minute for an extended period.
+- **Action:** Check for network issues, site rate limiting, or resource constraints. Consider adjusting worker count or Docker resource limits.
+
+### 6) Infrastructure Errors
+
+**Alert:** `HealthArchiveInfraErrorsHigh`
+
+- **Threshold:** `healtharchive_jobs_infra_error_recent_total{window="10m"} >= 3` (for 5m).
+- **Meaning:** Multiple jobs are failing due to infrastructure errors (errno 107 stale mount, permission denied, etc.) in a short window.
+- **Action:** Check Storage Box mount health, run hot-path recovery, verify output directory permissions.
+
+### 7) Metrics Freshness
+
+**Alert:** `HealthArchiveCrawlMetricsStale`
+
+- **Threshold:** `(time() - healtharchive_crawl_metrics_timestamp_seconds) > 600` (for 5m).
+- **Meaning:** The crawl metrics textfile hasn't been updated in over 10 minutes.
+- **Action:** Check if `healtharchive-crawl-metrics.timer` is running and `vps-crawl-metrics-textfile.py` is succeeding.
 
 ## Indexing Monitoring
 
