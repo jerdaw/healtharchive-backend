@@ -11,6 +11,12 @@ class _SearchMetrics:
     count: int = 0
     error_count: int = 0
 
+    # Error type breakdown for better SLA tracking
+    error_server: int = 0  # 500-class errors (internal errors)
+    error_client: int = 0  # 400-class errors (bad requests, validation)
+    error_timeout: int = 0  # Timeout errors
+    error_unknown: int = 0  # Unclassified errors
+
     duration_seconds_sum: float = 0.0
     duration_seconds_max: float = 0.0
 
@@ -35,19 +41,40 @@ class _SearchMetrics:
 SEARCH_METRICS = _SearchMetrics()
 
 
-def observe_search_request(*, duration_seconds: float, mode: str, ok: bool) -> None:
+def observe_search_request(
+    *, duration_seconds: float, mode: str, ok: bool, error_type: str | None = None
+) -> None:
     """
     Record a single /api/search request observation.
 
     Notes:
     - These metrics are per-process and reset on restart.
     - We keep the label-space intentionally small to avoid cardinality issues.
+
+    Args:
+        duration_seconds: Request duration
+        mode: Search mode used (relevance_fts, boolean, etc.)
+        ok: True if request succeeded, False otherwise
+        error_type: If ok=False, categorizes the error:
+            - "server": 500-class internal errors
+            - "client": 400-class client errors (validation, bad requests)
+            - "timeout": Timeout errors
+            - None or other: Unclassified errors
     """
     m = SEARCH_METRICS
     with m.lock:
         m.count += 1
         if not ok:
             m.error_count += 1
+            # Categorize error type
+            if error_type == "server":
+                m.error_server += 1
+            elif error_type == "client":
+                m.error_client += 1
+            elif error_type == "timeout":
+                m.error_timeout += 1
+            else:
+                m.error_unknown += 1
 
         m.duration_seconds_sum += float(duration_seconds)
         m.duration_seconds_max = max(m.duration_seconds_max, float(duration_seconds))
@@ -97,6 +124,15 @@ def render_search_metrics_prometheus() -> list[str]:
         )
         lines.append("# TYPE healtharchive_search_errors_total counter")
         lines.append(f"healtharchive_search_errors_total {m.error_count}")
+
+        lines.append(
+            "# HELP healtharchive_search_errors_by_type Error breakdown by type (per-process)"
+        )
+        lines.append("# TYPE healtharchive_search_errors_by_type counter")
+        lines.append(f'healtharchive_search_errors_by_type{{type="server"}} {m.error_server}')
+        lines.append(f'healtharchive_search_errors_by_type{{type="client"}} {m.error_client}')
+        lines.append(f'healtharchive_search_errors_by_type{{type="timeout"}} {m.error_timeout}')
+        lines.append(f'healtharchive_search_errors_by_type{{type="unknown"}} {m.error_unknown}')
 
         lines.append(
             "# HELP healtharchive_search_duration_seconds /api/search latency histogram (per-process)"

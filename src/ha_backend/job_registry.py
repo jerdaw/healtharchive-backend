@@ -160,6 +160,7 @@ SOURCE_JOB_CONFIGS: Dict[str, SourceJobConfig] = {
             "enable_adaptive_restart": True,
             "enable_vpn_rotation": False,
             "initial_workers": 2,
+            "stall_timeout_minutes": 60,  # Match HC/PHAC for consistency
             "docker_shm_size": "1g",
             "max_container_restarts": 20,
             "error_threshold_timeout": 50,

@@ -17,8 +17,13 @@ The **archive_tool** is HealthArchive's internal crawler and orchestrator subpac
 
 **Technology**:
 - Python 3.11+
-- Docker (runs `ghcr.io/openzim/zimit` container; override/pin via `HEALTHARCHIVE_ZIMIT_DOCKER_IMAGE`)
+- Docker (runs `ghcr.io/openzim/zimit` container)
 - State persistence (`.archive_state.json`)
+
+**Environment Variables**:
+- `HEALTHARCHIVE_ZIMIT_DOCKER_IMAGE`: Override Docker image (default: `ghcr.io/openzim/zimit`)
+- `HEALTHARCHIVE_DOCKER_MEMORY_LIMIT`: Container memory limit (default: `4g`)
+- `HEALTHARCHIVE_DOCKER_CPU_LIMIT`: Container CPU limit (default: `1.5`)
 
 Note: the HealthArchive backend indexes **WARCs** into `Snapshot` rows; it does not read `.zim` files. ZIM output is an optional artifact and can be skipped with `--skip-final-build`.
 

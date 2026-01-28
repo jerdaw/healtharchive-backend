@@ -114,6 +114,17 @@ def _deploy_lock_is_active(
             pass
 
 
+def _save_state_file(path: Path, data: dict) -> None:
+    """Write state file with fsync for durability."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    with open(tmp, "w", encoding="utf-8") as f:
+        f.write(json.dumps(data, indent=2, sort_keys=True) + "\n")
+        f.flush()
+        os.fsync(f.fileno())
+    tmp.replace(path)
+
+
 def _write_textfile_metrics(
     *,
     out_dir: Path,
@@ -373,19 +384,14 @@ def main(argv: list[str] | None = None) -> int:
     except Exception as exc:
         # Prefer to skip rather than flap the worker on partial DB visibility.
         reason = "db_error"
-        state_path.write_text(
-            json.dumps(
-                {
-                    "last_run_utc": now.replace(microsecond=0).isoformat(),
-                    "result": "skip",
-                    "reason": reason,
-                    "exception": str(exc),
-                },
-                indent=2,
-                sort_keys=True,
-            )
-            + "\n",
-            encoding="utf-8",
+        _save_state_file(
+            state_path,
+            {
+                "last_run_utc": now.replace(microsecond=0).isoformat(),
+                "result": "skip",
+                "reason": reason,
+                "exception": str(exc),
+            },
         )
         try:
             _write_textfile_metrics(
@@ -435,40 +441,30 @@ def main(argv: list[str] | None = None) -> int:
             else:
                 result = "fail"
                 reason = "systemctl_start_failed"
-                state_path.write_text(
-                    json.dumps(
-                        {
-                            "last_run_utc": now.replace(microsecond=0).isoformat(),
-                            "result": result,
-                            "reason": reason,
-                            "rc": int(cp.returncode),
-                            "stdout": (cp.stdout or "")[:400],
-                            "stderr": (cp.stderr or "")[:400],
-                        },
-                        indent=2,
-                        sort_keys=True,
-                    )
-                    + "\n",
-                    encoding="utf-8",
+                _save_state_file(
+                    state_path,
+                    {
+                        "last_run_utc": now.replace(microsecond=0).isoformat(),
+                        "result": result,
+                        "reason": reason,
+                        "rc": int(cp.returncode),
+                        "stdout": (cp.stdout or "")[:400],
+                        "stderr": (cp.stderr or "")[:400],
+                    },
                 )
 
     # Always write state (best-effort) for forensics.
     try:
-        state_path.write_text(
-            json.dumps(
-                {
-                    "last_run_utc": now.replace(microsecond=0).isoformat(),
-                    "result": result,
-                    "reason": reason,
-                    "worker_active": int(worker_active),
-                    "running_jobs": int(running_jobs),
-                    "pending_jobs": int(pending_jobs),
-                },
-                indent=2,
-                sort_keys=True,
-            )
-            + "\n",
-            encoding="utf-8",
+        _save_state_file(
+            state_path,
+            {
+                "last_run_utc": now.replace(microsecond=0).isoformat(),
+                "result": result,
+                "reason": reason,
+                "worker_active": int(worker_active),
+                "running_jobs": int(running_jobs),
+                "pending_jobs": int(pending_jobs),
+            },
         )
     except Exception:
         pass

@@ -2,7 +2,19 @@
 import argparse
 from typing import List, Tuple
 
-from .constants import DOCKER_IMAGE
+from .constants import (
+    DEFAULT_BACKOFF_DELAY_MINUTES,
+    DEFAULT_ERROR_THRESHOLD_HTTP,
+    DEFAULT_ERROR_THRESHOLD_TIMEOUT,
+    DEFAULT_INITIAL_WORKERS,
+    DEFAULT_MAX_CONTAINER_RESTARTS,
+    DEFAULT_MAX_VPN_ROTATIONS,
+    DEFAULT_MAX_WORKER_REDUCTIONS,
+    DEFAULT_MIN_WORKERS,
+    DEFAULT_MONITOR_INTERVAL_SEC,
+    DEFAULT_STALL_TIMEOUT_MINUTES,
+    DOCKER_IMAGE,
+)
 
 
 def parse_arguments() -> Tuple[argparse.Namespace, List[str]]:
@@ -19,7 +31,7 @@ def parse_arguments() -> Tuple[argparse.Namespace, List[str]]:
     core_group.add_argument(
         "--initial-workers",
         type=int,
-        default=1,
+        default=DEFAULT_INITIAL_WORKERS,
         help="Initial number of workers for zimit (can be overridden by passthrough --workers).",
     )
 
@@ -73,25 +85,25 @@ def parse_arguments() -> Tuple[argparse.Namespace, List[str]]:
     monitor_group.add_argument(
         "--monitor-interval-seconds",
         type=int,
-        default=30,
+        default=DEFAULT_MONITOR_INTERVAL_SEC,
         help="How often the monitor checks logs/conditions.",
     )
     monitor_group.add_argument(
         "--stall-timeout-minutes",
         type=int,
-        default=30,
+        default=DEFAULT_STALL_TIMEOUT_MINUTES,
         help="Minutes without crawl progress increase to detect stall.",
     )
     monitor_group.add_argument(
         "--error-threshold-timeout",
         type=int,
-        default=10,
+        default=DEFAULT_ERROR_THRESHOLD_TIMEOUT,
         help="Number of consecutive timeout errors to trigger action.",
     )
     monitor_group.add_argument(
         "--error-threshold-http",
         type=int,
-        default=10,
+        default=DEFAULT_ERROR_THRESHOLD_HTTP,
         help="Number of consecutive HTTP/network errors to trigger action.",
     )
 
@@ -105,13 +117,13 @@ def parse_arguments() -> Tuple[argparse.Namespace, List[str]]:
     adapt_group.add_argument(
         "--min-workers",
         type=int,
-        default=1,
+        default=DEFAULT_MIN_WORKERS,
         help="Minimum workers for adaptive reduction.",
     )
     adapt_group.add_argument(
         "--max-worker-reductions",
         type=int,
-        default=2,
+        default=DEFAULT_MAX_WORKER_REDUCTIONS,
         help="Max worker reduction attempts per run.",
     )
     adapt_group.add_argument(
@@ -122,7 +134,7 @@ def parse_arguments() -> Tuple[argparse.Namespace, List[str]]:
     adapt_group.add_argument(
         "--max-container-restarts",
         type=int,
-        default=2,
+        default=DEFAULT_MAX_CONTAINER_RESTARTS,
         help="Max container restart attempts per run.",
     )
     # ... (VPN args remain the same) ...
@@ -146,9 +158,9 @@ def parse_arguments() -> Tuple[argparse.Namespace, List[str]]:
     adapt_group.add_argument(
         "--max-vpn-rotations",
         type=int,
-        default=3,
+        default=DEFAULT_MAX_VPN_ROTATIONS,
         help="Max total VPN rotation attempts per run.",
-    )  # Default reset to 3, user can override
+    )
     adapt_group.add_argument(
         "--vpn-rotation-frequency-minutes",
         type=int,
@@ -177,7 +189,7 @@ def parse_arguments() -> Tuple[argparse.Namespace, List[str]]:
     adapt_group.add_argument(
         "--backoff-delay-minutes",
         type=int,
-        default=15,
+        default=DEFAULT_BACKOFF_DELAY_MINUTES,
         help="How long to pause after certain errors/adaptations.",
     )
 

@@ -3627,11 +3627,29 @@ def search_snapshots(
             ranking=ranking,
             db=db,
         )
-    except Exception:
+    except Exception as exc:
+        # Classify error type for metrics
+        from fastapi import HTTPException
+        from sqlalchemy.exc import TimeoutError as SQLAlchemyTimeout
+
+        error_type = "unknown"
+        if isinstance(exc, HTTPException):
+            if 400 <= exc.status_code < 500:
+                error_type = "client"
+            elif exc.status_code >= 500:
+                error_type = "server"
+        elif isinstance(exc, (TimeoutError, SQLAlchemyTimeout)):
+            error_type = "timeout"
+        elif isinstance(exc, (ValueError, TypeError, KeyError)):
+            error_type = "client"
+        else:
+            error_type = "server"
+
         observe_search_request(
             duration_seconds=time.perf_counter() - start_time,
             mode=mode,
             ok=False,
+            error_type=error_type,
         )
         raise
 

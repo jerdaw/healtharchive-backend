@@ -10,7 +10,13 @@ import threading
 import time
 from queue import Queue
 
-from .constants import HTTP_ERROR_PATTERNS, TIMEOUT_PATTERNS
+from .constants import (
+    HTTP_ERROR_PATTERNS,
+    MONITOR_LOG_PROCESS_TERM_TIMEOUT_SEC,
+    MONITOR_STARTUP_DELAY_SEC,
+    STATS_REGEX,
+    TIMEOUT_PATTERNS,
+)
 
 # Use absolute imports within the package
 from .state import CrawlState
@@ -41,13 +47,34 @@ class CrawlMonitor(threading.Thread):
         self.output_queue = output_queue
         self.stop_event = stop_event  # Use the shared stop event
 
-        # Compile regex patterns once
-        self.stats_pattern = re.compile(r'"context":"crawlStatus".*"details":({.*?})}')
+        # Use pre-compiled regex patterns from constants
+        self.stats_pattern = STATS_REGEX
         self.timeout_pattern = re.compile("|".join(TIMEOUT_PATTERNS), re.IGNORECASE)
         self.http_error_pattern = re.compile("|".join(HTTP_ERROR_PATTERNS))
 
     def run(self):
-        """Fetches logs, parses them, updates state, checks for stalls/errors, reports progress."""
+        """
+        Main thread loop that monitors a running zimit container via docker logs.
+
+        This method:
+        1. Starts a `docker logs -f` subprocess to stream container output
+        2. Reads log lines and parses them for crawl statistics and errors
+        3. Updates CrawlState with progress metrics (crawled count, pending, etc.)
+        4. Periodically checks for stall conditions (no progress) and error thresholds
+        5. Signals the main thread via output_queue when intervention is needed
+
+        The loop continues until:
+        - The Docker container exits (detected via process.poll() and docker ps)
+        - The stop_event is set (graceful shutdown requested)
+        - An unrecoverable error occurs
+
+        Queue messages sent to main thread:
+        - {"status": "progress"} - Periodic heartbeat with current stats
+        - {"status": "stalled", "reason": "timeout"} - No progress for stall_timeout_minutes
+        - {"status": "error", "reason": "timeout_threshold"} - Too many timeout errors
+        - {"status": "error", "reason": "http_threshold"} - Too many HTTP/network errors
+        - {"status": "error", "message": "..."} - Fatal monitoring error
+        """
         logger.info(f"Starting monitoring for container {self.container_id}...")
         last_check_time = time.monotonic()
         last_progress_report_time = time.monotonic()
@@ -56,7 +83,7 @@ class CrawlMonitor(threading.Thread):
         preexec_fn = os.setsid if hasattr(os, "setsid") else None  # For killing process group later
 
         # Add a small delay before the very first check
-        time.sleep(2)
+        time.sleep(MONITOR_STARTUP_DELAY_SEC)
 
         try:
             log_cmd = ["docker", "logs", "-f", "--tail", "50", self.container_id]
@@ -99,7 +126,7 @@ class CrawlMonitor(threading.Thread):
                         ]
                         logger.debug(f"Running docker ps check: {' '.join(ps_check_cmd)}")
                         ps_output = subprocess.check_output(
-                            ps_check_cmd, text=True, timeout=5
+                            ps_check_cmd, text=True, timeout=MONITOR_LOG_PROCESS_TERM_TIMEOUT_SEC
                         ).strip()
                         if ps_output and self.container_id in ps_output:
                             container_still_running = True
@@ -198,7 +225,7 @@ class CrawlMonitor(threading.Thread):
                         log_process.terminate()
                         logger.debug(f"Sent SIGTERM to process {log_process.pid}")
 
-                    log_process.wait(timeout=5)
+                    log_process.wait(timeout=MONITOR_LOG_PROCESS_TERM_TIMEOUT_SEC)
                     logger.debug("Docker logs process terminated.")
                 except Exception as e_kill:
                     logger.warning(f"Could not cleanly terminate docker logs process: {e_kill}")
@@ -212,7 +239,25 @@ class CrawlMonitor(threading.Thread):
             logger.info("Monitoring thread stopped.")
 
     def _parse_log_line(self, line: str, timestamp: float):
-        """Parses a single log line for stats or errors."""
+        """
+        Parse a single log line from the zimit container output.
+
+        Handles both JSON-formatted log entries (from Browsertrix/zimit) and
+        plain text output. Extracts crawl statistics and records errors.
+
+        Args:
+            line: Raw log line (already stripped of whitespace)
+            timestamp: Monotonic timestamp for error tracking and rate calculation
+
+        JSON log contexts handled:
+        - "crawlStatus" with "Crawl statistics": Updates progress metrics
+        - "pageStatus" with "Page Load Failed": Records timeout/HTTP/other errors
+
+        Error classification (based on regex patterns in constants.py):
+        - timeout: Navigation timeout, DNS timeout, connection timeout
+        - http: HTTP 4xx/5xx, connection refused/reset, network errors
+        - other: Unclassified errors at error/warn log level
+        """
         if not line:
             return
         try:
@@ -270,8 +315,27 @@ class CrawlMonitor(threading.Thread):
 
     def _check_stall_and_error_conditions(self, now: float) -> bool:
         """
-        Checks conditions and signals main thread via output_queue.
-        Returns True if an intervention signal was sent, False otherwise.
+        Check for stall conditions and error thresholds, signaling main thread if needed.
+
+        This is called periodically (every monitor_interval_seconds) to evaluate
+        whether the crawl is stuck or experiencing too many errors.
+
+        Args:
+            now: Current monotonic timestamp for duration calculations
+
+        Returns:
+            True if an intervention signal was sent to output_queue, False otherwise.
+            When True, the caller should expect the main thread to take action.
+
+        Conditions checked (in order, first match wins):
+        1. Stall detection: No progress (crawled count unchanged) for stall_timeout_minutes
+           while pending > 0 or pending is unknown. Resets progress timestamp after signaling.
+        2. Timeout threshold: Accumulated timeout errors >= error_threshold_timeout
+        3. HTTP threshold: Accumulated HTTP/network errors >= error_threshold_http
+
+        Side effects:
+        - Resets last_progress_timestamp when stall is detected (prevents re-trigger)
+        - Resets runtime error counts after signaling (allows fresh accumulation)
         """
         if not self.args.enable_monitoring:
             return False

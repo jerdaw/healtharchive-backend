@@ -80,32 +80,32 @@ def _ensure_docker_process_exits(process: subprocess.Popen, *, reason: str) -> N
     if process.poll() is not None:
         return
 
-    wait_seconds = 15
+    wait_timeout = constants.DOCKER_PROCESS_WAIT_TIMEOUT_SEC
     logger.info(
         "Waiting up to %ss for docker process to exit (%s)...",
-        wait_seconds,
+        wait_timeout,
         reason,
     )
     try:
-        process.wait(timeout=wait_seconds)
+        process.wait(timeout=wait_timeout)
         logger.info("Docker process exited.")
         return
     except subprocess.TimeoutExpired:
         logger.warning(
             "Docker process did not exit within %ss (%s); terminating...",
-            wait_seconds,
+            wait_timeout,
             reason,
         )
 
     try:
         process.terminate()
-        process.wait(timeout=10)
+        process.wait(timeout=constants.DOCKER_PROCESS_TERM_TIMEOUT_SEC)
         logger.info("Docker process terminated.")
     except subprocess.TimeoutExpired:
         logger.warning("Docker process did not terminate gracefully; attempting kill...")
         try:
             process.kill()
-            process.wait(timeout=5)
+            process.wait(timeout=constants.DOCKER_PROCESS_KILL_TIMEOUT_SEC)
             logger.info("Docker process killed.")
         except Exception as e:
             logger.error(f"Failed to kill Docker process: {e}", exc_info=True)
@@ -123,7 +123,7 @@ def format_duration(seconds: float) -> str:
             return f"{hours}:{mins:02d}:{secs:02d}"
         else:
             return f"{mins}:{secs:02d}"
-    except Exception:  # Catch potential errors with input
+    except (ValueError, TypeError):  # Invalid or non-numeric input
         return "??:??"
 
 
@@ -404,7 +404,7 @@ def main():
         test_file.touch()
         test_file.unlink()
         logger.debug("Output directory is writable.")
-    except Exception as e:
+    except OSError as e:
         logger.critical(
             f"Output directory '{script_args.output_dir}' is invalid or not writable: {e}",
             exc_info=True,
@@ -627,6 +627,17 @@ def main():
     logger.info("---------------------------------------")
 
     # --- Main Crawl/Resume Loop ---
+    # This is the core orchestration loop that handles:
+    # 1. Starting Docker containers for crawl stages
+    # 2. Monitoring progress via the CrawlMonitor thread
+    # 3. Responding to stalls/errors with adaptive strategies
+    # 4. Transitioning between crawl -> resume -> final build stages
+    #
+    # Loop exit conditions:
+    # - stage_status == "success" -> proceeds to final build
+    # - stage_status == "stopped" -> graceful shutdown via signal
+    # - stage_attempt > max_crawl_stages -> safety limit reached
+    # - stop_event.is_set() -> external shutdown request
     logger.info("Step 4: Entering Main Crawl/Resume Loop")
     current_stage_name = "Initial Crawl"
     if initial_run_mode == "Resume Crawl":
@@ -845,8 +856,9 @@ def main():
         # --- Inner Monitoring Loop (Runs while Docker process is alive) ---
         logger.debug(f"Entering inner monitoring loop for stage '{stage_name_with_attempt}'...")
         last_print_time = 0
-        print_interval_seconds = 60.0  # How often to print progress to console
-        queue_check_timeout = 1.0  # How long to wait for monitor message
+        print_interval_seconds = constants.PROGRESS_PRINT_INTERVAL_SEC
+        queue_check_timeout = constants.QUEUE_CHECK_TIMEOUT_SEC
+        monitor_death_logged = False  # Track whether we've logged monitor thread death
 
         # Initialize stage_status assuming it's running until proven otherwise
         stage_status = "running" if container_id else "running_no_monitor"
@@ -858,9 +870,18 @@ def main():
                 stage_status = "stopped"  # Mark status as stopped due to signal/event
                 break  # Exit inner loop
 
+            # Check monitor thread health - detect if it died unexpectedly
+            if active_monitor and not active_monitor.is_alive() and not monitor_death_logged:
+                logger.warning(
+                    "Monitor thread died unexpectedly! Adaptive strategies will be unavailable. "
+                    "Check logs for unhandled exceptions in the monitor."
+                )
+                monitor_death_logged = True
+                # Continue running - the crawl can still complete, just without monitoring
+
             # Check for messages from the monitor thread (if active)
             monitor_message = None
-            if active_monitor:
+            if active_monitor and active_monitor.is_alive():
                 try:
                     monitor_message = monitor_queue.get(timeout=queue_check_timeout)
                     logger.log(
@@ -900,6 +921,15 @@ def main():
                     )
 
                     # --- Try Adaptive Strategies ---
+                    # Strategy priority order (first success wins):
+                    # 1. Worker Reduction - reduces parallelism to avoid overload (requires restart)
+                    # 2. VPN Rotation - changes IP to bypass rate limits (live, no restart)
+                    # 3. Container Restart - fresh browser state (requires restart)
+                    #
+                    # After each strategy attempt:
+                    # - If successful and requires restart: break inner loop
+                    # - If successful and live (VPN): continue monitoring
+                    # - If none succeed: apply backoff delay then continue
                     logger.info("Attempting adaptive strategies...")
                     adaptation_performed_type = None  # Track *which* adaptation worked, if any
 
@@ -1116,14 +1146,16 @@ def main():
         logger.info(f"Processing end of stage '{stage_name_with_attempt}'...")
 
         if stage_log_drain_thread is not None:
-            stage_log_drain_thread.join(timeout=5.0)
+            stage_log_drain_thread.join(timeout=constants.THREAD_JOIN_TIMEOUT_SEC)
 
         # --- Stop Monitor Thread Gracefully ---
         if active_monitor and active_monitor.is_alive():
             logger.info("Stopping CrawlMonitor thread...")
             active_monitor.stop_event.set()  # Signal thread to stop
             try:
-                active_monitor.join(timeout=5.0)  # Wait for thread to finish
+                active_monitor.join(
+                    timeout=constants.THREAD_JOIN_TIMEOUT_SEC
+                )  # Wait for thread to finish
                 if active_monitor.is_alive():
                     logger.warning("CrawlMonitor thread did not stop gracefully within timeout.")
                 else:
@@ -1217,6 +1249,12 @@ def main():
             )
 
         # --- Determine Final Stage Status (if not already set by loop break) ---
+        # Status flow:
+        # - "running"/"running_no_monitor" + RC 0 -> "success" (crawl completed)
+        # - "running"/"running_no_monitor" + RC in ACCEPTABLE_CODES -> "success" (soft limit hit)
+        # - "running"/"running_no_monitor" + other RC -> "failed"
+        # - "stopped" -> kept as-is (signal/event triggered)
+        # - "stopped_for_adaptation" -> kept as-is (strategy triggered restart)
         logger.debug(
             f"Determining final status for stage '{stage_name_with_attempt}' (Current loop status: {stage_status}, RC: {final_rc})"
         )
@@ -1246,6 +1284,12 @@ def main():
         # else: stage_status already set to 'failed' if intervention failed etc.
 
         # --- Decide Next Action Based on Stage Status ---
+        # Decision tree:
+        # - "success" -> break to final build (consolidate WARCs into ZIM)
+        # - "stopped_for_adaptation" -> set next stage to "Resume Crawl", apply backoff, continue loop
+        # - "stopped" -> break (graceful shutdown, no final build)
+        # - "failed" -> if under limit, set next stage to "Resume Crawl", increment attempt, apply backoff
+        #            -> if at limit, break with "failed_max_attempts"
         logger.info(f"Deciding next action based on stage status: '{stage_status}'")
         if stage_status == "success":
             logger.info(
@@ -1461,7 +1505,7 @@ def main():
                     logger.info(
                         f"ZIM File Size: {final_zim_path.stat().st_size / (1024 * 1024):.2f} MB"
                     )
-                except Exception:
+                except OSError:
                     pass
             else:
                 logger.warning("Success reported, but final ZIM file check failed post-build!")

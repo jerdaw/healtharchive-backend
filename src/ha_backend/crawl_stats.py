@@ -49,6 +49,7 @@ class CrawlLogProgress:
     log_path: Path
     last_status: CrawlStatusEvent
     last_crawled_change_timestamp_utc: datetime
+    crawl_rate_ppm: float  # Pages per minute, computed from log window
 
     def last_progress_age_seconds(self, *, now_utc: datetime | None = None) -> float:
         now = now_utc or datetime.now(timezone.utc)
@@ -142,10 +143,20 @@ def parse_crawl_log_progress(
             last_change_timestamp = events[i + 1].timestamp_utc
             break
 
+    # Compute crawl rate (pages per minute) from first and last events in the window
+    crawl_rate_ppm = 0.0
+    if len(events) >= 2:
+        first_event = events[0]
+        crawled_delta = last_event.crawled - first_event.crawled
+        time_delta_seconds = (last_event.timestamp_utc - first_event.timestamp_utc).total_seconds()
+        if time_delta_seconds > 0 and crawled_delta >= 0:
+            crawl_rate_ppm = (crawled_delta / time_delta_seconds) * 60.0
+
     return CrawlLogProgress(
         log_path=log_path,
         last_status=last_event,
         last_crawled_change_timestamp_utc=last_change_timestamp,
+        crawl_rate_ppm=crawl_rate_ppm,
     )
 
 

@@ -85,7 +85,10 @@ def _load_state(path: Path) -> dict:
 def _save_state(path: Path, state: dict) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(path.suffix + ".tmp")
-    tmp.write_text(json.dumps(state, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    with open(tmp, "w", encoding="utf-8") as f:
+        f.write(json.dumps(state, indent=2, sort_keys=True) + "\n")
+        f.flush()
+        os.fsync(f.fileno())
     tmp.replace(path)
 
 
