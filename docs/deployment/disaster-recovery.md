@@ -172,7 +172,7 @@ Use this procedure when the VPS is running but the database is corrupted or drop
     ```bash
     sudo systemctl stop healtharchive-api healtharchive-worker
     ```
-    
+
     Swap:
     ```bash
     sudo -u postgres psql -c "ALTER DATABASE healtharchive RENAME TO healtharchive_old;"
