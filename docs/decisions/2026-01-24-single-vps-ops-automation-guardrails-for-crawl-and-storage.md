@@ -66,4 +66,3 @@ Status: accepted
   - `docs/operations/incidents/2026-01-24-infra-error-107-hotpath-thrash-and-worker-stop.md`
 - Related implemented roadmap:
   - `docs/roadmaps/implemented/2026-01-24-infra-error-and-storage-hotpath-hardening.md`
-
