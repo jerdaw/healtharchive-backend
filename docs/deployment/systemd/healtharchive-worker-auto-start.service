@@ -14,4 +14,3 @@ User=root
 Group=root
 EnvironmentFile=/etc/healtharchive/backend.env
 ExecStart=/opt/healtharchive-backend/.venv/bin/python3 /opt/healtharchive-backend/scripts/vps-worker-auto-start.py --apply
-

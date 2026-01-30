@@ -77,7 +77,7 @@ We implemented search ranking **v3** with three major enhancements:
 
 **Positive**:
 - ✅ Stable archived detection reduces query-time variability
-- ✅ Cleaner snippets improve user experience  
+- ✅ Cleaner snippets improve user experience
 - ✅ Recency boost helps with broad queries ("covid" prefers recent guidance)
 - ✅ Title exact-match strongly signals relevance
 - ✅ Database-backed `is_archived` enables analytics and filters
