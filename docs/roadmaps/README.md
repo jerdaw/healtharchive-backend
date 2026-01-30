@@ -11,11 +11,14 @@ When complete, move them to `docs/roadmaps/implemented/` and date them.
 
 Active plans:
 
-- (none currently)
+- WARC discovery consistency improvements: `2026-01-29-warc-discovery-consistency.md`
 
 ## Implemented plans (history)
 
 - Implemented plans archive: `implemented/README.md`
+- WARC manifest verification: `implemented/2026-01-29-warc-manifest-verification.md`
+- Patch-job-config CLI + integration tests: `implemented/2026-01-28-patch-job-config-and-integration-tests.md`
+- archive_tool hardening + ops improvements: `implemented/2026-01-27-archive-tool-hardening-and-ops-improvements.md`
 - Annual crawl throughput and WARC-first artifacts: `implemented/2026-01-23-annual-crawl-throughput-and-artifacts.md`
 - Infra-error retry storms + Storage Box hot-path resilience: `implemented/2026-01-24-infra-error-and-storage-hotpath-hardening.md`
 - SLA and service commitments (v1): `implemented/2026-01-17-sla-and-service-commitments.md`
