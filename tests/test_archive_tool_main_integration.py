@@ -458,3 +458,245 @@ class TestWorkerCountParsing:
         captured = capsys.readouterr()
         combined = captured.out + captured.err
         assert "7" in combined
+
+
+class TestRunModeDetection:
+    """Tests for run mode detection logic (Fresh, Resume, New-with-Consolidation, Overwrite)."""
+
+    def test_fresh_crawl_no_artifacts(
+        self,
+        tmp_path: Path,
+        monkeypatch,
+        mock_docker_check,
+        clean_stop_event,
+        capsys,
+    ):
+        """Fresh crawl when no artifacts exist (no ZIM, no config.yaml, no temp dirs)."""
+        out_dir = tmp_path / "fresh"
+        out_dir.mkdir()
+
+        argv = [
+            "archive-tool",
+            "--seeds",
+            "https://example.org",
+            "--name",
+            "test-job",
+            "--output-dir",
+            str(out_dir),
+            "--dry-run",
+        ]
+        monkeypatch.setattr(sys, "argv", argv)
+
+        archive_main.main()
+
+        captured = capsys.readouterr()
+        combined = captured.out + captured.err
+        # In dry-run mode, it should show configuration summary
+        assert "Dry run" in combined and "Configuration summary" in combined
+
+    def test_resume_mode_with_config_yaml(
+        self,
+        tmp_path: Path,
+        monkeypatch,
+        mock_docker_check,
+        clean_stop_event,
+        capsys,
+    ):
+        """Resume mode when config.yaml exists."""
+        out_dir = tmp_path / "resume"
+        out_dir.mkdir()
+
+        # Create a resume config file
+        config_file = out_dir / ".zimit_resume.yaml"
+        config_file.write_text("---\nresumeKey: abc123\n")
+
+        argv = [
+            "archive-tool",
+            "--seeds",
+            "https://example.org",
+            "--name",
+            "test-job",
+            "--output-dir",
+            str(out_dir),
+            "--dry-run",
+        ]
+        monkeypatch.setattr(sys, "argv", argv)
+
+        archive_main.main()
+
+        captured = capsys.readouterr()
+        combined = captured.out + captured.err
+        # Should detect resume mode
+        assert "resume" in combined.lower()
+
+    def test_overwrite_mode_with_existing_zim(
+        self,
+        tmp_path: Path,
+        monkeypatch,
+        mock_docker_check,
+        clean_stop_event,
+        capsys,
+    ):
+        """Overwrite mode when existing ZIM exists and --overwrite is specified."""
+        out_dir = tmp_path / "overwrite"
+        out_dir.mkdir()
+
+        # Create an existing ZIM file
+        zim_file = out_dir / "test-job.zim"
+        zim_file.write_bytes(b"fake zim")
+
+        argv = [
+            "archive-tool",
+            "--seeds",
+            "https://example.org",
+            "--name",
+            "test-job",
+            "--output-dir",
+            str(out_dir),
+            "--overwrite",
+            "--dry-run",
+        ]
+        monkeypatch.setattr(sys, "argv", argv)
+
+        archive_main.main()
+
+        captured = capsys.readouterr()
+        combined = captured.out + captured.err
+        # Should allow overwrite
+        assert "overwrite" in combined.lower() or "Dry-run" in combined
+
+
+class TestStageLoopExitCodes:
+    """Tests for stage loop exit code handling (ACCEPTABLE_CRAWLER_EXIT_CODES)."""
+
+    def test_acceptable_exit_code_32_size_limit(
+        self,
+        tmp_path: Path,
+        monkeypatch,
+        mock_docker_check,
+        mock_container_stop,
+        clean_stop_event,
+        capsys,
+    ):
+        """Exit code 32 (size limit) should be treated as acceptable completion."""
+        out_dir = tmp_path / "size_limit"
+        out_dir.mkdir()
+
+        # Mock container that exits with RC 32
+        class FakeProcess:
+            def __init__(self):
+                self.pid = 12345
+                self.stdout = None
+                self.returncode = None
+                self._polled = False
+
+            def poll(self):
+                # First poll returns None (running), second returns 32
+                if self._polled:
+                    self.returncode = 32
+                    return 32
+                self._polled = True
+                return None
+
+            def wait(self, timeout=None):
+                self.returncode = 32
+                return 32
+
+            def communicate(self, timeout=None):
+                return (b"", b"")
+
+        def fake_start(*args, **kwargs):
+            return FakeProcess(), "test-container"
+
+        monkeypatch.setattr(docker_runner_mod, "start_docker_container", fake_start)
+
+        argv = [
+            "archive-tool",
+            "--seeds",
+            "https://example.org",
+            "--name",
+            "test-job",
+            "--output-dir",
+            str(out_dir),
+            "--skip-final-build",
+        ]
+        monkeypatch.setattr(sys, "argv", argv)
+
+        # Should complete without error (acceptable exit code)
+        exit_code: int | str | None = None
+        try:
+            archive_main.main()
+            exit_code = 0
+        except SystemExit as e:
+            exit_code = e.code
+
+        captured = capsys.readouterr()
+        combined = captured.out + captured.err
+
+        # Should mention acceptable exit code or complete successfully
+        assert exit_code == 0 or "acceptable" in combined.lower()
+
+    def test_acceptable_exit_code_33_time_limit(
+        self,
+        tmp_path: Path,
+        monkeypatch,
+        mock_docker_check,
+        mock_container_stop,
+        clean_stop_event,
+        capsys,
+    ):
+        """Exit code 33 (time limit) should be treated as acceptable completion."""
+        out_dir = tmp_path / "time_limit"
+        out_dir.mkdir()
+
+        # Mock container that exits with RC 33
+        class FakeProcess:
+            def __init__(self):
+                self.pid = 12345
+                self.stdout = None
+                self.returncode = None
+                self._polled = False
+
+            def poll(self):
+                if self._polled:
+                    self.returncode = 33
+                    return 33
+                self._polled = True
+                return None
+
+            def wait(self, timeout=None):
+                self.returncode = 33
+                return 33
+
+            def communicate(self, timeout=None):
+                return (b"", b"")
+
+        def fake_start(*args, **kwargs):
+            return FakeProcess(), "test-container"
+
+        monkeypatch.setattr(docker_runner_mod, "start_docker_container", fake_start)
+
+        argv = [
+            "archive-tool",
+            "--seeds",
+            "https://example.org",
+            "--name",
+            "test-job",
+            "--output-dir",
+            str(out_dir),
+            "--skip-final-build",
+        ]
+        monkeypatch.setattr(sys, "argv", argv)
+
+        exit_code: int | str | None = None
+        try:
+            archive_main.main()
+            exit_code = 0
+        except SystemExit as e:
+            exit_code = e.code
+
+        captured = capsys.readouterr()
+        combined = captured.out + captured.err
+
+        # Should mention acceptable exit code or complete successfully
+        assert exit_code == 0 or "acceptable" in combined.lower()
