@@ -22,6 +22,8 @@ Implemented plans:
 - `2026-01-23-annual-crawl-throughput-and-artifacts.md`
 - `2026-01-24-infra-error-and-storage-hotpath-hardening.md`
 - `2026-01-27-archive-tool-hardening-and-ops-improvements.md`
+- `2026-01-28-patch-job-config-and-integration-tests.md`
+- `2026-01-29-warc-manifest-verification.md`
 
 Rules:
 
