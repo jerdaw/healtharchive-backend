@@ -2653,6 +2653,120 @@ def cmd_verify_warcs(args: argparse.Namespace) -> None:
     sys.exit(1)
 
 
+def cmd_verify_warc_manifest(args: argparse.Namespace) -> None:
+    """
+    Verify the WARC consolidation manifest for a job.
+
+    This checks that the manifest.json is valid and all listed WARCs exist on disk
+    with correct sizes (and optionally SHA256 hashes).
+
+    Unlike verify-warcs which checks WARC file integrity, this command verifies
+    that the manifest accurately represents the files on disk.
+    """
+    from pathlib import Path
+
+    from .archive_storage import verify_warc_manifest
+    from .models import ArchiveJob as ORMArchiveJob
+
+    job_id = args.id
+    level = args.level
+    json_output = args.json
+
+    check_size = level in ("size", "hash")
+    check_hash = level == "hash"
+
+    with get_session() as session:
+        job = session.get(ORMArchiveJob, job_id)
+        if job is None:
+            print(f"ERROR: Job {job_id} not found.", file=sys.stderr)
+            sys.exit(1)
+
+        source_code = job.source.code if job.source else "?"
+        output_dir = Path(job.output_dir).resolve()
+
+    result = verify_warc_manifest(output_dir, check_size=check_size, check_hash=check_hash)
+
+    if json_output:
+        # JSON output mode
+        output = {
+            "job_id": job_id,
+            "source": source_code,
+            "output_dir": str(output_dir),
+            "manifest_path": str(result.manifest_path),
+            "level": level,
+            "valid": result.valid,
+            "entries_total": result.entries_total,
+            "entries_verified": result.entries_verified,
+            "missing": result.missing,
+            "size_mismatches": [
+                {"name": name, "expected": expected, "actual": actual}
+                for name, expected, actual in result.size_mismatches
+            ],
+            "hash_mismatches": [
+                {"name": name, "expected": expected, "actual": actual}
+                for name, expected, actual in result.hash_mismatches
+            ],
+            "orphaned": result.orphaned,
+            "errors": result.errors,
+        }
+        print(json.dumps(output, indent=2))
+    else:
+        # Human-readable output
+        print(f"Job {job_id}: Verifying {result.manifest_path}")
+        print(f"Level: {level}")
+        print(f"Manifest entries: {result.entries_total}")
+        print(f"Files verified: {result.entries_verified}/{result.entries_total}")
+        print(f"Orphaned files: {len(result.orphaned)}")
+
+        if result.missing:
+            print("")
+            print("Missing files:")
+            for name in result.missing[:20]:
+                print(f"  MISSING: {name}")
+            if len(result.missing) > 20:
+                print(f"  ... ({len(result.missing) - 20} more)")
+
+        if result.size_mismatches:
+            print("")
+            print("Size mismatches:")
+            for name, expected, actual in result.size_mismatches[:20]:
+                print(f"  SIZE_MISMATCH: {name} (expected {expected}, found {actual})")
+            if len(result.size_mismatches) > 20:
+                print(f"  ... ({len(result.size_mismatches) - 20} more)")
+
+        if result.hash_mismatches:
+            print("")
+            print("Hash mismatches:")
+            for hname, hexpected, hactual in result.hash_mismatches[:20]:
+                print(f"  HASH_MISMATCH: {hname}")
+                print(f"    expected: {hexpected}")
+                print(f"    actual:   {hactual}")
+            if len(result.hash_mismatches) > 20:
+                print(f"  ... ({len(result.hash_mismatches) - 20} more)")
+
+        if result.errors:
+            print("")
+            print("Errors:")
+            for error in result.errors[:10]:
+                print(f"  ERROR: {error}")
+            if len(result.errors) > 10:
+                print(f"  ... ({len(result.errors) - 10} more)")
+
+        if result.orphaned:
+            print("")
+            print("Warning: Orphaned WARCs (in warcs/ but not in manifest):")
+            for name in result.orphaned[:10]:
+                print(f"  {name}")
+            if len(result.orphaned) > 10:
+                print(f"  ... ({len(result.orphaned) - 10} more)")
+
+        print("")
+        print(f"Status: {'OK' if result.valid else 'FAILED'}")
+
+    if not result.valid:
+        sys.exit(1)
+
+
 def cmd_replay_index_job(args: argparse.Namespace) -> None:
     """
     Create or refresh a pywb replay collection for an existing ArchiveJob.
@@ -4421,6 +4535,31 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     p_verify_warcs.set_defaults(func=cmd_verify_warcs)
+
+    # verify-warc-manifest
+    p_verify_manifest = subparsers.add_parser(
+        "verify-warc-manifest",
+        help="Verify WARC consolidation manifest (check files exist and match recorded metadata).",
+    )
+    p_verify_manifest.add_argument(
+        "--id",
+        type=int,
+        required=True,
+        help="ArchiveJob ID whose manifest should be verified.",
+    )
+    p_verify_manifest.add_argument(
+        "--level",
+        default="size",
+        choices=["presence", "size", "hash"],
+        help="Verification level: presence (files exist), size (default, check sizes), hash (slow, check SHA256).",
+    )
+    p_verify_manifest.add_argument(
+        "--json",
+        action="store_true",
+        default=False,
+        help="Output JSON instead of human-readable text.",
+    )
+    p_verify_manifest.set_defaults(func=cmd_verify_warc_manifest)
 
     # replay-index-job
     p_replay_index = subparsers.add_parser(

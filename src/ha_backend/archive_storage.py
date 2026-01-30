@@ -31,6 +31,21 @@ class WarcManifestEntry:
     sha256: str
 
 
+@dataclass
+class ManifestVerificationResult:
+    """Result of verifying a WARC manifest against actual files."""
+
+    valid: bool
+    manifest_path: Path
+    entries_total: int
+    entries_verified: int
+    missing: list[str]  # stable_name of missing files
+    size_mismatches: list[tuple[str, int, int]]  # (stable_name, expected, actual)
+    hash_mismatches: list[tuple[str, str, str]]  # (stable_name, expected, actual)
+    orphaned: list[str]  # files in warcs/ but not in manifest
+    errors: list[str]  # other errors encountered
+
+
 @dataclass(frozen=True)
 class WarcConsolidationResult:
     warcs_dir: Path
@@ -470,3 +485,146 @@ def snapshot_crawl_configs(
             shutil.copy2(yaml_path, dest_path)
 
     return copied
+
+
+def verify_warc_manifest(
+    output_dir: Path,
+    *,
+    check_size: bool = True,
+    check_hash: bool = False,
+) -> ManifestVerificationResult:
+    """
+    Verify the WARC consolidation manifest against actual files on disk.
+
+    This checks:
+    1. Manifest exists and is valid JSON
+    2. All entries in manifest have corresponding files on disk
+    3. Size matches (if check_size=True)
+    4. SHA256 matches (if check_hash=True)
+    5. No orphaned WARCs in warcs/ not in manifest (warning only)
+
+    Args:
+        output_dir: Job output directory containing warcs/manifest.json
+        check_size: Whether to verify file sizes match manifest
+        check_hash: Whether to verify SHA256 hashes match manifest (slow)
+
+    Returns:
+        ManifestVerificationResult with verification details
+    """
+    output_dir = output_dir.resolve()
+    warcs_dir = get_job_warcs_dir(output_dir)
+    manifest_path = get_job_warc_manifest_path(output_dir)
+
+    missing: list[str] = []
+    size_mismatches: list[tuple[str, int, int]] = []
+    hash_mismatches: list[tuple[str, str, str]] = []
+    orphaned: list[str] = []
+    errors: list[str] = []
+
+    # Check manifest exists
+    if not manifest_path.is_file():
+        return ManifestVerificationResult(
+            valid=False,
+            manifest_path=manifest_path,
+            entries_total=0,
+            entries_verified=0,
+            missing=[],
+            size_mismatches=[],
+            hash_mismatches=[],
+            orphaned=[],
+            errors=[f"Manifest not found: {manifest_path}"],
+        )
+
+    # Load and parse manifest
+    manifest = _load_manifest(manifest_path)
+    if not manifest:
+        return ManifestVerificationResult(
+            valid=False,
+            manifest_path=manifest_path,
+            entries_total=0,
+            entries_verified=0,
+            missing=[],
+            size_mismatches=[],
+            hash_mismatches=[],
+            orphaned=[],
+            errors=[f"Manifest is empty or invalid JSON: {manifest_path}"],
+        )
+
+    entries = manifest.get("entries") or []
+    entries_total = len(entries)
+    entries_verified = 0
+    manifest_stable_names: set[str] = set()
+
+    for entry in entries:
+        stable_name = entry.get("stable_name")
+        if not stable_name:
+            errors.append(f"Entry missing stable_name: {entry}")
+            continue
+
+        manifest_stable_names.add(stable_name)
+        warc_path = warcs_dir / stable_name
+
+        # Check file exists
+        try:
+            if not warc_path.is_file():
+                missing.append(stable_name)
+                continue
+        except OSError as exc:
+            errors.append(f"OSError checking {stable_name}: {exc}")
+            continue
+
+        # Check size
+        if check_size:
+            expected_size = entry.get("size_bytes")
+            if expected_size is not None:
+                try:
+                    actual_size = warc_path.stat().st_size
+                    if actual_size != expected_size:
+                        size_mismatches.append((stable_name, expected_size, actual_size))
+                        continue
+                except OSError as exc:
+                    errors.append(f"OSError stating {stable_name}: {exc}")
+                    continue
+
+        # Check hash
+        if check_hash:
+            expected_hash = entry.get("sha256")
+            if expected_hash:
+                try:
+                    actual_hash = _compute_sha256(warc_path)
+                    if actual_hash != expected_hash:
+                        hash_mismatches.append((stable_name, expected_hash, actual_hash))
+                        continue
+                except OSError as exc:
+                    errors.append(f"OSError hashing {stable_name}: {exc}")
+                    continue
+
+        entries_verified += 1
+
+    # Check for orphaned files
+    try:
+        actual_warcs = _iter_stable_warc_paths(warcs_dir)
+        for warc_path in actual_warcs:
+            if warc_path.name not in manifest_stable_names:
+                orphaned.append(warc_path.name)
+    except OSError as exc:
+        errors.append(f"OSError scanning warcs directory: {exc}")
+
+    valid = (
+        len(missing) == 0
+        and len(size_mismatches) == 0
+        and len(hash_mismatches) == 0
+        and len(errors) == 0
+    )
+
+    return ManifestVerificationResult(
+        valid=valid,
+        manifest_path=manifest_path,
+        entries_total=entries_total,
+        entries_verified=entries_verified,
+        missing=missing,
+        size_mismatches=size_mismatches,
+        hash_mismatches=hash_mismatches,
+        orphaned=orphaned,
+        errors=errors,
+    )
