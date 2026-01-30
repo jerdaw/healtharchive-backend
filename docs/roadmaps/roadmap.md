@@ -61,11 +61,10 @@ Keep this list short; prefer linking to the canonical doc that explains the item
 
 ### Crawling & indexing reliability (backend)
 
-- Ensure WARC discovery and "WARC files" reporting are consistent across:
-  - operator status output (`ha-backend show-job`, `scripts/vps-crawl-status.sh`)
-  - indexing pipeline discovery (`ha_backend/indexing/warc_discovery.py`)
-  - cleanup semantics (`ha-backend cleanup-job`)
-  - See: `../architecture.md` (indexing + archive-tool integration)
+- WARC discovery consistency improvements (partially done):
+  - ✅ `verify-warc-manifest` command for manifest integrity checking (2026-01-29)
+  - Remaining: unify discovery methods, enhance show-job output, sync vps-crawl-status.sh
+  - See: `./2026-01-29-warc-discovery-consistency.md`
 
 - Consider whether a separate staging backend is worth it (increases ops surface; only do if it buys real safety).
   - See: `../deployment/environments-and-configuration.md`
