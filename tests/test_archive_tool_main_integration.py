@@ -700,3 +700,68 @@ class TestStageLoopExitCodes:
 
         # Should mention acceptable exit code or complete successfully
         assert exit_code == 0 or "acceptable" in combined.lower()
+
+    def test_acceptable_exit_code_16_disk_utilization(
+        self,
+        tmp_path: Path,
+        monkeypatch,
+        mock_docker_check,
+        mock_container_stop,
+        clean_stop_event,
+        capsys,
+    ):
+        """Exit code 16 (disk utilization) should be treated as acceptable completion."""
+        out_dir = tmp_path / "disk_util"
+        out_dir.mkdir()
+
+        # Mock container that exits with RC 16
+        class FakeProcess:
+            def __init__(self):
+                self.pid = 12345
+                self.stdout = None
+                self.returncode = None
+                self._polled = False
+
+            def poll(self):
+                if self._polled:
+                    self.returncode = 16
+                    return 16
+                self._polled = True
+                return None
+
+            def wait(self, timeout=None):
+                self.returncode = 16
+                return 16
+
+            def communicate(self, timeout=None):
+                return (b"", b"")
+
+        def fake_start(*args, **kwargs):
+            return FakeProcess(), "test-container"
+
+        monkeypatch.setattr(docker_runner_mod, "start_docker_container", fake_start)
+
+        argv = [
+            "archive-tool",
+            "--seeds",
+            "https://example.org",
+            "--name",
+            "test-job",
+            "--output-dir",
+            str(out_dir),
+            "--skip-final-build",
+        ]
+        monkeypatch.setattr(sys, "argv", argv)
+
+        exit_code: int | str | None = None
+        try:
+            archive_main.main()
+            exit_code = 0
+        except SystemExit as e:
+            exit_code = e.code
+
+        captured = capsys.readouterr()
+        combined = captured.out + captured.err
+
+        # Should mention acceptable exit code or complete successfully
+        assert exit_code == 0 or "acceptable" in combined.lower()

@@ -6,7 +6,7 @@ It is intentionally **not** an implementation plan.
 
 ## How to use this file (workflow)
 
-1. Pick a small set of items from this backlog.
+1. Pick a reasonable amount of work from the items in this backlog.
 2. Create a focused implementation plan in `docs/roadmaps/` (example name: `YYYY-MM-<topic>.md`).
 3. Implement the work.
 4. Update canonical documentation so operators/users can run and maintain the result.

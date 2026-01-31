@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import logging
+import subprocess
 import time
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from typing import Optional
 
 from sqlalchemy import or_
@@ -18,6 +20,85 @@ logger = logging.getLogger("healtharchive.worker")
 MAX_CRAWL_RETRIES = 2
 DEFAULT_POLL_INTERVAL = 30
 INFRA_ERROR_RETRY_COOLDOWN_MINUTES = 10
+
+
+def _is_mountpoint(path: Path) -> bool:
+    """Check if path is a mountpoint using findmnt."""
+    try:
+        result = subprocess.run(
+            ["findmnt", "-T", str(path), "-o", "TARGET", "-n"],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        return result.returncode == 0 and result.stdout.strip() == str(path)
+    except (subprocess.TimeoutExpired, FileNotFoundError):
+        return False
+
+
+def _tier_annual_job_if_needed(job: ArchiveJob) -> None:
+    """
+    Automatically tier annual campaign jobs to storagebox before they start crawling.
+
+    This prevents disk pressure from large annual jobs consuming local disk.
+    Only tiers if the job is an annual campaign and not already tiered.
+    """
+    config = job.config or {}
+    if config.get("campaign_kind") != "annual":
+        return  # Not an annual job, skip tiering
+
+    output_dir = Path(job.output_dir)
+    if not output_dir.exists():
+        logger.debug("Job %s output_dir does not exist yet, skipping pre-tier check", job.id)
+        return
+
+    # Check if already tiered (is a mountpoint)
+    if _is_mountpoint(output_dir):
+        logger.debug("Job %s already tiered (is mountpoint), skipping", job.id)
+        return
+
+    campaign_year = config.get("campaign_year")
+    if not campaign_year:
+        logger.warning("Job %s is annual but missing campaign_year, cannot tier", job.id)
+        return
+
+    logger.info(
+        "Auto-tiering annual job %s (year=%s) to storagebox before crawl starts",
+        job.id,
+        campaign_year,
+    )
+
+    try:
+        # Run the tiering script
+        result = subprocess.run(
+            [
+                "/opt/healtharchive-backend/.venv/bin/python3",
+                "/opt/healtharchive-backend/scripts/vps-annual-output-tiering.py",
+                "--year",
+                str(campaign_year),
+                "--apply",
+                "--repair-stale-mounts",
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+
+        if result.returncode != 0:
+            logger.error(
+                "Auto-tiering failed for job %s: RC=%s, stderr=%s",
+                job.id,
+                result.returncode,
+                result.stderr[:500],
+            )
+        else:
+            logger.info("Auto-tiering completed successfully for job %s", job.id)
+    except subprocess.TimeoutExpired:
+        logger.error("Auto-tiering timed out for job %s after 120s", job.id)
+    except Exception as e:
+        logger.error("Auto-tiering exception for job %s: %s", job.id, e)
 
 
 def _select_next_crawl_job(session: Session, *, now_utc: datetime) -> Optional[ArchiveJob]:
@@ -70,6 +151,9 @@ def _process_single_job() -> bool:
             job.status,
             job.retry_count,
         )
+
+        # Auto-tier annual jobs to storagebox before crawl starts (prevents disk pressure)
+        _tier_annual_job_if_needed(job)
 
     # Run the crawl phase using the existing helper, which manages its own sessions.
     crawl_rc = run_persistent_job(job_id)

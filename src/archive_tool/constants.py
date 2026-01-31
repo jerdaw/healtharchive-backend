@@ -111,6 +111,7 @@ HTTP_ERROR_PATTERNS = [
 # Exit codes potentially indicating non-fatal completion (e.g., soft limits)
 # These might allow skipping resume/retries if encountered
 ACCEPTABLE_CRAWLER_EXIT_CODES = [
+    16,  # EXIT_CODE_DISK_UTILIZATION_EXCEEDED - prevents restart loops on disk full
     32,  # Zimit/Browsertrix constant EXIT_CODE_CRAWLER_SIZE_LIMIT_HIT
     33,  # Zimit/Browsertrix constant EXIT_CODE_CRAWLER_TIME_LIMIT_HIT
 ]
