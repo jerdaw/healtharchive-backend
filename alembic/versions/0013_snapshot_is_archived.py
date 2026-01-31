@@ -1,6 +1,6 @@
 """Add is_archived column to snapshots.
 
-Revision ID: 0013
+Revision ID: 0013_snapshot_is_archived
 Revises: 0012_snapshot_changes
 Create Date: 2026-01-18
 
@@ -12,8 +12,8 @@ import sqlalchemy as sa
 from alembic import op
 
 # revision identifiers, used by Alembic.
-revision = "0013"
-down_revision = "0012"
+revision = "0013_snapshot_is_archived"
+down_revision = "0012_snapshot_changes"
 branch_labels = None
 depends_on = None
 
