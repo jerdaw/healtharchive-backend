@@ -38,7 +38,21 @@ Canonical docs to consult first:
 - `docs/roadmaps/implemented/` – historical implementation plans (executed).
 - Frontend bilingual/dev architecture: `healtharchive-frontend/docs/development/bilingual-dev-guide.md`
 
-When you’re doing anything beyond tiny local changes, **open those docs and sync your mental model first**.
+When you're doing anything beyond tiny local changes, **open those docs and sync your mental model first**.
+
+---
+
+## Production VPS Access
+
+**CRITICAL: AI agents do NOT have access to the production VPS.**
+
+- You CANNOT run commands on the VPS (no SSH, no remote execution)
+- You CANNOT directly access production logs, databases, or filesystems
+- You CAN ONLY suggest commands for the human operator to run manually
+- When providing diagnostics or troubleshooting, format commands as examples for the operator to copy/paste
+- Never attempt `ssh vps` or similar remote access - it will always fail
+
+Only the human operator has direct VPS access. All VPS operations must be performed by the operator.
 
 ---
 
