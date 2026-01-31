@@ -8,7 +8,7 @@ import sys
 from pathlib import Path
 from typing import Any, ContextManager, Sequence, cast
 
-from sqlalchemy import text
+from sqlalchemy import func, text
 from sqlalchemy.engine.url import make_url
 
 from .changes import compute_changes_backfill, compute_changes_since
@@ -95,6 +95,146 @@ def cmd_check_db(args: argparse.Namespace) -> None:
         sys.exit(1)
     else:
         print("Database connection OK.")
+
+
+def cmd_status(args: argparse.Namespace) -> None:
+    """
+    Quick health overview: worker, disk, mounts, and job status.
+    """
+    import os
+    import subprocess
+
+    from ha_backend.models import ArchiveJob
+
+    print("HealthArchive Backend – Status Overview")
+    print("=" * 50)
+
+    # 1. Worker status
+    print("\n[Worker]")
+    try:
+        result = subprocess.run(
+            ["systemctl", "is-active", "healtharchive-worker.service"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        worker_status = result.stdout.strip()
+        if worker_status == "active":
+            print(f"  Worker service: \033[32m{worker_status}\033[0m")
+        else:
+            print(f"  Worker service: \033[33m{worker_status}\033[0m")
+    except Exception as e:
+        print(f"  Worker service: \033[31munable to check ({e})\033[0m")
+
+    # 2. Disk usage
+    print("\n[Disk]")
+    check_paths = ["/", "/srv/healtharchive/jobs"]
+    for path in check_paths:
+        try:
+            stat = os.statvfs(path)
+            total = stat.f_blocks * stat.f_frsize
+            free = stat.f_bavail * stat.f_frsize
+            if total > 0:
+                used_pct = int(100 * (total - free) / total)
+                free_gb = free / (1024**3)
+                color = (
+                    "\033[32m" if used_pct < 80 else ("\033[33m" if used_pct < 90 else "\033[31m")
+                )
+                print(f"  {path}: {color}{used_pct}%\033[0m used ({free_gb:.1f}GB free)")
+        except OSError as e:
+            print(f"  {path}: \033[31merror ({e})\033[0m")
+
+    # 3. Storage Box mount
+    print("\n[Storage Box]")
+    storagebox_path = "/srv/healtharchive/storagebox"
+    try:
+        result = subprocess.run(
+            ["findmnt", "-T", storagebox_path, "-o", "FSTYPE", "-n"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        if result.returncode == 0 and "sshfs" in result.stdout.lower():
+            # Try to read it
+            try:
+                os.listdir(storagebox_path)
+                print(f"  {storagebox_path}: \033[32mmounted and readable\033[0m")
+            except OSError as e:
+                print(
+                    f"  {storagebox_path}: \033[31mmounted but unreadable (Errno {e.errno})\033[0m"
+                )
+        else:
+            print(f"  {storagebox_path}: \033[31mnot mounted\033[0m")
+    except Exception as e:
+        print(f"  {storagebox_path}: \033[33munable to check ({e})\033[0m")
+
+    # 4. Job counts by status
+    print("\n[Jobs]")
+    try:
+        with get_session() as session:
+            counts = (
+                session.query(ArchiveJob.status, func.count(ArchiveJob.id))
+                .group_by(ArchiveJob.status)
+                .all()
+            )
+            status_counts = {status: count for status, count in counts}
+            total = sum(status_counts.values())
+
+            # Highlight actionable statuses
+            running = status_counts.get("running", 0)
+            queued = status_counts.get("queued", 0)
+            retryable = status_counts.get("retryable", 0)
+            failed = status_counts.get("failed", 0)
+            index_failed = status_counts.get("index_failed", 0)
+            completed = status_counts.get("completed", 0)
+            indexed = status_counts.get("indexed", 0)
+
+            print(f"  Total: {total}")
+            if running > 0:
+                print(f"  Running: \033[36m{running}\033[0m")
+            if queued > 0:
+                print(f"  Queued: \033[33m{queued}\033[0m")
+            if retryable > 0:
+                print(f"  Retryable: \033[33m{retryable}\033[0m")
+            if completed > 0:
+                print(f"  Completed (awaiting index): \033[33m{completed}\033[0m")
+            if failed > 0:
+                print(f"  Failed: \033[31m{failed}\033[0m")
+            if index_failed > 0:
+                print(f"  Index failed: \033[31m{index_failed}\033[0m")
+            print(f"  Indexed: \033[32m{indexed}\033[0m")
+
+            # Recent failures
+            recent_failures = (
+                session.query(ArchiveJob)
+                .filter(ArchiveJob.status.in_(["failed", "index_failed"]))
+                .order_by(ArchiveJob.updated_at.desc())
+                .limit(3)
+                .all()
+            )
+            if recent_failures:
+                print("\n[Recent Failures]")
+                for job in recent_failures:
+                    src = job.source.code if job.source else "?"
+                    print(
+                        f"  Job {job.id} ({src}): {job.status}, "
+                        f"crawler_status={job.crawler_status}, rc={job.crawler_exit_code}"
+                    )
+    except Exception as e:
+        print(f"  \033[31mDatabase error: {e}\033[0m")
+
+    # 5. Automation sentinel files
+    print("\n[Automation]")
+    sentinel_files = [
+        ("Worker auto-start", "/etc/healtharchive/worker-auto-start-enabled"),
+        ("Mount recovery", "/etc/healtharchive/storage-hotpath-auto-recover-enabled"),
+    ]
+    for name, path in sentinel_files:
+        exists = os.path.exists(path)
+        status = "\033[32menabled\033[0m" if exists else "\033[33mdisabled\033[0m"
+        print(f"  {name}: {status}")
+
+    print()
 
 
 def cmd_run_job(args: argparse.Namespace) -> None:
@@ -3866,6 +4006,13 @@ def build_parser() -> argparse.ArgumentParser:
         help="Check database connectivity using the configured DATABASE_URL.",
     )
     p_db.set_defaults(func=cmd_check_db)
+
+    # status
+    p_status = subparsers.add_parser(
+        "status",
+        help="Quick health overview: worker, disk, mounts, and job status.",
+    )
+    p_status.set_defaults(func=cmd_status)
 
     # run-job
     p_run = subparsers.add_parser(

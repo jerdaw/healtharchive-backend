@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import subprocess
 import time
 from datetime import datetime, timedelta, timezone
@@ -20,6 +21,9 @@ logger = logging.getLogger("healtharchive.worker")
 MAX_CRAWL_RETRIES = 2
 DEFAULT_POLL_INTERVAL = 30
 INFRA_ERROR_RETRY_COOLDOWN_MINUTES = 10
+# Disk headroom threshold: skip crawl if disk usage exceeds this percentage
+DISK_HEADROOM_THRESHOLD_PERCENT = 85
+DISK_HEADROOM_CHECK_PATH = "/srv/healtharchive/jobs"
 
 
 def _is_mountpoint(path: Path) -> bool:
@@ -35,6 +39,29 @@ def _is_mountpoint(path: Path) -> bool:
         return result.returncode == 0 and result.stdout.strip() == str(path)
     except (subprocess.TimeoutExpired, FileNotFoundError):
         return False
+
+
+def _check_disk_headroom() -> tuple[bool, int]:
+    """
+    Check if there's enough disk headroom to start a crawl.
+
+    Returns:
+        Tuple of (has_headroom, usage_percent).
+        has_headroom is True if disk usage is below threshold.
+    """
+    check_path = DISK_HEADROOM_CHECK_PATH
+    try:
+        stat = os.statvfs(check_path)
+        total = stat.f_blocks * stat.f_frsize
+        free = stat.f_bavail * stat.f_frsize
+        if total == 0:
+            return True, 0  # Can't determine, allow crawl
+        usage_percent = int(100 * (total - free) / total)
+        has_headroom = usage_percent < DISK_HEADROOM_THRESHOLD_PERCENT
+        return has_headroom, usage_percent
+    except OSError as e:
+        logger.warning("Could not check disk headroom at %s: %s", check_path, e)
+        return True, 0  # On error, allow crawl to proceed
 
 
 def _tier_annual_job_if_needed(job: ArchiveJob) -> None:
@@ -135,6 +162,17 @@ def _process_single_job() -> bool:
     """
     job_id: Optional[int] = None
 
+    # Pre-flight: check disk headroom before selecting a job.
+    # This prevents starting crawls when disk is already under pressure.
+    has_headroom, disk_percent = _check_disk_headroom()
+    if not has_headroom:
+        logger.warning(
+            "Disk usage at %d%% exceeds threshold (%d%%); skipping crawl to prevent disk-full failures.",
+            disk_percent,
+            DISK_HEADROOM_THRESHOLD_PERCENT,
+        )
+        return False
+
     # Select a job that needs crawling.
     now_utc = datetime.now(timezone.utc)
     with get_session() as session:
@@ -144,12 +182,13 @@ def _process_single_job() -> bool:
         job_id = job.id
         source = job.source
         logger.info(
-            "Worker picked job %s for source %s (%s) with status %s and retry_count %s",
+            "Worker picked job %s for source %s (%s) with status %s and retry_count %s (disk: %d%%)",
             job_id,
             source.code if source else "unknown",
             source.name if source else "unknown",
             job.status,
             job.retry_count,
+            disk_percent,
         )
 
         # Auto-tier annual jobs to storagebox before crawl starts (prevents disk pressure)
