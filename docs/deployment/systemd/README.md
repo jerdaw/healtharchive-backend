@@ -183,7 +183,7 @@ If you are using WARC tiering with a Storage Box, also create these files on the
 - `/etc/healtharchive/warc-tiering.binds`
   - Bind mount manifest consumed by `healtharchive-warc-tiering.service`.
 
-See: `docs/operations/playbooks/warc-storage-tiering.md`.
+See: `docs/operations/playbooks/storage/warc-storage-tiering.md`.
 
 Before enabling timers that write artifacts under `/srv/healtharchive/ops/`, ensure
 the ops directories exist with the expected permissions:

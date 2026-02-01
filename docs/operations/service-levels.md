@@ -150,7 +150,7 @@ After all maintenance:
 
 ### Incident Communication
 
-Following the incident disclosure policy ([Option B](playbooks/incident-response.md)):
+Following the incident disclosure policy ([Option B](playbooks/core/incident-response.md)):
 
 **Sev0/Sev1 (Service Down / Major Degradation):**
 - Communicate within 48 hours of resolution, or as soon as practical
@@ -254,7 +254,7 @@ Baselines should be measured:
 ## References
 
 - [Production Runbook](../deployment/production-single-vps.md) - Infrastructure details and deployment procedures
-- [Incident Response Playbook](playbooks/incident-response.md) - Incident classification and response procedures
+- [Incident Response Playbook](playbooks/core/incident-response.md) - Incident classification and response procedures
 - [Monitoring Checklist](monitoring-and-ci-checklist.md) - Monitoring setup and external checks
 - [Disaster Recovery](../deployment/disaster-recovery.md) - Recovery procedures and RTO/RPO targets
 - [Ops Cadence Checklist](ops-cadence-checklist.md) - Routine operational tasks

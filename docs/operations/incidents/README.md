@@ -10,7 +10,7 @@ Goals:
 
 Related:
 
-- Operator recovery steps: `../playbooks/incident-response.md`
+- Operator recovery steps: `../playbooks/core/incident-response.md`
 - Ops playbooks index: `../playbooks/README.md`
 - Severity rubric: `severity.md`
 
@@ -54,7 +54,7 @@ Example:
 
 The template includes an **Action items (TODOs)** section; use checkboxes so it’s obvious what work remains.
 
-If the incident requires engineering work (automation, new scripts, behavior changes), capture it as a follow-up and create a focused implementation plan under `docs/roadmaps/` (then link it from the incident note).
+If the incident requires engineering work (automation, new scripts, behavior changes), capture it as a follow-up and create a focused implementation plan under `docs/planning/` (then link it from the incident note).
 
 ### What not to include
 

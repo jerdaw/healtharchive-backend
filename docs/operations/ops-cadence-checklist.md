@@ -73,7 +73,7 @@ See: `../deployment/systemd/README.md`
   - Confirm a dataset release exists for the expected quarter/date.
   - Verify checksums: `sha256sum -c SHA256SUMS` (see `dataset-release-runbook.md`).
 - **Docs maintenance**
-  - Re-read `incidents/severity.md` + `playbooks/incident-response.md` and ensure they match current reality.
+  - Re-read `incidents/severity.md` + `playbooks/core/incident-response.md` and ensure they match current reality.
 - **Adoption signals entry** (public-safe)
   - Add a dated entry under `/srv/healtharchive/ops/adoption/` (links + aggregates only).
 - **Mentions log refresh** (public-safe)

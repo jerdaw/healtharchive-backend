@@ -11,6 +11,6 @@ to reduce documentation drift.
 Canonical guidance:
 
 - Roadmap workflow: `documentation-guidelines.md`
-- Roadmaps index: `roadmaps/README.md`
-- Backlog: `roadmaps/roadmap.md`
-- Implemented plans archive: `roadmaps/implemented/README.md`
+- Roadmaps index: `planning/README.md`
+- Backlog: `planning/roadmap.md`
+- Implemented plans archive: `planning/implemented/README.md`

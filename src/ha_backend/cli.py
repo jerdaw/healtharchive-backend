@@ -1,5 +1,27 @@
 from __future__ import annotations
 
+"""
+ha_backend.cli - Command-line interface for HealthArchive backend
+
+Provides the 'ha-backend' command with subcommands for:
+
+    - check-env: Verify environment configuration
+    - serve: Start the FastAPI development server
+    - worker: Run the job worker loop
+    - create-job: Create a new crawl job
+    - run-job: Execute a job (crawl + index)
+    - index-job: Index WARCs for a completed job
+    - cleanup-job: Remove temporary files for a job
+    - compute-changes: Compute change events between snapshots
+    - refresh-snapshot-metadata: Re-extract metadata from WARCs
+
+Usage: ha-backend <command> [options]
+
+See also:
+    - docs/reference/cli-commands.md for command documentation
+    - docs/development/live-testing.md for local testing flows
+"""
+
 import argparse
 import json
 import re

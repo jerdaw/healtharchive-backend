@@ -106,10 +106,10 @@ curl -s http://127.0.0.1:9100/metrics | rg '^healtharchive_replay_smoke_'
   - Canonical doc: `../../deployment/replay-service-pywb.md`
 - Tiering service resilience:
   - Updated the tiering systemd unit template to run `vps-warc-tiering-bind-mounts.sh --apply --repair-stale-mounts` so it can automatically unmount stale `Errno 107` mountpoints and re-apply binds on start.
-  - Canonical playbook: `../playbooks/warc-storage-tiering.md`
+  - Canonical playbook: `../playbooks/storage/warc-storage-tiering.md`
 - Storage hot-path auto-recovery:
   - Enabled `healtharchive-storage-hotpath-auto-recover.timer` (opt-in via sentinel file) so stale mounts are detected and recovered without requiring a manual incident response for common `Errno 107` cases.
-  - Canonical playbook: `../playbooks/storagebox-sshfs-stale-mount-recovery.md`
+  - Canonical playbook: `../playbooks/storage/storagebox-sshfs-stale-mount-recovery.md`
 
 ## Post-incident verification
 
@@ -150,5 +150,5 @@ curl -s http://127.0.0.1:9100/metrics | rg '^healtharchive_replay_smoke_'
 
 - Tiering manifest (VPS): `/etc/healtharchive/warc-tiering.binds`
 - Tiering script (VPS): `scripts/vps-warc-tiering-bind-mounts.sh`
-- Replay smoke playbook: `../playbooks/replay-smoke-tests.md`
-- Storage recovery playbook: `../playbooks/storagebox-sshfs-stale-mount-recovery.md`
+- Replay smoke playbook: `../playbooks/validation/replay-smoke-tests.md`
+- Storage recovery playbook: `../playbooks/storage/storagebox-sshfs-stale-mount-recovery.md`

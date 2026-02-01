@@ -1,5 +1,22 @@
 from __future__ import annotations
 
+"""
+ha_backend.config - Central configuration for HealthArchive backend
+
+Resolves paths, commands, and URLs from environment variables with sensible
+defaults. Key configuration categories:
+
+    - Archive paths: HEALTHARCHIVE_ARCHIVE_ROOT for job output storage
+    - Tool invocation: HEALTHARCHIVE_TOOL_CMD for archive-tool command
+    - Replay service: HEALTHARCHIVE_REPLAY_BASE_URL for pywb integration
+    - Database: HEALTHARCHIVE_DATABASE_URL for SQLAlchemy connection
+    - Security: HEALTHARCHIVE_ADMIN_TOKEN, HEALTHARCHIVE_ENV
+
+See also:
+    - docs/deployment/environments-and-configuration.md for all env vars
+    - docs/deployment/production-single-vps.md for production setup
+"""
+
 import os
 import shutil
 import sys

@@ -4,20 +4,20 @@
 
 **New operator?**
 
-- **First:** [Operator Responsibilities](playbooks/operator-responsibilities.md) — Core duties
-- **Deploy:** [Deploy & Verify](playbooks/deploy-and-verify.md) — Deployment workflow
+- **First:** [Operator Responsibilities](playbooks/core/operator-responsibilities.md) — Core duties
+- **Deploy:** [Deploy & Verify](playbooks/core/deploy-and-verify.md) — Deployment workflow
 - **Monitor:** [Monitoring Checklist](monitoring-and-ci-checklist.md) — Monitoring setup
-- **Respond:** [Incident Response](playbooks/incident-response.md) — When something breaks
+- **Respond:** [Incident Response](playbooks/core/incident-response.md) — When something breaks
 
 **Quick reference:**
 
 | Task | Documentation |
 | :--- | :--- |
 | Daily checks | [Ops Cadence](ops-cadence-checklist.md) |
-| Deploy changes | [Deploy & Verify](playbooks/deploy-and-verify.md) |
-| Investigate issues | [Incident Response](playbooks/incident-response.md) |
+| Deploy changes | [Deploy & Verify](playbooks/core/deploy-and-verify.md) |
+| Investigate issues | [Incident Response](playbooks/core/incident-response.md) |
 | Monitor health | [Monitoring](monitoring-and-ci-checklist.md) |
-| Quarterly tasks | [Restore Test](playbooks/restore-test.md), [Dataset Release](dataset-release-runbook.md) |
+| Quarterly tasks | [Restore Test](playbooks/validation/restore-test.md), [Dataset Release](dataset-release-runbook.md) |
 
 ## All Operational Documentation
 

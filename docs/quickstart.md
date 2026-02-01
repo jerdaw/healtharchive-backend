@@ -15,8 +15,8 @@ Pick the guide that matches your role:
 **Goal**: Deploy, monitor, and maintain the production system.
 
 1. Read the [Production Runbook](deployment/production-single-vps.md) for deployment setup
-2. Review [Operator Responsibilities](operations/playbooks/operator-responsibilities.md) for your must-do checklist
-3. Bookmark [Incident Response](operations/playbooks/incident-response.md) for emergencies
+2. Review [Operator Responsibilities](operations/playbooks/core/operator-responsibilities.md) for your must-do checklist
+3. Bookmark [Incident Response](operations/playbooks/core/incident-response.md) for emergencies
 
 **Quick Deploy**:
 ```bash

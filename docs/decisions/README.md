@@ -27,7 +27,7 @@ Related:
 
 ## What does not go here
 
-- Backlog items and implementation steps (use `../roadmaps/`).
+- Backlog items and implementation steps (use `../planning/`).
 - Incident timelines and recovery notes (use `../operations/incidents/`).
 - Routine ops logs (restore tests, adoption signals; use `/srv/healtharchive/ops/...`).
 

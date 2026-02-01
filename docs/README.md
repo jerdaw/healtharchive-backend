@@ -7,7 +7,7 @@ frontend and datasets documentation.
 
 **Choose your path:**
 
-- **👤 Operators**: Start with [Operations Overview](operations/README.md) → [Operator Responsibilities](operations/playbooks/operator-responsibilities.md)
+- **👤 Operators**: Start with [Operations Overview](operations/README.md) → [Operator Responsibilities](operations/playbooks/core/operator-responsibilities.md)
 - **💻 Developers**: Start with [Development Guide](development/README.md) → [Live Testing](development/live-testing.md)
 - **🔧 Deploying**: Start with [Production Runbook](deployment/production-single-vps.md)
 - **📊 API consumers**: Start with [API Documentation](api.md)
@@ -20,7 +20,7 @@ frontend and datasets documentation.
 | Architecture overview | [Architecture](architecture.md) |
 | Production deployment | [Production Runbook](deployment/production-single-vps.md) |
 | Local development setup | [Dev Setup](development/dev-environment-setup.md) |
-| Incident response | [Incident Response](operations/playbooks/incident-response.md) |
+| Incident response | [Incident Response](operations/playbooks/core/incident-response.md) |
 | Search API | [API Documentation](api.md) |
 | Monitoring setup | [Monitoring](operations/monitoring-and-ci-checklist.md) |
 
@@ -59,7 +59,7 @@ docs are canonical in their repos and are linked-to from this site:
 5. Operations (how to keep it healthy)
    - `operations/README.md` (index of ops docs)
 6. Roadmaps and implementation plans
-   - `roadmaps/README.md`
+   - `planning/README.md`
    - `roadmap-process.md` (short pointer)
 
 ## Notes

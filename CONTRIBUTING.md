@@ -485,7 +485,7 @@ For significant architectural changes:
 
 1. **Open a Discussion** - Get feedback early
 2. **Write a decision record** - Document the choice (see `docs/decisions/`)
-3. **Create a roadmap** - For multi-step implementations (see `docs/roadmaps/`)
+3. **Create a roadmap** - For multi-step implementations (see `docs/planning/`)
 4. **Get consensus** - Especially for breaking changes
 
 ### Decision Record Template

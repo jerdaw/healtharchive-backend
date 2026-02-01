@@ -67,7 +67,7 @@ This page tracks the health and coverage of HealthArchive documentation.
 | **Contribution guide** | ✅ Yes | Complete CONTRIBUTING.md |
 | **Code of Conduct** | ✅ Yes | In CONTRIBUTING.md |
 | **Deployment runbook** | ✅ Yes | `deployment/production-single-vps.md` |
-| **Incident response** | ✅ Yes | `operations/playbooks/incident-response.md` |
+| **Incident response** | ✅ Yes | `operations/playbooks/core/incident-response.md` |
 | **Testing guidelines** | ✅ Yes | `development/testing-guidelines.md` |
 
 **Score**: 8/8 ✅ **Excellent**
@@ -341,7 +341,7 @@ Every 3 months, review:
 
 - [Documentation Process Audit](../documentation-process-audit.md) - 2026-01-09 audit
 - [Documentation Guidelines](../documentation-guidelines.md) - Standards and taxonomy
-- [Documentation Architecture Improvements](../roadmaps/implemented/2026-01-17-documentation-architecture-improvements.md) - Implementation roadmap
+- [Documentation Architecture Improvements](../planning/implemented/2026-01-17-documentation-architecture-improvements.md) - Implementation roadmap
 
 ---
 

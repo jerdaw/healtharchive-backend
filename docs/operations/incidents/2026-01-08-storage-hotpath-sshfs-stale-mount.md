@@ -218,7 +218,7 @@ What this changed:
 
 ## Action items (TODOs)
 
-- [x] Create a focused roadmap and implement guardrails/automation: `docs/roadmaps/implemented/2026-01-08-storagebox-sshfs-stale-mount-recovery-and-integrity.md` (owner=eng, priority=high, due=2026-01-15)
+- [x] Create a focused roadmap and implement guardrails/automation: `docs/planning/implemented/2026-01-08-storagebox-sshfs-stale-mount-recovery-and-integrity.md` (owner=eng, priority=high, due=2026-01-15)
 - [x] Add “hot path unreadable” metrics + alerting rules (owner=eng, priority=high, due=2026-01-15)
 - [x] Add operator drill tooling for alert pipeline and stale-mount recovery (owner=eng, priority=medium, due=2026-01-20)
 - [x] Enable `healtharchive-storage-hotpath-auto-recover.timer` + sentinel on production after a maintenance window (ensure it will not interrupt active crawls unexpectedly). (owner=ops, priority=high, due=2026-01-20, done=2026-01-16)
@@ -248,7 +248,7 @@ What this changed:
 - Tiering / mounts:
   - `scripts/vps-warc-tiering-bind-mounts.sh`
   - `scripts/vps-annual-output-tiering.py`
-  - Playbook: `../playbooks/storagebox-sshfs-stale-mount-recovery.md`
-  - Drill playbook: `../playbooks/storagebox-sshfs-stale-mount-drills.md`
+  - Playbook: `../playbooks/storage/storagebox-sshfs-stale-mount-recovery.md`
+  - Drill playbook: `../playbooks/storage/storagebox-sshfs-stale-mount-drills.md`
 - Follow-up implementation plan:
-  - `docs/roadmaps/implemented/2026-01-08-storagebox-sshfs-stale-mount-recovery-and-integrity.md`
+  - `docs/planning/implemented/2026-01-08-storagebox-sshfs-stale-mount-recovery-and-integrity.md`

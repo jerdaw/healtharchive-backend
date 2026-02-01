@@ -9,8 +9,8 @@ Keep documentation accurate, minimal, and easy to maintain across repos.
 - Navigation config: `mkdocs.yml` (source of truth for sidebar structure).
 - Cross-repo environment wiring: `docs/deployment/environments-and-configuration.md`
 - Ops roadmap/todo: `docs/operations/healtharchive-ops-roadmap.md`
-- Future roadmap backlog (not-yet-implemented work): `docs/roadmaps/roadmap.md`
-- Implemented plans archive (historical records): `docs/roadmaps/implemented/`
+- Future roadmap backlog (not-yet-implemented work): `docs/planning/roadmap.md`
+- Implemented plans archive (historical records): `docs/planning/implemented/`
 - Frontend documentation (canonical): https://github.com/jerdaw/healtharchive-frontend/tree/main/docs
 - Datasets documentation (canonical): https://github.com/jerdaw/healtharchive-datasets
 
@@ -195,7 +195,7 @@ Docs should reflect **current reality**. If something is intentionally outdated:
 
 - Put a short note at the top: what changed, and where the new canonical doc lives.
 - Prefer updating the doc over adding a second “new doc” (avoid forks).
-- For long historical artifacts, move them under `docs/roadmaps/implemented/` (dated).
+- For long historical artifacts, move them under `docs/planning/implemented/` (dated).
 
 Suggested cadence (keep it lightweight):
 
@@ -208,19 +208,63 @@ Suggested cadence (keep it lightweight):
 This project separates **backlog** vs **implementation plans** vs **canonical docs** to reduce drift.
 
 - Short pointer (for new contributors): `roadmap-process.md`
-- `docs/roadmaps/roadmap.md` is the single backlog of not-yet-implemented items.
-- When you start work, create a focused implementation plan under `docs/roadmaps/`.
+- `docs/planning/roadmap.md` is the single backlog of not-yet-implemented items.
+- When you start work, create a focused implementation plan under `docs/planning/`.
 - When the work is done, update canonical docs (deployment/ops/dev) so the result is maintainable.
-- Then move the implementation plan into `docs/roadmaps/implemented/` with a dated filename.
+- Then move the implementation plan into `docs/planning/implemented/` with a dated filename.
 
 Rule of thumb: documentation should describe **what exists and how to use/operate it**, not the order it was implemented.
+
+## Implementation plan lifecycle
+
+Implementation plans follow a specific lifecycle to prevent documentation sprawl:
+
+### 1. Active planning
+Create in `docs/planning/` with dated filename: `YYYY-MM-DD-<short-slug>.md`
+
+### 2. During implementation
+Update with progress notes as needed. Keep the focus on outcomes and decisions.
+
+### 3. After completion
+- Update all canonical docs (deployment/operations/development) with outcomes
+- Compress the plan to summary format (see below)
+- Move to `docs/planning/implemented/`
+
+### 4. Compressed format for implemented plans
+
+Completed plans >200 lines should be compressed to this format (~40-80 lines):
+
+```markdown
+# [Title] (Implemented YYYY-MM-DD)
+
+**Status:** Implemented | **Scope:** [1-2 sentences describing what was done]
+
+## Outcomes
+- [Bullet list of what was delivered]
+
+## Canonical Docs Updated
+- [Links to docs that now contain this information]
+
+## Decisions Created (if any)
+- [Links to decision records]
+
+## Historical Context
+[Brief note that detailed implementation history is preserved in git]
+```
+
+**Why compress?** Detailed phase-by-phase narratives become historical journals that duplicate content now in canonical docs. Compression:
+- Reduces maintenance burden
+- Prevents documentation sprawl
+- Preserves outcomes while keeping the archive scannable
+
+**Detailed history:** Git preserves the full implementation narrative for anyone who needs it.
 
 ## Naming and organization
 
 - Use descriptive filenames (`runbook`, `checklist`, `guidelines`) and avoid phase prefixes.
 - File titles and filenames should reflect the document’s actual purpose and content. If the purpose or content changes, rename the file and update links as needed.
-- Put roadmaps and active implementation plans in `docs/roadmaps`.
-- Move completed implementation plans into `docs/roadmaps/implemented/` (dated).
+- Put roadmaps and active implementation plans in `docs/planning`.
+- Move completed implementation plans into `docs/planning/implemented/` (dated).
 - Put operational procedures in `docs/operations`.
 - Put incident notes / lightweight postmortems in `docs/operations/incidents/` (template: `docs/operations/incidents/incident-template.md`).
 - Put ops playbooks (task-oriented checklists) in `docs/operations/playbooks/`.

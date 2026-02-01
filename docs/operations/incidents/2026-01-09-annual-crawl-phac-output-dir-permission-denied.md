@@ -125,8 +125,8 @@ Recovery restored a writable output directory and reset the job’s retry budget
 ## References / Artifacts
 
 - Operator snapshot script: `scripts/vps-crawl-status.sh`
-- Incident response playbook: `../playbooks/incident-response.md`
-- Crawl stalls playbook: `../playbooks/crawl-stalls.md`
-- Storage hot-path incidents: `../playbooks/storagebox-sshfs-stale-mount-recovery.md`
+- Incident response playbook: `../playbooks/core/incident-response.md`
+- Crawl stalls playbook: `../playbooks/crawl/crawl-stalls.md`
+- Storage hot-path incidents: `../playbooks/storage/storagebox-sshfs-stale-mount-recovery.md`
 - Note: job 7 produced no combined crawl logs because it failed before `archive_tool` started.
 - Related: `2026-01-09-annual-crawl-hc-job-stalled.md`

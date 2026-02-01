@@ -365,7 +365,7 @@ mount | rg '/srv/healtharchive/jobs/|/srv/healtharchive/storagebox'
 
 Recovery playbook:
 
-- `../operations/playbooks/storagebox-sshfs-stale-mount-recovery.md`
+- `../operations/playbooks/storage/storagebox-sshfs-stale-mount-recovery.md`
 
 ---
 

@@ -62,13 +62,13 @@ As of 2026-01-16, the job showed many `net::ERR_HTTP2_PROTOCOL_ERROR` failures o
 
 ## Decision: Manual Recovery (Option C)
 
-We elected to stick with the manual recover-stale-jobs procedure (documented in `../playbooks/crawl-stalls.md`) rather than automating granular per-job stops. The risk of interrupting a healthy concurrent job is acceptable given the rarity of stalls, and stopping the worker is the safest way to ensure no partial state corruption.
+We elected to stick with the manual recover-stale-jobs procedure (documented in `../playbooks/crawl/crawl-stalls.md`) rather than automating granular per-job stops. The risk of interrupting a healthy concurrent job is acceptable given the rarity of stalls, and stopping the worker is the safest way to ensure no partial state corruption.
 
 ## Resolution / Recovery
 
 Performed on 2026-01-16 (VPS):
 
-- Followed `docs/operations/playbooks/crawl-stalls.md`:
+- Followed `docs/operations/playbooks/crawl/crawl-stalls.md`:
   - `sudo systemctl stop healtharchive-worker.service`
   - `set -a; source /etc/healtharchive/backend.env; set +a`
   - `/opt/healtharchive-backend/.venv/bin/ha-backend recover-stale-jobs --older-than-minutes 5 --apply --source hc --limit 1`
@@ -102,6 +102,6 @@ TBD (once recovered).
 - Operator snapshot script: `scripts/vps-crawl-status.sh`
 - Latest combined log (as of 2026-01-09 12:57Z snapshot): `/srv/healtharchive/jobs/hc/20260101T000502Z__hc-20260101/archive_new_crawl_phase_-_attempt_1_20260109_060517.combined.log`
 - Latest combined log after 2026-01-16 recovery: `/srv/healtharchive/jobs/hc/20260101T000502Z__hc-20260101/archive_new_crawl_phase_-_attempt_1_20260116_025617.combined.log`
-- Playbook: `../playbooks/crawl-stalls.md`
-- Playbook: `../playbooks/incident-response.md`
+- Playbook: `../playbooks/crawl/crawl-stalls.md`
+- Playbook: `../playbooks/core/incident-response.md`
 - Related: `2026-01-09-annual-crawl-phac-output-dir-permission-denied.md`

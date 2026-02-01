@@ -4,7 +4,7 @@ This file tracks the current ops roadmap/todo items only. Keep it short and curr
 
 For historical roadmaps and upgrade context, see:
 
-- `docs/roadmaps/README.md` (backend repo)
+- `docs/planning/README.md` (backend repo)
 
 Keep the two synced copies of this file aligned:
 
@@ -38,4 +38,4 @@ Keep the two synced copies of this file aligned:
 
 Track external validation/outreach work (partner, verifier, mentions/citations log) in:
 
-- `../roadmaps/roadmap.md`
+- `../planning/roadmap.md`

@@ -1,5 +1,24 @@
 from __future__ import annotations
 
+"""
+ha_backend.models - SQLAlchemy ORM models for HealthArchive
+
+Core entities:
+    - Source: Logical content origin (e.g., 'hc' for Health Canada)
+    - ArchiveJob: A crawl job and its lifecycle (queued → running → indexed)
+    - Snapshot: A captured page with URL, timestamp, WARC path, metadata
+    - ChangeEvent: Detected changes between snapshot pairs
+    - Page: Aggregated page-level signals (PageRank, authority, hubness)
+    - UsageMetric: Aggregate daily usage counters
+    - IssueReport: User-submitted issue reports
+
+All models use TimestampMixin for created_at/updated_at tracking.
+
+See also:
+    - docs/architecture.md for data model relationships
+    - docs/reference/data-model.md for field documentation
+"""
+
 from datetime import date, datetime
 from typing import Any, Dict, List, Optional
 

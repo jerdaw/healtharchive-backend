@@ -1,5 +1,25 @@
 from __future__ import annotations
 
+"""
+ha_backend.indexing.pipeline - WARC to Snapshot indexing orchestration
+
+Transforms completed crawl jobs into searchable Snapshot records:
+    1. Discovers WARC files in job output directory
+    2. Iterates HTML records from WARCs
+    3. Extracts title, text, snippet, language from HTML
+    4. Creates/updates Snapshot rows in database
+    5. Computes storage statistics and page signals
+
+Key functions:
+    - index_job(job_id): Main entry point for indexing a job
+    - refresh_snapshot_metadata(job_id): Re-extract metadata for existing snapshots
+
+See also:
+    - docs/architecture.md for indexing pipeline details
+    - ha_backend.indexing.text_extraction for HTML processing
+    - ha_backend.indexing.warc_discovery for WARC file discovery
+"""
+
 import logging
 import os
 import stat

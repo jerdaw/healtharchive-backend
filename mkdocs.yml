@@ -75,7 +75,7 @@ nav:
       - Quick Start: quickstart.md
       - Project Overview: project.md
       - Choose Your Path:
-          - "I'm an Operator": operations/playbooks/operator-responsibilities.md
+          - "I'm an Operator": operations/playbooks/core/operator-responsibilities.md
           - "I'm a Developer": development/dev-environment-setup.md
           - "I'm an API Consumer": api-consumer-guide.md
   - Tutorials:
@@ -87,11 +87,12 @@ nav:
       - Operations:
           - Overview: operations/README.md
           - Core Playbooks:
-              - Operator Responsibilities: operations/playbooks/operator-responsibilities.md
-              - Deploy & Verify: operations/playbooks/deploy-and-verify.md
-              - Incident Response: operations/playbooks/incident-response.md
+              - Operator Responsibilities: operations/playbooks/core/operator-responsibilities.md
+              - Deploy & Verify: operations/playbooks/core/deploy-and-verify.md
+              - Incident Response: operations/playbooks/core/incident-response.md
               - Escalation Procedures: operations/escalation-procedures.md
           - Observability:
+              - Setup Guide: operations/playbooks/observability/observability-guide.md
               - Check Logs: operations/playbooks/check-logs-api-worker-access.md
               - Verify Search Index: operations/playbooks/verify-search-index-coverage.md
               - Monitor WARC Tiering: operations/playbooks/check-warc-tiering-status.md
@@ -109,13 +110,13 @@ nav:
               - Manage WARC Cleanup: operations/playbooks/manage-warc-cleanup.md
               - Verify WARC Tier Distribution: operations/playbooks/verify-warc-tier-distribution.md
           - Validation:
-              - Restore Test: operations/playbooks/restore-test.md
+              - Restore Test: operations/playbooks/validation/restore-test.md
               - Verify Coverage: operations/playbooks/verify-coverage.md
-              - Dataset Release: operations/playbooks/dataset-release.md
+              - Dataset Release: operations/playbooks/validation/dataset-release.md
               - Baseline Drift Check: operations/playbooks/baseline-drift-check.md
               - Verify Ops Automation: operations/playbooks/verify-ops-automation.md
           - External:
-              - Adoption Signals: operations/playbooks/adoption-signals.md
+              - Adoption Signals: operations/playbooks/external/adoption-signals.md
               - Write Changelog Entry: operations/playbooks/write-changelog-entry.md
               - Handle User Issue Report: operations/playbooks/handle-user-issue-report.md
           - Service Levels: operations/service-levels.md
@@ -168,14 +169,14 @@ nav:
               - PHAC Permission Denied (2026-01-09): operations/incidents/2026-01-09-annual-crawl-phac-output-dir-permission-denied.md
               - Replay Smoke 503 (2026-01-16): operations/incidents/2026-01-16-replay-smoke-503-and-warctieringfailed.md
   - Planning & Roadmaps:
-      - Active Work: roadmaps/README.md
+      - Active Work: planning/README.md
       - Active Investigations:
-          - Disk Usage Mystery: roadmaps/2026-02-01-disk-usage-investigation.md
-      - Future Roadmap: roadmaps/roadmap.md
+          - Disk Usage Mystery: planning/2026-02-01-disk-usage-investigation.md
+      - Future Roadmap: planning/roadmap.md
       - Roadmap Process: roadmap-process.md
       - Implemented Plans:
-          - Overview: roadmaps/implemented/README.md
-          - Operational Resilience (2026-02-01): roadmaps/implemented/2026-02-01-operational-resilience-improvements.md
+          - Overview: planning/implemented/README.md
+          - Operational Resilience (2026-02-01): planning/implemented/2026-02-01-operational-resilience-improvements.md
   - About:
       - Multi-Repo Setup: project.md
       - Contributing: CONTRIBUTING.md

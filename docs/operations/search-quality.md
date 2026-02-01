@@ -179,7 +179,7 @@ Future (storage-only, must preserve trustworthiness): if we can *prove* the HTML
 payload is identical (and preserve provenance), consider pruning same-day
 duplicates from storage to save disk space. Track this work in:
 
-- `../roadmaps/roadmap.md`
+- `../planning/roadmap.md`
 
 ### 5.3 Backfill outlinks + authority signals
 

@@ -160,7 +160,7 @@ See: `docs/operations/disk-baseline-and-cleanup.md`
 
 **Known issue**: Stale mounts still occur despite hardened options (root cause under investigation).
 
-See: `docs/roadmaps/2026-02-01-operational-resilience-improvements.md`, Phase 3
+See: `docs/planning/2026-02-01-operational-resilience-improvements.md`, Phase 3
 
 ---
 
@@ -189,7 +189,7 @@ See: `docs/roadmaps/2026-02-01-operational-resilience-improvements.md`, Phase 3
 - Increase to 20min if infrastructure is persistently unstable
 - Decrease to 5min if false positives are common (careful!)
 
-See: `docs/roadmaps/implemented/2026-01-24-infra-error-and-storage-hotpath-hardening.md`
+See: `docs/planning/implemented/2026-01-24-infra-error-and-storage-hotpath-hardening.md`
 
 ---
 
@@ -264,6 +264,6 @@ When adjusting thresholds:
 
 - Disk baseline: `docs/operations/disk-baseline-and-cleanup.md`
 - Alerting strategy: `docs/operations/monitoring-and-alerting.md`
-- Stale mount playbook: `docs/operations/playbooks/storagebox-sshfs-stale-mount-recovery.md`
-- Crawl stall playbook: `docs/operations/playbooks/crawl-stalls.md`
-- Operational resilience improvements: `docs/roadmaps/2026-02-01-operational-resilience-improvements.md`
+- Stale mount playbook: `docs/operations/playbooks/storage/storagebox-sshfs-stale-mount-recovery.md`
+- Crawl stall playbook: `docs/operations/playbooks/crawl/crawl-stalls.md`
+- Operational resilience improvements: `docs/planning/2026-02-01-operational-resilience-improvements.md`

@@ -134,7 +134,7 @@ Observed outcome: job 6 (HC) restarted at ~12:31Z and began writing new crawl te
 
 ## Action items (TODOs)
 
-- [x] Implement mitigations and recovery improvements in `docs/roadmaps/implemented/2026-01-24-infra-error-and-storage-hotpath-hardening.md`. (owner=eng, priority=high, due=2026-02-01)
+- [x] Implement mitigations and recovery improvements in `docs/planning/implemented/2026-01-24-infra-error-and-storage-hotpath-hardening.md`. (owner=eng, priority=high, due=2026-02-01)
 - [ ] Investigate underlying cause of the hot-path staleness (Storage Box/sshfs/network/FUSE). (owner=eng, priority=high, due=2026-02-01)
 - [x] Add a worker-side guardrail to prevent tight “pick same job instantly” loops on infra errors (cooldown + metric). (owner=eng, priority=high, due=2026-02-01)
 - [x] Add a playbook section for “CLI shows sqlite/no such table” (env export reminder) to reduce operator confusion. (owner=ops, priority=low, due=2026-02-01)
@@ -157,7 +157,7 @@ Observed outcome: job 6 (HC) restarted at ~12:31Z and began writing new crawl te
 ## References / Artifacts
 
 - Related incident: `docs/operations/incidents/2026-01-08-storage-hotpath-sshfs-stale-mount.md`
-- Follow-up roadmap: `docs/roadmaps/implemented/2026-01-24-infra-error-and-storage-hotpath-hardening.md`
+- Follow-up roadmap: `docs/planning/implemented/2026-01-24-infra-error-and-storage-hotpath-hardening.md`
 - `healtharchive-crawl-auto-recover.service` journal window:
   - `sudo journalctl -u healtharchive-crawl-auto-recover.service --since '2026-01-24 05:45:00' --until '2026-01-24 07:15:00' --no-pager | tail -n 200`
 - Most relevant worker log excerpt (redacted):

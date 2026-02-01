@@ -569,7 +569,7 @@ If you're still stuck:
 
 - **Architecture Guide**: [architecture.md](../architecture.md)
 - **Archive Tool Documentation**: `src/archive_tool/docs/documentation.md`
-- **Incident Response**: [operations/playbooks/incident-response.md](../operations/playbooks/incident-response.md)
+- **Incident Response**: [operations/playbooks/core/incident-response.md](../operations/playbooks/core/incident-response.md)
 
 ---
 

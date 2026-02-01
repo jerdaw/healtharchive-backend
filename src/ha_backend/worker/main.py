@@ -1,5 +1,22 @@
 from __future__ import annotations
 
+"""
+ha_backend.worker.main - Job worker loop
+
+Picks queued/retryable jobs, runs archive_tool crawls, and triggers indexing.
+Implements retry logic with cooldowns for infrastructure errors and disk
+pressure protection.
+
+Key thresholds defined here:
+    - DISK_HEADROOM_THRESHOLD_PERCENT (85%): Skip crawls if disk usage exceeds
+    - INFRA_ERROR_RETRY_COOLDOWN_MINUTES (10): Cooldown after infra errors
+    - MAX_CRAWL_RETRIES (2): Maximum retry attempts per job
+
+See also:
+    - docs/operations/thresholds-and-tuning.md for operational guidance
+    - docs/architecture.md for worker lifecycle details
+"""
+
 import logging
 import os
 import subprocess

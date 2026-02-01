@@ -1,5 +1,26 @@
 from __future__ import annotations
 
+"""
+ha_backend.search_ranking - Search result ranking for HealthArchive queries
+
+Implements a configurable scoring system that combines:
+    - Authority (inbound link count)
+    - Hubness (outbound link count for broad queries)
+    - PageRank (graph-based authority)
+    - URL depth penalty
+    - Title match bonuses
+    - Archived page penalty
+
+Supports multiple ranking versions (v1, v2, v3) selectable via:
+    - Query param: ranking=v3
+    - Environment: HA_SEARCH_RANKING_VERSION=v3
+
+See also:
+    - docs/operations/search-quality.md for evaluation guidance
+    - docs/operations/search-golden-queries.md for golden query tests
+    - docs/decisions/2026-01-18-search-ranking-v3.md for v3 design
+"""
+
 import os
 import re
 from dataclasses import dataclass

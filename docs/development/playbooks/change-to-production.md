@@ -6,7 +6,7 @@ Canonical references:
 
 - Docs guidelines: `../../documentation-guidelines.md`
 - Monitoring/CI gate: `../../operations/monitoring-and-ci-checklist.md`
-- Deploy playbook (VPS): `../../operations/playbooks/deploy-and-verify.md`
+- Deploy playbook (VPS): `../../operations/playbooks/core/deploy-and-verify.md`
 
 ## Workflow
 

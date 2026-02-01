@@ -14,9 +14,9 @@ Choose your entry point based on what you want to do:
 
 **Start Here**:
 1. [Production Runbook](deployment/production-single-vps.md) - Complete production setup guide
-2. [Operator Responsibilities](operations/playbooks/operator-responsibilities.md) - Must-do checklist
-3. [Deploy & Verify](operations/playbooks/deploy-and-verify.md) - Safe deployment process
-4. [Incident Response](operations/playbooks/incident-response.md) - Emergency procedures
+2. [Operator Responsibilities](operations/playbooks/core/operator-responsibilities.md) - Must-do checklist
+3. [Deploy & Verify](operations/playbooks/core/deploy-and-verify.md) - Safe deployment process
+4. [Incident Response](operations/playbooks/core/incident-response.md) - Emergency procedures
 
 **Key Resources**:
 - [Ops Cadence Checklist](operations/ops-cadence-checklist.md) - Daily/weekly/quarterly tasks
@@ -268,7 +268,7 @@ This documentation follows the [Diátaxis framework](https://diataxis.fr/) for c
 | **Deployment problems** | [Production Runbook](deployment/production-single-vps.md) → [Playbooks](operations/playbooks/README.md) |
 | **Code questions** | [Architecture Guide](architecture.md) → [GitHub Discussions](https://github.com/jerdaw/healtharchive-backend/discussions) |
 | **Bugs or feature requests** | [GitHub Issues](https://github.com/jerdaw/healtharchive-backend/issues) |
-| **Operational incidents** | [Incident Response](operations/playbooks/incident-response.md) |
+| **Operational incidents** | [Incident Response](operations/playbooks/core/incident-response.md) |
 
 ### Community
 
@@ -311,7 +311,7 @@ Based on your role, here's what to do next:
 ### Operators
 1. ✅ Review [Production Runbook](deployment/production-single-vps.md)
 2. ✅ Complete [Monitoring Checklist](operations/monitoring-and-ci-checklist.md)
-3. ✅ Bookmark [Incident Response](operations/playbooks/incident-response.md)
+3. ✅ Bookmark [Incident Response](operations/playbooks/core/incident-response.md)
 
 ### Developers
 1. ✅ Complete [Quick Start](quickstart.md)
@@ -349,7 +349,7 @@ Based on your role, here's what to do next:
 **Reference**:
 - [Documentation Guidelines](documentation-guidelines.md)
 - [Decision Records](decisions/README.md)
-- [Roadmaps](roadmaps/README.md)
+- [Roadmaps](planning/README.md)
 
 ---
 

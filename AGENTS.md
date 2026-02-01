@@ -28,8 +28,8 @@ Canonical docs to consult first:
 - `docs/operations/monitoring-and-ci-checklist.md` – monitoring, uptime, and CI guidance.
 - `docs/operations/monitoring-and-alerting.md` – **NEW (2026):** Critical crawl metrics and alert thresholds strategies.
 - `docs/deployment/production-single-vps.md` – current production runbook (Hetzner + Tailscale-only SSH, nightly backups, NAS pull).
-- `docs/roadmaps/roadmap.md` – backlog of not-yet-implemented work.
-- `docs/roadmaps/implemented/` – historical implementation plans (executed).
+- `docs/planning/roadmap.md` – backlog of not-yet-implemented work.
+- `docs/planning/implemented/` – historical implementation plans (executed).
 - Frontend bilingual/dev architecture: `healtharchive-frontend/docs/development/bilingual-dev-guide.md`
 
 When you're doing anything beyond tiny local changes, **open those docs and sync your mental model first**.

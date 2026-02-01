@@ -17,7 +17,7 @@ Overall: the project’s documentation system is already unusually strong for it
 
 Key strengths (high confidence):
 
-- **Drift prevention by design**: single canonical sources + pointer docs, and explicit backlog/plan/canonical separation (`docs/roadmaps/**` vs `docs/**`).
+- **Drift prevention by design**: single canonical sources + pointer docs, and explicit backlog/plan/canonical separation (`docs/planning/**` vs `docs/**`).
 - **Operations maturity**: production runbook, playbooks, cadence checklists, monitoring/CI setup guidance, and safety posture are explicit and actionable.
 - **Incident management**: severity rubric + incident template + operator response playbook + at least one real incident note showing good practice.
 - **Public vs private boundaries**: explicit contracts for privacy-preserving usage metrics, issue-report retention, and non-public admin/metrics access.
@@ -43,15 +43,15 @@ This is the set of documents that define *how* documentation is produced, mainta
   - `healtharchive-backend/docs/README.md`
   - `healtharchive-backend/docs/operations/README.md`
   - `healtharchive-backend/docs/operations/playbooks/README.md`
-  - `healtharchive-backend/docs/roadmaps/README.md`
+  - `healtharchive-backend/docs/planning/README.md`
   - https://github.com/jerdaw/healtharchive-frontend/blob/main/docs/README.md
 
 ### Planning / change management
 
 - Backlog and implementation plan workflow:
   - `healtharchive-backend/docs/roadmap-process.md`
-  - `healtharchive-backend/docs/roadmaps/roadmap.md`
-  - `healtharchive-backend/docs/roadmaps/implemented/`
+  - `healtharchive-backend/docs/planning/roadmap.md`
+  - `healtharchive-backend/docs/planning/implemented/`
 
 ### Incidents and post-incident learning
 
@@ -59,7 +59,7 @@ This is the set of documents that define *how* documentation is produced, mainta
   - `healtharchive-backend/docs/operations/incidents/README.md`
   - `healtharchive-backend/docs/operations/incidents/incident-template.md`
   - `healtharchive-backend/docs/operations/incidents/severity.md`
-  - `healtharchive-backend/docs/operations/playbooks/incident-response.md`
+  - `healtharchive-backend/docs/operations/playbooks/core/incident-response.md`
 
 ### Operations and reliability subprocesses (repeatable routines)
 
@@ -67,7 +67,7 @@ This is the set of documents that define *how* documentation is produced, mainta
   - `healtharchive-backend/docs/operations/ops-cadence-checklist.md`
 - Monitoring/CI and deploy gating:
   - `healtharchive-backend/docs/operations/monitoring-and-ci-checklist.md`
-  - `healtharchive-backend/docs/operations/playbooks/deploy-and-verify.md`
+  - `healtharchive-backend/docs/operations/playbooks/core/deploy-and-verify.md`
   - `healtharchive-backend/docs/operations/baseline-drift.md`
 - Backup/restore validation:
   - `healtharchive-backend/docs/operations/restore-test-procedure.md`
@@ -116,8 +116,8 @@ Evidence:
 
 - Explicit canonical sources + pointer strategy.
 - Explicit separation:
-  - backlog (`roadmaps/roadmap.md`)
-  - active plans (`docs/roadmaps/*.md`)
+  - backlog (`planning/roadmap.md`)
+  - active plans (`docs/planning/*.md`)
   - canonical docs (deployment/ops/dev)
 
 Residual risks:
@@ -240,5 +240,5 @@ These are low-risk upgrades that make doc creation and maintenance more consiste
 
 - Prefer stable, scripted entrypoints over fragile shell snippets.
 - Keep internal docs public-safe by default (assume they may be shared).
-- Separate “what exists and how to operate it” from “how we got here” (roadmaps/implemented plans).
+- Separate “what exists and how to operate it” from “how we got here” (planning/implemented plans).
 - Treat verification as first-class: every operational procedure should define what “done” means.
