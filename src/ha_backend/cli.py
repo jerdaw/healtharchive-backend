@@ -237,6 +237,233 @@ def cmd_status(args: argparse.Namespace) -> None:
     print()
 
 
+def cmd_watchdog_status(args: argparse.Namespace) -> None:
+    """
+    Display unified status of all HealthArchive watchdogs and automation.
+
+    This command aggregates state from multiple watchdog JSON files and provides
+    a consolidated view of automation health, rate limits, and current issues.
+    """
+    import json
+    import os
+    from datetime import datetime, timezone
+    from pathlib import Path
+
+    from ha_backend.models import ArchiveJob
+
+    def _load_json(path: Path) -> dict:
+        """Load JSON file, return empty dict on error."""
+        try:
+            if not path.is_file():
+                return {}
+            return json.loads(path.read_text(encoding="utf-8"))
+        except Exception:
+            return {}
+
+    def _parse_timestamp(ts_str: str | None) -> datetime | None:
+        """Parse ISO timestamp, return None on error."""
+        if not ts_str:
+            return None
+        try:
+            dt = datetime.fromisoformat(str(ts_str))
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
+            return dt
+        except Exception:
+            return None
+
+    def _format_age(dt: datetime | None, now: datetime) -> str:
+        """Format time ago as human-readable string."""
+        if dt is None:
+            return "unknown"
+        age = (now - dt).total_seconds()
+        if age < 60:
+            return f"{int(age)}s ago"
+        if age < 3600:
+            return f"{int(age / 60)}m ago"
+        if age < 86400:
+            return f"{int(age / 3600)}h ago"
+        return f"{int(age / 86400)}d ago"
+
+    def _check_disk_usage() -> tuple[int, str]:
+        """Return (usage_percent, status_text) for root filesystem."""
+        try:
+            stat = os.statvfs("/")
+            total = stat.f_blocks * stat.f_frsize
+            free = stat.f_bavail * stat.f_frsize
+            if total > 0:
+                used_pct = int(100 * (total - free) / total)
+                if used_pct >= 92:
+                    return used_pct, "CRITICAL"
+                elif used_pct >= 85:
+                    return used_pct, "ABOVE THRESHOLD"
+                else:
+                    return used_pct, "OK"
+        except OSError:
+            pass
+        return 0, "UNKNOWN"
+
+    def _probe_storagebox() -> str:
+        """Check if Storage Box mount is readable."""
+        storagebox_path = "/srv/healtharchive/storagebox"
+        try:
+            os.listdir(storagebox_path)
+            return "OK (readable)"
+        except OSError as e:
+            return f"Error (Errno {e.errno})"
+        except Exception:
+            return "UNKNOWN"
+
+    def _count_stale_mounts(state: dict) -> int:
+        """Count currently detected stale targets from storage hotpath state."""
+        observations = state.get("observations", {})
+        if not isinstance(observations, dict):
+            return 0
+        return len(observations)
+
+    now = datetime.now(timezone.utc)
+
+    # Load watchdog state files
+    crawl_state_path = Path("/srv/healtharchive/ops/watchdog/crawl-auto-recover.json")
+    storage_state_path = Path("/srv/healtharchive/ops/watchdog/storage-hotpath-auto-recover.json")
+
+    crawl_state = _load_json(crawl_state_path)
+    storage_state = _load_json(storage_state_path)
+
+    # Check sentinel files
+    crawl_sentinel = Path("/etc/healtharchive/crawl-auto-recover-enabled")
+    storage_sentinel = Path("/etc/healtharchive/storage-hotpath-auto-recover-enabled")
+    cleanup_config = Path("/opt/healtharchive-backend/ops/automation/cleanup-automation.toml")
+
+    crawl_enabled = crawl_sentinel.is_file()
+    storage_enabled = storage_sentinel.is_file()
+    cleanup_enabled = cleanup_config.is_file()
+
+    print("HealthArchive Watchdog Status")
+    print("=" * 60)
+    print(f"Timestamp: {now.replace(microsecond=0).isoformat()}")
+    print()
+
+    # Crawl Auto-Recovery
+    print("[Crawl Auto-Recovery]")
+    print(
+        f"  Enabled:     {'Yes (sentinel present)' if crawl_enabled else 'No (sentinel missing)'}"
+    )
+
+    recoveries = crawl_state.get("recoveries", {})
+    total_recoveries = sum(len(v) for v in recoveries.values() if isinstance(v, list))
+
+    # Estimate running/stalled jobs (would need to query DB for accurate count)
+    # For now, show what we can from state
+    print(f"  Recoveries:  {total_recoveries} total recorded")
+
+    if crawl_enabled:
+        # Look for job IDs with recent recoveries
+        recent_recoveries = []
+        for job_id_str, timestamps in recoveries.items():
+            if not isinstance(timestamps, list):
+                continue
+            for ts_str in timestamps[-3:]:  # Last 3
+                ts = _parse_timestamp(ts_str)
+                if ts and (now - ts).total_seconds() < 86400:  # Last 24h
+                    recent_recoveries.append((job_id_str, ts))
+
+        if recent_recoveries:
+            print(f"  Recent:      {len(recent_recoveries)} in last 24h")
+    print()
+
+    # Storage Hot-Path Recovery
+    print("[Storage Hot-Path Recovery]")
+    print(
+        f"  Enabled:     {'Yes (sentinel present)' if storage_enabled else 'No (sentinel missing)'}"
+    )
+
+    last_run = _parse_timestamp(storage_state.get("last_healthy_utc"))
+    last_apply = _parse_timestamp(storage_state.get("last_apply_utc"))
+    last_apply_ok = int(storage_state.get("last_apply_ok", 0))
+
+    if last_run:
+        print(f"  Last healthy: {_format_age(last_run, now)}")
+
+    stale_count = _count_stale_mounts(storage_state)
+    if stale_count > 0:
+        print(f"  Detected:    {stale_count} stale target(s)")
+
+    if last_apply:
+        status_text = "OK" if last_apply_ok == 1 else "FAILED"
+        print(f"  Last apply:  {_format_age(last_apply, now)} ({status_text})")
+
+        if last_apply_ok == 0:
+            errors = storage_state.get("last_apply_errors", [])
+            if errors and isinstance(errors, list):
+                print(f"  Error:       {errors[0][:80]}...")
+
+    global_recoveries = storage_state.get("recoveries", {}).get("global", [])
+    if isinstance(global_recoveries, list):
+        print(f"  Recoveries:  {len(global_recoveries)} total recorded")
+    print()
+
+    # Disk Cleanup
+    print("[Disk Cleanup]")
+    print(f"  Enabled:     {'Yes (config present)' if cleanup_enabled else 'No (config missing)'}")
+    print("  Note:        Timer-based (not yet threshold-triggered)")
+    print()
+
+    # Current Health
+    print("[Current Health]")
+
+    disk_pct, disk_status = _check_disk_usage()
+    disk_color = (
+        "\033[32m"
+        if disk_status == "OK"
+        else ("\033[33m" if "THRESHOLD" in disk_status else "\033[31m")
+    )
+    print(f"  Disk usage:  {disk_color}{disk_pct}% [{disk_status}]\033[0m")
+
+    storagebox_status = _probe_storagebox()
+    sb_color = "\033[32m" if storagebox_status.startswith("OK") else "\033[31m"
+    print(f"  Base sshfs:  {sb_color}{storagebox_status}\033[0m")
+
+    if stale_count > 0:
+        print(f"  Stale mounts: \033[31m{stale_count} detected\033[0m")
+    else:
+        print("  Stale mounts: \033[32m0 detected\033[0m")
+
+    # Job counts
+    try:
+        with get_session() as session:
+            running = session.query(ArchiveJob).filter(ArchiveJob.status == "running").count()
+            queued = session.query(ArchiveJob).filter(ArchiveJob.status == "queued").count()
+            retryable = session.query(ArchiveJob).filter(ArchiveJob.status == "retryable").count()
+
+            print(f"  Running jobs: {running}")
+            print(
+                f"  Queued jobs:  {queued}{' (blocked by disk)' if disk_pct >= 85 and queued > 0 else ''}"
+            )
+            if retryable > 0:
+                print(f"  Retryable:    \033[33m{retryable}\033[0m")
+    except Exception as e:
+        print(f"  Jobs:        \033[31mDatabase error: {e}\033[0m")
+    print()
+
+    # Recommendations
+    recommendations = []
+    if stale_count > 0:
+        recommendations.append("Clear stale mounts (see roadmap Phase 1.1)")
+    if disk_pct >= 85:
+        recommendations.append("Free disk space to below 85% (see roadmap Phase 1.2)")
+    if not crawl_enabled:
+        recommendations.append("Consider enabling crawl auto-recovery (create sentinel file)")
+    if not storage_enabled:
+        recommendations.append("Consider enabling storage hotpath recovery (create sentinel file)")
+
+    if recommendations:
+        print("[Recommendations]")
+        for rec in recommendations:
+            print(f"  - {rec}")
+        print()
+
+
 def cmd_run_job(args: argparse.Namespace) -> None:
     """
     Run a single archive_tool job immediately.
@@ -4013,6 +4240,13 @@ def build_parser() -> argparse.ArgumentParser:
         help="Quick health overview: worker, disk, mounts, and job status.",
     )
     p_status.set_defaults(func=cmd_status)
+
+    # watchdog-status
+    p_watchdog = subparsers.add_parser(
+        "watchdog-status",
+        help="Unified view of all watchdog states and automation health.",
+    )
+    p_watchdog.set_defaults(func=cmd_watchdog_status)
 
     # run-job
     p_run = subparsers.add_parser(
