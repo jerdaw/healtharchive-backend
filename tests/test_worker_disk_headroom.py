@@ -2,18 +2,12 @@
 
 from __future__ import annotations
 
-import os
 from pathlib import Path
-from unittest.mock import MagicMock
-
-import pytest
 
 from ha_backend import db as db_module
 from ha_backend.db import Base, get_engine, get_session
 from ha_backend.models import ArchiveJob, Source
 from ha_backend.worker.main import (
-    DISK_HEADROOM_CHECK_PATH,
-    DISK_HEADROOM_THRESHOLD_PERCENT,
     _check_disk_headroom,
     run_worker_loop,
 )
