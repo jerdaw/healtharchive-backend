@@ -247,7 +247,6 @@ def cmd_watchdog_status(args: argparse.Namespace) -> None:
     import json
     import os
     from datetime import datetime, timezone
-    from pathlib import Path
 
     from ha_backend.models import ArchiveJob
 
