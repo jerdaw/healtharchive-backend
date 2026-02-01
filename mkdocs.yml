@@ -143,6 +143,7 @@ nav:
       - Configuration:
           - Environment Variables: deployment/environments-and-configuration.md
           - Systemd Units: deployment/systemd/README.md
+          - Thresholds & Tuning: operations/thresholds-and-tuning.md
       - Datasets: datasets-external/README.md
       - Frontend:
           - Overview: frontend-external/README.md
