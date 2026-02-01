@@ -46,8 +46,8 @@ def test_watchdog_status_command_basic_output(monkeypatch, tmp_path) -> None:
     """Test that watchdog-status command produces expected output sections."""
     _init_test_db(tmp_path, monkeypatch)
 
-    # Create watchdog state files
-    watchdog_dir = tmp_path / "ops" / "watchdog"
+    # Create watchdog state files (path matches monkeypatched /srv/healtharchive/...)
+    watchdog_dir = tmp_path / "srv" / "healtharchive" / "ops" / "watchdog"
     watchdog_dir.mkdir(parents=True, exist_ok=True)
 
     crawl_state = {
@@ -72,13 +72,13 @@ def test_watchdog_status_command_basic_output(monkeypatch, tmp_path) -> None:
     sentinel_dir.mkdir(parents=True, exist_ok=True)
     (sentinel_dir / "crawl-auto-recover-enabled").touch()
 
-    # Mock paths
-    monkeypatch.setattr(
-        "ha_backend.cli.Path",
-        lambda p: tmp_path / p.lstrip("/")
-        if p.startswith("/srv") or p.startswith("/etc")
-        else Path(p),
-    )
+    # Mock paths - use module object directly for reliability
+    def mock_path(p):
+        if p.startswith("/srv") or p.startswith("/etc") or p.startswith("/opt"):
+            return tmp_path / p.lstrip("/")
+        return Path(p)
+
+    monkeypatch.setattr(cli_module, "Path", mock_path)
 
     # Create some test jobs
     with get_session() as session:
@@ -120,13 +120,13 @@ def test_watchdog_status_handles_missing_files(monkeypatch, tmp_path) -> None:
     """Test watchdog-status handles missing state files gracefully."""
     _init_test_db(tmp_path, monkeypatch)
 
-    # Don't create any watchdog files
-    monkeypatch.setattr(
-        "ha_backend.cli.Path",
-        lambda p: tmp_path / p.lstrip("/")
-        if p.startswith("/srv") or p.startswith("/etc")
-        else Path(p),
-    )
+    # Don't create any watchdog files - mock paths
+    def mock_path(p):
+        if p.startswith("/srv") or p.startswith("/etc") or p.startswith("/opt"):
+            return tmp_path / p.lstrip("/")
+        return Path(p)
+
+    monkeypatch.setattr(cli_module, "Path", mock_path)
 
     output = _run_cli(["watchdog-status"])
 
@@ -141,7 +141,7 @@ def test_watchdog_status_shows_stale_mounts(monkeypatch, tmp_path) -> None:
     """Test that stale mounts are detected and shown."""
     _init_test_db(tmp_path, monkeypatch)
 
-    watchdog_dir = tmp_path / "ops" / "watchdog"
+    watchdog_dir = tmp_path / "srv" / "healtharchive" / "ops" / "watchdog"
     watchdog_dir.mkdir(parents=True, exist_ok=True)
 
     # Storage state with stale mount observations
@@ -166,12 +166,12 @@ def test_watchdog_status_shows_stale_mounts(monkeypatch, tmp_path) -> None:
     }
     (watchdog_dir / "storage-hotpath-auto-recover.json").write_text(json.dumps(storage_state))
 
-    monkeypatch.setattr(
-        "ha_backend.cli.Path",
-        lambda p: tmp_path / p.lstrip("/")
-        if p.startswith("/srv") or p.startswith("/etc")
-        else Path(p),
-    )
+    def mock_path(p):
+        if p.startswith("/srv") or p.startswith("/etc") or p.startswith("/opt"):
+            return tmp_path / p.lstrip("/")
+        return Path(p)
+
+    monkeypatch.setattr(cli_module, "Path", mock_path)
 
     output = _run_cli(["watchdog-status"])
 
