@@ -525,10 +525,6 @@
          <lastmod>2026-02-01</lastmod>
     </url>
     <url>
-         <loc>https://docs.healtharchive.ca/roadmaps/2026-02-01-operational-resilience-improvements/</loc>
-         <lastmod>2026-02-01</lastmod>
-    </url>
-    <url>
          <loc>https://docs.healtharchive.ca/roadmaps/roadmap/</loc>
          <lastmod>2026-02-01</lastmod>
     </url>
@@ -622,6 +618,10 @@
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/roadmaps/implemented/2026-01-29-warc-manifest-verification/</loc>
+         <lastmod>2026-02-01</lastmod>
+    </url>
+    <url>
+         <loc>https://docs.healtharchive.ca/roadmaps/implemented/2026-02-01-operational-resilience-improvements/</loc>
          <lastmod>2026-02-01</lastmod>
     </url>
     <url>
