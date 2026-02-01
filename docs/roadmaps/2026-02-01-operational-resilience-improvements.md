@@ -401,7 +401,7 @@ RECOVERY_BUDGET = {
 | 2.1 | Disk threshold cleanup trigger | 2-3 hrs | P1 | ✅ Done (2026-02-01) - needs VPS deployment |
 | 2.2 | Worker disk warning log | 30 min | P2 | ✅ Already implemented |
 | 3.1 | Root cause investigation | Ongoing | P1 | Manual - operator |
-| 3.2 | Watchdog diagnostic logging | 1 hr | P2 | TODO |
+| 3.2 | Watchdog diagnostic logging | 1 hr | P2 | ✅ Done (2026-02-01) |
 | 4.1 | Watchdog status CLI | 2-3 hrs | P2 | ✅ Done (2026-02-01) |
 | 4.2 | Threshold documentation | 1 hr | P2 | ✅ Done (2026-02-01) |
 | 5.1 | Stall classification | 4-6 hrs | P3 | Deferred |

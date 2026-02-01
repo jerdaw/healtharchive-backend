@@ -239,6 +239,76 @@ def _file_age_seconds(path: Path, *, now_utc: datetime) -> float | None:
     return max(0.0, (now_utc - mtime).total_seconds())
 
 
+def _log_stale_mount_diagnostics(
+    path: str,
+    job_id: int | None,
+    mount_info: dict,
+    *,
+    storagebox_mount: Path,
+) -> None:
+    """
+    Log diagnostic information when a stale mount is detected.
+
+    Helps investigate root cause by capturing:
+    - Base Storage Box mount health
+    - Mount type (bind mount vs direct sshfs)
+    - Network connectivity hints
+    - Filesystem state
+    """
+    print(f"DIAGNOSTIC: Stale mount detected at {path}", file=sys.stderr)
+    if job_id is not None:
+        print(f"  Job ID: {job_id}", file=sys.stderr)
+
+    # Check base Storage Box mount
+    storagebox_ok, storagebox_errno = _probe_readable_dir(storagebox_mount)
+    if storagebox_ok == 1:
+        print("  Base sshfs: OK (readable)", file=sys.stderr)
+    else:
+        print(f"  Base sshfs: FAILED (errno={storagebox_errno})", file=sys.stderr)
+
+    # Analyze mount type
+    fstype = mount_info.get("fstype", "unknown")
+    source = mount_info.get("source", "unknown")
+    target = mount_info.get("target", "unknown")
+
+    if "fuse.sshfs" in fstype:
+        mount_type = "direct sshfs mount"
+    elif source and ":" not in source:
+        mount_type = "bind mount (from local path)"
+    else:
+        mount_type = "unknown"
+
+    print(f"  Mount type: {mount_type}", file=sys.stderr)
+    print(f"  Mount source: {source}", file=sys.stderr)
+    print(f"  Mount target: {target}", file=sys.stderr)
+    print(f"  Filesystem type: {fstype}", file=sys.stderr)
+
+    # Check if path is under storagebox (indicates bind mount relationship)
+    if str(storagebox_mount) in str(path):
+        print("  Note: Path is under Storage Box mount (bind mount scenario)", file=sys.stderr)
+
+    # Probe findmnt for more details
+    try:
+        result = _run_read(["findmnt", "-T", path, "-o", "SOURCE,TARGET,FSTYPE,OPTIONS", "-n"])
+        if result.returncode == 0 and result.stdout.strip():
+            print(f"  findmnt output: {result.stdout.strip()}", file=sys.stderr)
+    except Exception:
+        pass
+
+    # Check if parent directory is readable (helps isolate issue)
+    try:
+        parent = str(Path(path).parent)
+        parent_ok, parent_errno = _probe_readable_dir(Path(parent))
+        if parent_ok == 1:
+            print(f"  Parent dir ({parent}): readable", file=sys.stderr)
+        else:
+            print(f"  Parent dir ({parent}): unreadable (errno={parent_errno})", file=sys.stderr)
+    except Exception as e:
+        print(f"  Parent dir check failed: {e}", file=sys.stderr)
+
+    print("", file=sys.stderr)
+
+
 def _deploy_lock_is_active(
     deploy_lock_file: Path,
     *,
@@ -716,15 +786,20 @@ def main(argv: list[str] | None = None) -> int:
         ok, errno = _probe_readable_dir(out_dir)
         if ok == 0 and errno == 107:
             key = f"job:{job.job_id}"
+            mount_info = _get_mount_info(str(out_dir)) or {}
             detected[key] = {
                 "kind": "job_output_dir",
                 "job_id": job.job_id,
                 "source": job.source_code,
                 "path": str(out_dir),
                 "errno": errno,
-                "mount": _get_mount_info(str(out_dir)) or {},
+                "mount": mount_info,
             }
             impacted_sources.add(job.source_code)
+            # Log diagnostics for root cause investigation
+            _log_stale_mount_diagnostics(
+                str(out_dir), job.job_id, mount_info, storagebox_mount=storagebox_mount
+            )
 
     # Probe output dirs for the next queued/retryable jobs (secondary signal; prevents retry storms).
     for job in next_jobs:
@@ -734,6 +809,7 @@ def main(argv: list[str] | None = None) -> int:
         ok, errno = _probe_readable_dir(out_dir)
         if ok == 0 and errno == 107:
             key = f"next_job:{job.job_id}"
+            mount_info = _get_mount_info(str(out_dir)) or {}
             detected[key] = {
                 "kind": "next_job_output_dir",
                 "job_id": job.job_id,
@@ -741,20 +817,29 @@ def main(argv: list[str] | None = None) -> int:
                 "status": job.status,
                 "path": str(out_dir),
                 "errno": errno,
-                "mount": _get_mount_info(str(out_dir)) or {},
+                "mount": mount_info,
             }
+            # Log diagnostics for next jobs too (helps understand scope of issue)
+            _log_stale_mount_diagnostics(
+                str(out_dir), job.job_id, mount_info, storagebox_mount=storagebox_mount
+            )
 
     # Probe manifest hot paths (secondary signal; catches imports/etc).
     for hot in hot_paths:
         ok, errno = _probe_readable_dir(hot)
         if ok == 0 and errno == 107:
             key = f"hot:{hot}"
+            mount_info = _get_mount_info(str(hot)) or {}
             detected[key] = {
                 "kind": "tiering_hot_path",
                 "path": str(hot),
                 "errno": errno,
-                "mount": _get_mount_info(str(hot)) or {},
+                "mount": mount_info,
             }
+            # Log diagnostics for tiering hot paths
+            _log_stale_mount_diagnostics(
+                str(hot), None, mount_info, storagebox_mount=storagebox_mount
+            )
 
     if simulate_broken_paths:
         running_by_output_dir = {
