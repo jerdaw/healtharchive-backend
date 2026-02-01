@@ -317,6 +317,10 @@
          <lastmod>2026-02-01</lastmod>
     </url>
     <url>
+         <loc>https://docs.healtharchive.ca/operations/thresholds-and-tuning/</loc>
+         <lastmod>2026-02-01</lastmod>
+    </url>
+    <url>
          <loc>https://docs.healtharchive.ca/operations/verification-packet/</loc>
          <lastmod>2026-02-01</lastmod>
     </url>
@@ -514,6 +518,10 @@
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/roadmaps/2026-01-29-warc-discovery-consistency/</loc>
+         <lastmod>2026-02-01</lastmod>
+    </url>
+    <url>
+         <loc>https://docs.healtharchive.ca/roadmaps/2026-02-01-operational-resilience-improvements/</loc>
          <lastmod>2026-02-01</lastmod>
     </url>
     <url>
