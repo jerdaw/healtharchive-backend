@@ -3,7 +3,7 @@
 **Created**: 2026-02-01
 **Status**: Active Investigation
 **Priority**: P1 - Impacts crawler operations
-**Related**: [Operational Resilience Roadmap](./2026-02-01-operational-resilience-improvements.md)
+**Related**: [Operational Resilience Roadmap](./implemented/2026-02-01-operational-resilience-improvements.md)
 
 ---
 

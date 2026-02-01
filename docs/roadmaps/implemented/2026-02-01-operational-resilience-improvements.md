@@ -1,7 +1,8 @@
 # Implementation Plan: Operational Resilience Improvements
 
 **Created**: 2026-02-01
-**Status**: Active
+**Completed**: 2026-02-01
+**Status**: Implemented
 **Focus**: Address recurring operational issues: stale mounts, disk pressure, crawl stalls
 
 ---
@@ -32,13 +33,13 @@ Based on production observations from the 2026 annual campaign:
 5. **Disk usage mystery** (discovered during investigation)
    - `du -x` shows 14GB actual data, `df` shows 62GB used
    - 48GB discrepancy unexplained after extensive investigation
-   - See: [Disk Usage Investigation](./2026-02-01-disk-usage-investigation.md)
+   - See: [Disk Usage Investigation](../2026-02-01-disk-usage-investigation.md)
 
 ---
 
 ## Related Investigations
 
-- **[Disk Usage Mystery](./2026-02-01-disk-usage-investigation.md)**: Detailed investigation of 48GB discrepancy between `du` and `df`. Includes temporary measures, what we've tried, and maintenance window plan for `fsck`.
+- **[Disk Usage Mystery](../2026-02-01-disk-usage-investigation.md)**: Detailed investigation of 48GB discrepancy between `du` and `df`. Includes temporary measures, what we've tried, and maintenance window plan for `fsck`.
 
 ---
 
@@ -81,7 +82,7 @@ Based on production observations from the 2026 annual campaign:
 | Stale mount root cause unknown | Recoveries happen but issue recurs | P1 | 🔍 **Investigating** - Diagnostic logging added |
 | No stall type classification | All stalls treated equally | P3 | Deferred |
 | Threshold rationale undocumented | Tuning requires archaeology | P2 | ✅ **Resolved** - Thresholds doc created |
-| 48GB disk usage mystery | Disk at 82-86% with only 14GB data | P1 | 🔍 **Investigating** - See [disk investigation](./2026-02-01-disk-usage-investigation.md) |
+| 48GB disk usage mystery | Disk at 82-86% with only 14GB data | P1 | 🔍 **Investigating** - See [disk investigation](../2026-02-01-disk-usage-investigation.md) |
 
 ---
 
@@ -408,14 +409,14 @@ RECOVERY_BUDGET = {
 | Phase | Item | Effort | Priority | Status |
 |-------|------|--------|----------|--------|
 | 1.1 | Clear stale mounts | 30 min | P0 | ✅ Done on VPS (2026-02-01) |
-| 1.2 | Free disk space | 30 min | P0 | ✅ Done on VPS (2026-02-01) - see [disk investigation](./2026-02-01-disk-usage-investigation.md) |
+| 1.2 | Free disk space | 30 min | P0 | ✅ Done on VPS (2026-02-01) - see [disk investigation](../2026-02-01-disk-usage-investigation.md) |
 | 1.3 | Investigate watchdog behavior | 1 hr | P0 | ✅ Reviewed (2026-02-01) - rate limits/caps functioning |
 | 2.1 | Disk threshold cleanup trigger | 2-3 hrs | P1 | ✅ Deployed on VPS (2026-02-01) |
 | 2.2 | Worker disk warning log | 30 min | P2 | ✅ Already implemented (verified at `worker/main.py:168-174`) |
-| 3.1 | Root cause investigation | Ongoing | P1 | Ongoing - see [disk investigation](./2026-02-01-disk-usage-investigation.md) |
+| 3.1 | Root cause investigation | Ongoing | P1 | Ongoing - see [disk investigation](../2026-02-01-disk-usage-investigation.md) |
 | 3.2 | Watchdog diagnostic logging | 1 hr | P2 | ✅ Deployed on VPS (2026-02-01) |
 | 4.1 | Watchdog status CLI | 2-3 hrs | P2 | ✅ Done (2026-02-01) - see known issues below |
-| 4.2 | Threshold documentation | 1 hr | P2 | ✅ Done - see [thresholds-and-tuning.md](../operations/thresholds-and-tuning.md) |
+| 4.2 | Threshold documentation | 1 hr | P2 | ✅ Done - see [thresholds-and-tuning.md](../../operations/thresholds-and-tuning.md) |
 | 5.1 | Stall classification | 4-6 hrs | P3 | Deferred |
 
 ---
@@ -489,4 +490,4 @@ chmod +x /tmp/watchdog-status.sh
 - SSHFS mount options are already hardened; root cause is likely elsewhere
 - All automation remains opt-in via sentinel files (safe-by-default)
 - ~~Watchdog status CLI would significantly improve operator experience~~ **Implemented with workaround**
-- See [Disk Usage Investigation](./2026-02-01-disk-usage-investigation.md) for 48GB mystery and temporary measures
+- See [Disk Usage Investigation](../2026-02-01-disk-usage-investigation.md) for 48GB mystery and temporary measures
