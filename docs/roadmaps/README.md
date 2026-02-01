@@ -11,6 +11,7 @@ When complete, move them to `docs/roadmaps/implemented/` and date them.
 
 Active plans:
 
+- Operational resilience improvements: `2026-02-01-operational-resilience-improvements.md`
 - WARC discovery consistency improvements: `2026-01-29-warc-discovery-consistency.md`
 
 ## Implemented plans (history)
