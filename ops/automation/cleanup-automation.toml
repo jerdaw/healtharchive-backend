@@ -1,3 +1,8 @@
+# Regular cleanup (timer-based)
 min_age_days = 14
 keep_latest_per_source = 2
 max_jobs_per_run = 1
+
+# Threshold-triggered cleanup (event-driven)
+threshold_trigger_percent = 80
+threshold_max_jobs_per_run = 5
