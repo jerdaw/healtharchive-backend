@@ -29,6 +29,17 @@ Based on production observations from the 2026 annual campaign:
    - Each watchdog has Prometheus metrics but no consolidated operator view
    - Threshold rationale is scattered across docs
 
+5. **Disk usage mystery** (discovered during investigation)
+   - `du -x` shows 14GB actual data, `df` shows 62GB used
+   - 48GB discrepancy unexplained after extensive investigation
+   - See: [Disk Usage Investigation](./2026-02-01-disk-usage-investigation.md)
+
+---
+
+## Related Investigations
+
+- **[Disk Usage Mystery](./2026-02-01-disk-usage-investigation.md)**: Detailed investigation of 48GB discrepancy between `du` and `df`. Includes temporary measures, what we've tried, and maintenance window plan for `fsck`.
+
 ---
 
 ## Existing Implementation (Already Done)
