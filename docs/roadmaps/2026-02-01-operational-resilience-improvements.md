@@ -72,15 +72,16 @@ Based on production observations from the 2026 annual campaign:
 
 ---
 
-## What's Actually Missing
+## What's Actually Missing (Gap Analysis)
 
-| Gap | Impact | Priority |
-|-----|--------|----------|
-| No disk threshold cleanup trigger | Jobs blocked until manual cleanup | P1 |
-| No unified watchdog status view | Operators must check 3+ JSON files | P2 |
-| Stale mount root cause unknown | Recoveries happen but issue recurs | P1 |
-| No stall type classification | All stalls treated equally | P3 |
-| Threshold rationale undocumented | Tuning requires archaeology | P2 |
+| Gap | Impact | Priority | Status |
+|-----|--------|----------|--------|
+| No disk threshold cleanup trigger | Jobs blocked until manual cleanup | P1 | ✅ **Resolved** - Timer deployed |
+| No unified watchdog status view | Operators must check 3+ JSON files | P2 | ✅ **Resolved** - CLI command added |
+| Stale mount root cause unknown | Recoveries happen but issue recurs | P1 | 🔍 **Investigating** - Diagnostic logging added |
+| No stall type classification | All stalls treated equally | P3 | Deferred |
+| Threshold rationale undocumented | Tuning requires archaeology | P2 | ✅ **Resolved** - Thresholds doc created |
+| 48GB disk usage mystery | Disk at 82-86% with only 14GB data | P1 | 🔍 **Investigating** - See [disk investigation](./2026-02-01-disk-usage-investigation.md) |
 
 ---
 
@@ -406,15 +407,15 @@ RECOVERY_BUDGET = {
 
 | Phase | Item | Effort | Priority | Status |
 |-------|------|--------|----------|--------|
-| 1.1 | Clear stale mounts | 30 min | P0 | Manual - operator |
-| 1.2 | Free disk space | 30 min | P0 | Manual - operator |
-| 1.3 | Investigate watchdog behavior | 1 hr | P0 | Manual - operator |
-| 2.1 | Disk threshold cleanup trigger | 2-3 hrs | P1 | ✅ Done (2026-02-01) - needs VPS deployment |
-| 2.2 | Worker disk warning log | 30 min | P2 | ✅ Already implemented |
-| 3.1 | Root cause investigation | Ongoing | P1 | Manual - operator |
-| 3.2 | Watchdog diagnostic logging | 1 hr | P2 | ✅ Done (2026-02-01) |
-| 4.1 | Watchdog status CLI | 2-3 hrs | P2 | ✅ Done (2026-02-01) |
-| 4.2 | Threshold documentation | 1 hr | P2 | ✅ Done (2026-02-01) |
+| 1.1 | Clear stale mounts | 30 min | P0 | ✅ Done on VPS (2026-02-01) |
+| 1.2 | Free disk space | 30 min | P0 | ✅ Done on VPS (2026-02-01) - see [disk investigation](./2026-02-01-disk-usage-investigation.md) |
+| 1.3 | Investigate watchdog behavior | 1 hr | P0 | ✅ Reviewed (2026-02-01) - rate limits/caps functioning |
+| 2.1 | Disk threshold cleanup trigger | 2-3 hrs | P1 | ✅ Deployed on VPS (2026-02-01) |
+| 2.2 | Worker disk warning log | 30 min | P2 | ✅ Already implemented (verified at `worker/main.py:168-174`) |
+| 3.1 | Root cause investigation | Ongoing | P1 | Ongoing - see [disk investigation](./2026-02-01-disk-usage-investigation.md) |
+| 3.2 | Watchdog diagnostic logging | 1 hr | P2 | ✅ Deployed on VPS (2026-02-01) |
+| 4.1 | Watchdog status CLI | 2-3 hrs | P2 | ✅ Done (2026-02-01) - see known issues below |
+| 4.2 | Threshold documentation | 1 hr | P2 | ✅ Done - see [thresholds-and-tuning.md](../operations/thresholds-and-tuning.md) |
 | 5.1 | Stall classification | 4-6 hrs | P3 | Deferred |
 
 ---
@@ -453,10 +454,39 @@ RECOVERY_BUDGET = {
 
 ---
 
+## Known Issues
+
+### Watchdog-status CLI invocation bug
+
+The `watchdog-status` command doesn't work when invoked via `python -m ha_backend.cli watchdog-status` (produces no output), but works when calling the function directly.
+
+**Workaround** (on VPS):
+```bash
+# Create wrapper script
+cat > /tmp/watchdog-status.sh << 'EOF'
+#!/bin/bash
+sudo -u haadmin bash -lc 'set -a; source /etc/healtharchive/backend.env; set +a; \
+  /opt/healtharchive-backend/.venv/bin/python3 -c "
+from ha_backend.cli import cmd_watchdog_status
+import argparse
+cmd_watchdog_status(argparse.Namespace())
+"'
+EOF
+chmod +x /tmp/watchdog-status.sh
+
+# Use:
+/tmp/watchdog-status.sh
+```
+
+**Status**: Low priority - workaround is sufficient for operator use.
+
+---
+
 ## Notes
 
-- Phase 1 should be executed immediately by the operator
+- ~~Phase 1 should be executed immediately by the operator~~ **Done (2026-02-01)**
 - The existing automation is comprehensive but may be hitting rate limits or deploy locks
 - SSHFS mount options are already hardened; root cause is likely elsewhere
 - All automation remains opt-in via sentinel files (safe-by-default)
-- Watchdog status CLI would significantly improve operator experience
+- ~~Watchdog status CLI would significantly improve operator experience~~ **Implemented with workaround**
+- See [Disk Usage Investigation](./2026-02-01-disk-usage-investigation.md) for 48GB mystery and temporary measures
