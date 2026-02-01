@@ -398,7 +398,7 @@ RECOVERY_BUDGET = {
 | 1.1 | Clear stale mounts | 30 min | P0 | Manual - operator |
 | 1.2 | Free disk space | 30 min | P0 | Manual - operator |
 | 1.3 | Investigate watchdog behavior | 1 hr | P0 | Manual - operator |
-| 2.1 | Disk threshold cleanup trigger | 2-3 hrs | P1 | TODO |
+| 2.1 | Disk threshold cleanup trigger | 2-3 hrs | P1 | ✅ Done (2026-02-01) - needs VPS deployment |
 | 2.2 | Worker disk warning log | 30 min | P2 | ✅ Already implemented |
 | 3.1 | Root cause investigation | Ongoing | P1 | Manual - operator |
 | 3.2 | Watchdog diagnostic logging | 1 hr | P2 | TODO |

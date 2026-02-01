@@ -1,0 +1,11 @@
+[Unit]
+Description=HealthArchive disk threshold cleanup timer
+Documentation=https://github.com/jerdaw/healtharchive-backend
+
+[Timer]
+# Run every 30 minutes
+OnCalendar=*:00,30
+Persistent=true
+
+[Install]
+WantedBy=timers.target

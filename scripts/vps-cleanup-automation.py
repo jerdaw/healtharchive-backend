@@ -19,6 +19,8 @@ class CleanupConfig:
     min_age_days: int
     keep_latest_per_source: int
     max_jobs_per_run: int
+    threshold_trigger_percent: int = 80
+    threshold_max_jobs_per_run: int = 5
 
 
 @dataclass(frozen=True)
@@ -53,10 +55,14 @@ def _load_config(path: Path) -> CleanupConfig:
     min_age_days = int(raw.get("min_age_days", 14))
     keep_latest = int(raw.get("keep_latest_per_source", 2))
     max_jobs = int(raw.get("max_jobs_per_run", 1))
+    threshold_trigger = int(raw.get("threshold_trigger_percent", 80))
+    threshold_max = int(raw.get("threshold_max_jobs_per_run", 5))
     return CleanupConfig(
         min_age_days=min_age_days,
         keep_latest_per_source=keep_latest,
         max_jobs_per_run=max_jobs,
+        threshold_trigger_percent=threshold_trigger,
+        threshold_max_jobs_per_run=threshold_max,
     )
 
 
@@ -106,6 +112,18 @@ def _iter_candidates(session, sources: Iterable[str] | None) -> list[CleanupCand
     return candidates
 
 
+def _check_disk_usage(path: str = "/") -> int:
+    """Return disk usage percentage for the given path."""
+    try:
+        st = os.statvfs(path)
+        used = st.f_blocks - st.f_bavail
+        if st.f_blocks > 0:
+            return int(100 * used / st.f_blocks)
+    except OSError:
+        pass
+    return 0
+
+
 def _find_ha_backend_bin() -> str:
     preferred = Path("/opt/healtharchive-backend/.venv/bin/ha-backend")
     if preferred.is_file():
@@ -148,6 +166,15 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         default=False,
         help="Apply cleanup (default is dry-run).",
+    )
+    parser.add_argument(
+        "--threshold-mode",
+        action="store_true",
+        default=False,
+        help=(
+            "Threshold-triggered cleanup: only run if disk usage exceeds threshold, "
+            "and use more aggressive max_jobs_per_run."
+        ),
     )
     parser.add_argument(
         "--out-dir",
@@ -210,6 +237,47 @@ def main(argv: list[str] | None = None) -> int:
         tmp.replace(out_file)
         return 0
 
+    # Threshold mode: only run if disk usage exceeds threshold
+    if args.threshold_mode:
+        disk_usage = _check_disk_usage("/")
+        if disk_usage < config.threshold_trigger_percent:
+            print(
+                f"Disk usage at {disk_usage}%, below threshold {config.threshold_trigger_percent}%. Skipping cleanup."
+            )
+            _emit(lines, "healtharchive_cleanup_candidates_total 0")
+            _emit(lines, "healtharchive_cleanup_selected_total 0")
+            _emit(lines, "healtharchive_cleanup_applied_total 0")
+            _emit(lines, "healtharchive_cleanup_apply_errors_total 0")
+            _emit(
+                lines,
+                "# HELP healtharchive_cleanup_threshold_triggered 1 if cleanup was triggered by disk threshold.",
+            )
+            _emit(lines, "# TYPE healtharchive_cleanup_threshold_triggered gauge")
+            _emit(lines, "healtharchive_cleanup_threshold_triggered 0")
+            _emit(
+                lines,
+                "# HELP healtharchive_cleanup_disk_usage Disk usage percent at time of check.",
+            )
+            _emit(lines, "# TYPE healtharchive_cleanup_disk_usage gauge")
+            _emit(lines, f"healtharchive_cleanup_disk_usage {disk_usage}")
+            out_dir = Path(args.out_dir)
+            out_dir.mkdir(parents=True, exist_ok=True)
+            out_file = out_dir / str(args.out_file)
+            tmp = out_file.with_suffix(out_file.suffix + f".{os.getpid()}.tmp")
+            tmp.write_text("\n".join(lines) + "\n", encoding="utf-8")
+            tmp.chmod(0o644)
+            tmp.replace(out_file)
+            return 0
+        else:
+            print(
+                f"Disk usage at {disk_usage}%, above threshold {config.threshold_trigger_percent}%. Running aggressive cleanup."
+            )
+            # Use more aggressive max_jobs_per_run in threshold mode
+            max_jobs_override = config.threshold_max_jobs_per_run
+    else:
+        disk_usage = _check_disk_usage("/")
+        max_jobs_override = config.max_jobs_per_run
+
     selected: list[CleanupCandidate] = []
     with get_session() as session:
         rows = _iter_candidates(session, None)
@@ -259,7 +327,7 @@ def main(argv: list[str] | None = None) -> int:
         eligible,
         key=lambda c: c.timestamp() or datetime.min.replace(tzinfo=timezone.utc),
     )
-    selected = eligible_sorted[: int(config.max_jobs_per_run)]
+    selected = eligible_sorted[: int(max_jobs_override)]
 
     _emit(lines, f"healtharchive_cleanup_candidates_total {len(eligible_sorted)}")
     _emit(lines, f"healtharchive_cleanup_selected_total {len(selected)}")
@@ -275,6 +343,17 @@ def main(argv: list[str] | None = None) -> int:
 
     _emit(lines, f"healtharchive_cleanup_applied_total {applied}")
     _emit(lines, f"healtharchive_cleanup_apply_errors_total {errors}")
+
+    # Emit threshold mode metrics
+    _emit(
+        lines,
+        "# HELP healtharchive_cleanup_threshold_triggered 1 if cleanup was triggered by disk threshold.",
+    )
+    _emit(lines, "# TYPE healtharchive_cleanup_threshold_triggered gauge")
+    _emit(lines, f"healtharchive_cleanup_threshold_triggered {1 if args.threshold_mode else 0}")
+    _emit(lines, "# HELP healtharchive_cleanup_disk_usage Disk usage percent at time of check.")
+    _emit(lines, "# TYPE healtharchive_cleanup_disk_usage gauge")
+    _emit(lines, f"healtharchive_cleanup_disk_usage {disk_usage}")
 
     out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
