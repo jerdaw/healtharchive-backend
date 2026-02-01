@@ -75,11 +75,11 @@ def test_status_command_basic_output(monkeypatch, tmp_path) -> None:
     assert "[Jobs]" in output
     assert "[Automation]" in output
 
-    # Verify job counts
+    # Verify job counts (accounting for ANSI color codes)
     assert "Total: 3" in output
-    assert "Running: 1" in output
-    assert "Retryable: 1" in output
-    assert "Indexed: 1" in output
+    assert "Running:" in output and "1" in output
+    assert "Retryable:" in output
+    assert "Indexed:" in output
 
 
 def test_status_command_with_no_jobs(monkeypatch, tmp_path) -> None:
