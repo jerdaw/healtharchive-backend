@@ -171,10 +171,11 @@ nav:
       - Active Work: roadmaps/README.md
       - Active Investigations:
           - Disk Usage Mystery: roadmaps/2026-02-01-disk-usage-investigation.md
-          - Operational Resilience: roadmaps/2026-02-01-operational-resilience-improvements.md
       - Future Roadmap: roadmaps/roadmap.md
       - Roadmap Process: roadmap-process.md
-      - Implemented Plans: roadmaps/implemented/README.md
+      - Implemented Plans:
+          - Overview: roadmaps/implemented/README.md
+          - Operational Resilience (2026-02-01): roadmaps/implemented/2026-02-01-operational-resilience-improvements.md
   - About:
       - Multi-Repo Setup: project.md
       - Contributing: CONTRIBUTING.md
