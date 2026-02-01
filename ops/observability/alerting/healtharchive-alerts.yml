@@ -15,27 +15,27 @@ groups:
       - alert: HealthArchiveDiskUsageHigh
         expr: |
           (100 - (node_filesystem_avail_bytes{mountpoint="__MOUNTPOINT__",fstype!~"tmpfs|overlay"} /
-          node_filesystem_size_bytes{mountpoint="__MOUNTPOINT__",fstype!~"tmpfs|overlay"} * 100)) > 80
+          node_filesystem_size_bytes{mountpoint="__MOUNTPOINT__",fstype!~"tmpfs|overlay"} * 100)) > 85
         for: 30m
         labels:
           severity: warning
           service: healtharchive
         annotations:
-          summary: "Disk usage > 80% on __MOUNTPOINT__"
-          description: "Disk usage has been > 80% for 30m on the filesystem backing __MOUNTPOINT__. On a single-VPS setup, this often includes /srv/healtharchive."
+          summary: "Disk usage > 85% on __MOUNTPOINT__"
+          description: "Disk usage has been > 85% for 30m on the filesystem backing __MOUNTPOINT__. Baseline is ~82% with automated cleanup; sustained usage above 85% indicates accumulation. Check Docker images, logs, and temp crawl dirs."
           runbook_url: "https://github.com/jerdaw/healtharchive-backend/blob/main/docs/operations/playbooks/incident-response.md"
 
       - alert: HealthArchiveDiskUsageCritical
         expr: |
           (100 - (node_filesystem_avail_bytes{mountpoint="__MOUNTPOINT__",fstype!~"tmpfs|overlay"} /
-          node_filesystem_size_bytes{mountpoint="__MOUNTPOINT__",fstype!~"tmpfs|overlay"} * 100)) > 90
+          node_filesystem_size_bytes{mountpoint="__MOUNTPOINT__",fstype!~"tmpfs|overlay"} * 100)) > 92
         for: 10m
         labels:
           severity: critical
           service: healtharchive
         annotations:
-          summary: "Disk usage > 90% on __MOUNTPOINT__"
-          description: "Disk usage has been > 90% for 10m on the filesystem backing __MOUNTPOINT__. Immediate cleanup or storage expansion is recommended."
+          summary: "Disk usage > 92% on __MOUNTPOINT__"
+          description: "Disk usage has been > 92% for 10m on the filesystem backing __MOUNTPOINT__. Immediate action required: run docker-cleanup.sh, truncate container logs, or stop crawls to prevent disk-full failures."
           runbook_url: "https://github.com/jerdaw/healtharchive-backend/blob/main/docs/operations/playbooks/incident-response.md"
 
       - alert: HealthArchiveSearchErrorsSustained
