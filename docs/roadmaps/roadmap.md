@@ -66,6 +66,13 @@ Keep this list short; prefer linking to the canonical doc that explains the item
   - Remaining: unify discovery methods, enhance show-job output, sync vps-crawl-status.sh
   - See: `./2026-01-29-warc-discovery-consistency.md`
 
+- ✅ Disk management & monitoring (completed 2026-02-01):
+  - Pre-crawl disk headroom check (85% threshold)
+  - Automated cleanup (Docker weekly, log rotation)
+  - Updated alert thresholds (85% warning, 92% critical)
+  - Disk baseline documentation
+  - See: `../operations/disk-baseline-and-cleanup.md`
+
 - Consider whether a separate staging backend is worth it (increases ops surface; only do if it buys real safety).
   - See: `../deployment/environments-and-configuration.md`
 - Canary replay job (replay smoke independence):
