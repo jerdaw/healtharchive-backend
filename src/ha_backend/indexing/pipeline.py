@@ -66,7 +66,7 @@ def _has_stable_warcs(warcs_dir: Path) -> bool:
     return has_compressed or has_uncompressed
 
 
-def _attempt_temp_warc_consolidation(job_id: int, job: "ORMArchiveJob", output_dir: Path) -> None:
+def _attempt_temp_warc_consolidation(job_id: int, job: ArchiveJob, output_dir: Path) -> None:
     """Try consolidating legacy temp WARCs into stable directory."""
     temp_warcs = discover_temp_warcs_for_job(job)
     if not temp_warcs:
