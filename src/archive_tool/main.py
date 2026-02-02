@@ -25,6 +25,34 @@ logger = logging.getLogger("website_archiver.main")
 stop_event = threading.Event()
 
 
+# --- Helper Functions for Adaptation Logic ---
+
+
+def _should_attempt_container_restart(
+    adaptation_performed: bool,
+    enable_restart: bool,
+    event_status: str,
+    event_reason: Optional[str],
+) -> bool:
+    """
+    Check if container restart adaptation should be attempted.
+
+    Container restart is attempted when:
+    - No other adaptation has been performed yet
+    - Container restart is enabled
+    - Either the crawl is stalled OR persistent error thresholds were hit
+    """
+    if adaptation_performed:
+        return False
+    if not enable_restart:
+        return False
+
+    is_stalled = event_status == "stalled"
+    hit_error_threshold = event_reason in {"http_threshold", "timeout_threshold"}
+
+    return is_stalled or hit_error_threshold
+
+
 # --- Global Signal Handling Setup ---
 def signal_handler(signum, frame):
     """Handles SIGINT/SIGTERM for graceful shutdown attempt."""
@@ -48,14 +76,17 @@ def signal_handler(signum, frame):
         )
         try:
             docker_runner.current_docker_process.terminate()
-            # Wait a short time for termination
-            docker_runner.current_docker_process.wait(timeout=10)
+            docker_runner.current_docker_process.wait(
+                timeout=constants.DOCKER_PROCESS_TERM_TIMEOUT_SEC
+            )
             logger.info("Docker process terminated.")
         except subprocess.TimeoutExpired:
             logger.warning("Docker process did not terminate gracefully, attempting kill...")
             try:
                 docker_runner.current_docker_process.kill()
-                docker_runner.current_docker_process.wait(timeout=5)  # Wait for kill
+                docker_runner.current_docker_process.wait(
+                    timeout=constants.DOCKER_PROCESS_KILL_TIMEOUT_SEC
+                )
                 logger.info("Docker process killed.")
             except Exception as e:
                 logger.error(f"Failed to kill Docker process: {e}", exc_info=True)
@@ -986,18 +1017,11 @@ def main():
                             )
 
                     # 3. Container Restart (Requires Container Restart)
-                    #
-                    # Only apply when explicitly enabled. In addition to the
-                    # monitor's stall detection, allow restart on persistent
-                    # error-threshold events (e.g. repeated ERR_HTTP2_* on canada.ca)
-                    # to avoid getting stuck in "backoff-only" loops.
-                    if (
-                        adaptation_performed_type is None
-                        and getattr(script_args, "enable_adaptive_restart", False)
-                        and (
-                            event_status == "stalled"
-                            or event_reason in {"http_threshold", "timeout_threshold"}
-                        )
+                    if _should_attempt_container_restart(
+                        adaptation_performed=adaptation_performed_type is not None,
+                        enable_restart=getattr(script_args, "enable_adaptive_restart", False),
+                        event_status=event_status,
+                        event_reason=event_reason,
                     ):
                         logger.info("Attempting strategy: Container Restart")
                         try:

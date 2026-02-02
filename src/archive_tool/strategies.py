@@ -7,6 +7,7 @@ import threading
 import time
 
 # Use absolute imports
+from archive_tool.constants import CONTAINER_STOP_SETTLE_DELAY_SEC
 from archive_tool.state import CrawlState
 from archive_tool.utils import execute_external_command
 
@@ -46,7 +47,7 @@ def attempt_worker_reduction(state: CrawlState, args: argparse.Namespace) -> boo
     logger.info("Stopping Docker container for worker reduction...")
     stop_docker_container(current_container_id)  # Requires container ID from docker_runner
     logger.info("Waiting briefly after container stop...")
-    time.sleep(5)  # Allow time for container to fully stop
+    time.sleep(CONTAINER_STOP_SETTLE_DELAY_SEC)
 
     # --- Update State ---
     new_worker_count = max(args.min_workers, state.current_workers - 1)
@@ -90,7 +91,7 @@ def attempt_container_restart(state: CrawlState, args: argparse.Namespace) -> bo
     logger.info("Stopping Docker container for restart...")
     stop_docker_container(current_container_id)
     logger.info("Waiting briefly after container stop...")
-    time.sleep(5)
+    time.sleep(CONTAINER_STOP_SETTLE_DELAY_SEC)
 
     state.container_restarts_done += 1
     state.reset_runtime_errors()

@@ -49,6 +49,11 @@ from .logging_config import configure_logging
 from .seeds import seed_sources
 from .worker import run_worker_loop
 
+# === Constants ===
+
+# Subprocess timeouts for status commands
+SYSTEM_STATUS_CHECK_TIMEOUT_SEC = 5  # Timeout for systemctl and findmnt checks
+
 # === Command implementations ===
 
 
@@ -138,7 +143,7 @@ def cmd_status(args: argparse.Namespace) -> None:
             ["systemctl", "is-active", "healtharchive-worker.service"],
             capture_output=True,
             text=True,
-            timeout=5,
+            timeout=SYSTEM_STATUS_CHECK_TIMEOUT_SEC,
         )
         worker_status = result.stdout.strip()
         if worker_status == "active":
@@ -174,7 +179,7 @@ def cmd_status(args: argparse.Namespace) -> None:
             ["findmnt", "-T", storagebox_path, "-o", "FSTYPE", "-n"],
             capture_output=True,
             text=True,
-            timeout=5,
+            timeout=SYSTEM_STATUS_CHECK_TIMEOUT_SEC,
         )
         if result.returncode == 0 and "sshfs" in result.stdout.lower():
             # Try to read it

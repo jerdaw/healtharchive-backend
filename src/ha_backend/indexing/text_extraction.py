@@ -9,6 +9,15 @@ from bs4 import BeautifulSoup, Tag
 from ha_backend.indexing.mapping import normalize_url_for_grouping
 
 # ---------------------------------------------------------------------------
+# Text analysis constants
+# ---------------------------------------------------------------------------
+
+# Text sample lengths for content analysis
+BOILERPLATE_CHECK_SAMPLE_LENGTH = 200  # Characters to check for boilerplate phrases
+LANGUAGE_DETECTION_SAMPLE_LENGTH = 500  # Characters to sample for language detection
+ARCHIVED_DETECTION_SAMPLE_LENGTH = 2000  # Characters to check for archived page markers
+
+# ---------------------------------------------------------------------------
 # Boilerplate phrase lists (bilingual EN/FR)
 # ---------------------------------------------------------------------------
 
@@ -171,7 +180,7 @@ def _find_content_root(soup: BeautifulSoup) -> Tag | BeautifulSoup:
 
 def _is_boilerplate_text(text: str) -> bool:
     """Check if text starts with or is dominated by boilerplate phrases."""
-    text_lower = text.lower().strip()[:200]
+    text_lower = text.lower().strip()[:BOILERPLATE_CHECK_SAMPLE_LENGTH]
 
     for phrase in _BOILERPLATE_PHRASES:
         if text_lower.startswith(phrase):
@@ -302,7 +311,7 @@ def detect_language(text: str, headers: Optional[Dict[str, str]] = None) -> str:
         if primary:
             return primary
 
-    sample = text[:500].lower()
+    sample = text[:LANGUAGE_DETECTION_SAMPLE_LENGTH].lower()
     if any(token in sample for token in [" le ", " la ", " des ", " que ", " une "]):
         return "fr"
     if any(token in sample for token in [" the ", " and ", " of ", " for ", " with "]):
@@ -334,7 +343,7 @@ def detect_is_archived(title: Optional[str], text: str) -> bool:
                 return True
 
     # Check body for archived banner phrases.
-    text_lower = text.lower()[:2000]  # Check first 2000 chars for banners.
+    text_lower = text.lower()[:ARCHIVED_DETECTION_SAMPLE_LENGTH]
     for pattern in _ARCHIVED_BODY_PATTERNS:
         if pattern in text_lower:
             return True

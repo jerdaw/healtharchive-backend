@@ -30,6 +30,34 @@ logger = logging.getLogger("healtharchive.jobs")
 # jobs which otherwise bypass the retry budget.
 MAX_INFRA_ERROR_RETRIES = 5
 
+
+# --- Helper predicates for error classification ---
+
+
+def _has_remaining_infra_error_retries(retry_count: int) -> bool:
+    """Check if job has remaining infra error retry budget."""
+    return retry_count < MAX_INFRA_ERROR_RETRIES
+
+
+def _should_retry_as_infra_error(retry_count: int) -> bool:
+    """Determine if job should be retried due to infra error."""
+    return _has_remaining_infra_error_retries(retry_count)
+
+
+def _check_output_dir_is_accessible_directory(output_dir: Path) -> bool:
+    """
+    Check if output directory exists and is accessible.
+
+    Returns:
+        True if directory is accessible, False if there's a config/layout problem.
+
+    Raises:
+        OSError: If there's a storage infrastructure error (errno 107, 13, etc.)
+    """
+    st = output_dir.stat()
+    return stat.S_ISDIR(st.st_mode)
+
+
 _LOG_CONFIG_ERROR_MARKERS = (
     "unrecognized arguments",
     "unknown option",
@@ -485,10 +513,8 @@ def run_persistent_job(job_id: int) -> int:
         else:
             infra = False
             try:
-                st = Path(job_row.output_dir).stat()
-                if not stat.S_ISDIR(st.st_mode):
-                    # Not a directory (unexpected); treat as a configuration/layout problem
-                    # rather than an sshfs mount outage.
+                if not _check_output_dir_is_accessible_directory(Path(job_row.output_dir)):
+                    # Not a directory; treat as configuration/layout problem
                     job_row.status = "failed"
                     job_row.crawler_status = "infra_error_config"
                     job_row.crawler_exit_code = rc
@@ -499,8 +525,7 @@ def run_persistent_job(job_id: int) -> int:
                 )
 
             if infra:
-                # Check retry cap to prevent infinite infra_error retries
-                if job_row.retry_count < MAX_INFRA_ERROR_RETRIES:
+                if _should_retry_as_infra_error(job_row.retry_count):
                     job_row.status = "retryable"
                     job_row.crawler_status = "infra_error"
                 else:
@@ -523,8 +548,7 @@ def run_persistent_job(job_id: int) -> int:
                     # transport endpoint not connected) before config errors.
                     # These are retryable since the underlying storage may recover.
                     if _looks_like_infra_error_from_log(tail):
-                        # Check retry cap to prevent infinite infra_error retries
-                        if job_row.retry_count < MAX_INFRA_ERROR_RETRIES:
+                        if _should_retry_as_infra_error(job_row.retry_count):
                             job_row.status = "retryable"
                             job_row.crawler_status = "infra_error"
                         else:

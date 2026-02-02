@@ -16,8 +16,10 @@ from typing import (
 
 # Use absolute imports
 from . import constants  # Import constants module
-
-# Import specific constants used here for clarity
+from .constants import (
+    DOCKER_VERSION_CHECK_TIMEOUT_SEC,
+    EXTERNAL_COMMAND_TIMEOUT_SEC,
+)
 
 logger = logging.getLogger("website_archiver.utils")
 
@@ -30,7 +32,7 @@ def check_docker() -> bool:
             capture_output=True,
             text=True,
             check=True,
-            timeout=10,
+            timeout=DOCKER_VERSION_CHECK_TIMEOUT_SEC,
         )
         logger.info(f"Docker found: {process.stdout.strip()}")
         return True
@@ -549,7 +551,13 @@ def execute_external_command(command: str, description: str) -> bool:
     logger.info(f"Executing {description} command: {command}")
     try:
         args = shlex.split(command)
-        process = subprocess.run(args, capture_output=True, text=True, check=True, timeout=120)
+        process = subprocess.run(
+            args,
+            capture_output=True,
+            text=True,
+            check=True,
+            timeout=EXTERNAL_COMMAND_TIMEOUT_SEC,
+        )
         logger.info(f"{description} STDOUT:\n{process.stdout.strip()}")
         if process.stderr.strip():
             logger.warning(f"{description} STDERR:\n{process.stderr.strip()}")

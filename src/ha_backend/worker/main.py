@@ -35,12 +35,19 @@ from ha_backend.models import ArchiveJob, Source
 
 logger = logging.getLogger("healtharchive.worker")
 
+# Worker retry and threshold constants
 MAX_CRAWL_RETRIES = 2
 DEFAULT_POLL_INTERVAL = 30
 INFRA_ERROR_RETRY_COOLDOWN_MINUTES = 10
+
 # Disk headroom threshold: skip crawl if disk usage exceeds this percentage
 DISK_HEADROOM_THRESHOLD_PERCENT = 85
 DISK_HEADROOM_CHECK_PATH = "/srv/healtharchive/jobs"
+
+# Subprocess timeouts and logging
+FINDMNT_TIMEOUT_SEC = 5  # Timeout for mountpoint check via findmnt
+AUTO_TIERING_TIMEOUT_SEC = 120  # Timeout for auto-tiering script execution
+STDERR_LOG_TRUNCATE_LENGTH = 500  # Truncate stderr output in logs to this length
 
 
 def _is_mountpoint(path: Path) -> bool:
@@ -51,7 +58,7 @@ def _is_mountpoint(path: Path) -> bool:
             check=False,
             capture_output=True,
             text=True,
-            timeout=5,
+            timeout=FINDMNT_TIMEOUT_SEC,
         )
         return result.returncode == 0 and result.stdout.strip() == str(path)
     except (subprocess.TimeoutExpired, FileNotFoundError):
@@ -127,7 +134,7 @@ def _tier_annual_job_if_needed(job: ArchiveJob) -> None:
             check=False,
             capture_output=True,
             text=True,
-            timeout=120,
+            timeout=AUTO_TIERING_TIMEOUT_SEC,
         )
 
         if result.returncode != 0:
@@ -135,12 +142,14 @@ def _tier_annual_job_if_needed(job: ArchiveJob) -> None:
                 "Auto-tiering failed for job %s: RC=%s, stderr=%s",
                 job.id,
                 result.returncode,
-                result.stderr[:500],
+                result.stderr[:STDERR_LOG_TRUNCATE_LENGTH],
             )
         else:
             logger.info("Auto-tiering completed successfully for job %s", job.id)
     except subprocess.TimeoutExpired:
-        logger.error("Auto-tiering timed out for job %s after 120s", job.id)
+        logger.error(
+            "Auto-tiering timed out for job %s after %ds", job.id, AUTO_TIERING_TIMEOUT_SEC
+        )
     except Exception as e:
         logger.error("Auto-tiering exception for job %s: %s", job.id, e)
 

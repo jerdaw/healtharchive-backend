@@ -54,6 +54,63 @@ from ha_backend.models import ArchiveJob, Snapshot, SnapshotOutlink
 logger = logging.getLogger("healtharchive.indexing")
 
 
+# --- Helper functions for WARC consolidation ---
+
+
+def _has_stable_warcs(warcs_dir: Path) -> bool:
+    """Check if job has WARCs in stable warcs/ directory."""
+    if not warcs_dir.is_dir():
+        return False
+    has_compressed = any(warcs_dir.rglob("*.warc.gz"))
+    has_uncompressed = any(warcs_dir.rglob("*.warc"))
+    return has_compressed or has_uncompressed
+
+
+def _attempt_temp_warc_consolidation(job_id: int, job: "ORMArchiveJob", output_dir: Path) -> None:
+    """Try consolidating legacy temp WARCs into stable directory."""
+    temp_warcs = discover_temp_warcs_for_job(job)
+    if not temp_warcs:
+        return
+
+    try:
+        result = consolidate_warcs(
+            output_dir=output_dir,
+            source_warc_paths=temp_warcs,
+            allow_copy_fallback=False,
+            dry_run=False,
+        )
+        logger.info(
+            "Consolidated %d WARC(s) into %s (created=%d reused=%d).",
+            len(result.stable_warcs),
+            result.warcs_dir,
+            result.created,
+            result.reused,
+        )
+    except Exception as exc:
+        logger.warning(
+            "WARC consolidation failed for job %s; continuing with legacy `.tmp*` WARCs: %s",
+            job_id,
+            exc,
+        )
+
+
+def _ensure_stable_warcs_available(job_id: int, job: "ArchiveJob", output_dir: Path) -> None:
+    """
+    Ensure WARCs in stable location, consolidating from temp if needed.
+
+    If job only has legacy WARCs under `.tmp*`, consolidate them into
+    `<output_dir>/warcs/` via hardlink. This allows operators to safely
+    delete `.tmp*` without breaking replay or snapshot viewing.
+    """
+    output_dir = output_dir.resolve()
+    stable_warcs_dir = get_job_warcs_dir(output_dir)
+
+    if _has_stable_warcs(stable_warcs_dir):
+        return
+
+    _attempt_temp_warc_consolidation(job_id, job, output_dir)
+
+
 def _load_job(session: Session, job_id: int) -> ArchiveJob:
     job = session.get(ArchiveJob, job_id)
     if job is None:
@@ -111,39 +168,8 @@ def index_job(job_id: int) -> int:
             return 1
 
         try:
-            # Prefer indexing from stable per-job WARCs when possible.
-            #
-            # If the job only has legacy WARCs under `.tmp*`, consolidate them into
-            # `<output_dir>/warcs/` first (via hardlink) so operators can later
-            # safely delete `.tmp*` without breaking replay or snapshot viewing.
-            output_dir = output_dir.resolve()
-            stable_warcs_dir = get_job_warcs_dir(output_dir)
-            stable_present = stable_warcs_dir.is_dir() and (
-                any(stable_warcs_dir.rglob("*.warc.gz")) or any(stable_warcs_dir.rglob("*.warc"))
-            )
-            if not stable_present:
-                temp_warcs = discover_temp_warcs_for_job(job)
-                if temp_warcs:
-                    try:
-                        result = consolidate_warcs(
-                            output_dir=output_dir,
-                            source_warc_paths=temp_warcs,
-                            allow_copy_fallback=False,
-                            dry_run=False,
-                        )
-                        logger.info(
-                            "Consolidated %d WARC(s) into %s (created=%d reused=%d).",
-                            len(result.stable_warcs),
-                            result.warcs_dir,
-                            result.created,
-                            result.reused,
-                        )
-                    except Exception as exc:
-                        logger.warning(
-                            "WARC consolidation failed for job %s; continuing with legacy `.tmp*` WARCs: %s",
-                            job_id,
-                            exc,
-                        )
+            # Prefer indexing from stable per-job WARCs when possible
+            _ensure_stable_warcs_available(job_id, job, output_dir)
 
             # Discover WARC files for this job.
             warc_paths = discover_warcs_for_job(job)

@@ -58,6 +58,17 @@ DOCKER_CONTAINER_ID_MAX_RETRIES = 5  # Max retries for container ID lookup
 MONITOR_STARTUP_DELAY_SEC = 2  # Delay before monitor starts reading logs
 MONITOR_LOG_PROCESS_TERM_TIMEOUT_SEC = 5  # Timeout for log process termination
 
+# Strategy adaptation
+CONTAINER_STOP_SETTLE_DELAY_SEC = 5  # Wait after stopping container for full shutdown
+
+# Logging and truncation
+LOG_LINE_TRUNCATE_LENGTH = 200  # Truncate log lines to this length for display
+LOG_LINE_ERROR_TRUNCATE_LENGTH = 100  # Truncate error log lines to this shorter length
+
+# Utility command timeouts
+DOCKER_VERSION_CHECK_TIMEOUT_SEC = 10  # Timeout for docker --version check
+EXTERNAL_COMMAND_TIMEOUT_SEC = 120  # Timeout for external command execution
+
 # Main loop
 PROGRESS_PRINT_INTERVAL_SEC = 60.0  # How often to print progress to console
 QUEUE_CHECK_TIMEOUT_SEC = 1.0  # How long to wait for monitor queue message

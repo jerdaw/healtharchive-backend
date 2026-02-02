@@ -12,6 +12,8 @@ from queue import Queue
 
 from .constants import (
     HTTP_ERROR_PATTERNS,
+    LOG_LINE_ERROR_TRUNCATE_LENGTH,
+    LOG_LINE_TRUNCATE_LENGTH,
     MONITOR_LOG_PROCESS_TERM_TIMEOUT_SEC,
     MONITOR_STARTUP_DELAY_SEC,
     STATS_REGEX,
@@ -279,13 +281,19 @@ class CrawlMonitor(threading.Thread):
                 error_msg = details.get("msg", "")
                 if self.timeout_pattern.search(error_msg):
                     self.state.record_error("timeout", timestamp)
-                    logger.warning(f"Timeout reported by pageStatus: {line[:200]}...")
+                    logger.warning(
+                        f"Timeout reported by pageStatus: {line[:LOG_LINE_TRUNCATE_LENGTH]}..."
+                    )
                 elif self.http_error_pattern.search(error_msg):
                     self.state.record_error("http", timestamp)
-                    logger.warning(f"HTTP/Network error reported by pageStatus: {line[:200]}...")
+                    logger.warning(
+                        f"HTTP/Network error reported by pageStatus: {line[:LOG_LINE_TRUNCATE_LENGTH]}..."
+                    )
                 else:
                     self.state.record_error("other", timestamp)
-                    logger.warning(f"Unknown page load failure: {line[:200]}...")
+                    logger.warning(
+                        f"Unknown page load failure: {line[:LOG_LINE_TRUNCATE_LENGTH]}..."
+                    )
                 return
 
             if level in ["error", "warn"]:
@@ -294,24 +302,36 @@ class CrawlMonitor(threading.Thread):
                     full_log_check
                 ):
                     self.state.record_error("timeout", timestamp)
-                    logger.warning(f"Timeout detected in logs: {line[:200]}...")
+                    logger.warning(
+                        f"Timeout detected in logs: {line[:LOG_LINE_TRUNCATE_LENGTH]}..."
+                    )
                 elif self.http_error_pattern.search(message) or self.http_error_pattern.search(
                     full_log_check
                 ):
                     self.state.record_error("http", timestamp)
-                    logger.warning(f"HTTP/Network error detected in logs: {line[:200]}...")
+                    logger.warning(
+                        f"HTTP/Network error detected in logs: {line[:LOG_LINE_TRUNCATE_LENGTH]}..."
+                    )
                 elif level == "error":
                     self.state.record_error("other", timestamp)
-                    logger.error(f"Generic error detected in logs: {line[:200]}...")
+                    logger.error(
+                        f"Generic error detected in logs: {line[:LOG_LINE_TRUNCATE_LENGTH]}..."
+                    )
         except json.JSONDecodeError:
             if self.timeout_pattern.search(line):
                 self.state.record_error("timeout", timestamp)
-                logger.warning(f"Timeout detected in non-JSON log: {line[:200]}...")
+                logger.warning(
+                    f"Timeout detected in non-JSON log: {line[:LOG_LINE_TRUNCATE_LENGTH]}..."
+                )
             elif self.http_error_pattern.search(line):
                 self.state.record_error("http", timestamp)
-                logger.warning(f"HTTP/Network error detected in non-JSON log: {line[:200]}...")
+                logger.warning(
+                    f"HTTP/Network error detected in non-JSON log: {line[:LOG_LINE_TRUNCATE_LENGTH]}..."
+                )
         except Exception as e:
-            logger.error(f"Error parsing log line: '{line[:100]}...' - {e}")
+            logger.error(
+                f"Error parsing log line: '{line[:LOG_LINE_ERROR_TRUNCATE_LENGTH]}...' - {e}"
+            )
 
     def _check_stall_and_error_conditions(self, now: float) -> bool:
         """
