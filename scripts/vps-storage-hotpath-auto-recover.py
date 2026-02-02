@@ -1042,13 +1042,25 @@ def main(argv: list[str] | None = None) -> int:
             continue
         mount = info.get("mount") if isinstance(info.get("mount"), dict) else {}
         target = str(mount.get("target") or "")
-        if target != path:
+        errno_detected = int(info.get("errno") or 0)
+
+        # Accept paths that are either:
+        # 1. Confirmed mountpoints (target == path from findmnt), OR
+        # 2. Detected as Errno 107 (transport endpoint not connected) - this is
+        #    strong evidence of a stale FUSE/sshfs bind mount. When _get_mount_info()
+        #    fails to retrieve mount details for a stale path, errno 107 itself is
+        #    sufficient evidence to attempt unmount.
+        is_confirmed_mountpoint = bool(target and target == path)
+        is_stale_errno_107 = errno_detected == 107
+        if not is_confirmed_mountpoint and not is_stale_errno_107:
             continue
+
         stale_mountpoints.append(
             {
                 "path": path,
                 "mount_source": str(mount.get("source") or ""),
                 "mount_fstype": str(mount.get("fstype") or ""),
+                "errno": errno_detected,
             }
         )
 
@@ -1080,11 +1092,16 @@ def main(argv: list[str] | None = None) -> int:
         if stale_mountpoints:
             print(f"  2) unmount stale mountpoints ({len(stale_mountpoints)}):")
             for item in stale_mountpoints:
-                print(
-                    f"     - {item['path']} (source={item['mount_source']} fstype={item['mount_fstype']})"
-                )
+                mount_source = item.get("mount_source") or ""
+                mount_fstype = item.get("mount_fstype") or ""
+                item_errno = item.get("errno", 0)
+                if mount_source and mount_fstype:
+                    print(f"     - {item['path']} (source={mount_source} fstype={mount_fstype})")
+                else:
+                    # Mount info unavailable (common for stale Errno 107 mounts)
+                    print(f"     - {item['path']} (errno={item_errno}, mount info unavailable)")
         else:
-            print("  2) (skip) no exact stale mountpoints eligible for unmount")
+            print("  2) (skip) no stale mountpoints eligible for unmount")
 
         if storage_ok == 0:
             if storage_unit_present:
@@ -1194,14 +1211,25 @@ def main(argv: list[str] | None = None) -> int:
             continue
         mount = info.get("mount") if isinstance(info.get("mount"), dict) else {}
         target = str(mount.get("target") or "")
-        if target != path:
-            # Refuse to unmount anything other than the exact mountpoint.
+        errno_detected = int(info.get("errno") or 0)
+
+        # Accept paths that are either:
+        # 1. Confirmed mountpoints (target == path from findmnt), OR
+        # 2. Detected as Errno 107 (transport endpoint not connected) - this is
+        #    strong evidence of a stale FUSE/sshfs bind mount. When _get_mount_info()
+        #    fails to retrieve mount details for a stale path, errno 107 itself is
+        #    sufficient evidence to attempt unmount.
+        is_confirmed_mountpoint = bool(target and target == path)
+        is_stale_errno_107 = errno_detected == 107
+        if not is_confirmed_mountpoint and not is_stale_errno_107:
             continue
+
         stale_mountpoints.append(
             {
                 "path": path,
                 "mount_source": str(mount.get("source") or ""),
                 "mount_fstype": str(mount.get("fstype") or ""),
+                "errno": errno_detected,
             }
         )
 
@@ -1306,19 +1334,23 @@ def main(argv: list[str] | None = None) -> int:
             note_err(f"recover-stale-jobs failed source={source_code}", cp, critical=False)
 
     # Post-check: ensure previously-stale mountpoints are readable again.
+    # Primary success indicator is readability; mount info is secondary.
     post_ok = True
     for item in stale_mountpoints:
         path = item["path"]
+        ok, errno = _probe_readable_dir(Path(path))
+        if ok == 1:
+            # Path is readable - success, even if _get_mount_info() fails
+            continue
+        # Path is still unreadable - check if mount was restored
         mount = _get_mount_info(path) or {}
         target = str(mount.get("target") or "")
         if target != path:
             post_ok = False
             critical_errors.append(
-                f"mountpoint not restored for path={path} (target={target or '??'})"
+                f"mountpoint not restored for path={path} (target={target or '??'}, errno={errno})"
             )
-            continue
-        ok, errno = _probe_readable_dir(Path(path))
-        if ok != 1:
+        else:
             post_ok = False
             critical_errors.append(
                 f"path still unreadable after recovery: path={path} errno={errno}"
