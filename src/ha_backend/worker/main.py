@@ -1,5 +1,21 @@
 from __future__ import annotations
 
+import logging
+import os
+import subprocess
+import time
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+from typing import Optional
+
+from sqlalchemy import or_
+from sqlalchemy.orm import Session
+
+from ha_backend.db import get_session
+from ha_backend.indexing import index_job
+from ha_backend.jobs import run_persistent_job
+from ha_backend.models import ArchiveJob, Source
+
 """
 ha_backend.worker.main - Job worker loop
 
@@ -16,22 +32,6 @@ See also:
     - docs/operations/thresholds-and-tuning.md for operational guidance
     - docs/architecture.md for worker lifecycle details
 """
-
-import logging
-import os
-import subprocess
-import time
-from datetime import datetime, timedelta, timezone
-from pathlib import Path
-from typing import Optional
-
-from sqlalchemy import or_
-from sqlalchemy.orm import Session
-
-from ha_backend.db import get_session
-from ha_backend.indexing import index_job
-from ha_backend.jobs import run_persistent_job
-from ha_backend.models import ArchiveJob, Source
 
 logger = logging.getLogger("healtharchive.worker")
 
