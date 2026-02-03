@@ -37,6 +37,11 @@ def _isolate_process_env(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("HEALTHARCHIVE_REPLAY_BASE_URL", raising=False)
     monkeypatch.delenv("HA_SEARCH_RANKING_VERSION", raising=False)
 
+    # Avoid cross-test/process contention on job locks when running tests in parallel.
+    monkeypatch.setenv(
+        "HEALTHARCHIVE_JOB_LOCK_DIR", f"/tmp/healtharchive-job-locks-tests-{os.getpid()}"
+    )
+
 
 @pytest.fixture(name="db_session")
 def fixture_db_session(

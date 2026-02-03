@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 
 from ha_backend.db import get_session
 from ha_backend.indexing import index_job
-from ha_backend.jobs import run_persistent_job
+from ha_backend.jobs import JobAlreadyRunningError, run_persistent_job
 from ha_backend.models import ArchiveJob, Source
 
 """
@@ -221,7 +221,22 @@ def _process_single_job() -> bool:
         _tier_annual_job_if_needed(job)
 
     # Run the crawl phase using the existing helper, which manages its own sessions.
-    crawl_rc = run_persistent_job(job_id)
+    try:
+        crawl_rc = run_persistent_job(job_id)
+    except JobAlreadyRunningError as exc:
+        logger.warning(
+            "Job %s appears to already be running (lock held at %s); syncing DB status to 'running' and skipping.",
+            job_id,
+            exc.lock_path,
+        )
+        with get_session() as session:
+            job = session.get(ArchiveJob, job_id)
+            if job is not None and job.status != "running":
+                job.status = "running"
+                if job.started_at is None:
+                    job.started_at = datetime.now(timezone.utc)
+                job.finished_at = None
+        return True
 
     # Post-crawl handling: update retry semantics.
     with get_session() as session:
