@@ -4,8 +4,8 @@ Goal: detect large year-over-year coverage drops after annual jobs are indexed.
 
 Canonical refs:
 
-- systemd unit templates: `../../deployment/systemd/README.md`
-- monitoring checklist: `../monitoring-and-ci-checklist.md`
+- systemd unit templates: `../../../deployment/systemd/README.md`
+- monitoring checklist: `../../monitoring-and-ci-checklist.md`
 
 ## What this does
 

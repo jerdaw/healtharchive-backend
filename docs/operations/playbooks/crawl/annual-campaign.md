@@ -4,13 +4,13 @@ Goal: keep the annual capture cycle predictable and operationally boring.
 
 Canonical references:
 
-- Annual scope/seeds (source of truth): `../annual-campaign.md`
-- Automation implementation plan: `../automation-implementation-plan.md`
-- systemd units + enablement: `../../deployment/systemd/README.md`
+- Annual scope/seeds (source of truth): `../../annual-campaign.md`
+- Automation implementation plan: `../../automation-implementation-plan.md`
+- systemd units + enablement: `../../../deployment/systemd/README.md`
 
 ## Before Jan 01 UTC (readiness)
 
-- Review and update scope/seeds in `../annual-campaign.md` (docs-only change).
+- Review and update scope/seeds in `../../annual-campaign.md` (docs-only change).
 - Ensure you have storage headroom and backups are healthy.
 - Run the crawl preflight audit (recommended):
   - `YEAR=2026; ./scripts/vps-preflight-crawl.sh --year "$YEAR"`
@@ -26,7 +26,7 @@ Canonical references:
 
 ## During/after the campaign (high level)
 
-- Use the automation plan (`../automation-implementation-plan.md`) to decide what is enabled and what is manual.
+- Use the automation plan (`../../automation-implementation-plan.md`) to decide what is enabled and what is manual.
 - Prefer safe, idempotent entrypoints (systemd services/timers or the provided scripts).
 - Annual jobs are scheduled with crawler monitoring enabled so stalls / error storms can trigger adaptive worker reduction.
 
@@ -50,5 +50,5 @@ sudo journalctl -u healtharchive-annual-campaign-sentinel.service -n 200 --no-pa
 
 ## What “done” means
 
-- Annual scope is current in `../annual-campaign.md`.
+- Annual scope is current in `../../annual-campaign.md`.
 - If automation is enabled, the scheduler and follow-up tasks run as intended and are verifiable in logs/artifacts.

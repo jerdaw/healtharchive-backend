@@ -5,8 +5,8 @@ Goal: remove `.tmp*` crawl directories from older indexed jobs without breaking 
 Canonical refs:
 
 - cleanup command: `ha-backend cleanup-job --mode temp-nonwarc`
-- systemd unit templates: `../../deployment/systemd/README.md`
-- replay retention note: `../../operations/growth-constraints.md`
+- systemd unit templates: `../../../deployment/systemd/README.md`
+- replay retention note: `../../growth-constraints.md`
 
 ## What this does
 

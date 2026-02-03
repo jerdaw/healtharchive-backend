@@ -69,9 +69,9 @@ The Errno 107 detection itself is sufficient evidence that a path under `jobs_ro
 
 ## Related Implementation Plans
 
-- [2026-01-08 Storage Box Stale Mount Recovery](../planning/implemented/2026-01-08-storagebox-sshfs-stale-mount-recovery-and-integrity.md) - Initial watchdog implementation
-- [2026-01-24 Infra Error and Storage Hotpath Hardening](../planning/implemented/2026-01-24-infra-error-and-storage-hotpath-hardening.md) - Watchdog improvements
-- [2026-02-01 Operational Resilience Improvements](../planning/implemented/2026-02-01-operational-resilience-improvements.md) - Latest hardening work
+- [2026-01-08 Storage Box Stale Mount Recovery](../../planning/implemented/2026-01-08-storagebox-sshfs-stale-mount-recovery-and-integrity.md) - Initial watchdog implementation
+- [2026-01-24 Infra Error and Storage Hotpath Hardening](../../planning/implemented/2026-01-24-infra-error-and-storage-hotpath-hardening.md) - Watchdog improvements
+- [2026-02-01 Operational Resilience Improvements](../../planning/implemented/2026-02-01-operational-resilience-improvements.md) - Latest hardening work
 
 ## Lessons Learned
 

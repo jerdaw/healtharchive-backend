@@ -90,35 +90,35 @@ nav:
               - Operator Responsibilities: operations/playbooks/core/operator-responsibilities.md
               - Deploy & Verify: operations/playbooks/core/deploy-and-verify.md
               - Incident Response: operations/playbooks/core/incident-response.md
+              - Admin Proxy: operations/playbooks/core/admin-proxy.md
+              - Replay Service: operations/playbooks/core/replay-service.md
               - Escalation Procedures: operations/escalation-procedures.md
           - Observability:
-              - Setup Guide: operations/playbooks/observability/observability-guide.md
-              - Check Logs: operations/playbooks/check-logs-api-worker-access.md
-              - Verify Search Index: operations/playbooks/verify-search-index-coverage.md
-              - Monitor WARC Tiering: operations/playbooks/check-warc-tiering-status.md
-              - Check Disk Space: operations/playbooks/check-disk-space.md
-              - Check Healthchecks: operations/playbooks/check-healthchecks-io-status.md
-              - Check Tailscale: operations/playbooks/check-tailscale-connectivity.md
-              - Review Metrics: operations/playbooks/review-prometheus-metrics.md
+              - Observability Guide: operations/playbooks/observability/observability-guide.md
+              - Monitoring & Alerting: operations/playbooks/observability/monitoring-and-alerting.md
           - Crawls & Archives:
-              - Validate Export Integrity: operations/playbooks/validate-export-integrity.md
-              - Reconcile Replay Collection: operations/playbooks/reconcile-replay-collection.md
-              - Reindex Job WARCs: operations/playbooks/reindex-job-warcs.md
-              - Trigger Manual Crawl: operations/playbooks/trigger-manual-crawl.md
+              - Crawl Preflight: operations/playbooks/crawl/crawl-preflight.md
+              - Crawl Stalls: operations/playbooks/crawl/crawl-stalls.md
+              - Crawl Auto-Recover Drills: operations/playbooks/crawl/crawl-auto-recover-drills.md
+              - Cleanup Automation: operations/playbooks/crawl/cleanup-automation.md
+              - Annual Campaign: operations/playbooks/crawl/annual-campaign.md
+              - Controlled Restart (2026): operations/playbooks/crawl/2026-01-annual-campaign-controlled-restart.md
           - Storage:
-              - Check Storage Quotas: operations/playbooks/check-tailnet-storage-quota.md
-              - Manage WARC Cleanup: operations/playbooks/manage-warc-cleanup.md
-              - Verify WARC Tier Distribution: operations/playbooks/verify-warc-tier-distribution.md
+              - WARC Storage Tiering: operations/playbooks/storage/warc-storage-tiering.md
+              - WARC Integrity Verification: operations/playbooks/storage/warc-integrity-verification.md
+              - Stale Mount Recovery: operations/playbooks/storage/storagebox-sshfs-stale-mount-recovery.md
+              - Stale Mount Drills: operations/playbooks/storage/storagebox-sshfs-stale-mount-drills.md
           - Validation:
               - Restore Test: operations/playbooks/validation/restore-test.md
-              - Verify Coverage: operations/playbooks/verify-coverage.md
               - Dataset Release: operations/playbooks/validation/dataset-release.md
-              - Baseline Drift Check: operations/playbooks/baseline-drift-check.md
-              - Verify Ops Automation: operations/playbooks/verify-ops-automation.md
+              - Coverage Guardrails: operations/playbooks/validation/coverage-guardrails.md
+              - Replay Smoke Tests: operations/playbooks/validation/replay-smoke-tests.md
+              - Healthchecks Parity: operations/playbooks/validation/healthchecks-parity.md
+              - Security Posture: operations/playbooks/validation/security-posture.md
+              - Automation Maintenance: operations/playbooks/validation/automation-maintenance.md
           - External:
+              - Outreach & Verification: operations/playbooks/external/outreach-and-verification.md
               - Adoption Signals: operations/playbooks/external/adoption-signals.md
-              - Write Changelog Entry: operations/playbooks/write-changelog-entry.md
-              - Handle User Issue Report: operations/playbooks/handle-user-issue-report.md
           - Service Levels: operations/service-levels.md
       - Development:
           - Environment Setup: development/dev-environment-setup.md
@@ -126,6 +126,7 @@ nav:
           - Making Database Changes: development/playbooks/database-migrations.md
           - Adding New CLI Commands: development/playbooks/add-cli-command.md
       - Deployment:
+          - Deployment Overview: deployment/README.md
           - Production Setup: deployment/production-single-vps.md
           - Configure Environments: deployment/environments-and-configuration.md
           - Deploy to Production: deployment/hosting-and-live-server-to-dos.md
@@ -158,7 +159,7 @@ nav:
       - Monitoring Checklist: operations/monitoring-and-ci-checklist.md
       - Risk Register: operations/risk-register.md
       - Baseline Drift: operations/baseline-drift.md
-      - Data Handling: operations/data-handling-and-retention.md
+      - Data Handling: operations/data-handling-retention.md
       - Automation: operations/automation.md
       - Incident Management:
           - Overview: operations/incidents/README.md
@@ -179,6 +180,6 @@ nav:
           - Operational Resilience (2026-02-01): planning/implemented/2026-02-01-operational-resilience-improvements.md
   - About:
       - Multi-Repo Setup: project.md
-      - Contributing: CONTRIBUTING.md
+      - Contributing: contributing.md
       - Documentation Health: meta/documentation-health.md
       - Templates: _templates/README.md

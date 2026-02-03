@@ -2,7 +2,7 @@
 
 This document centralizes all operational thresholds used in HealthArchive automation, monitoring, and safeguards.
 
-**Last updated**: 2026-02-01
+**Last updated**: 2026-02-03
 
 ---
 
@@ -24,7 +24,7 @@ HealthArchive uses conservative thresholds to prevent runaway automation and ens
 
 | Parameter | Value | Location | Rationale |
 |-----------|-------|----------|-----------|
-| **Threshold** | 85% | `src/ha_backend/worker/main.py:DISK_HEADROOM_THRESHOLD_PERCENT` | Allows ~11GB buffer for multi-GB annual crawls |
+| **Threshold** | 85% | `src/ha_backend/worker/main.py` (`DISK_HEADROOM_THRESHOLD_PERCENT`) | Allows ~11GB buffer for multi-GB annual crawls |
 | **Check frequency** | Every job selection | Worker loop | Prevents mid-crawl disk-full failures |
 | **Action** | Skip job selection | Worker logs warning | Jobs remain queued until space is freed |
 
@@ -41,17 +41,15 @@ HealthArchive uses conservative thresholds to prevent runaway automation and ens
 
 | Severity | Threshold | Duration | Location | Action |
 |----------|-----------|----------|----------|--------|
-| **Warning** | >85% | 30 minutes | `ops/observability/alerting/healtharchive-alerts.yml:33-44` | Page on-call during business hours |
-| **Critical** | >92% | 10 minutes | `ops/observability/alerting/healtharchive-alerts.yml:46-57` | Page on-call immediately |
+| **Warning** | >85% | 30 minutes | `ops/observability/alerting/healtharchive-alerts.yml` (`HealthArchiveDiskUsageHigh`) | Page on-call during business hours |
+| **Critical** | >92% | 10 minutes | `ops/observability/alerting/healtharchive-alerts.yml` (`HealthArchiveDiskUsageCritical`) | Page on-call immediately |
 
 **Tuning guidance**:
 - Warning duration (30min) gives time to react without false positives
 - Critical threshold (92%) leaves ~6GB for emergency response
 - Don't raise critical above 95% - risk of sudden disk-full
 
-**Current baseline**: 82% disk usage (14GB free on 75GB VPS)
-
-See: `docs/operations/disk-baseline-and-cleanup.md`
+See: `docs/operations/disk-baseline-and-cleanup.md` (current baseline + cleanup posture)
 
 ---
 
@@ -59,17 +57,21 @@ See: `docs/operations/disk-baseline-and-cleanup.md`
 
 | Parameter | Value | Location | Purpose |
 |-----------|-------|----------|---------|
-| **Min age** | 14 days | `ops/automation/cleanup-automation.toml:min_age_days` | Avoid cleaning recent jobs |
-| **Keep latest per source** | 2 | `ops/automation/cleanup-automation.toml:keep_latest_per_source` | Preserve recent snapshots |
-| **Max jobs per run** | 1 | `ops/automation/cleanup-automation.toml:max_jobs_per_run` | Conservative incremental cleanup |
-| **Cleanup mode** | `temp-nonwarc` | `scripts/vps-cleanup-automation.py:123` | Preserves WARCs (safe) |
+| **Min age** | 14 days | `ops/automation/cleanup-automation.toml` (`min_age_days`) | Avoid cleaning recent jobs |
+| **Keep latest per source** | 2 | `ops/automation/cleanup-automation.toml` (`keep_latest_per_source`) | Preserve recent snapshots |
+| **Max jobs per run (weekly)** | 1 | `ops/automation/cleanup-automation.toml` (`max_jobs_per_run`) | Conservative incremental cleanup |
+| **Threshold trigger** | 80% | `ops/automation/cleanup-automation.toml` (`threshold_trigger_percent`) | Only run threshold cleanup when disk exceeds this |
+| **Max jobs per run (threshold)** | 5 | `ops/automation/cleanup-automation.toml` (`threshold_max_jobs_per_run`) | More aggressive cleanup under disk pressure |
+| **Cleanup mode** | `temp-nonwarc` | `scripts/vps-cleanup-automation.py` (`ha-backend cleanup-job --mode temp-nonwarc`) | Preserves WARCs (safe) |
 
 **Tuning guidance**:
-- Increase `max_jobs_per_run` to 3-5 if disk fills faster than weekly cleanup
+- Increase `threshold_max_jobs_per_run` to 7-10 only if disk pressure is chronic and the cleanup is consistently safe
 - Decrease `min_age_days` to 7 if disk pressure is chronic
 - Increase `keep_latest_per_source` to 3+ if operators need more history
 
-**Not yet implemented**: Disk threshold trigger (Phase 2.1 of `2026-02-01-operational-resilience-improvements.md`)
+**Implementation notes**:
+- Weekly cleanup: `docs/deployment/systemd/healtharchive-cleanup-automation.service` + `docs/deployment/systemd/healtharchive-cleanup-automation.timer`
+- Disk threshold cleanup: `docs/deployment/systemd/healtharchive-disk-threshold-cleanup.service` + `docs/deployment/systemd/healtharchive-disk-threshold-cleanup.timer` (runs every 30 min; no-op when below threshold)
 
 ---
 
@@ -79,9 +81,9 @@ See: `docs/operations/disk-baseline-and-cleanup.md`
 
 | Parameter | Value | Location | Rationale |
 |-----------|-------|----------|-----------|
-| **Stall threshold** | 3600s (60 min) | `scripts/vps-crawl-auto-recover.py` | Balance between false positives and timely recovery |
+| **Stall threshold** | 3600s (60 min) | `scripts/vps-crawl-auto-recover.py` (`--stall-threshold-seconds`, default: 3600) | Balance between false positives and timely recovery |
 | **Progress metric** | `crawled` count unchanged | Parsed from combined log | Reliable indicator of actual progress |
-| **Guard window** | 600s (10 min) | `scripts/vps-crawl-auto-recover.py:342` | Avoid interrupting healthy crawls |
+| **Guard window** | 600s (10 min) | `scripts/vps-crawl-auto-recover.py` (`--skip-if-any-job-progress-within-seconds`, default: 600) | Avoid interrupting healthy crawls |
 
 **Tuning guidance**:
 - Lower to 1800s (30min) for fast sites (e.g., small test crawls)
@@ -94,8 +96,8 @@ See: `docs/operations/disk-baseline-and-cleanup.md`
 
 | Parameter | Value | Location | Rationale |
 |-----------|-------|----------|-----------|
-| **Per-job daily cap** | 3 | `scripts/vps-crawl-auto-recover.py:374` | Prevents restart loops for fundamentally broken jobs |
-| **Soft recovery enabled** | True | `scripts/vps-crawl-auto-recover.py:350` | Mark stalled jobs retryable without stopping healthy crawls |
+| **Per-job daily cap** | 3 | `scripts/vps-crawl-auto-recover.py` (`--max-recoveries-per-job-per-day`, default: 3) | Prevents restart loops for fundamentally broken jobs |
+| **Soft recovery enabled** | True | `scripts/vps-crawl-auto-recover.py` (`--soft-recover-when-guarded`, default: true) | Mark stalled jobs retryable without stopping healthy crawls |
 
 **Tuning guidance**:
 - Increase per-job cap to 5 for known-flaky sources (e.g., sites with frequent timeouts)
@@ -104,7 +106,7 @@ See: `docs/operations/disk-baseline-and-cleanup.md`
 **Recovery enhancements** (auto-applied):
 - `enable_adaptive_restart=True`
 - `max_container_restarts=20` (annual jobs)
-- See: `scripts/vps-crawl-auto-recover.py:175-241` (`_ensure_recovery_tool_options`)
+- See: `scripts/vps-crawl-auto-recover.py` (`_ensure_recovery_tool_options`)
 
 ---
 
@@ -114,8 +116,8 @@ See: `docs/operations/disk-baseline-and-cleanup.md`
 
 | Parameter | Value | Location | Rationale |
 |-----------|-------|----------|-----------|
-| **Min failure age** | 120s (2 min) | `scripts/vps-storage-hotpath-auto-recover.py:465` | Avoid acting on transient failures |
-| **Confirm runs** | 2 consecutive | `scripts/vps-storage-hotpath-auto-recover.py:471` | Require persistence before acting |
+| **Min failure age** | 120s (2 min) | `scripts/vps-storage-hotpath-auto-recover.py` (`--min-failure-age-seconds`, default: 120) | Avoid acting on transient failures |
+| **Confirm runs** | 2 consecutive | `scripts/vps-storage-hotpath-auto-recover.py` (`--confirm-runs`, default: 2) | Require persistence before acting |
 | **Detection signal** | Errno 107 | Probed via `os.stat()` | "Transport endpoint is not connected" |
 
 **Probed locations**:
@@ -133,9 +135,9 @@ See: `docs/operations/disk-baseline-and-cleanup.md`
 
 | Parameter | Value | Location | Rationale |
 |-----------|-------|----------|-----------|
-| **Cooldown** | 15 minutes | `scripts/vps-storage-hotpath-auto-recover.py:477` | Prevent flapping after recovery |
-| **Hourly cap** | 2 | `scripts/vps-storage-hotpath-auto-recover.py:482` | Global safety limit |
-| **Daily cap** | 6 global, 3/job | `scripts/vps-storage-hotpath-auto-recover.py:488,495` | Prevent runaway automation |
+| **Cooldown** | 15 minutes | `scripts/vps-storage-hotpath-auto-recover.py` (`--cooldown-seconds`, default: 900) | Prevent flapping after recovery |
+| **Hourly cap** | 2 | `scripts/vps-storage-hotpath-auto-recover.py` (`--max-recoveries-per-hour`, default: 2) | Global safety limit |
+| **Daily cap** | 6 global, 3/job | `scripts/vps-storage-hotpath-auto-recover.py` (`--max-recoveries-per-day`, default: 6; `--max-recoveries-per-job-per-day`, default: 3) | Prevent runaway automation |
 
 **Tuning guidance**:
 - Increase cooldown to 30min if recovery attempts fail repeatedly
@@ -148,7 +150,7 @@ See: `docs/operations/disk-baseline-and-cleanup.md`
 
 | Option | Value | Location | Purpose |
 |--------|-------|----------|---------|
-| **reconnect** | Enabled | `docs/deployment/systemd/healtharchive-storagebox-sshfs.service:27` | Auto-reconnect on connection loss |
+| **reconnect** | Enabled | `docs/deployment/systemd/healtharchive-storagebox-sshfs.service` | Auto-reconnect on connection loss |
 | **ServerAliveInterval** | 15s | systemd service | Send keepalive every 15 seconds |
 | **ServerAliveCountMax** | 3 | systemd service | Disconnect after 3 missed keepalives (45s total) |
 | **kernel_cache** | Enabled | systemd service | Performance optimization |
@@ -160,7 +162,7 @@ See: `docs/operations/disk-baseline-and-cleanup.md`
 
 **Known issue**: Stale mounts still occur despite hardened options (root cause under investigation).
 
-See: `docs/planning/2026-02-01-operational-resilience-improvements.md`, Phase 3
+See: `docs/planning/implemented/2026-02-01-operational-resilience-improvements.md`
 
 ---
 
@@ -168,7 +170,7 @@ See: `docs/planning/2026-02-01-operational-resilience-improvements.md`, Phase 3
 
 | Parameter | Value | Location | Purpose |
 |-----------|-------|----------|---------|
-| **Max age** | 2 hours | `scripts/vps-*-auto-recover.py` (various) | Stale lock detection |
+| **Max age** | 2 hours | `scripts/vps-crawl-auto-recover.py` + `scripts/vps-storage-hotpath-auto-recover.py` (`--deploy-lock-max-age-seconds`, default: 2h) | Stale lock detection |
 | **Lock file** | `/tmp/healtharchive-backend-deploy.lock` | Deploy script + watchdogs | Prevent watchdog/deploy conflicts |
 | **Lock mechanism** | `flock` | `scripts/vps-deploy.sh` | Atomic lock acquisition |
 
@@ -182,7 +184,7 @@ See: `docs/planning/2026-02-01-operational-resilience-improvements.md`, Phase 3
 
 | Parameter | Value | Location | Rationale |
 |-----------|-------|----------|-----------|
-| **Cooldown** | 10 minutes | `src/ha_backend/worker/main.py:77` | Prevent retry storms when infra is unhealthy |
+| **Cooldown** | 10 minutes | `src/ha_backend/worker/main.py` (`INFRA_ERROR_RETRY_COOLDOWN_MINUTES`) | Prevent retry storms when infra is unhealthy |
 | **Infra errors** | Errno 107, Errno 5, `OSError` during job launch | `src/ha_backend/infra_errors.py` | Infrastructure failures (not crawl failures) |
 
 **Tuning guidance**:
@@ -222,7 +224,7 @@ See: `docs/planning/implemented/2026-01-24-infra-error-and-storage-hotpath-harde
 - Lower max restarts (3-5) for quick test jobs
 - Increase stall timeout to 90min for very slow sites
 
-See: `src/archive_tool/constants.py`, `scripts/vps-crawl-auto-recover.py:175-241`
+See: `src/archive_tool/constants.py`, `scripts/vps-crawl-auto-recover.py`
 
 ---
 
@@ -266,4 +268,4 @@ When adjusting thresholds:
 - Alerting strategy: `docs/operations/monitoring-and-alerting.md`
 - Stale mount playbook: `docs/operations/playbooks/storage/storagebox-sshfs-stale-mount-recovery.md`
 - Crawl stall playbook: `docs/operations/playbooks/crawl/crawl-stalls.md`
-- Operational resilience improvements: `docs/planning/2026-02-01-operational-resilience-improvements.md`
+- Operational resilience improvements: `docs/planning/implemented/2026-02-01-operational-resilience-improvements.md`

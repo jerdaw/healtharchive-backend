@@ -4,12 +4,12 @@ Goal: record lightweight, public-safe “is anyone using this?” signals withou
 
 Canonical references:
 
-- Template: `../adoption-signals-log-template.md`
-- Ops roadmap (remaining external work): `../healtharchive-ops-roadmap.md`
+- Template: `../../../_templates/adoption-signals-log-template.md`
+- Ops roadmap (remaining external work): `../../healtharchive-ops-roadmap.md`
 
 ## Procedure (high level)
 
-1. Create a new dated entry using `../adoption-signals-log-template.md`.
+1. Create a new dated entry using `../../../_templates/adoption-signals-log-template.md`.
 2. Store it on the VPS under:
    - `/srv/healtharchive/ops/adoption/`
 

@@ -12,7 +12,7 @@ Search quality is central to HealthArchive's value proposition - researchers nee
 
 2. **Missing modern ranking signals** - No recency preference for broad queries, no exact title matching boost, and fixed BM25 weights limited relevance tuning.
 
-The roadmap `docs/planning/2026-01-03-search-ranking-and-snippets-v3.md` defined a phased implementation plan to address these gaps while maintaining single-VPS constraints.
+The roadmap `docs/planning/implemented/2026-01-03-search-ranking-and-snippets-v3.md` defined a phased implementation plan to address these gaps while maintaining single-VPS constraints.
 
 ## Decision
 
@@ -98,6 +98,6 @@ We implemented search ranking **v3** with three major enhancements:
 
 ## References
 
-- Roadmap: `docs/planning/2026-01-03-search-ranking-and-snippets-v3.md`
+- Roadmap: `docs/planning/implemented/2026-01-03-search-ranking-and-snippets-v3.md`
 - Migration: `alembic/versions/0013_snapshot_is_archived.py`
 - Tests: `tests/test_text_extraction_v3.py`, `tests/test_ranking_v3_signals.py`

@@ -50,6 +50,7 @@ Managing crawls and archive lifecycle:
 
 - **Crawl preflight**: [crawl/crawl-preflight.md](crawl/crawl-preflight.md) — Pre-crawl audit (before annual/large crawls)
 - **Crawl stalls**: [crawl/crawl-stalls.md](crawl/crawl-stalls.md) — Stalled progress + status snapshot
+- **Crawl auto-recover drills**: [crawl/crawl-auto-recover-drills.md](crawl/crawl-auto-recover-drills.md) — Safe dry-run drills (production)
 - **Annual campaign**: [crawl/annual-campaign.md](crawl/annual-campaign.md) — Seasonal campaign operations
 - **Controlled restart**: [crawl/2026-01-annual-campaign-controlled-restart.md](crawl/2026-01-annual-campaign-controlled-restart.md) — 2026 annual crawl restart procedure
 - **Cleanup automation**: [crawl/cleanup-automation.md](crawl/cleanup-automation.md) — Safe temp cleanup

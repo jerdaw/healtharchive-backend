@@ -28,13 +28,15 @@
 
 ## Files Moved
 
-| From | To |
-|------|-----|
-| `deployment/runbook-template.md` | `_templates/runbook-template.md` |
-| `operations/playbooks/playbook-template.md` | `_templates/playbook-template.md` |
-| `operations/incidents/incident-template.md` | `_templates/incident-template.md` |
-| `decisions/decision-template.md` | `_templates/decision-template.md` |
-| 4 log templates from `operations/` | `_templates/*.md` |
+Templates were consolidated under `docs/_templates/` (historical file locations are preserved in git history).
+
+| Template | Canonical path |
+|----------|----------------|
+| Runbook template | `docs/_templates/runbook-template.md` |
+| Playbook template | `docs/_templates/playbook-template.md` |
+| Incident template | `docs/_templates/incident-template.md` |
+| Decision template | `docs/_templates/decision-template.md` |
+| Log templates | `docs/_templates/*.md` |
 
 ## Historical Context
 

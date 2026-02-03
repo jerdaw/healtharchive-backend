@@ -92,14 +92,14 @@ Templates are stored in `docs/_templates/`. To use:
 
 Available templates:
 
-- `runbook-template.md` — For deployment procedures
-- `playbook-template.md` — For operational tasks
-- `incident-template.md` — For incident postmortems
-- `decision-template.md` — For architectural decisions
-- `restore-test-log-template.md` — For quarterly restore test logs
-- `adoption-signals-log-template.md` — For quarterly adoption signals
-- `mentions-log-template.md` — For mentions log entries
-- `ops-ui-friction-log-template.md` — For internal friction logging
+- `_templates/runbook-template.md` — For deployment procedures
+- `_templates/playbook-template.md` — For operational tasks
+- `_templates/incident-template.md` — For incident postmortems
+- `_templates/decision-template.md` — For architectural decisions
+- `_templates/restore-test-log-template.md` — For quarterly restore test logs
+- `_templates/adoption-signals-log-template.md` — For quarterly adoption signals
+- `_templates/mentions-log-template.md` — For mentions log entries
+- `_templates/ops-ui-friction-log-template.md` — For internal friction logging
 
 ## When adding or changing docs
 
@@ -108,7 +108,7 @@ Available templates:
 - **Registry**: New critical docs should be added to the `nav` section of `mkdocs.yml`. All docs should be added to their directory's `README.md` index.
 - Use MkDocs Material features like **Admonitions** (`!!! note`), **Tabs**, and **Mermaid** diagrams.
 - Documentation should be English-only; do not duplicate it in other languages.
-- Avoid "phase" labels or other implementation-ordering labels outside `docs/roadmaps` and explicit implementation plans. The order that something was implemented in is not something that needs documentation; rather documentation should focus on key elements of what was implemented, how it was implemented, and how it is to be used.
+- Avoid "phase" labels or other implementation-ordering labels outside `docs/planning/roadmap.md` and `docs/planning/implemented/`. The order that something was implemented in is not something that needs documentation; rather documentation should focus on key elements of what was implemented, how it was implemented, and how it is to be used.
 - Keep public copy public-safe (no secrets, private emails, or internal IPs).
 - If you sync your workspace via Syncthing, treat `.stignore` as "sync ignore" (like `.gitignore`) and ensure it excludes build artifacts and machine-local dev artifacts (e.g., `.venv/`, `node_modules/`, `.dev-archive-root/`). Secrets may sync via Syncthing, but must remain git-ignored.
 
@@ -135,23 +135,23 @@ Our existing document types map to Diátaxis categories:
 
 **Tutorials** (Learning):
 - Lives under `docs/tutorials/`
-- Examples: `first-contribution.md`, `architecture-walkthrough.md`, `debug-crawl.md`
+- Examples: `tutorials/first-contribution.md`, `tutorials/architecture-walkthrough.md`, `tutorials/debug-crawl.md`
 - Characteristics: Step-by-step, hands-on, designed for learning
 
 **How-To Guides** (Tasks):
-- **Runbooks**: Deployment procedures in `docs/deployment/` (template: `runbook-template.md`)
-- **Playbooks**: Operational tasks in `docs/operations/playbooks/` or `docs/development/playbooks/` (template: `playbook-template.md`)
+- **Runbooks**: Deployment procedures in `docs/deployment/` (template: `_templates/runbook-template.md`)
+- **Playbooks**: Operational tasks in `docs/operations/playbooks/` or `docs/development/playbooks/` (template: `_templates/playbook-template.md`)
 - **Checklists**: Minimal verification lists
 - Characteristics: Goal-oriented, assume some knowledge, focused on results
 
 **Reference** (Information):
 - Lives under `docs/reference/` or specialized files (`api.md`, etc.)
-- Examples: `data-model.md`, `cli-commands.md`, `archive-tool.md`
+- Examples: `reference/data-model.md`, `reference/cli-commands.md`, `reference/archive-tool.md`
 - Also: API documentation (`api.md`), Architecture sections
 - Characteristics: Factual, precise, structured for lookup
 
 **Explanation** (Understanding):
-- **Decision records**: In `docs/decisions/` (template: `decision-template.md`)
+- **Decision records**: In `docs/decisions/` (template: `_templates/decision-template.md`)
 - **Policies/contracts**: Invariants and boundaries
 - **Guidelines**: This file, `documentation-process-audit.md`
 - **Architecture**: `architecture.md` (blends reference and explanation)
@@ -266,7 +266,7 @@ Completed plans >200 lines should be compressed to this format (~40-80 lines):
 - Put roadmaps and active implementation plans in `docs/planning`.
 - Move completed implementation plans into `docs/planning/implemented/` (dated).
 - Put operational procedures in `docs/operations`.
-- Put incident notes / lightweight postmortems in `docs/operations/incidents/` (template: `docs/operations/incidents/incident-template.md`).
+- Put incident notes / lightweight postmortems in `docs/operations/incidents/` (template: `docs/_templates/incident-template.md`).
 - Put ops playbooks (task-oriented checklists) in `docs/operations/playbooks/`.
 - Put deployment/runbooks in `docs/deployment`.
 - Put developer workflows (local setup, testing, debugging) in `docs/development`.

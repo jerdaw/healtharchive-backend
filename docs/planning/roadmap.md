@@ -17,13 +17,13 @@ It is intentionally **not** an implementation plan.
 These items are intentionally “external” and require ongoing human follow-through.
 
 - External outreach + verification execution (operator-only):
-  - Playbook: `../operations/playbooks/outreach-and-verification.md`
+  - Playbook: `../operations/playbooks/external/outreach-and-verification.md`
 - Secure at least 1 distribution partner (permission to name them publicly).
 - Secure at least 1 verifier (permission to name them publicly).
 - Maintain a public-safe mentions/citations log with real entries:
   - `../operations/mentions-log.md` (links only; no private contact data)
 - Healthchecks.io alignment: keep systemd timers, `/etc/healtharchive/healthchecks.env`, and the Healthchecks UI in sync.
-  - See: `../operations/playbooks/healthchecks-parity.md` and `../deployment/production-single-vps.md`
+  - See: `../operations/playbooks/validation/healthchecks-parity.md` and `../deployment/production-single-vps.md`
 
 Track the current status and next actions in:
 
@@ -62,16 +62,12 @@ Keep this list short; prefer linking to the canonical doc that explains the item
 ### Crawling & indexing reliability (backend)
 
 - WARC discovery consistency improvements (partially done):
-  - ✅ `verify-warc-manifest` command for manifest integrity checking (2026-01-29)
-  - Remaining: unify discovery methods, enhance show-job output, sync vps-crawl-status.sh
-  - See: `./2026-01-29-warc-discovery-consistency.md`
+  - Remaining: unify discovery methods, enhance show-job output, sync `scripts/vps-crawl-status.sh`
+  - See: `2026-01-29-warc-discovery-consistency.md`
 
-- ✅ Disk management & monitoring (completed 2026-02-01):
-  - Pre-crawl disk headroom check (85% threshold)
-  - Automated cleanup (Docker weekly, log rotation)
-  - Updated alert thresholds (85% warning, 92% critical)
-  - Disk baseline documentation
-  - See: `../operations/disk-baseline-and-cleanup.md`
+- Resolve VPS root disk usage discrepancy (`df` vs `du`):
+  - Active investigation: `2026-02-01-disk-usage-investigation.md`
+  - Likely requires a maintenance window (`fsck`) if ext4 accounting is corrupted.
 
 - Consider whether a separate staging backend is worth it (increases ops surface; only do if it buys real safety).
   - See: `../deployment/environments-and-configuration.md`

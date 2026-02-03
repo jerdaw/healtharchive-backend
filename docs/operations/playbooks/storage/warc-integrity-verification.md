@@ -87,4 +87,4 @@ Treat it as a critical integrity incident:
 - capture a verification report (`--json-out` recommended)
 - decide whether to rebuild the dataset / replay from backups, or to re-crawl the affected source
 
-Escalate via `incident-response.md` and record the outcome in `docs/operations/mentions-log.md`.
+Escalate via `../core/incident-response.md` and record the outcome in `docs/operations/mentions-log.md`.

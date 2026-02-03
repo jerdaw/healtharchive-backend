@@ -5,7 +5,7 @@ Status: draft | closed
 ## Metadata
 
 - Date (UTC): YYYY-MM-DD
-- Severity (see `severity.md`): sev0 | sev1 | sev2 | sev3
+- Severity (see `operations/incidents/severity.md`): sev0 | sev1 | sev2 | sev3
 - Environment: production | staging | dev
 - Primary area: crawl | indexing | storage | api | replay | search | infra
 - Owner: <name/handle>

@@ -32,6 +32,7 @@ Related docs:
 - **Disk usage trend**
   - `df -h /`
   - If `/srv/healtharchive` exists: `du -sh /srv/healtharchive/* | sort -h | tail -n 5`
+  - If cleanup is needed: [Disk baseline and cleanup](disk-baseline-and-cleanup.md)
 - **Recent errors**
   - `sudo journalctl -u healtharchive-api -n 200 --no-pager`
   - `sudo journalctl -u healtharchive-worker -n 200 --no-pager`
@@ -68,7 +69,7 @@ See: `../deployment/systemd/README.md`
 ## Quarterly (1–2 hours)
 
 - **Restore test**
-  - Follow `restore-test-procedure.md` and record results using `restore-test-log-template.md`.
+  - Follow `restore-test-procedure.md` and record results using `../_templates/restore-test-log-template.md`.
 - **Dataset release integrity**
   - Confirm a dataset release exists for the expected quarter/date.
   - Verify checksums: `sha256sum -c SHA256SUMS` (see `dataset-release-runbook.md`).

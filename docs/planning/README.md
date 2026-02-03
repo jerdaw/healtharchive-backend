@@ -11,12 +11,13 @@ When complete, move them to `docs/planning/implemented/` and date them.
 
 Active plans:
 
-- Operational resilience improvements: `2026-02-01-operational-resilience-improvements.md`
+- Disk usage investigation (48GB discrepancy): `2026-02-01-disk-usage-investigation.md`
 - WARC discovery consistency improvements: `2026-01-29-warc-discovery-consistency.md`
 
 ## Implemented plans (history)
 
 - Implemented plans archive: `implemented/README.md`
+- Operational resilience improvements: `implemented/2026-02-01-operational-resilience-improvements.md`
 - WARC manifest verification: `implemented/2026-01-29-warc-manifest-verification.md`
 - Patch-job-config CLI + integration tests: `implemented/2026-01-28-patch-job-config-and-integration-tests.md`
 - archive_tool hardening + ops improvements: `implemented/2026-01-27-archive-tool-hardening-and-ops-improvements.md`

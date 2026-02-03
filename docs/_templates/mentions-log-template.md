@@ -7,7 +7,7 @@ Do NOT add private emails or outreach notes.
 
 Canonical log (real entries live here):
 
-- `mentions-log.md`
+- `operations/mentions-log.md`
 
 ---
 

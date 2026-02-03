@@ -26,7 +26,7 @@
 
 ## Docs Updated
 
-- [operations/incident-response.md](../../operations/incident-response.md) — links to escalation
+- [operations/playbooks/core/incident-response.md](../../operations/playbooks/core/incident-response.md) — links to escalation
 - [deployment/production-single-vps.md](../../deployment/production-single-vps.md) — links to DR
 - [operations/risk-register.md](../../operations/risk-register.md) — references DR mitigation
 - `mkdocs.yml` — navigation updated

@@ -76,7 +76,7 @@ If you need a quick CLI-only check, run:
 
 ## Step 5 — Record results
 
-Use `restore-test-log-template.md` and record:
+Use `../_templates/restore-test-log-template.md` and record:
 
 - date + operator,
 - backup source used,

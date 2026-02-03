@@ -4,13 +4,13 @@ Goal: prove backups are usable by performing a restore and minimal API checks.
 
 Canonical reference:
 
-- `../restore-test-procedure.md`
+- `../../restore-test-procedure.md`
 
 ## Procedure (high level)
 
-1. Follow `../restore-test-procedure.md`.
+1. Follow `../../restore-test-procedure.md`.
 2. Record results using the template:
-   - `../restore-test-log-template.md`
+   - `../../../_templates/restore-test-log-template.md`
 3. Store the public-safe log on the VPS:
    - `/srv/healtharchive/ops/restore-tests/`
 

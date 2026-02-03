@@ -4,13 +4,13 @@ Goal: keep replay (`replay.healtharchive.ca`) available when the project relies 
 
 Canonical references:
 
-- Replay runbook: `../../deployment/replay-service-pywb.md`
-- Production runbook: `../../deployment/production-single-vps.md`
-- Replay automation design: `../replay-and-preview-automation-plan.md`
+- Replay runbook: `../../../deployment/replay-service-pywb.md`
+- Production runbook: `../../../deployment/production-single-vps.md`
+- Replay automation design: `../../replay-and-preview-automation-plan.md`
 
 ## Setup / recovery (if replay is missing)
 
-Follow `../../deployment/replay-service-pywb.md`.
+Follow `../../../deployment/replay-service-pywb.md`.
 
 ## Verify replay is working
 
