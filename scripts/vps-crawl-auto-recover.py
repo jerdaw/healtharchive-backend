@@ -383,6 +383,22 @@ def _output_dir_has_running_process(output_dir: str | None, ps_rows: list[PsRow]
     return any(needle in row.args for row in ps_rows)
 
 
+def _is_likely_crawl_runner_cmd(args: str) -> bool:
+    s = str(args or "")
+    if "archive-tool" in s:
+        return True
+    if "docker run" in s and "ghcr.io/openzim/zimit" in s:
+        return True
+    return False
+
+
+def _output_dir_has_running_crawl_process(output_dir: str | None, ps_rows: list[PsRow]) -> bool:
+    if not output_dir:
+        return False
+    needle = str(output_dir)
+    return any(needle in row.args and _is_likely_crawl_runner_cmd(row.args) for row in ps_rows)
+
+
 def _output_dir_running_under_pid(
     output_dir: str | None, *, root_pid: int | None, ps_rows: list[PsRow]
 ) -> bool:
@@ -392,6 +408,8 @@ def _output_dir_running_under_pid(
     parent_by_pid = {row.pid: row.ppid for row in ps_rows}
     for row in ps_rows:
         if needle not in row.args:
+            continue
+        if not _is_likely_crawl_runner_cmd(row.args):
             continue
         if _pid_has_ancestor(row.pid, int(root_pid), parent_by_pid):
             return True
@@ -860,6 +878,54 @@ def main(argv: list[str] | None = None) -> int:
                 print(
                     f"DRY-RUN: would sync {len(drift_job_ids)} job(s) to status=running based on held job locks: "
                     + ", ".join(str(x) for x in drift_job_ids)
+                )
+
+    # Additional drift repair: if a job is running but lacks a lock (e.g., older
+    # runner before lock adoption), sync it to running based on active crawl
+    # processes using its output_dir.
+    ps_rows = _ps_snapshot()
+    if ps_rows is not None:
+        process_drift_job_ids: list[int] = []
+        with get_session() as session:
+            rows = (
+                session.query(ArchiveJob.id, ArchiveJob.output_dir, ArchiveJob.started_at)
+                .filter(ArchiveJob.status != "running")
+                .filter(ArchiveJob.started_at.isnot(None))
+                .filter(ArchiveJob.finished_at.is_(None))
+                .order_by(ArchiveJob.id.asc())
+                .all()
+            )
+            for job_id, output_dir, started_at in rows:
+                jid = int(job_id)
+                if jid in held_lock_job_ids:
+                    continue
+                if not _output_dir_has_running_crawl_process(
+                    str(output_dir) if output_dir else None, ps_rows
+                ):
+                    continue
+                process_drift_job_ids.append(jid)
+                if args.apply and not simulate_mode:
+                    orm_job = session.get(ArchiveJob, jid)
+                    if orm_job is None:
+                        continue
+                    orm_job.status = "running"
+                    if orm_job.started_at is None:
+                        orm_job.started_at = started_at or now
+                    orm_job.finished_at = None
+            if args.apply and not simulate_mode and process_drift_job_ids:
+                session.commit()
+        if process_drift_job_ids:
+            if args.apply and not simulate_mode:
+                print(
+                    "APPLY: synced "
+                    f"{len(process_drift_job_ids)} job(s) to status=running based on active crawl processes: "
+                    + ", ".join(str(x) for x in process_drift_job_ids)
+                )
+            else:
+                print(
+                    "DRY-RUN: would sync "
+                    f"{len(process_drift_job_ids)} job(s) to status=running based on active crawl processes: "
+                    + ", ".join(str(x) for x in process_drift_job_ids)
                 )
 
     running_jobs: list[RunningJob] = []
