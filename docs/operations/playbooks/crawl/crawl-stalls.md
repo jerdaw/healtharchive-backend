@@ -83,6 +83,8 @@ sudo journalctl -u healtharchive-worker.service -n 50 --no-pager
 - To periodically validate the watchdog logic safely on production, run the drills in:
   - `crawl-auto-recover-drills.md`
 - The watchdog is designed to avoid interrupting a healthy crawl; when another job is actively making progress, it may “soft recover” zombie `status=running` jobs by marking them `retryable` without restarting the worker.
+- If enabled via systemd, the watchdog can also **auto-start** underfilled annual jobs (`--ensure-min-running-jobs`) to maintain concurrency.
+  - See: `docs/operations/thresholds-and-tuning.md` and the “queue fill / auto-start” drills in `crawl-auto-recover-drills.md`.
 - If the watchdog is enabled but prints `SKIP ... max recoveries reached`, you can still do the manual recovery above, or (carefully) run the watchdog script once with a higher cap:
   ```bash
   sudo bash -lc 'set -a; source /etc/healtharchive/backend.env; set +a; /opt/healtharchive-backend/.venv/bin/python3 /opt/healtharchive-backend/scripts/vps-crawl-auto-recover.py --apply --max-recoveries-per-job-per-day 4'

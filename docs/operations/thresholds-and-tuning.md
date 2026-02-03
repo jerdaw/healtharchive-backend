@@ -110,6 +110,31 @@ See: `docs/operations/disk-baseline-and-cleanup.md` (current baseline + cleanup 
 
 ---
 
+## Crawl Auto-Start (Queue Fill)
+
+When enabled, the crawl auto-recover watchdog can also act as a **queue fill** mechanism:
+if there are **no stalled jobs**, but the annual campaign is running **fewer than N jobs**, it can auto-start
+one queued/retryable annual job via `systemd-run`.
+
+This is designed to avoid the operational failure mode where a stalled job gets marked `retryable` but never
+returns to running because the worker is already busy with another crawl.
+
+### Auto-Start Thresholds
+
+| Parameter | Value | Location | Rationale |
+|-----------|-------|----------|-----------|
+| **Min running jobs** | 3 | `docs/deployment/systemd/healtharchive-crawl-auto-recover.service` (`--ensure-min-running-jobs`) | Keep annual campaign concurrency stable |
+| **Per-job daily cap** | 3 | `scripts/vps-crawl-auto-recover.py` (`--max-starts-per-job-per-day`, default: 3) | Prevent auto-start loops |
+| **Disk safety limit** | 88% | `docs/deployment/systemd/healtharchive-crawl-auto-recover.service` (`--start-max-disk-usage-percent`) | Avoid starting new crawls when disk is near full |
+
+**Implementation notes**:
+- Auto-start only considers jobs with `config.campaign_kind="annual"` and matching `config.campaign_year`.
+- Auto-start runs the job using `systemd-run` (detached) and applies Docker caps via env vars:
+  - `HEALTHARCHIVE_DOCKER_CPU_LIMIT` (default: 1.0; configurable via `--start-docker-cpu-limit`)
+  - `HEALTHARCHIVE_DOCKER_MEMORY_LIMIT` (default: 3g; configurable via `--start-docker-memory-limit`)
+
+---
+
 ## Storage Hot-Path Recovery Thresholds
 
 ### Stale Mount Detection
