@@ -5,6 +5,7 @@ import argparse
 import fcntl
 import json
 import os
+import shlex
 import subprocess
 import sys
 from dataclasses import dataclass
@@ -20,6 +21,8 @@ DEFAULT_STATE_FILE = "/srv/healtharchive/ops/watchdog/crawl-auto-recover.json"
 DEFAULT_LOCK_FILE = "/srv/healtharchive/ops/watchdog/crawl-auto-recover.lock"
 DEFAULT_TEXTFILE_OUT_DIR = "/var/lib/node_exporter/textfile_collector"
 DEFAULT_TEXTFILE_OUT_FILE = "healtharchive_crawl_auto_recover.prom"
+DEFAULT_JOB_LOCK_DIR = Path("/tmp/healtharchive-job-locks")
+JOB_LOCK_DIR_ENV = "HEALTHARCHIVE_JOB_LOCK_DIR"
 
 
 def _dt_to_epoch_seconds(dt: datetime) -> int:
@@ -86,6 +89,54 @@ def _deploy_lock_is_active(
             pass
 
 
+def _get_job_lock_dir() -> Path:
+    raw = os.environ.get(JOB_LOCK_DIR_ENV, "").strip()
+    if raw:
+        return Path(raw).expanduser()
+    return DEFAULT_JOB_LOCK_DIR
+
+
+def _held_job_lock_job_ids(lock_dir: Path) -> set[int]:
+    """
+    Return job IDs whose per-job lock file exists and appears held by another process.
+
+    This uses non-blocking flock probes. It's best-effort: unreadable directories/files
+    simply result in an empty set.
+    """
+    try:
+        candidates = list(lock_dir.glob("job-*.lock"))
+    except OSError:
+        return set()
+
+    held: set[int] = set()
+    for p in candidates:
+        name = p.name
+        if not name.startswith("job-") or not name.endswith(".lock"):
+            continue
+        raw_id = name[len("job-") : -len(".lock")]
+        try:
+            job_id = int(raw_id)
+        except ValueError:
+            continue
+        try:
+            fd = os.open(str(p), os.O_RDONLY)
+        except OSError:
+            continue
+        try:
+            try:
+                fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except BlockingIOError:
+                held.add(job_id)
+            else:
+                try:
+                    fcntl.flock(fd, fcntl.LOCK_UN)
+                except OSError:
+                    pass
+        finally:
+            os.close(fd)
+    return held
+
+
 @dataclass(frozen=True)
 class RunningJob:
     job_id: int
@@ -93,6 +144,21 @@ class RunningJob:
     started_at: datetime | None
     output_dir: str | None
     combined_log_path: str | None
+
+
+@dataclass(frozen=True)
+class JobRunner:
+    """
+    Best-effort classification of where a DB job is currently running.
+
+    Invariants we try to uphold:
+    - Never flip DB status to retryable while a crawl process is still running.
+    - Prefer stopping only the runner for the stalled job (unit vs worker) to avoid
+      interrupting unrelated jobs.
+    """
+
+    kind: str  # one of: none, worker, systemd_unit, unknown
+    unit: str | None = None
 
 
 def _utc_now() -> datetime:
@@ -175,6 +241,195 @@ def _find_job_log(job: RunningJob) -> Path | None:
 
 def _run(cmd: list[str]) -> None:
     subprocess.run(cmd, check=True)  # nosec: B603
+
+
+def _run_capture(cmd: list[str]) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(cmd, check=False, capture_output=True, text=True)  # nosec: B603
+
+
+def _parse_cmd_tokens(raw: str) -> list[str]:
+    s = str(raw or "").strip()
+    if not s:
+        return []
+    try:
+        return shlex.split(s)
+    except ValueError:
+        return s.split()
+
+
+def _looks_like_run_db_job_for_id(cmdline: str, job_id: int) -> bool:
+    toks = _parse_cmd_tokens(cmdline)
+    if not toks:
+        return False
+    if "run-db-job" not in toks:
+        return False
+    # Accept both "--id 8" and "--id=8"
+    for i, tok in enumerate(toks):
+        if tok == "--id" and i + 1 < len(toks) and toks[i + 1] == str(job_id):
+            return True
+        if tok.startswith("--id=") and tok.split("=", 1)[1] == str(job_id):
+            return True
+    return False
+
+
+def _systemctl_show_value(unit: str, prop: str) -> str | None:
+    cp = _run_capture(["systemctl", "show", unit, f"--property={prop}", "--value", "--no-pager"])
+    if cp.returncode != 0:
+        return None
+    return cp.stdout.strip() or None
+
+
+def _systemctl_main_pid(unit: str) -> int | None:
+    raw = _systemctl_show_value(unit, "MainPID")
+    if raw is None:
+        return None
+    try:
+        pid = int(raw)
+    except ValueError:
+        return None
+    return pid if pid > 0 else None
+
+
+def _systemctl_list_running_services() -> list[str]:
+    cp = _run_capture(
+        [
+            "systemctl",
+            "list-units",
+            "--type=service",
+            "--state=running",
+            "--no-legend",
+            "--no-pager",
+        ]
+    )
+    if cp.returncode != 0:
+        return []
+    units: list[str] = []
+    for line in cp.stdout.splitlines():
+        # Format: UNIT LOAD ACTIVE SUB DESCRIPTION
+        parts = line.strip().split()
+        if not parts:
+            continue
+        units.append(parts[0])
+    return units
+
+
+def _ps_args_for_pid(pid: int) -> str | None:
+    cp = _run_capture(["ps", "-p", str(pid), "-o", "args="])
+    if cp.returncode != 0:
+        return None
+    return cp.stdout.strip() or None
+
+
+def _find_running_job_unit(job_id: int) -> str | None:
+    """
+    Attempt to find a running systemd unit whose MainPID is `ha-backend run-db-job --id <job_id>`.
+
+    This is the safest way to stop/restart a detached job without touching the worker.
+    """
+    for unit in _systemctl_list_running_services():
+        # Keep this conservative: scan likely HealthArchive job units only.
+        if "healtharchive" not in unit:
+            continue
+        pid = _systemctl_main_pid(unit)
+        if pid is None:
+            continue
+        cmdline = _ps_args_for_pid(pid) or ""
+        if _looks_like_run_db_job_for_id(cmdline, job_id):
+            return unit
+    return None
+
+
+@dataclass(frozen=True)
+class PsRow:
+    pid: int
+    ppid: int
+    args: str
+
+
+def _ps_snapshot() -> list[PsRow] | None:
+    cp = _run_capture(["ps", "-eo", "pid=,ppid=,args="])
+    if cp.returncode != 0:
+        return None
+    rows: list[PsRow] = []
+    for line in cp.stdout.splitlines():
+        parts = line.strip().split(maxsplit=2)
+        if len(parts) < 3:
+            continue
+        try:
+            pid = int(parts[0])
+            ppid = int(parts[1])
+        except ValueError:
+            continue
+        rows.append(PsRow(pid=pid, ppid=ppid, args=parts[2]))
+    return rows
+
+
+def _pid_has_ancestor(pid: int, ancestor_pid: int, parent_by_pid: dict[int, int]) -> bool:
+    cur = pid
+    for _ in range(64):  # defensive upper bound
+        if cur == ancestor_pid:
+            return True
+        ppid = parent_by_pid.get(cur)
+        if ppid is None or ppid <= 0 or ppid == cur:
+            return False
+        cur = ppid
+    return False
+
+
+def _output_dir_has_running_process(output_dir: str | None, ps_rows: list[PsRow]) -> bool:
+    if not output_dir:
+        return False
+    needle = str(output_dir)
+    return any(needle in row.args for row in ps_rows)
+
+
+def _output_dir_running_under_pid(
+    output_dir: str | None, *, root_pid: int | None, ps_rows: list[PsRow]
+) -> bool:
+    if not output_dir or root_pid is None or root_pid <= 0:
+        return False
+    needle = str(output_dir)
+    parent_by_pid = {row.pid: row.ppid for row in ps_rows}
+    for row in ps_rows:
+        if needle not in row.args:
+            continue
+        if _pid_has_ancestor(row.pid, int(root_pid), parent_by_pid):
+            return True
+    return False
+
+
+def _detect_job_runner(
+    job: RunningJob,
+    *,
+    simulate_mode: bool,
+    simulate_runner: str | None,
+    simulate_runner_unit: str | None,
+) -> JobRunner:
+    """
+    Detect where a job is running (if at all).
+
+    In drill mode, detection can be overridden to prove the planned actions
+    without requiring real systemd services or processes.
+    """
+    if simulate_mode and simulate_runner:
+        kind = str(simulate_runner).strip().lower()
+        if kind in {"none", "worker", "systemd_unit", "unknown"}:
+            unit = str(simulate_runner_unit).strip() if simulate_runner_unit else None
+            return JobRunner(kind=kind, unit=unit or None)
+
+    unit = _find_running_job_unit(int(job.job_id))
+    if unit:
+        return JobRunner(kind="systemd_unit", unit=unit)
+
+    ps_rows = _ps_snapshot()
+    if ps_rows is None:
+        return JobRunner(kind="unknown")
+    worker_pid = _systemctl_main_pid("healtharchive-worker.service")
+    if _output_dir_running_under_pid(job.output_dir, root_pid=worker_pid, ps_rows=ps_rows):
+        return JobRunner(kind="worker", unit="healtharchive-worker.service")
+    if _output_dir_has_running_process(job.output_dir, ps_rows):
+        return JobRunner(kind="unknown")
+    return JobRunner(kind="none")
 
 
 def _ensure_recovery_tool_options(job: ArchiveJob) -> bool:
@@ -411,6 +666,24 @@ def main(argv: list[str] | None = None) -> int:
         ),
     )
     parser.add_argument(
+        "--simulate-stalled-job-runner",
+        default=None,
+        choices=["none", "worker", "systemd_unit", "unknown"],
+        help=(
+            "DRILL ONLY: override runner detection for the simulated stalled job. "
+            "Use this to validate that the watchdog would stop the correct runner "
+            "before marking a job retryable."
+        ),
+    )
+    parser.add_argument(
+        "--simulate-stalled-job-runner-unit",
+        default=None,
+        help=(
+            "DRILL ONLY: when using --simulate-stalled-job-runner=systemd_unit, use this unit name "
+            "in the planned actions output."
+        ),
+    )
+    parser.add_argument(
         "--sentinel-file",
         default="/etc/healtharchive/crawl-auto-recover-enabled",
         help="Sentinel file that indicates automation is enabled (written by operator).",
@@ -447,6 +720,22 @@ def main(argv: list[str] | None = None) -> int:
     simulate_job_ids_raw = list(getattr(args, "simulate_stalled_job_id", []) or [])
     simulate_job_ids = [int(x) for x in simulate_job_ids_raw if str(x).strip()]
     simulate_mode = bool(simulate_job_ids)
+    if bool(getattr(args, "simulate_stalled_job_runner", None)) and not simulate_mode:
+        print(
+            "ERROR: --simulate-stalled-job-runner is only allowed with --simulate-stalled-job-id.",
+            file=sys.stderr,
+        )
+        return 2
+    if (
+        simulate_mode
+        and bool(getattr(args, "simulate_stalled_job_runner", None))
+        and len(simulate_job_ids) != 1
+    ):
+        print(
+            "ERROR: --simulate-stalled-job-runner currently requires exactly one --simulate-stalled-job-id.",
+            file=sys.stderr,
+        )
+        return 2
     if simulate_mode and bool(args.apply):
         print(
             "ERROR: --simulate-stalled-job-id is only allowed in dry-run mode (omit --apply).",
@@ -540,6 +829,33 @@ def main(argv: list[str] | None = None) -> int:
 
     state = _load_state(state_path)
     recent_cutoff = now - timedelta(days=1)
+
+    # Repair DB drift: if a job is clearly running (job lock held) but DB status is not
+    # running, sync it back to running so monitoring + stall detection remains accurate.
+    held_lock_job_ids = _held_job_lock_job_ids(_get_job_lock_dir())
+    if held_lock_job_ids:
+        drift_job_ids: list[int] = []
+        with get_session() as session:
+            for jid in sorted(held_lock_job_ids):
+                orm_job = session.get(ArchiveJob, jid)
+                if orm_job is None:
+                    continue
+                if orm_job.status == "running":
+                    continue
+                drift_job_ids.append(jid)
+                if args.apply and not simulate_mode:
+                    orm_job.status = "running"
+                    if orm_job.started_at is None:
+                        orm_job.started_at = now
+                    orm_job.finished_at = None
+            if args.apply and not simulate_mode and drift_job_ids:
+                session.commit()
+        if drift_job_ids:
+            mode = "APPLY" if args.apply and not simulate_mode else "DRY-RUN"
+            print(
+                f"{mode}: synced {len(drift_job_ids)} job(s) to status=running based on held job locks: "
+                + ", ".join(str(x) for x in drift_job_ids)
+            )
 
     running_jobs: list[RunningJob] = []
     try:
@@ -656,6 +972,12 @@ def main(argv: list[str] | None = None) -> int:
 
     # Only recover one job per run (worker processes one job at a time).
     job, age = stalled[0]
+    runner = _detect_job_runner(
+        job,
+        simulate_mode=simulate_mode,
+        simulate_runner=getattr(args, "simulate_stalled_job_runner", None),
+        simulate_runner_unit=getattr(args, "simulate_stalled_job_runner_unit", None),
+    )
     guard_seconds = int(args.skip_if_any_job_progress_within_seconds or 0)
     if guard_seconds > 0:
         other_recent = [
@@ -665,105 +987,115 @@ def main(argv: list[str] | None = None) -> int:
         ]
         if other_recent:
             jid, a = sorted(other_recent, key=lambda item: item[1])[0]
-            if not bool(args.soft_recover_when_guarded):
+            # If the stalled job is *not* currently running (zombie DB row),
+            # soft recovery can safely clean it up without touching the worker.
+            #
+            # If we can detect an active runner, we must stop it first to avoid
+            # leaving an orphaned crawl with DB status != running.
+            if runner.kind == "none":
+                if not bool(args.soft_recover_when_guarded):
+                    print(
+                        f"SKIP job_id={job.job_id} source={job.source_code}: stalled for {age:.0f}s, "
+                        f"but another running job_id={jid} made progress {a:.0f}s ago (<{guard_seconds}s guard)."
+                    )
+                    write_metrics(
+                        running_jobs=len(running_jobs),
+                        stalled_jobs=len(stalled),
+                        result="skip",
+                        reason="guard_window_healthy_job",
+                        state=state,
+                    )
+                    return 0
                 print(
-                    f"SKIP job_id={job.job_id} source={job.source_code}: stalled for {age:.0f}s, "
-                    f"but another running job_id={jid} made progress {a:.0f}s ago (<{guard_seconds}s guard)."
+                    f"{'APPLY' if args.apply else 'DRY-RUN'}: soft-recover stalled job_id={job.job_id} "
+                    f"source={job.source_code} stalled_age_seconds={age:.0f} "
+                    f"(another job_id={jid} made progress {a:.0f}s ago; not restarting worker)"
                 )
+                if not args.apply:
+                    print("")
+                    print("Planned actions (dry-run):")
+                    print("  1) (skip) do not restart the worker (guard window active)")
+                    print(
+                        "  2) /opt/healtharchive-backend/.venv/bin/ha-backend recover-stale-jobs "
+                        f"--older-than-minutes {int(args.recover_older_than_minutes)} "
+                        f"--require-no-progress-seconds {int(args.stall_threshold_seconds)} "
+                        f"--apply --source {job.source_code} --limit 5"
+                    )
+                    write_metrics(
+                        running_jobs=len(running_jobs),
+                        stalled_jobs=len(stalled),
+                        result="skip",
+                        reason="dry_run_soft_recover",
+                        state=state,
+                    )
+                    return 0
+
+                recent_n = _count_recent_recoveries(state, job.job_id, since_utc=recent_cutoff)
+                if recent_n >= int(args.max_recoveries_per_job_per_day):
+                    print(
+                        f"SKIP job_id={job.job_id} source={job.source_code}: stalled for {age:.0f}s, "
+                        f"but max recoveries reached ({recent_n}/{args.max_recoveries_per_job_per_day} in last 24h)."
+                    )
+                    write_metrics(
+                        running_jobs=len(running_jobs),
+                        stalled_jobs=len(stalled),
+                        result="skip",
+                        reason="max_recoveries_soft",
+                        state=state,
+                    )
+                    return 0
+
+                # Soft-recover: mark stale running jobs retryable without stopping the worker.
+                # This is only safe when we detect no active runner (zombie DB row).
+                try:
+                    with get_session() as session:
+                        orm_job = session.get(ArchiveJob, job.job_id)
+                        if orm_job is not None:
+                            if _ensure_recovery_tool_options(orm_job):
+                                tool_opts = (orm_job.config or {}).get("tool_options") or {}
+                                try:
+                                    max_restarts = int(tool_opts.get("max_container_restarts") or 0)
+                                except (TypeError, ValueError):
+                                    max_restarts = 0
+                                print(
+                                    "Updated job config before soft recovery: "
+                                    f"enable_adaptive_restart={bool(tool_opts.get('enable_adaptive_restart'))} "
+                                    f"max_container_restarts={max_restarts}"
+                                )
+                except Exception as exc:
+                    print(f"WARNING: failed to update job config before soft recovery: {exc}")
+
+                _run(
+                    [
+                        "/opt/healtharchive-backend/.venv/bin/ha-backend",
+                        "recover-stale-jobs",
+                        "--older-than-minutes",
+                        str(int(args.recover_older_than_minutes)),
+                        "--require-no-progress-seconds",
+                        str(int(args.stall_threshold_seconds)),
+                        "--apply",
+                        "--source",
+                        job.source_code,
+                        "--limit",
+                        "5",
+                    ]
+                )
+
+                _record_recovery(state, job.job_id, when_utc=now)
+                _save_state(state_path, state)
                 write_metrics(
                     running_jobs=len(running_jobs),
                     stalled_jobs=len(stalled),
-                    result="skip",
-                    reason="guard_window_healthy_job",
+                    result="ok",
+                    reason="soft_recovered",
                     state=state,
                 )
                 return 0
+
             print(
-                f"{'APPLY' if args.apply else 'DRY-RUN'}: soft-recover stalled job_id={job.job_id} "
-                f"source={job.source_code} stalled_age_seconds={age:.0f} "
-                f"(another job_id={jid} made progress {a:.0f}s ago; not restarting worker)"
+                f"NOTE: guard window is active (job_id={jid} progressed {a:.0f}s ago), but stalled job_id={job.job_id} "
+                f"appears to have an active runner ({runner.kind}); proceeding with recovery."
             )
-            if not args.apply:
-                print("")
-                print("Planned actions (dry-run):")
-                print("  1) (skip) do not restart the worker (guard window active)")
-                print(
-                    "  2) /opt/healtharchive-backend/.venv/bin/ha-backend recover-stale-jobs "
-                    f"--older-than-minutes {int(args.recover_older_than_minutes)} "
-                    f"--require-no-progress-seconds {int(args.stall_threshold_seconds)} "
-                    f"--apply --source {job.source_code} --limit 5"
-                )
-                write_metrics(
-                    running_jobs=len(running_jobs),
-                    stalled_jobs=len(stalled),
-                    result="skip",
-                    reason="dry_run_soft_recover",
-                    state=state,
-                )
-                return 0
-
-            recent_n = _count_recent_recoveries(state, job.job_id, since_utc=recent_cutoff)
-            if recent_n >= int(args.max_recoveries_per_job_per_day):
-                print(
-                    f"SKIP job_id={job.job_id} source={job.source_code}: stalled for {age:.0f}s, "
-                    f"but max recoveries reached ({recent_n}/{args.max_recoveries_per_job_per_day} in last 24h)."
-                )
-                write_metrics(
-                    running_jobs=len(running_jobs),
-                    stalled_jobs=len(stalled),
-                    result="skip",
-                    reason="max_recoveries_soft",
-                    state=state,
-                )
-                return 0
-
-            # Soft-recover: mark stale running jobs retryable without stopping the worker.
-            # This avoids interrupting a healthy crawl (single-worker host), while cleaning up
-            # zombie 'running' jobs so they can be retried later.
-            try:
-                with get_session() as session:
-                    orm_job = session.get(ArchiveJob, job.job_id)
-                    if orm_job is not None:
-                        if _ensure_recovery_tool_options(orm_job):
-                            tool_opts = (orm_job.config or {}).get("tool_options") or {}
-                            try:
-                                max_restarts = int(tool_opts.get("max_container_restarts") or 0)
-                            except (TypeError, ValueError):
-                                max_restarts = 0
-                            print(
-                                "Updated job config before soft recovery: "
-                                f"enable_adaptive_restart={bool(tool_opts.get('enable_adaptive_restart'))} "
-                                f"max_container_restarts={max_restarts}"
-                            )
-            except Exception as exc:
-                print(f"WARNING: failed to update job config before soft recovery: {exc}")
-
-            _run(
-                [
-                    "/opt/healtharchive-backend/.venv/bin/ha-backend",
-                    "recover-stale-jobs",
-                    "--older-than-minutes",
-                    str(int(args.recover_older_than_minutes)),
-                    "--require-no-progress-seconds",
-                    str(int(args.stall_threshold_seconds)),
-                    "--apply",
-                    "--source",
-                    job.source_code,
-                    "--limit",
-                    "5",
-                ]
-            )
-
-            _record_recovery(state, job.job_id, when_utc=now)
-            _save_state(state_path, state)
-            write_metrics(
-                running_jobs=len(running_jobs),
-                stalled_jobs=len(stalled),
-                result="ok",
-                reason="soft_recovered",
-                state=state,
-            )
-            return 0
 
     recent_n = _count_recent_recoveries(state, job.job_id, since_utc=recent_cutoff)
     if recent_n >= int(args.max_recoveries_per_job_per_day):
@@ -782,19 +1114,33 @@ def main(argv: list[str] | None = None) -> int:
 
     print(
         f"{'APPLY' if args.apply else 'DRY-RUN'}: would recover stalled job_id={job.job_id} "
-        f"source={job.source_code} stalled_age_seconds={age:.0f}"
+        f"source={job.source_code} stalled_age_seconds={age:.0f} runner={runner.kind}"
     )
     if not args.apply:
         print("")
         print("Planned actions (dry-run):")
-        print("  1) systemctl stop healtharchive-worker.service")
+        step = 1
+        if runner.kind == "systemd_unit" and runner.unit:
+            print(f"  {step}) systemctl stop {runner.unit}")
+            step += 1
+        elif runner.kind == "worker":
+            print(f"  {step}) systemctl stop healtharchive-worker.service")
+            step += 1
+        elif runner.kind == "unknown":
+            print(f"  {step}) (skip) runner unknown; operator intervention required")
+            step += 1
+
         print(
-            "  2) /opt/healtharchive-backend/.venv/bin/ha-backend recover-stale-jobs "
+            f"  {step}) /opt/healtharchive-backend/.venv/bin/ha-backend recover-stale-jobs "
             f"--older-than-minutes {int(args.recover_older_than_minutes)} "
             f"--require-no-progress-seconds {int(args.stall_threshold_seconds)} "
             f"--apply --source {job.source_code} --limit 5"
         )
-        print("  3) systemctl start healtharchive-worker.service")
+        step += 1
+        if runner.kind == "systemd_unit" and runner.unit:
+            print(f"  {step}) systemctl start {runner.unit}")
+        elif runner.kind == "worker":
+            print(f"  {step}) systemctl start healtharchive-worker.service")
         write_metrics(
             running_jobs=len(running_jobs),
             stalled_jobs=len(stalled),
@@ -824,7 +1170,23 @@ def main(argv: list[str] | None = None) -> int:
     except Exception as exc:
         print(f"WARNING: failed to update job config before recovery: {exc}")
 
-    _run(["systemctl", "stop", "healtharchive-worker.service"])
+    if runner.kind == "systemd_unit" and runner.unit:
+        _run(["systemctl", "stop", runner.unit])
+    elif runner.kind == "worker":
+        _run(["systemctl", "stop", "healtharchive-worker.service"])
+    elif runner.kind == "unknown":
+        print(
+            f"ERROR: stalled job_id={job.job_id} appears to have an active runner, but could not identify a safe stop target.",
+            file=sys.stderr,
+        )
+        write_metrics(
+            running_jobs=len(running_jobs),
+            stalled_jobs=len(stalled),
+            result="skip",
+            reason="runner_unknown",
+            state=state,
+        )
+        return 2
     _run(
         [
             "/opt/healtharchive-backend/.venv/bin/ha-backend",
@@ -840,7 +1202,10 @@ def main(argv: list[str] | None = None) -> int:
             "5",
         ]
     )
-    _run(["systemctl", "start", "healtharchive-worker.service"])
+    if runner.kind == "systemd_unit" and runner.unit:
+        _run(["systemctl", "start", runner.unit])
+    elif runner.kind == "worker":
+        _run(["systemctl", "start", "healtharchive-worker.service"])
 
     _record_recovery(state, job.job_id, when_utc=now)
     _save_state(state_path, state)

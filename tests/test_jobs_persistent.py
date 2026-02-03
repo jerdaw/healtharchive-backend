@@ -1,12 +1,16 @@
 from __future__ import annotations
 
 import errno
+import fcntl
+import os
 from pathlib import Path
+
+import pytest
 
 from ha_backend import db as db_module
 from ha_backend.db import Base, get_engine, get_session
 from ha_backend.job_registry import SOURCE_JOB_CONFIGS, create_job_for_source
-from ha_backend.jobs import run_persistent_job
+from ha_backend.jobs import JobAlreadyRunningError, run_persistent_job
 from ha_backend.models import ArchiveJob
 from ha_backend.seeds import seed_sources
 
@@ -314,3 +318,41 @@ def test_run_persistent_job_marks_cli_usage_errors_as_infra_error_config(
         assert stored.crawler_status == "infra_error_config"
         assert stored.crawler_exit_code == 1
         assert stored.combined_log_path is not None
+
+
+def test_run_persistent_job_refuses_to_run_when_lock_held(tmp_path, monkeypatch) -> None:
+    _init_test_db(tmp_path, monkeypatch)
+
+    archive_root = tmp_path / "jobs"
+    monkeypatch.setenv("HEALTHARCHIVE_ARCHIVE_ROOT", str(archive_root))
+    monkeypatch.setenv("HEALTHARCHIVE_TOOL_CMD", "echo")
+    lock_dir = tmp_path / "locks"
+    monkeypatch.setenv("HEALTHARCHIVE_JOB_LOCK_DIR", str(lock_dir))
+
+    with get_session() as session:
+        seed_sources(session)
+
+    with get_session() as session:
+        job_row = create_job_for_source("hc", session=session)
+        job_id = job_row.id
+
+    lock_dir.mkdir(parents=True, exist_ok=True)
+    lock_path = lock_dir / f"job-{job_id}.lock"
+    fd = os.open(str(lock_path), os.O_CREAT | os.O_RDWR, 0o666)
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        with pytest.raises(JobAlreadyRunningError):
+            run_persistent_job(job_id)
+    finally:
+        try:
+            fcntl.flock(fd, fcntl.LOCK_UN)
+        except OSError:
+            pass
+        os.close(fd)
+
+    with get_session() as session:
+        stored = session.get(ArchiveJob, job_id)
+        assert stored is not None
+        assert stored.status in {"queued", "retryable"}
+        assert stored.started_at is None
+        assert stored.finished_at is None

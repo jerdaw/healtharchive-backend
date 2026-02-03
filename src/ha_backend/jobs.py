@@ -1,13 +1,16 @@
 from __future__ import annotations
 
+import fcntl
 import logging
+import os
 import stat
 import subprocess  # nosec: B404 - expected for running archive_tool
 import sys
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Iterable, Sequence
+from typing import Iterable, Iterator, Sequence
 
 from sqlalchemy.orm import Session
 
@@ -29,6 +32,61 @@ logger = logging.getLogger("healtharchive.jobs")
 # Note: normal failures are handled by worker/main.py; this cap is for infra_error
 # jobs which otherwise bypass the retry budget.
 MAX_INFRA_ERROR_RETRIES = 5
+
+DEFAULT_JOB_LOCK_DIR = Path("/tmp/healtharchive-job-locks")
+JOB_LOCK_DIR_ENV = "HEALTHARCHIVE_JOB_LOCK_DIR"
+
+
+class JobAlreadyRunningError(RuntimeError):
+    def __init__(self, job_id: int, lock_path: Path) -> None:
+        super().__init__(f"Job {job_id} appears to already be running (lock held): {lock_path}")
+        self.job_id = int(job_id)
+        self.lock_path = str(lock_path)
+
+
+def _get_job_lock_dir() -> Path:
+    raw = os.environ.get(JOB_LOCK_DIR_ENV, "").strip()
+    if raw:
+        return Path(raw).expanduser()
+    return DEFAULT_JOB_LOCK_DIR
+
+
+@contextmanager
+def _job_lock(job_id: int) -> Iterator[Path]:
+    lock_dir = _get_job_lock_dir()
+    try:
+        lock_dir.mkdir(parents=True, exist_ok=True)
+        try:
+            lock_dir.chmod(0o1777)
+        except OSError:
+            pass
+    except OSError:
+        lock_dir = Path("/tmp")
+
+    lock_path = lock_dir / f"job-{int(job_id)}.lock"
+    fd = os.open(str(lock_path), os.O_CREAT | os.O_RDWR, 0o666)
+    try:
+        try:
+            os.fchmod(fd, 0o666)
+        except OSError:
+            pass
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError as exc:
+            raise JobAlreadyRunningError(int(job_id), lock_path) from exc
+        try:
+            os.lseek(fd, 0, os.SEEK_SET)
+            os.ftruncate(fd, 0)
+            os.write(fd, f"pid={os.getpid()}\n".encode("utf-8"))
+        except OSError:
+            pass
+        yield lock_path
+    finally:
+        try:
+            fcntl.flock(fd, fcntl.LOCK_UN)
+        except OSError:
+            pass
+        os.close(fd)
 
 
 # --- Helper predicates for error classification ---
@@ -402,176 +460,177 @@ def run_persistent_job(job_id: int) -> int:
     sync with the argument model in ``archive_tool.cli``; if you change one
     side, update the other.
     """
-    # First session: validate and mark as running, and snapshot configuration.
-    with get_session() as session:
-        job_row = _load_job_for_update(session, job_id)
+    with _job_lock(job_id):
+        # First session: validate and mark as running, and snapshot configuration.
+        with get_session() as session:
+            job_row = _load_job_for_update(session, job_id)
 
-        if job_row.status not in ("queued", "retryable"):
-            raise ValueError(f"Job {job_id} has status {job_row.status!r} and is not runnable.")
+            if job_row.status not in ("queued", "retryable"):
+                raise ValueError(f"Job {job_id} has status {job_row.status!r} and is not runnable.")
 
-        raw_config = job_row.config or {}
-        job_cfg = ArchiveJobConfig.from_dict(raw_config)
-        seeds = list(job_cfg.seeds)
-        zimit_args = list(job_cfg.zimit_passthrough_args)
-        tool_options = job_cfg.tool_options
+            raw_config = job_row.config or {}
+            job_cfg = ArchiveJobConfig.from_dict(raw_config)
+            seeds = list(job_cfg.seeds)
+            zimit_args = list(job_cfg.zimit_passthrough_args)
+            tool_options = job_cfg.tool_options
 
-        if not seeds:
-            raise ValueError(
-                f"Job {job_id} has no seeds configured; cannot build archive_tool command."
-            )
-
-        output_dir_str = job_row.output_dir
-        job_name = job_row.name
-
-        now = datetime.now(timezone.utc)
-        job_row.status = "running"
-        job_row.started_at = now
-        job_row.finished_at = None
-        job_row.crawler_exit_code = None
-        job_row.crawler_status = None
-        job_row.crawler_stage = None
-        job_row.combined_log_path = None
-
-    # Execute outside of an open Session to keep the database interaction
-    # simple and avoid long-lived transactions.
-    output_dir = Path(output_dir_str)
-    runtime_job = RuntimeArchiveJob(name=job_name, seeds=seeds)
-
-    initial_workers = int(tool_options.initial_workers)
-    cleanup = bool(tool_options.cleanup)
-    overwrite = bool(tool_options.overwrite)
-    log_level = str(tool_options.log_level)
-
-    # Build archive_tool-specific CLI options (before the '--' separator).
-    extra_tool_args: list[str] = _build_tool_extra_args(tool_options)
-
-    # Compose final extra args: tool args first, then the Zimit passthrough
-    # arguments (no additional '--' separator needed; archive_tool will pass
-    # these directly through to zimit).
-    full_extra_args: list[str] = list(extra_tool_args)
-    if zimit_args:
-        full_extra_args.extend(zimit_args)
-
-    rc: int | None = None
-    run_exc: Exception | None = None
-    try:
-        rc = runtime_job.run(
-            initial_workers=initial_workers,
-            cleanup=cleanup,
-            overwrite=overwrite,
-            log_level=log_level,
-            extra_args=full_extra_args,
-            stream_output=True,
-            output_dir_override=output_dir,
-        )
-    except Exception as exc:  # noqa: BLE001 - intentional boundary around runtime execution
-        run_exc = exc
-        logger.warning("Job %s raised during archive_tool execution: %s", job_id, exc)
-
-    # Second session: record final status and exit code.
-    finished = datetime.now(timezone.utc)
-    with get_session() as session:
-        job_row = _load_job_for_update(session, job_id)
-        job_row.finished_at = finished
-
-        combined_log_path = _find_latest_combined_log(Path(job_row.output_dir))
-        if combined_log_path is not None:
-            job_row.combined_log_path = str(combined_log_path)
-
-        if run_exc is not None:
-            if is_storage_infra_error(run_exc) or is_output_dir_write_infra_error(
-                run_exc, output_dir=output_dir
-            ):
-                # Check retry cap to prevent infinite infra_error retries
-                if job_row.retry_count < MAX_INFRA_ERROR_RETRIES:
-                    job_row.status = "retryable"
-                    job_row.crawler_status = "infra_error"
-                else:
-                    logger.warning(
-                        "Job %s exceeded max infra error retries (%d); marking as failed.",
-                        job_id,
-                        MAX_INFRA_ERROR_RETRIES,
-                    )
-                    job_row.status = "failed"
-                    job_row.crawler_status = "infra_error"
-            else:
-                job_row.status = "failed"
-                job_row.crawler_status = "infra_error_config"
-            job_row.crawler_exit_code = None
-            return 1
-
-        if rc is None:
-            job_row.status = "failed"
-            job_row.crawler_status = "infra_error_config"
-            job_row.crawler_exit_code = None
-            return 1
-        job_row.crawler_exit_code = rc
-
-        if rc == 0:
-            job_row.status = "completed"
-            job_row.crawler_status = "success"
-        else:
-            infra = False
-            try:
-                if not _check_output_dir_is_accessible_directory(Path(job_row.output_dir)):
-                    # Not a directory; treat as configuration/layout problem
-                    job_row.status = "failed"
-                    job_row.crawler_status = "infra_error_config"
-                    job_row.crawler_exit_code = rc
-                    return rc
-            except OSError as exc:
-                infra = is_storage_infra_errno(exc.errno) or is_output_dir_write_infra_error(
-                    exc, output_dir=Path(job_row.output_dir)
+            if not seeds:
+                raise ValueError(
+                    f"Job {job_id} has no seeds configured; cannot build archive_tool command."
                 )
 
-            if infra:
-                if _should_retry_as_infra_error(job_row.retry_count):
-                    job_row.status = "retryable"
-                    job_row.crawler_status = "infra_error"
+            output_dir_str = job_row.output_dir
+            job_name = job_row.name
+
+            now = datetime.now(timezone.utc)
+            job_row.status = "running"
+            job_row.started_at = now
+            job_row.finished_at = None
+            job_row.crawler_exit_code = None
+            job_row.crawler_status = None
+            job_row.crawler_stage = None
+            job_row.combined_log_path = None
+
+        # Execute outside of an open Session to keep the database interaction
+        # simple and avoid long-lived transactions.
+        output_dir = Path(output_dir_str)
+        runtime_job = RuntimeArchiveJob(name=job_name, seeds=seeds)
+
+        initial_workers = int(tool_options.initial_workers)
+        cleanup = bool(tool_options.cleanup)
+        overwrite = bool(tool_options.overwrite)
+        log_level = str(tool_options.log_level)
+
+        # Build archive_tool-specific CLI options (before the '--' separator).
+        extra_tool_args: list[str] = _build_tool_extra_args(tool_options)
+
+        # Compose final extra args: tool args first, then the Zimit passthrough
+        # arguments (no additional '--' separator needed; archive_tool will pass
+        # these directly through to zimit).
+        full_extra_args: list[str] = list(extra_tool_args)
+        if zimit_args:
+            full_extra_args.extend(zimit_args)
+
+        rc: int | None = None
+        run_exc: Exception | None = None
+        try:
+            rc = runtime_job.run(
+                initial_workers=initial_workers,
+                cleanup=cleanup,
+                overwrite=overwrite,
+                log_level=log_level,
+                extra_args=full_extra_args,
+                stream_output=True,
+                output_dir_override=output_dir,
+            )
+        except Exception as exc:  # noqa: BLE001 - intentional boundary around runtime execution
+            run_exc = exc
+            logger.warning("Job %s raised during archive_tool execution: %s", job_id, exc)
+
+        # Second session: record final status and exit code.
+        finished = datetime.now(timezone.utc)
+        with get_session() as session:
+            job_row = _load_job_for_update(session, job_id)
+            job_row.finished_at = finished
+
+            combined_log_path = _find_latest_combined_log(Path(job_row.output_dir))
+            if combined_log_path is not None:
+                job_row.combined_log_path = str(combined_log_path)
+
+            if run_exc is not None:
+                if is_storage_infra_error(run_exc) or is_output_dir_write_infra_error(
+                    run_exc, output_dir=output_dir
+                ):
+                    # Check retry cap to prevent infinite infra_error retries
+                    if job_row.retry_count < MAX_INFRA_ERROR_RETRIES:
+                        job_row.status = "retryable"
+                        job_row.crawler_status = "infra_error"
+                    else:
+                        logger.warning(
+                            "Job %s exceeded max infra error retries (%d); marking as failed.",
+                            job_id,
+                            MAX_INFRA_ERROR_RETRIES,
+                        )
+                        job_row.status = "failed"
+                        job_row.crawler_status = "infra_error"
                 else:
-                    logger.warning(
-                        "Job %s exceeded max infra error retries (%d); marking as failed.",
-                        job_id,
-                        MAX_INFRA_ERROR_RETRIES,
-                    )
                     job_row.status = "failed"
-                    job_row.crawler_status = "infra_error"
+                    job_row.crawler_status = "infra_error_config"
+                job_row.crawler_exit_code = None
+                return 1
+
+            if rc is None:
+                job_row.status = "failed"
+                job_row.crawler_status = "infra_error_config"
+                job_row.crawler_exit_code = None
+                return 1
+            job_row.crawler_exit_code = rc
+
+            if rc == 0:
+                job_row.status = "completed"
+                job_row.crawler_status = "success"
             else:
-                # Classify common CLI/runtime errors (e.g. invalid Zimit args) as
-                # infra_error_config so the worker doesn't churn retry budget.
-                #
-                # Note: we keep this heuristic intentionally narrow and only
-                # inspect the combined log tail to avoid reading large logs.
-                if combined_log_path is not None:
-                    tail = _read_log_tail(combined_log_path)
-                    # Check for infra errors from log (e.g. permission denied,
-                    # transport endpoint not connected) before config errors.
-                    # These are retryable since the underlying storage may recover.
-                    if _looks_like_infra_error_from_log(tail):
-                        if _should_retry_as_infra_error(job_row.retry_count):
-                            job_row.status = "retryable"
-                            job_row.crawler_status = "infra_error"
-                        else:
-                            logger.warning(
-                                "Job %s exceeded max infra error retries (%d); marking as failed.",
-                                job_id,
-                                MAX_INFRA_ERROR_RETRIES,
-                            )
-                            job_row.status = "failed"
-                            job_row.crawler_status = "infra_error"
-                        job_row.crawler_exit_code = rc
-                        return int(rc)
-                    if _looks_like_config_error_from_log(tail):
+                infra = False
+                try:
+                    if not _check_output_dir_is_accessible_directory(Path(job_row.output_dir)):
+                        # Not a directory; treat as configuration/layout problem
                         job_row.status = "failed"
                         job_row.crawler_status = "infra_error_config"
                         job_row.crawler_exit_code = rc
-                        return int(rc)
-                job_row.status = "failed"
-                job_row.crawler_status = "failed"
+                        return rc
+                except OSError as exc:
+                    infra = is_storage_infra_errno(exc.errno) or is_output_dir_write_infra_error(
+                        exc, output_dir=Path(job_row.output_dir)
+                    )
 
-        # Best-effort stats sync from archive_tool logs; failures are logged
-        # inside the helper and should not interfere with status updates.
-        if job_row.crawler_status not in {"infra_error", "infra_error_config"}:
-            update_job_stats_from_logs(job_row)
+                if infra:
+                    if _should_retry_as_infra_error(job_row.retry_count):
+                        job_row.status = "retryable"
+                        job_row.crawler_status = "infra_error"
+                    else:
+                        logger.warning(
+                            "Job %s exceeded max infra error retries (%d); marking as failed.",
+                            job_id,
+                            MAX_INFRA_ERROR_RETRIES,
+                        )
+                        job_row.status = "failed"
+                        job_row.crawler_status = "infra_error"
+                else:
+                    # Classify common CLI/runtime errors (e.g. invalid Zimit args) as
+                    # infra_error_config so the worker doesn't churn retry budget.
+                    #
+                    # Note: we keep this heuristic intentionally narrow and only
+                    # inspect the combined log tail to avoid reading large logs.
+                    if combined_log_path is not None:
+                        tail = _read_log_tail(combined_log_path)
+                        # Check for infra errors from log (e.g. permission denied,
+                        # transport endpoint not connected) before config errors.
+                        # These are retryable since the underlying storage may recover.
+                        if _looks_like_infra_error_from_log(tail):
+                            if _should_retry_as_infra_error(job_row.retry_count):
+                                job_row.status = "retryable"
+                                job_row.crawler_status = "infra_error"
+                            else:
+                                logger.warning(
+                                    "Job %s exceeded max infra error retries (%d); marking as failed.",
+                                    job_id,
+                                    MAX_INFRA_ERROR_RETRIES,
+                                )
+                                job_row.status = "failed"
+                                job_row.crawler_status = "infra_error"
+                            job_row.crawler_exit_code = rc
+                            return int(rc)
+                        if _looks_like_config_error_from_log(tail):
+                            job_row.status = "failed"
+                            job_row.crawler_status = "infra_error_config"
+                            job_row.crawler_exit_code = rc
+                            return int(rc)
+                    job_row.status = "failed"
+                    job_row.crawler_status = "failed"
 
-    return int(rc)
+            # Best-effort stats sync from archive_tool logs; failures are logged
+            # inside the helper and should not interfere with status updates.
+            if job_row.crawler_status not in {"infra_error", "infra_error_config"}:
+                update_job_stats_from_logs(job_row)
+
+        return int(rc)

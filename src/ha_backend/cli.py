@@ -571,9 +571,14 @@ def cmd_run_db_job(args: argparse.Namespace) -> None:
     """
     Run a database-backed ArchiveJob by ID.
     """
+    from .jobs import JobAlreadyRunningError
+
     job_id = args.id
     try:
         rc = run_persistent_job(job_id)
+    except JobAlreadyRunningError as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        sys.exit(1)
     except ValueError as exc:
         print(f"ERROR: {exc}", file=sys.stderr)
         sys.exit(1)
@@ -1934,6 +1939,7 @@ def cmd_recover_stale_jobs(args: argparse.Namespace) -> None:
     from sqlalchemy import or_
 
     from .crawl_stats import parse_crawl_log_progress
+    from .jobs import JobAlreadyRunningError, _job_lock
     from .models import ArchiveJob as ORMArchiveJob
     from .models import Source
 
@@ -2073,6 +2079,33 @@ def cmd_recover_stale_jobs(args: argparse.Namespace) -> None:
             if not jobs:
                 print("No stale running jobs matched the progress requirement.")
                 return
+
+        # Safety: if a job lock is held, the job is still actively running under ha-backend.
+        # Marking it retryable without stopping the runner would cause DB/process drift.
+        filtered_jobs: list[ORMArchiveJob] = []
+        skipped_locked: list[str] = []
+        for job in jobs:
+            try:
+                with _job_lock(int(job.id)):
+                    pass
+            except JobAlreadyRunningError as exc:
+                skipped_locked.append(f"job_id={job.id} (lock held: {exc.lock_path})")
+                continue
+            filtered_jobs.append(job)
+
+        if skipped_locked:
+            print("Skipping jobs that appear to still be running (job lock held):")
+            for line in skipped_locked:
+                print(f"- {line}")
+            print("")
+
+        jobs = filtered_jobs
+        if not jobs:
+            print(
+                "No stale running jobs matched the safety checks. "
+                "Hint: use the crawl auto-recover watchdog to stop the runner before recovery."
+            )
+            return
 
         for job in jobs:
             started_at = job.started_at
