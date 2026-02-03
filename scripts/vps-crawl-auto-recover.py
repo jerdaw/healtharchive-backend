@@ -24,6 +24,17 @@ DEFAULT_TEXTFILE_OUT_FILE = "healtharchive_crawl_auto_recover.prom"
 DEFAULT_JOB_LOCK_DIR = Path("/tmp/healtharchive-job-locks")
 JOB_LOCK_DIR_ENV = "HEALTHARCHIVE_JOB_LOCK_DIR"
 
+DEFAULT_START_WORKING_DIR = "/opt/healtharchive-backend"
+DEFAULT_START_ENV_FILE = "/etc/healtharchive/backend.env"
+DEFAULT_START_USER = "haadmin"
+DEFAULT_START_GROUP = "haadmin"
+DEFAULT_START_HA_BACKEND = "/opt/healtharchive-backend/.venv/bin/ha-backend"
+DEFAULT_START_UNIT_PREFIX = "healtharchive-job"
+DEFAULT_START_DOCKER_CPU_LIMIT = "1.0"
+DEFAULT_START_DOCKER_MEMORY_LIMIT = "3g"
+DEFAULT_START_DISK_CHECK_PATH = "/srv/healtharchive/jobs"
+DEFAULT_START_MAX_DISK_USAGE_PERCENT = 90
+
 
 def _dt_to_epoch_seconds(dt: datetime) -> int:
     return int(dt.astimezone(timezone.utc).timestamp())
@@ -191,6 +202,13 @@ def _record_recovery(state: dict, job_id: int, *, when_utc: datetime) -> None:
     recoveries[str(job_id)] = items
 
 
+def _record_start(state: dict, job_id: int, *, when_utc: datetime) -> None:
+    starts = state.setdefault("starts", {})
+    items = list(starts.get(str(job_id)) or [])
+    items.append(when_utc.replace(microsecond=0).isoformat())
+    starts[str(job_id)] = items
+
+
 def _count_recent_recoveries(state: dict, job_id: int, *, since_utc: datetime) -> int:
     recoveries = state.get("recoveries", {})
     items = list(recoveries.get(str(job_id)) or [])
@@ -205,6 +223,47 @@ def _count_recent_recoveries(state: dict, job_id: int, *, since_utc: datetime) -
         if ts >= since_utc:
             n += 1
     return n
+
+
+def _count_recent_starts(state: dict, job_id: int, *, since_utc: datetime) -> int:
+    starts = state.get("starts", {})
+    items = list(starts.get(str(job_id)) or [])
+    n = 0
+    for raw in items:
+        try:
+            ts = datetime.fromisoformat(str(raw))
+        except ValueError:
+            continue
+        if ts.tzinfo is None:
+            ts = ts.replace(tzinfo=timezone.utc)
+        if ts >= since_utc:
+            n += 1
+    return n
+
+
+def _disk_usage_percent(path: Path) -> int | None:
+    try:
+        stat = os.statvfs(str(path))
+    except OSError:
+        return None
+    total = stat.f_blocks * stat.f_frsize
+    free = stat.f_bavail * stat.f_frsize
+    if total <= 0:
+        return None
+    return int(100 * (total - free) / total)
+
+
+def _sanitize_systemd_unit_name(raw: str) -> str:
+    allowed = set("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_.@:-")
+    cleaned = "".join(ch if ch in allowed else "-" for ch in raw)
+    cleaned = cleaned.strip("-")
+    return cleaned or "healtharchive-job"
+
+
+def _format_start_unit(prefix: str, job_id: int, *, now_utc: datetime) -> str:
+    ts = now_utc.strftime("%Y%m%dT%H%M%SZ")
+    base = f"{prefix}{job_id}-auto-{ts}"
+    return _sanitize_systemd_unit_name(base)
 
 
 def _find_latest_combined_log(output_dir: Path) -> Path | None:
@@ -586,6 +645,14 @@ def _write_textfile_metrics(
     lines.append("# TYPE healtharchive_crawl_auto_recover_recoveries_total counter")
     lines.append(f"healtharchive_crawl_auto_recover_recoveries_total {int(total_recoveries)}")
 
+    starts = state.get("starts", {})
+    total_starts = sum(len(v) for v in starts.values() if isinstance(v, list))
+    lines.append(
+        "# HELP healtharchive_crawl_auto_recover_starts_total Total number of auto-start attempts recorded."
+    )
+    lines.append("# TYPE healtharchive_crawl_auto_recover_starts_total counter")
+    lines.append(f"healtharchive_crawl_auto_recover_starts_total {int(total_starts)}")
+
     lines.append(
         "# HELP healtharchive_crawl_auto_recover_last_result 1 for the most recent watchdog outcome."
     )
@@ -731,6 +798,87 @@ def main(argv: list[str] | None = None) -> int:
         "--textfile-out-file",
         default=DEFAULT_TEXTFILE_OUT_FILE,
         help="Output filename under --textfile-out-dir.",
+    )
+    parser.add_argument(
+        "--ensure-min-running-jobs",
+        type=int,
+        default=0,
+        help=(
+            "Optional: if no stalled jobs are detected, ensure at least this many annual campaign jobs "
+            "are running by starting a queued/retryable annual job via systemd-run. "
+            "Default: 0 (disabled)."
+        ),
+    )
+    parser.add_argument(
+        "--ensure-campaign-year",
+        type=int,
+        default=None,
+        help=(
+            "Optional: only consider annual jobs with config campaign_year=YYYY when auto-starting "
+            "queued/retryable jobs. Default: current UTC year."
+        ),
+    )
+    parser.add_argument(
+        "--max-starts-per-job-per-day",
+        type=int,
+        default=3,
+        help="Safety cap: maximum auto-start attempts per job per 24h.",
+    )
+    parser.add_argument(
+        "--start-unit-prefix",
+        default=DEFAULT_START_UNIT_PREFIX,
+        help="Prefix for systemd-run unit names created by auto-start.",
+    )
+    parser.add_argument(
+        "--start-working-dir",
+        default=DEFAULT_START_WORKING_DIR,
+        help="Working directory for auto-started transient units.",
+    )
+    parser.add_argument(
+        "--start-env-file",
+        default=DEFAULT_START_ENV_FILE,
+        help="EnvironmentFile for auto-started transient units (must include DB URL).",
+    )
+    parser.add_argument(
+        "--start-user", default=DEFAULT_START_USER, help="User for auto-started units."
+    )
+    parser.add_argument(
+        "--start-group", default=DEFAULT_START_GROUP, help="Group for auto-started units."
+    )
+    parser.add_argument(
+        "--start-ha-backend",
+        default=DEFAULT_START_HA_BACKEND,
+        help="Path to ha-backend CLI for auto-started units.",
+    )
+    parser.add_argument(
+        "--start-docker-cpu-limit",
+        default=DEFAULT_START_DOCKER_CPU_LIMIT,
+        help=(
+            "Value for HEALTHARCHIVE_DOCKER_CPU_LIMIT when auto-starting a job "
+            "(passed via systemd-run --setenv)."
+        ),
+    )
+    parser.add_argument(
+        "--start-docker-memory-limit",
+        default=DEFAULT_START_DOCKER_MEMORY_LIMIT,
+        help=(
+            "Value for HEALTHARCHIVE_DOCKER_MEMORY_LIMIT when auto-starting a job "
+            "(passed via systemd-run --setenv)."
+        ),
+    )
+    parser.add_argument(
+        "--start-disk-check-path",
+        default=DEFAULT_START_DISK_CHECK_PATH,
+        help="Path to use for disk usage safety check before auto-starting jobs.",
+    )
+    parser.add_argument(
+        "--start-max-disk-usage-percent",
+        type=int,
+        default=DEFAULT_START_MAX_DISK_USAGE_PERCENT,
+        help=(
+            "Safety: do not auto-start additional jobs when disk usage at --start-disk-check-path "
+            "is at or above this percent."
+        ),
     )
     args = parser.parse_args(argv)
 
@@ -1032,11 +1180,184 @@ def main(argv: list[str] | None = None) -> int:
             stalled.append((job, age))
 
     if not stalled:
+        ensure_min_running = int(getattr(args, "ensure_min_running_jobs", 0) or 0)
+        if ensure_min_running <= 0:
+            write_metrics(
+                running_jobs=len(running_jobs),
+                stalled_jobs=0,
+                result="skip",
+                reason="no_stalled_jobs",
+                state=state,
+            )
+            return 0
+
+        running_count = len(running_jobs)
+        if running_count >= ensure_min_running:
+            write_metrics(
+                running_jobs=running_count,
+                stalled_jobs=0,
+                result="skip",
+                reason="no_stalled_jobs",
+                state=state,
+            )
+            return 0
+
+        ensure_year = (
+            int(args.ensure_campaign_year)
+            if args.ensure_campaign_year is not None
+            else int(now.year)
+        )
+
+        disk_percent = _disk_usage_percent(Path(str(args.start_disk_check_path)))
+        if disk_percent is not None and disk_percent >= int(args.start_max_disk_usage_percent):
+            print(
+                f"SKIP: underfilled running jobs ({running_count}/{ensure_min_running}), "
+                f"but disk usage at {args.start_disk_check_path} is {disk_percent}% "
+                f"(>= {int(args.start_max_disk_usage_percent)}%)."
+            )
+            write_metrics(
+                running_jobs=running_count,
+                stalled_jobs=0,
+                result="skip",
+                reason="start_disk_high",
+                state=state,
+            )
+            return 0
+
+        with get_session() as session:
+            rows = (
+                session.query(ArchiveJob, Source.code)
+                .join(Source, ArchiveJob.source_id == Source.id)
+                .filter(ArchiveJob.status.in_(["queued", "retryable"]))
+                .order_by(ArchiveJob.queued_at.asc().nullsfirst(), ArchiveJob.created_at.asc())
+                .all()
+            )
+
+            candidate: tuple[int, str, str] | None = None
+            for orm_job, source_code in rows:
+                cfg = orm_job.config or {}
+                if str(cfg.get("campaign_kind") or "") != "annual":
+                    continue
+                try:
+                    cfg_year = int(cfg.get("campaign_year") or 0)
+                except (TypeError, ValueError):
+                    cfg_year = 0
+                if cfg_year != ensure_year:
+                    continue
+                candidate = (int(orm_job.id), str(source_code), str(orm_job.status))
+                break
+
+        if candidate is None:
+            print(
+                f"SKIP: underfilled running jobs ({running_count}/{ensure_min_running}), "
+                f"but no eligible annual queued/retryable jobs found for campaign_year={ensure_year}."
+            )
+            write_metrics(
+                running_jobs=running_count,
+                stalled_jobs=0,
+                result="skip",
+                reason="no_start_candidates",
+                state=state,
+            )
+            return 0
+
+        candidate_id, candidate_source, candidate_status = candidate
+
+        recent_starts = _count_recent_starts(state, candidate_id, since_utc=recent_cutoff)
+        if recent_starts >= int(args.max_starts_per_job_per_day):
+            print(
+                f"SKIP: would auto-start job_id={candidate_id} source={candidate_source} status={candidate_status}, "
+                f"but max starts reached ({recent_starts}/{int(args.max_starts_per_job_per_day)} in last 24h)."
+            )
+            write_metrics(
+                running_jobs=running_count,
+                stalled_jobs=0,
+                result="skip",
+                reason="max_starts",
+                state=state,
+            )
+            return 0
+
+        unit = _format_start_unit(str(args.start_unit_prefix), candidate_id, now_utc=now)
+        systemd_run_cmd: list[str] = [
+            "systemd-run",
+            f"--unit={unit}",
+            f"--property=WorkingDirectory={str(args.start_working_dir)}",
+            f"--property=EnvironmentFile={str(args.start_env_file)}",
+            f"--property=User={str(args.start_user)}",
+            f"--property=Group={str(args.start_group)}",
+        ]
+        cpu = str(args.start_docker_cpu_limit or "").strip()
+        mem = str(args.start_docker_memory_limit or "").strip()
+        if cpu:
+            systemd_run_cmd.append(f"--setenv=HEALTHARCHIVE_DOCKER_CPU_LIMIT={cpu}")
+        if mem:
+            systemd_run_cmd.append(f"--setenv=HEALTHARCHIVE_DOCKER_MEMORY_LIMIT={mem}")
+        systemd_run_cmd += [
+            str(args.start_ha_backend),
+            "run-db-job",
+            "--id",
+            str(candidate_id),
+        ]
+
+        print(
+            f"{'APPLY' if args.apply else 'DRY-RUN'}: would auto-start annual job_id={candidate_id} "
+            f"source={candidate_source} status={candidate_status} to reach "
+            f"ensure-min-running-jobs={ensure_min_running} (currently {running_count})."
+        )
+
+        if not args.apply:
+            print("")
+            print("Planned actions (dry-run):")
+            print("  1) " + " ".join(shlex.quote(x) for x in systemd_run_cmd))
+            write_metrics(
+                running_jobs=running_count,
+                stalled_jobs=0,
+                result="skip",
+                reason="dry_run_start",
+                state=state,
+            )
+            return 0
+
+        # Before starting, ensure annual self-healing options are set (idempotent).
+        try:
+            with get_session() as session:
+                orm_job = session.get(ArchiveJob, candidate_id)
+                if orm_job is not None and _ensure_recovery_tool_options(orm_job):
+                    session.commit()
+        except Exception as exc:
+            print(f"WARNING: failed to update job config before auto-start: {exc}")
+
+        cp = _run_capture(systemd_run_cmd)
+        if cp.returncode != 0:
+            print(
+                f"ERROR: failed to auto-start job_id={candidate_id} via systemd-run unit={unit}.service",
+                file=sys.stderr,
+            )
+            if cp.stdout.strip():
+                print(cp.stdout.rstrip())
+            if cp.stderr.strip():
+                print(cp.stderr.rstrip(), file=sys.stderr)
+            write_metrics(
+                running_jobs=running_count,
+                stalled_jobs=0,
+                result="skip",
+                reason="start_failed",
+                state=state,
+            )
+            return 2
+
+        print(f"APPLY: started job_id={candidate_id} via {unit}.service")
+        print(f"  Tail logs: journalctl -u {unit}.service -f --no-pager")
+        print(f"  Status:    systemctl --no-pager --full status {unit}.service")
+
+        _record_start(state, candidate_id, when_utc=now)
+        _save_state(state_path, state)
         write_metrics(
-            running_jobs=len(running_jobs),
+            running_jobs=running_count,
             stalled_jobs=0,
-            result="skip",
-            reason="no_stalled_jobs",
+            result="ok",
+            reason="started_job",
             state=state,
         )
         return 0

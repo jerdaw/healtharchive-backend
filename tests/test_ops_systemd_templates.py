@@ -51,6 +51,8 @@ def test_crawl_auto_recover_systemd_template_sets_stall_threshold() -> None:
     text = unit_path.read_text(encoding="utf-8")
     assert "vps-crawl-auto-recover.py --apply" in text
     assert "--stall-threshold-seconds 3600" in text
+    assert "--ensure-min-running-jobs 3" in text
+    assert "--start-max-disk-usage-percent 88" in text
 
 
 def test_disk_threshold_cleanup_systemd_template_is_sentinel_and_env_gated() -> None:
