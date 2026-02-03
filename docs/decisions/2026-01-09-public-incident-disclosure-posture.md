@@ -45,7 +45,7 @@ Status: accepted
 ## Verification / rollout
 
 - Incident templates and severity rubric should reflect the “Option B” trigger:
-  - `docs/operations/incidents/incident-template.md`
+  - `docs/_templates/incident-template.md`
   - `docs/operations/incidents/severity.md`
 - Ops cadence includes routine doc maintenance so these rules don’t drift:
   - `docs/operations/ops-cadence-checklist.md`

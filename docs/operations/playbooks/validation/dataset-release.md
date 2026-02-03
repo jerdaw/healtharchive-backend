@@ -4,7 +4,7 @@ Goal: confirm a dataset release exists and its checksums verify cleanly.
 
 Canonical reference:
 
-- `../dataset-release-runbook.md`
+- `../../dataset-release-runbook.md`
 
 ## Procedure (high level)
 

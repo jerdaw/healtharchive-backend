@@ -43,6 +43,17 @@ Example:
 
 ---
 
+## Incident notes index
+
+- [Storage watchdog unmount filter bug (2026-02-02)](2026-02-02-storage-watchdog-unmount-filter-bug.md)
+- [Infra error 107 + hot-path thrash + worker stop (2026-01-24)](2026-01-24-infra-error-107-hotpath-thrash-and-worker-stop.md)
+- [Replay smoke 503 + tiering failures (2026-01-16)](2026-01-16-replay-smoke-503-and-warctieringfailed.md)
+- [Annual crawl stalled (HC) (2026-01-09)](2026-01-09-annual-crawl-hc-job-stalled.md)
+- [PHAC output dir permission denied (2026-01-09)](2026-01-09-annual-crawl-phac-output-dir-permission-denied.md)
+- [Storage hot-path sshfs stale mount (2026-01-08)](2026-01-08-storage-hotpath-sshfs-stale-mount.md)
+
+---
+
 ## How to write one
 
 1) Copy the template: `../../_templates/incident-template.md`

@@ -146,7 +146,7 @@ ha-backend cleanup-job --id OLD_JOB_ID --mode temp
 rm -rf /mnt/nasd/nobak/healtharchive/jobs/hc/*/.tmp_*
 ```
 
-**See**: `operations/playbooks/manage-warc-cleanup.md`
+**See**: `operations/playbooks/crawl/cleanup-automation.md`
 
 ---
 

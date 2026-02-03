@@ -4,8 +4,8 @@ Goal: confirm replay is serving real content for the latest indexed jobs.
 
 Canonical refs:
 
-- replay runbook: `../../deployment/replay-service-pywb.md`
-- systemd unit templates: `../../deployment/systemd/README.md`
+- replay runbook: `../../../deployment/replay-service-pywb.md`
+- systemd unit templates: `../../../deployment/systemd/README.md`
 
 ## What this does
 

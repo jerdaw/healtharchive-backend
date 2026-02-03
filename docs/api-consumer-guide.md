@@ -772,7 +772,7 @@ A: Check the capture dates via `/api/sources`. We can only provide what was arch
 A: Currently no on-demand archiving. Future feature under consideration.
 
 **Q: How long are snapshots retained?**
-A: Indefinitely, subject to storage constraints. See [Data Handling Policy](operations/data-handling-and-retention.md).
+A: Indefinitely, subject to storage constraints. See [Data Handling Policy](operations/data-handling-retention.md).
 
 **Q: Is there a GraphQL API?**
 A: Not yet. REST/JSON only for now.

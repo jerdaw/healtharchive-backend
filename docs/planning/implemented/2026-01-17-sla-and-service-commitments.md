@@ -31,7 +31,7 @@
 ## Docs Updated
 
 - [operations/monitoring-and-ci-checklist.md](../../operations/monitoring-and-ci-checklist.md) — references SLOs
-- [operations/incident-response.md](../../operations/incident-response.md) — references communication commitments
+- [operations/playbooks/core/incident-response.md](../../operations/playbooks/core/incident-response.md) — references communication commitments
 - `mkdocs.yml` — navigation updated
 
 ## Key Decisions

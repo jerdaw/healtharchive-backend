@@ -153,7 +153,7 @@ If anything fails, review the error messages and check:
 
 Let's add a simple `--version` command to the CLI.
 
-1. **Open `src/ha_backend/cli/main.py`** in your editor
+1. **Open `src/ha_backend/cli.py`** in your editor
 
 2. **Add a version command** (example change):
    ```python
@@ -184,7 +184,7 @@ Let's add a simple `--version` command to the CLI.
 
 Every code change needs tests. Let's write a test for our new command.
 
-1. **Create or update test file**: `tests/test_cli_version.py`
+1. **Create or update test file**: `tests/test_cli_<your_feature>.py`
 
    ```python
    """Tests for version CLI command."""
@@ -206,7 +206,7 @@ Every code change needs tests. Let's write a test for our new command.
 
 2. **Run the test**:
    ```bash
-   pytest tests/test_cli_version.py -v
+   pytest tests/test_cli_<your_feature>.py -v
    ```
 
 3. **Verify it passes**:

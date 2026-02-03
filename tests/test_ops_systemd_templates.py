@@ -53,6 +53,25 @@ def test_crawl_auto_recover_systemd_template_sets_stall_threshold() -> None:
     assert "--stall-threshold-seconds 3600" in text
 
 
+def test_disk_threshold_cleanup_systemd_template_is_sentinel_and_env_gated() -> None:
+    repo_root = Path(__file__).resolve().parents[1]
+    unit_path = (
+        repo_root
+        / "docs"
+        / "deployment"
+        / "systemd"
+        / "healtharchive-disk-threshold-cleanup.service"
+    )
+    text = unit_path.read_text(encoding="utf-8")
+    assert "ConditionPathExists=/etc/healtharchive/backend.env" in text
+    assert "ConditionPathExists=/etc/healtharchive/cleanup-automation-enabled" in text
+    assert "ConditionPathExists=/opt/healtharchive-backend/.venv/bin/python3" in text
+    assert "EnvironmentFile=/etc/healtharchive/backend.env" in text
+    assert "scripts/vps-cleanup-automation.py" in text
+    assert "--threshold-mode" in text
+    assert "--apply" in text
+
+
 def test_storage_hotpath_auto_recover_script_has_no_top_level_backend_imports() -> None:
     repo_root = Path(__file__).resolve().parents[1]
     script_path = repo_root / "scripts" / "vps-storage-hotpath-auto-recover.py"

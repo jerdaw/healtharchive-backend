@@ -4,9 +4,9 @@ Goal: deploy a known-good `main` and verify production matches policy.
 
 Canonical references:
 
-- Production runbook: `../../deployment/production-single-vps.md`
-- Monitoring/CI gate: `../monitoring-and-ci-checklist.md`
-- Baseline drift: `../baseline-drift.md`
+- Production runbook: `../../../deployment/production-single-vps.md`
+- Monitoring/CI gate: `../../monitoring-and-ci-checklist.md`
+- Baseline drift: `../../baseline-drift.md`
 
 ## Preconditions
 

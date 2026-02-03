@@ -61,7 +61,7 @@ This page tracks the health and coverage of HealthArchive documentation.
 
 | Indicator | Status | Notes |
 |-----------|--------|-------|
-| **Quick Start exists** | ✅ Yes | `quickstart.md` |
+| **Quick Start exists** | ✅ Yes | `../quickstart.md` |
 | **Architecture documented** | ✅ Yes | Comprehensive 1,314-line guide |
 | **API documented** | ✅ Yes | OpenAPI spec + consumer guide |
 | **Contribution guide** | ✅ Yes | Complete CONTRIBUTING.md |
@@ -192,14 +192,14 @@ Located in `docs/_templates/`:
 
 | Template | Purpose | Usage Count |
 |----------|---------|-------------|
-| `runbook-template.md` | Deployment procedures | 15+ runbooks |
-| `playbook-template.md` | Operational tasks | 32 playbooks |
-| `incident-template.md` | Post-mortems | 4 incidents |
-| `decision-template.md` | ADR-lite records | 1 decision |
-| `restore-test-log-template.md` | Restore verification | VPS logs |
-| `adoption-signals-log-template.md` | Adoption tracking | VPS logs |
-| `mentions-log-template.md` | Mentions tracking | VPS logs |
-| `ops-ui-friction-log-template.md` | UX issues | VPS logs |
+| `../_templates/runbook-template.md` | Deployment procedures | 15+ runbooks |
+| `../_templates/playbook-template.md` | Operational tasks | 32 playbooks |
+| `../_templates/incident-template.md` | Post-mortems | 4 incidents |
+| `../_templates/decision-template.md` | ADR-lite records | 1 decision |
+| `../_templates/restore-test-log-template.md` | Restore verification | VPS logs |
+| `../_templates/adoption-signals-log-template.md` | Adoption tracking | VPS logs |
+| `../_templates/mentions-log-template.md` | Mentions tracking | VPS logs |
+| `../_templates/ops-ui-friction-log-template.md` | UX issues | VPS logs |
 
 **Status**: ✅ **Well-used templates ensure consistency**
 
@@ -297,7 +297,7 @@ Every 3 months, review:
 - 🎨 **Improve diagrams**: Enhance Mermaid diagrams
 - 🔍 **Review PRs**: Help review documentation changes
 
-**See**: [CONTRIBUTING.md](../../CONTRIBUTING.md#-documentation-standards)
+**See**: [contributing.md](../contributing.md)
 
 ---
 

@@ -39,7 +39,7 @@ Choose your entry point based on what you want to do:
 - [Architecture Walkthrough](tutorials/architecture-walkthrough.md) - Visual guide to how it all works
 - [Architecture Deep Dive](architecture.md) - Complete technical reference
 - [Testing Guidelines](development/testing-guidelines.md) - How to write and run tests
-- [Contributing Guide](CONTRIBUTING.md) - Code standards and workflow
+- [Contributing Guide](contributing.md) - Code standards and workflow
 
 ---
 
@@ -59,7 +59,7 @@ curl "https://api.healtharchive.ca/api/search?q=vaccines&source=hc"
 
 **Key Resources**:
 - **Dataset Downloads**: [healtharchive-datasets](https://github.com/jerdaw/healtharchive-datasets) - Bulk metadata exports
-- [Data Handling Policy](operations/data-handling-and-retention.md) - Retention and privacy
+- [Data Handling Policy](operations/data-handling-retention.md) - Retention and privacy
 - **Live Site**: [healtharchive.ca](https://healtharchive.ca) - Web interface
 
 ---
@@ -199,7 +199,7 @@ If you have all repos cloned as siblings:
 └── healtharchive-datasets/
 ```
 
-Some docs use relative paths like `../healtharchive-frontend/...` for convenience.
+Some docs use workspace paths like `healtharchive-frontend/...` for convenience.
 
 **Note**: These paths only work in local workspaces, not on GitHub.
 
@@ -274,7 +274,7 @@ This documentation follows the [Diátaxis framework](https://diataxis.fr/) for c
 
 - **GitHub Discussions**: [backend](https://github.com/jerdaw/healtharchive-backend/discussions) | [frontend](https://github.com/jerdaw/healtharchive-frontend/discussions)
 - **Issues**: [backend](https://github.com/jerdaw/healtharchive-backend/issues) | [frontend](https://github.com/jerdaw/healtharchive-frontend/issues) | [datasets](https://github.com/jerdaw/healtharchive-datasets/issues)
-- **Contributor Guide**: [CONTRIBUTING.md](CONTRIBUTING.md)
+- **Contributor Guide**: [contributing.md](contributing.md)
 
 ---
 

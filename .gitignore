@@ -60,8 +60,7 @@ docs/openapi.json
 # Local docs symlink (optional convenience)
 docs/frontend
 
-# AI agent files (local development only)
-CLAUDE.md
+# Agent tooling (local development only)
 .claude/
 
 # UV lock file (auto-generated, should not be committed)

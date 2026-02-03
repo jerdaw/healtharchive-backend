@@ -57,6 +57,7 @@ If a decision changes later, create a new decision record and mark the old one a
 
 ## Decision records
 
+- `2026-02-03-crawl-job-db-state-reconciliation.md`
 - `2026-01-24-single-vps-ops-automation-guardrails-for-crawl-and-storage.md`
 - `2026-01-23-annual-crawl-throughput-and-artifacts.md`
 - `2026-01-19-annual-crawl-resiliency-and-queue-order.md`

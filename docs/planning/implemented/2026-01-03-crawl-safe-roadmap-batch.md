@@ -20,7 +20,7 @@
 - Added CODEOWNERS, PR template, and pre-push hook to datasets repo
 
 ### External Outreach Scaffolding
-- Operator playbook: `docs/operations/playbooks/outreach-and-verification.md`
+- Operator playbook: `docs/operations/playbooks/external/outreach-and-verification.md`
 - Public-safe mentions log: `docs/operations/mentions-log.md`
 - Healthchecks.io alignment completed for all enabled timers
 

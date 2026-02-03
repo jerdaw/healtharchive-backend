@@ -4,8 +4,8 @@ Goal: keep automation boring, observable, and explicitly controlled.
 
 Canonical references:
 
-- systemd unit templates + enable/rollback: `../../deployment/systemd/README.md`
-- Verification ritual: `../automation-verification-rituals.md`
+- systemd unit templates + enable/rollback: `../../../deployment/systemd/README.md`
+- Verification ritual: `../../automation-verification-rituals.md`
 
 ## Install/update templates (after repo updates)
 
@@ -24,7 +24,7 @@ If `/srv/healtharchive/ops/` is not prepared:
 
 Automation is intentionally gated by sentinel files under `/etc/healtharchive/`.
 
-Follow the enable/rollback steps in `../../deployment/systemd/README.md`.
+Follow the enable/rollback steps in `../../../deployment/systemd/README.md`.
 
 ## Verify posture
 

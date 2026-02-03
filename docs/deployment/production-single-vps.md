@@ -294,13 +294,8 @@ The important safety rule:
 Install flow (VPS):
 
 - Follow the observability playbooks under `docs/operations/playbooks/`:
-  - `docs/operations/playbooks/observability-bootstrap.md`
-  - `docs/operations/playbooks/observability-exporters.md`
-  - `docs/operations/playbooks/observability-prometheus.md`
-  - `docs/operations/playbooks/observability-grafana.md`
-  - `docs/operations/playbooks/observability-dashboards.md`
-  - `docs/operations/playbooks/observability-alerting.md`
-  - `docs/operations/playbooks/observability-maintenance.md`
+  - `docs/operations/playbooks/observability/observability-guide.md`
+  - `docs/operations/playbooks/observability/monitoring-and-alerting.md`
 
 Where things live (VPS):
 

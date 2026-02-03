@@ -132,7 +132,7 @@ Enabling cleanup changes production behavior (even if intended to be safe). Defe
 ### Post-crawl enablement checklist (when you decide “yes, enable cleanup”)
 
 1) Review the cleanup behavior and config:
-   - Playbook: `cleanup-automation.md`
+   - Playbook: `../crawl/cleanup-automation.md`
    - Config: `/opt/healtharchive-backend/ops/automation/cleanup-automation.toml`
 
 2) Decide Healthchecks schedule (from the timer):

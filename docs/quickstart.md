@@ -150,4 +150,4 @@ See the [Project Overview](project.md) for detailed navigation.
 ### For Researchers
 1. Explore the [API Documentation](api.md)
 2. Download datasets from [healtharchive-datasets](https://github.com/jerdaw/healtharchive-datasets)
-3. Read about [Data Handling](operations/data-handling-and-retention.md)
+3. Read about [Data Handling](operations/data-handling-retention.md)

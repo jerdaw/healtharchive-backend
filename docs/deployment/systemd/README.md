@@ -71,6 +71,9 @@ Assumptions (adjust paths/user if your VPS differs):
 - `healtharchive-cleanup-automation.service` + `.timer`
   - Cleans indexed jobs using safe `temp-nonwarc` mode (keeps WARCs).
   - Gated by `ConditionPathExists=/etc/healtharchive/cleanup-automation-enabled`.
+- `healtharchive-disk-threshold-cleanup.service` + `.timer`
+  - Runs safe `temp-nonwarc` cleanup in threshold mode (no-op when disk is below threshold).
+  - Gated by `ConditionPathExists=/etc/healtharchive/cleanup-automation-enabled`.
 - `healtharchive-baseline-drift-check.service`
   - Runs `scripts/check_baseline_drift.py` (policy vs observed; writes artifacts under `/srv/healtharchive/ops/baseline/`).
   - Gated by `ConditionPathExists=/etc/healtharchive/baseline-drift-enabled`.
@@ -141,6 +144,8 @@ matches your operational readiness.
   - Enable only if replay is enabled and stable.
 - **Cleanup automation** (`healtharchive-cleanup-automation.timer`)
   - Optional; keep caps conservative and review first dry-run.
+- **Disk threshold cleanup** (`healtharchive-disk-threshold-cleanup.timer`)
+  - Optional; runs every 30 minutes but only applies cleanup when disk usage exceeds the configured threshold.
 - **Baseline drift check** (`healtharchive-baseline-drift-check.timer`)
   - Recommended; low-risk and catches “silent” ops drift.
 - **Storage hot-path auto-recover** (`healtharchive-storage-hotpath-auto-recover.timer`)
@@ -547,6 +552,36 @@ Enable the timer:
 ```bash
 sudo systemctl enable --now healtharchive-cleanup-automation.timer
 systemctl list-timers | rg healtharchive-cleanup-automation || systemctl list-timers | grep healtharchive-cleanup-automation
+```
+
+---
+
+## Enable disk threshold cleanup (optional)
+
+This is an **event-driven safety net** for disk pressure:
+
+- it runs on a frequent timer (every 30 minutes),
+- but only applies cleanup if disk usage exceeds `threshold_trigger_percent`
+  from `ops/automation/cleanup-automation.toml`,
+- and uses `threshold_max_jobs_per_run` as the cap when triggered.
+
+It is gated by the same sentinel file as weekly cleanup:
+
+```bash
+sudo install -m 0644 -o root -g root /dev/null /etc/healtharchive/cleanup-automation-enabled
+```
+
+Enable the timer:
+
+```bash
+sudo systemctl enable --now healtharchive-disk-threshold-cleanup.timer
+systemctl list-timers | rg healtharchive-disk-threshold-cleanup || systemctl list-timers | grep healtharchive-disk-threshold-cleanup
+```
+
+Rollback:
+
+```bash
+sudo systemctl disable --now healtharchive-disk-threshold-cleanup.timer
 ```
 
 ---

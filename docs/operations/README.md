@@ -25,6 +25,7 @@
 - Incident notes / postmortems (internal): `incidents/README.md`
 - Observability + private stats contract (public vs private boundaries): `observability-and-private-stats.md`
 - Annual capture campaign (scope + seeds): `annual-campaign.md`
+- Automation index (overview): `automation.md`
 - Automation implementation plan (phased, production-only): `automation-implementation-plan.md`
 - Monitoring + uptime + CI checklist: `monitoring-and-ci-checklist.md`
 - Annual Crawl Alerting Strategy: `monitoring-and-alerting.md`
@@ -49,7 +50,7 @@
 - Outreach templates (email copy): `outreach-templates.md`
 - Verification packet (verifier handoff): `verification-packet.md`
 - Mentions log (public-safe, link-only): `mentions-log.md`
-- Mentions log template (public-safe): `mentions-log-template.md`
+- Mentions log template (public-safe): `../_templates/mentions-log-template.md`
 - Exports data dictionary (pointer to public asset): `exports-data-dictionary.md`
 - Methods note outline (poster/preprint scaffold): `methods-note-outline.md`
 - Search relevance evaluation (process + commands): `search-quality.md`

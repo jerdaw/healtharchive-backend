@@ -65,6 +65,6 @@ Rationale:
 
 ## References
 
-- Decision record: `../decisions/2026-01-23-annual-crawl-throughput-and-artifacts.md`
-- Annual campaign scope: `../operations/annual-campaign.md`
-- Production runbook: `../deployment/production-single-vps.md`
+- Decision record: `../../decisions/2026-01-23-annual-crawl-throughput-and-artifacts.md`
+- Annual campaign scope: `../../operations/annual-campaign.md`
+- Production runbook: `../../deployment/production-single-vps.md`

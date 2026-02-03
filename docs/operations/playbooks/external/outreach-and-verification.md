@@ -4,11 +4,11 @@ Goal: run external outreach and verification work **without** storing private co
 
 Canonical references:
 
-- Outreach email templates: `../outreach-templates.md`
-- Partner kit (links + screenshot checklist): `../partner-kit.md`
-- Verification packet outline: `../verification-packet.md`
-- Mentions log (public-safe, link-only): `../mentions-log.md`
-- Data handling & retention rules: `../data-handling-retention.md`
+- Outreach email templates: `../../outreach-templates.md`
+- Partner kit (links + screenshot checklist): `../../partner-kit.md`
+- Verification packet outline: `../../verification-packet.md`
+- Mentions log (public-safe, link-only): `../../mentions-log.md`
+- Data handling & retention rules: `../../data-handling-retention.md`
 - Adoption signals (quarterly, VPS-only): `adoption-signals.md`
 
 ## Rules (hard)
@@ -44,7 +44,7 @@ Suggested fields:
 - Confirm these pages are accurate and up-to-date:
   - `https://www.healtharchive.ca/brief`
   - `https://www.healtharchive.ca/cite`
-- (Optional) Capture screenshots using `../partner-kit.md` so you can attach them.
+- (Optional) Capture screenshots using `../../partner-kit.md` so you can attach them.
 
 ### 3) Build a target list (operator-only)
 
@@ -57,7 +57,7 @@ Start with a small batch (e.g., 10–20), split between:
 
 ### 4) Send outreach (operator-only)
 
-- Use `../outreach-templates.md` and customize only what’s needed:
+- Use `../../outreach-templates.md` and customize only what’s needed:
   - recipient name
   - why this is relevant to them
   - the single best link to include (usually `/digest` or `/changes`)
@@ -69,16 +69,16 @@ Start with a small batch (e.g., 10–20), split between:
 
 Only when there is a public link (and/or explicit permission to name), add an entry to:
 
-- `../mentions-log.md`
+- `../../mentions-log.md`
 
 ### 6) Run the verifier workflow (operator-only)
 
-- Send `../verification-packet.md` to the verifier.
+- Send `../../verification-packet.md` to the verifier.
 - Ask explicitly:
   - permission to name them publicly (yes/no)
   - preferred wording (if any)
 - If they grant permission and there is a public link (or they agree to be listed), record it in:
-  - `../mentions-log.md`
+- `../../mentions-log.md`
 
 ### 7) Quarterly adoption signals (VPS-only; public-safe)
 

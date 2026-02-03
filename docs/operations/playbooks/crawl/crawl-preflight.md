@@ -4,11 +4,11 @@ Goal: catch obvious blockers before a large crawl (especially the Jan 01 UTC ann
 
 Canonical references:
 
-- Production runbook: `../../deployment/production-single-vps.md`
-- Annual scope/seeds (source of truth): `../annual-campaign.md`
-- Growth/storage policy: `../growth-constraints.md`
-- Baseline drift (policy vs reality): `../baseline-drift.md`
-- Automation posture: `../automation-implementation-plan.md`, `../../deployment/systemd/README.md`
+- Production runbook: `../../../deployment/production-single-vps.md`
+- Annual scope/seeds (source of truth): `../../annual-campaign.md`
+- Growth/storage policy: `../../growth-constraints.md`
+- Baseline drift (policy vs reality): `../../baseline-drift.md`
+- Automation posture: `../../automation-implementation-plan.md`, `../../../deployment/systemd/README.md`
 
 ## Preconditions
 

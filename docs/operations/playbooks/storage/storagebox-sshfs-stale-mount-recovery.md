@@ -12,7 +12,7 @@ Operational note:
 
 For background and the full implementation plan (prevention + automation + integrity), see:
 
-- `../../planning/implemented/2026-01-08-storagebox-sshfs-stale-mount-recovery-and-integrity.md`
+- `../../../planning/implemented/2026-01-08-storagebox-sshfs-stale-mount-recovery-and-integrity.md`
 - Drills (safe on production): `storagebox-sshfs-stale-mount-drills.md`
 
 ---
@@ -271,7 +271,7 @@ sudo systemctl restart healtharchive-storagebox-sshfs.service
 
 If this becomes a recurring pattern, treat it as an infrastructure incident and follow:
 
-- `incident-response.md`
+- `../core/incident-response.md`
 
 ---
 
