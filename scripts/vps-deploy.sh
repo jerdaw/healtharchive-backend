@@ -10,6 +10,7 @@ Safe-by-default: this script is DRY-RUN unless you pass --apply.
 Usage:
   ./scripts/vps-deploy.sh [--apply] [--ref REF] [--repo-dir DIR] [--env-file FILE] [--health-url URL]
                          [--skip-deps] [--skip-migrations] [--skip-restart] [--restart-replay]
+                         [--skip-worker-restart] [--force-worker-restart]
                          [--skip-baseline-drift] [--baseline-mode MODE]
                          [--skip-public-surface-verify]
                          [--install-systemd-units] [--apply-alerting]
@@ -32,6 +33,8 @@ Notes:
   - This script never prints secrets; it only sources the env file to run Alembic.
   - It refuses to run with a dirty git working tree unless you pass --allow-dirty.
   - It uses a lock file to avoid concurrent deploys (default: /tmp/healtharchive-backend-deploy.lock).
+  - By default it will NOT restart the worker if there are running crawl jobs (to avoid SIGTERMing crawls).
+    Use --force-worker-restart to override.
 EOF
 }
 
@@ -48,6 +51,8 @@ SKIP_DEPS="false"
 SKIP_MIGRATIONS="false"
 SKIP_RESTART="false"
 RESTART_REPLAY="false"
+SKIP_WORKER_RESTART="false"
+FORCE_WORKER_RESTART="false"
 SKIP_BASELINE_DRIFT="false"
 BASELINE_MODE="local"
 SKIP_PUBLIC_SURFACE_VERIFY="false"
@@ -105,6 +110,14 @@ while [[ $# -gt 0 ]]; do
       ;;
     --restart-replay)
       RESTART_REPLAY="true"
+      shift 1
+      ;;
+    --skip-worker-restart)
+      SKIP_WORKER_RESTART="true"
+      shift 1
+      ;;
+    --force-worker-restart)
+      FORCE_WORKER_RESTART="true"
       shift 1
       ;;
     --skip-baseline-drift)
@@ -187,6 +200,28 @@ run_shell() {
     return 0
   fi
   bash -lc "$1"
+}
+
+has_running_jobs() {
+  # Returns 0 if at least one job is in status=running, 1 otherwise.
+  #
+  # NOTE: This intentionally sources the env file (DB URL) but never prints it.
+  # If the DB isn't reachable, we conservatively assume "yes" to avoid killing crawls.
+  if [[ ! -x "${VENV_BIN}/ha-backend" ]]; then
+    echo "WARN: ha-backend not found at ${VENV_BIN}/ha-backend; assuming running jobs exist (will not restart worker)." >&2
+    return 0
+  fi
+
+  local out=""
+  out="$(bash -lc "set -a; source \"${ENV_FILE}\"; set +a; \"${VENV_BIN}/ha-backend\" list-jobs --status running --limit 1" 2>/dev/null || true)"
+  if [[ -z "${out}" ]]; then
+    echo "WARN: Could not query running jobs (DB unreachable?); assuming running jobs exist (will not restart worker)." >&2
+    return 0
+  fi
+  if echo "${out}" | head -n 1 | grep -Fq "No jobs found."; then
+    return 1
+  fi
+  return 0
 }
 
 wait_for_health() {
@@ -296,7 +331,25 @@ fi
 
 if [[ "${SKIP_RESTART}" != "true" ]]; then
   run sudo systemctl daemon-reload
-  run sudo systemctl restart healtharchive-api healtharchive-worker
+  run sudo systemctl restart healtharchive-api
+
+  restart_worker="true"
+  if [[ "${SKIP_WORKER_RESTART}" == "true" ]]; then
+    restart_worker="false"
+  elif [[ "${FORCE_WORKER_RESTART}" != "true" ]]; then
+    if has_running_jobs; then
+      restart_worker="false"
+      echo "WARN: Detected running crawl jobs; skipping worker restart to avoid SIGTERMing crawls."
+      echo "      Override with: --force-worker-restart"
+    fi
+  fi
+
+  if [[ "${restart_worker}" == "true" ]]; then
+    run sudo systemctl restart healtharchive-worker
+  else
+    echo "Skipping worker restart."
+  fi
+
   run sudo systemctl status healtharchive-api healtharchive-worker --no-pager -l
 
   if [[ "${RESTART_REPLAY}" == "true" ]]; then

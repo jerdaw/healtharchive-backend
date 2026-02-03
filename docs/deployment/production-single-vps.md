@@ -271,6 +271,10 @@ Notes:
 - The deploy script runs a **public-surface smoke verify** by default (public API + frontend + replay + usage):
   - `./scripts/verify_public_surface.py` (defaults to `https://api.healtharchive.ca` and `https://www.healtharchive.ca`)
   - You can skip in emergencies: `./scripts/vps-deploy.sh --apply --skip-public-surface-verify`
+- Crawl-safety: if any jobs are `status=running`, the deploy helper will restart `healtharchive-api` but will
+  **skip restarting `healtharchive-worker`** by default (to avoid SIGTERMing an active crawl).
+  - To force a worker restart (only when you are OK interrupting crawls): `./scripts/vps-deploy.sh --apply --force-worker-restart`
+  - To explicitly skip the worker restart regardless of job status: `./scripts/vps-deploy.sh --apply --skip-worker-restart`
 
 ---
 

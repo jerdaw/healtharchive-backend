@@ -26,7 +26,7 @@ Canonical references:
    This includes:
 
    - DB migrations
-   - service restarts
+   - service restarts (API always; worker may be skipped during active crawls)
    - baseline drift verification
    - public surface verification
 
@@ -44,6 +44,13 @@ Canonical references:
    single-VPS deployment, include replay restart + banner install:
 
    - `./scripts/vps-deploy.sh --apply --baseline-mode live --restart-replay`
+
+   Crawl safety:
+
+   - If any jobs are `status=running`, the deploy helper will **skip restarting** `healtharchive-worker`
+     by default to avoid SIGTERMing an active crawl.
+   - When you need to force a worker restart (only when safe): `./scripts/vps-deploy.sh --apply --baseline-mode live --force-worker-restart`
+   - If you want to explicitly keep the worker untouched regardless of job status: `./scripts/vps-deploy.sh --apply --baseline-mode live --skip-worker-restart`
 
 3. If the deploy gate fails:
 
