@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import os
 import re
+import shlex
 import subprocess
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -50,6 +51,26 @@ def build_systemd_run_cmd(cfg: RunConfig) -> list[str]:
 
 def _run(cmd: list[str]) -> subprocess.CompletedProcess[str]:
     return subprocess.run(cmd, check=False, capture_output=True, text=True)
+
+
+def _run_with_env_file(
+    cmd: list[str],
+    *,
+    env_file: Path,
+    cwd: Path,
+) -> subprocess.CompletedProcess[str]:
+    # Source the env file in a subshell so the called CLI sees HEALTHARCHIVE_DATABASE_URL, etc.
+    #
+    # This helper intentionally does not print env values (which may include secrets).
+    quoted = " ".join(shlex.quote(x) for x in cmd)
+    script = f"set -a; source {shlex.quote(str(env_file))}; set +a; {quoted}"
+    return subprocess.run(
+        ["bash", "-lc", script],
+        check=False,
+        capture_output=True,
+        text=True,
+        cwd=str(cwd),
+    )
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -129,7 +150,7 @@ def main(argv: list[str] | None = None) -> int:
 
         if cfg.retry_first:
             retry_cmd = [str(cfg.ha_backend), "retry-job", "--id", str(cfg.job_id)]
-            retry = _run(retry_cmd)
+            retry = _run_with_env_file(retry_cmd, env_file=cfg.env_file, cwd=cfg.working_dir)
             if retry.returncode != 0:
                 print(f"WARNING: retry-job failed for {cfg.job_id}: rc={retry.returncode}")
                 if retry.stderr.strip():
