@@ -80,6 +80,8 @@ sudo journalctl -u healtharchive-worker.service -n 50 --no-pager
 
 - `archive_tool` has built-in monitoring/adaptation; most stalls should self-heal, but this recovery is the “break glass” operator workflow.
 - Optional: you can enable the `healtharchive-crawl-auto-recover.timer` watchdog (sentinel: `/etc/healtharchive/crawl-auto-recover-enabled`) once you’re confident in the thresholds/caps.
+- To periodically validate the watchdog logic safely on production, run the drills in:
+  - `crawl-auto-recover-drills.md`
 - The watchdog is designed to avoid interrupting a healthy crawl; when another job is actively making progress, it may “soft recover” zombie `status=running` jobs by marking them `retryable` without restarting the worker.
 - If the watchdog is enabled but prints `SKIP ... max recoveries reached`, you can still do the manual recovery above, or (carefully) run the watchdog script once with a higher cap:
   ```bash

@@ -6,6 +6,7 @@ import fcntl
 import json
 import os
 import subprocess
+import sys
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -15,6 +16,10 @@ from ha_backend.db import get_session
 from ha_backend.models import ArchiveJob, Source
 
 DEFAULT_DEPLOY_LOCK_FILE = "/tmp/healtharchive-backend-deploy.lock"
+DEFAULT_STATE_FILE = "/srv/healtharchive/ops/watchdog/crawl-auto-recover.json"
+DEFAULT_LOCK_FILE = "/srv/healtharchive/ops/watchdog/crawl-auto-recover.lock"
+DEFAULT_TEXTFILE_OUT_DIR = "/var/lib/node_exporter/textfile_collector"
+DEFAULT_TEXTFILE_OUT_FILE = "healtharchive_crawl_auto_recover.prom"
 
 
 def _dt_to_epoch_seconds(dt: datetime) -> int:
@@ -377,7 +382,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument(
         "--state-file",
-        default="/srv/healtharchive/ops/watchdog/crawl-auto-recover.json",
+        default=DEFAULT_STATE_FILE,
         help="Where to store watchdog recovery history.",
     )
     parser.add_argument(
@@ -387,13 +392,32 @@ def main(argv: list[str] | None = None) -> int:
         help="Apply recovery actions (default is dry-run).",
     )
     parser.add_argument(
+        "--simulate-stalled-job-id",
+        action="append",
+        default=[],
+        help=(
+            "DRILL ONLY (dry-run): treat the given job ID as stalled regardless of log progress. "
+            "Requires overriding --state-file/--lock-file/--textfile-out-dir/--textfile-out-file "
+            "to avoid touching production watchdog state or Prometheus metrics."
+        ),
+    )
+    parser.add_argument(
+        "--simulate-stalled-age-seconds",
+        type=int,
+        default=None,
+        help=(
+            "DRILL ONLY: when using --simulate-stalled-job-id, treat the simulated job(s) as stalled for "
+            "this long. Default: stall_threshold_seconds + 1."
+        ),
+    )
+    parser.add_argument(
         "--sentinel-file",
         default="/etc/healtharchive/crawl-auto-recover-enabled",
         help="Sentinel file that indicates automation is enabled (written by operator).",
     )
     parser.add_argument(
         "--lock-file",
-        default="/srv/healtharchive/ops/watchdog/crawl-auto-recover.lock",
+        default=DEFAULT_LOCK_FILE,
         help="Lock file to prevent concurrent runs.",
     )
     parser.add_argument(
@@ -409,17 +433,55 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument(
         "--textfile-out-dir",
-        default="/var/lib/node_exporter/textfile_collector",
+        default=DEFAULT_TEXTFILE_OUT_DIR,
         help="node_exporter textfile collector directory.",
     )
     parser.add_argument(
         "--textfile-out-file",
-        default="healtharchive_crawl_auto_recover.prom",
+        default=DEFAULT_TEXTFILE_OUT_FILE,
         help="Output filename under --textfile-out-dir.",
     )
     args = parser.parse_args(argv)
 
     now = _utc_now()
+    simulate_job_ids_raw = list(getattr(args, "simulate_stalled_job_id", []) or [])
+    simulate_job_ids = [int(x) for x in simulate_job_ids_raw if str(x).strip()]
+    simulate_mode = bool(simulate_job_ids)
+    if simulate_mode and bool(args.apply):
+        print(
+            "ERROR: --simulate-stalled-job-id is only allowed in dry-run mode (omit --apply).",
+            file=sys.stderr,
+        )
+        return 2
+    if simulate_mode:
+        # Hard safety rail: drills should not write production state/metrics or contend for the production lock.
+        required_overrides: list[str] = []
+        if str(args.state_file) == DEFAULT_STATE_FILE:
+            required_overrides.append("--state-file")
+        if str(args.lock_file) == DEFAULT_LOCK_FILE:
+            required_overrides.append("--lock-file")
+        if str(args.textfile_out_dir) == DEFAULT_TEXTFILE_OUT_DIR:
+            required_overrides.append("--textfile-out-dir")
+        if str(args.textfile_out_file) == DEFAULT_TEXTFILE_OUT_FILE:
+            required_overrides.append("--textfile-out-file")
+        if required_overrides:
+            print(
+                "ERROR: drill mode requires overriding these flags to avoid touching production watchdog state/metrics:",
+                file=sys.stderr,
+            )
+            print("  " + " ".join(required_overrides), file=sys.stderr)
+            print(
+                "Hint: use /tmp paths, for example:",
+                file=sys.stderr,
+            )
+            print(
+                "  --state-file /tmp/healtharchive-crawl-auto-recover.drill.state.json "
+                "--lock-file /tmp/healtharchive-crawl-auto-recover.drill.lock "
+                "--textfile-out-dir /tmp --textfile-out-file healtharchive_crawl_auto_recover.drill.prom",
+                file=sys.stderr,
+            )
+            return 2
+
     state_path = Path(args.state_file)
     sentinel_file = Path(args.sentinel_file)
     enabled = 1 if sentinel_file.is_file() else 0
@@ -450,8 +512,8 @@ def main(argv: list[str] | None = None) -> int:
         except Exception:
             pass
 
-    # Disabled by default unless operator creates the sentinel
-    if enabled != 1:
+    # Disabled by default unless operator creates the sentinel (drills bypass this).
+    if enabled != 1 and not simulate_mode:
         write_metrics(result="skip", reason="disabled")
         return 0
 
@@ -465,14 +527,14 @@ def main(argv: list[str] | None = None) -> int:
         # Another instance is running
         return 0
 
-    # Deploy lock check
+    # Deploy lock check (drills bypass this).
     deploy_lock_file = Path(str(args.deploy_lock_file))
     deploy_lock_present, _deploy_lock_age_seconds = _deploy_lock_is_active(
         deploy_lock_file,
         now_utc=now,
         deploy_lock_max_age_seconds=float(args.deploy_lock_max_age_seconds),
     )
-    if deploy_lock_present == 1:
+    if deploy_lock_present == 1 and not simulate_mode:
         write_metrics(deploy_lock_present=1, result="skip", reason="deploy_lock")
         return 0
 
@@ -505,6 +567,43 @@ def main(argv: list[str] | None = None) -> int:
                 )
                 for job_id, source_code, started_at, output_dir, combined_log_path in rows
             ]
+
+            if simulate_mode:
+                sim_rows = (
+                    session.query(
+                        ArchiveJob.id,
+                        Source.code,
+                        ArchiveJob.started_at,
+                        ArchiveJob.output_dir,
+                        ArchiveJob.combined_log_path,
+                    )
+                    .join(Source, ArchiveJob.source_id == Source.id)
+                    .filter(ArchiveJob.id.in_(simulate_job_ids))
+                    .order_by(ArchiveJob.id.asc())
+                    .all()
+                )
+                existing_ids = {int(j.job_id) for j in running_jobs}
+                found_ids: set[int] = set()
+                for job_id, source_code, started_at, output_dir, combined_log_path in sim_rows:
+                    jid = int(job_id)
+                    found_ids.add(jid)
+                    if jid in existing_ids:
+                        continue
+                    running_jobs.append(
+                        RunningJob(
+                            job_id=jid,
+                            source_code=str(source_code),
+                            started_at=started_at,
+                            output_dir=str(output_dir) if output_dir is not None else None,
+                            combined_log_path=str(combined_log_path) if combined_log_path else None,
+                        )
+                    )
+                missing = [jid for jid in simulate_job_ids if jid not in found_ids]
+                if missing:
+                    print(
+                        "WARNING: drill simulate job(s) not found in DB and will be ignored: "
+                        + ", ".join(str(x) for x in missing)
+                    )
     except Exception as exc:
         msg = str(exc)
         if "no such table" in msg and "archive_jobs" in msg:
@@ -514,9 +613,26 @@ def main(argv: list[str] | None = None) -> int:
             return 2
         raise
 
+    if simulate_mode:
+        print(
+            "DRILL: simulate-stalled-job-id active; dry-run only. "
+            "No systemd actions or DB writes will be performed."
+        )
+
     stalled: list[tuple[RunningJob, float]] = []
     progress_age_by_job_id: dict[int, float] = {}
     for job in running_jobs:
+        if int(job.job_id) in simulate_job_ids:
+            simulated_age = (
+                int(args.simulate_stalled_age_seconds)
+                if args.simulate_stalled_age_seconds is not None
+                else int(args.stall_threshold_seconds) + 1
+            )
+            age = float(simulated_age)
+            progress_age_by_job_id[int(job.job_id)] = float(age)
+            if age >= float(args.stall_threshold_seconds):
+                stalled.append((job, age))
+            continue
         log_path = _find_job_log(job)
         if log_path is None:
             continue
@@ -568,6 +684,15 @@ def main(argv: list[str] | None = None) -> int:
                 f"(another job_id={jid} made progress {a:.0f}s ago; not restarting worker)"
             )
             if not args.apply:
+                print("")
+                print("Planned actions (dry-run):")
+                print("  1) (skip) do not restart the worker (guard window active)")
+                print(
+                    "  2) /opt/healtharchive-backend/.venv/bin/ha-backend recover-stale-jobs "
+                    f"--older-than-minutes {int(args.recover_older_than_minutes)} "
+                    f"--require-no-progress-seconds {int(args.stall_threshold_seconds)} "
+                    f"--apply --source {job.source_code} --limit 5"
+                )
                 write_metrics(
                     running_jobs=len(running_jobs),
                     stalled_jobs=len(stalled),
@@ -660,6 +785,16 @@ def main(argv: list[str] | None = None) -> int:
         f"source={job.source_code} stalled_age_seconds={age:.0f}"
     )
     if not args.apply:
+        print("")
+        print("Planned actions (dry-run):")
+        print("  1) systemctl stop healtharchive-worker.service")
+        print(
+            "  2) /opt/healtharchive-backend/.venv/bin/ha-backend recover-stale-jobs "
+            f"--older-than-minutes {int(args.recover_older_than_minutes)} "
+            f"--require-no-progress-seconds {int(args.stall_threshold_seconds)} "
+            f"--apply --source {job.source_code} --limit 5"
+        )
+        print("  3) systemctl start healtharchive-worker.service")
         write_metrics(
             running_jobs=len(running_jobs),
             stalled_jobs=len(stalled),
