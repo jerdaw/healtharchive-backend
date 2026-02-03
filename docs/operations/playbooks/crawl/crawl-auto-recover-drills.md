@@ -145,7 +145,54 @@ Expected output includes:
 - `recover-stale-jobs ... --apply --source ...`
 - `systemctl start ...` (matching the stop target above)
 
-## 4) Cleanup
+## 4) Drill: queue fill / auto-start (safe on production)
+
+Goal: prove the watchdog would **auto-start** a queued/retryable annual job when the annual campaign is **underfilled**
+(fewer than N running jobs), without actually starting anything.
+
+Safety rules:
+
+- Do **not** pass `--apply`.
+- Always override:
+  - `--state-file`, `--lock-file`, `--textfile-out-dir`, `--textfile-out-file` (use `/tmp` paths)
+
+This drill does not require `--simulate-stalled-job-id` — it exercises the “no stalled jobs” path.
+
+### Steps
+
+1) Confirm how many jobs are currently `status=running`:
+
+```bash
+set -a; source /etc/healtharchive/backend.env; set +a
+/opt/healtharchive-backend/.venv/bin/ha-backend list-jobs --status running --limit 10
+```
+
+2) Run a dry-run with `--ensure-min-running-jobs` set above the current count (example uses `3`):
+
+```bash
+cd /opt/healtharchive-backend
+sudo bash -lc 'set -a; source /etc/healtharchive/backend.env; set +a; \
+  /opt/healtharchive-backend/.venv/bin/python3 /opt/healtharchive-backend/scripts/vps-crawl-auto-recover.py \
+    --ensure-min-running-jobs 3 \
+    --state-file /tmp/healtharchive-crawl-auto-recover.start-drill.state.json \
+    --lock-file /tmp/healtharchive-crawl-auto-recover.start-drill.lock \
+    --textfile-out-dir /tmp \
+    --textfile-out-file healtharchive_crawl_auto_recover.start-drill.prom'
+```
+
+Expected output includes:
+
+- `DRY-RUN: would auto-start annual job_id=...`
+- `Planned actions (dry-run):`
+- `systemd-run ... ha-backend run-db-job --id ...`
+
+Confirm the drill metrics were written:
+
+```bash
+cat /tmp/healtharchive_crawl_auto_recover.start-drill.prom
+```
+
+## 5) Cleanup
 
 Drill artifacts are safe to delete:
 
