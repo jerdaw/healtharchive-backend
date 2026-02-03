@@ -152,9 +152,11 @@ def test_vps_resource_headroom_passes_with_good_inputs(monkeypatch) -> None:
     monkeypatch.setattr(
         mod,
         "_read_psi",
-        lambda kind: {"some": {"avg10": 0.0}, "full": {"avg10": 0.0}}
-        if kind == "memory"
-        else {"some": {"avg10": 0.0}},
+        lambda kind: (
+            {"some": {"avg10": 0.0}, "full": {"avg10": 0.0}}
+            if kind == "memory"
+            else {"some": {"avg10": 0.0}}
+        ),
     )
 
     assert mod.main([]) == 0
