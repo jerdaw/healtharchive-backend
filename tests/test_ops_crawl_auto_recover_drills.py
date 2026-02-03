@@ -315,3 +315,62 @@ def test_apply_syncs_db_status_when_job_lock_held(tmp_path, monkeypatch, capsys)
         stored = session.get(ArchiveJob, job_id)
         assert stored is not None
         assert stored.status == "running"
+
+
+def test_apply_syncs_db_status_when_crawl_process_running(tmp_path, monkeypatch, capsys) -> None:
+    _init_test_db(tmp_path, monkeypatch)
+    module = _load_script_module()
+
+    hc_source_id = _create_source(code="hc", name="Health Canada")
+    output_dir = tmp_path / "jobs" / "hc"
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    with get_session() as session:
+        job = ArchiveJob(
+            source_id=hc_source_id,
+            name="hc-test",
+            output_dir=str(output_dir),
+            status="retryable",
+            started_at=datetime.now(timezone.utc),
+        )
+        session.add(job)
+        session.flush()
+        job_id = int(job.id)
+        session.commit()
+
+    fake_ps = [
+        module.PsRow(
+            pid=123,
+            ppid=1,
+            args=f"/opt/healtharchive-backend/.venv/bin/archive-tool --output-dir {output_dir} --name hc-test",
+        )
+    ]
+    monkeypatch.setattr(module, "_ps_snapshot", lambda: fake_ps)
+
+    sentinel = tmp_path / "enabled"
+    sentinel.write_text("", encoding="utf-8")
+    rc = module.main(
+        [
+            "--apply",
+            "--sentinel-file",
+            str(sentinel),
+            "--deploy-lock-file",
+            str(tmp_path / "deploy.lock"),
+            "--state-file",
+            str(tmp_path / "state.json"),
+            "--lock-file",
+            str(tmp_path / "watchdog.lock"),
+            "--textfile-out-dir",
+            str(tmp_path),
+            "--textfile-out-file",
+            "metrics.prom",
+        ]
+    )
+    assert rc == 0
+    out = capsys.readouterr().out
+    assert "synced 1 job(s) to status=running based on active crawl processes" in out
+
+    with get_session() as session:
+        stored = session.get(ArchiveJob, job_id)
+        assert stored is not None
+        assert stored.status == "running"
