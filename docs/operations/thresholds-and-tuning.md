@@ -79,14 +79,14 @@ See: `docs/operations/disk-baseline-and-cleanup.md`
 
 | Parameter | Value | Location | Rationale |
 |-----------|-------|----------|-----------|
-| **Stall threshold** | 5400s (90 min) | `scripts/vps-crawl-auto-recover.py:337` | Balance between false positives and timely recovery |
+| **Stall threshold** | 3600s (60 min) | `scripts/vps-crawl-auto-recover.py` | Balance between false positives and timely recovery |
 | **Progress metric** | `crawled` count unchanged | Parsed from combined log | Reliable indicator of actual progress |
 | **Guard window** | 600s (10 min) | `scripts/vps-crawl-auto-recover.py:342` | Avoid interrupting healthy crawls |
 
 **Tuning guidance**:
-- Lower to 3600s (60min) for fast sites (e.g., small test crawls)
-- Raise to 7200s (120min) for very slow sites or flaky networks
-- Don't lower below 1800s (30min) - risks false positives during normal slow periods
+- Lower to 1800s (30min) for fast sites (e.g., small test crawls)
+- Raise to 5400s (90min) or 7200s (120min) for very slow sites or flaky networks
+- Don't lower below 1800s (30min) — risks false positives during normal slow periods
 
 ---
 
@@ -233,7 +233,7 @@ See: `src/archive_tool/constants.py`, `scripts/vps-crawl-auto-recover.py:175-241
 | **Disk** | Worker headroom | 85% | P0 | `worker/main.py` |
 | | Alert warning | 85% for 30m | P1 | alerting YAML |
 | | Alert critical | 92% for 10m | P0 | alerting YAML |
-| **Crawl** | Stall threshold | 90 min | P1 | `vps-crawl-auto-recover.py` |
+| **Crawl** | Stall threshold | 60 min | P1 | `vps-crawl-auto-recover.py` |
 | | Recovery cap | 3/job/day | P1 | `vps-crawl-auto-recover.py` |
 | **Storage** | Stale mount age | 120s | P1 | `vps-storage-hotpath-auto-recover.py` |
 | | Recovery cooldown | 15 min | P1 | `vps-storage-hotpath-auto-recover.py` |
