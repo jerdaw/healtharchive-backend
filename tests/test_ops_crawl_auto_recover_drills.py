@@ -95,6 +95,30 @@ def _create_annual_job(
         return job_id
 
 
+def _create_legacy_annual_job_missing_campaign_meta(
+    *,
+    source_id: int,
+    name: str,
+    status: str,
+    output_dir: Path,
+) -> int:
+    output_dir.mkdir(parents=True, exist_ok=True)
+    with get_session() as session:
+        job = ArchiveJob(
+            source_id=source_id,
+            name=name,
+            output_dir=str(output_dir),
+            status=status,
+            queued_at=datetime.now(timezone.utc),
+            config={},
+        )
+        session.add(job)
+        session.flush()
+        job_id = int(job.id)
+        session.commit()
+        return job_id
+
+
 def _write_recent_crawlstatus(log_path: Path) -> None:
     ts = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
     payload = {
@@ -458,6 +482,60 @@ def test_auto_start_dry_run_plans_systemd_run_when_underfilled(
         in metrics
     )
     assert "healtharchive_crawl_auto_recover_starts_total 0" in metrics
+
+
+def test_auto_start_dry_run_accepts_legacy_annual_jobs_by_name(
+    tmp_path, monkeypatch, capsys
+) -> None:
+    _init_test_db(tmp_path, monkeypatch)
+    module = _load_script_module()
+
+    fixed_now = datetime(2026, 2, 3, 0, 0, 0, tzinfo=timezone.utc)
+    monkeypatch.setattr(module, "_utc_now", lambda: fixed_now)
+    monkeypatch.setattr(module, "_disk_usage_percent", lambda _path: 10)
+    monkeypatch.setattr(module, "_ps_snapshot", lambda: [])
+
+    src_id = _create_source(code="phac", name="PHAC")
+    job_id = _create_legacy_annual_job_missing_campaign_meta(
+        source_id=src_id,
+        name="phac-20990101",
+        status="retryable",
+        output_dir=tmp_path / "jobs" / "phac" / "20990101T000000Z__phac-20990101",
+    )
+
+    sentinel = tmp_path / "enabled"
+    sentinel.write_text("", encoding="utf-8")
+    rc = module.main(
+        [
+            "--sentinel-file",
+            str(sentinel),
+            "--deploy-lock-file",
+            str(tmp_path / "deploy.lock"),
+            "--state-file",
+            str(tmp_path / "state.json"),
+            "--lock-file",
+            str(tmp_path / "watchdog.lock"),
+            "--textfile-out-dir",
+            str(tmp_path),
+            "--textfile-out-file",
+            "metrics.prom",
+            "--ensure-min-running-jobs",
+            "1",
+            "--ensure-campaign-year",
+            "2099",
+        ]
+    )
+    assert rc == 0
+
+    out = capsys.readouterr().out
+    assert f"DRY-RUN: would auto-start annual job_id={job_id}" in out
+    assert "systemd-run" in out
+
+    metrics = (tmp_path / "metrics.prom").read_text(encoding="utf-8")
+    assert (
+        'healtharchive_crawl_auto_recover_last_result{result="skip",reason="dry_run_start"} 1'
+        in metrics
+    )
 
 
 def test_auto_start_apply_records_state_and_metrics(tmp_path, monkeypatch, capsys) -> None:

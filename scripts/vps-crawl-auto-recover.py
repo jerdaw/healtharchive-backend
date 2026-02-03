@@ -5,6 +5,7 @@ import argparse
 import fcntl
 import json
 import os
+import re
 import shlex
 import subprocess
 import sys
@@ -34,6 +35,8 @@ DEFAULT_START_DOCKER_CPU_LIMIT = "1.0"
 DEFAULT_START_DOCKER_MEMORY_LIMIT = "3g"
 DEFAULT_START_DISK_CHECK_PATH = "/srv/healtharchive/jobs"
 DEFAULT_START_MAX_DISK_USAGE_PERCENT = 90
+
+_ANNUAL_JOB_SUFFIX_RE = re.compile(r"-(?P<year>[0-9]{4})0101(?:\\b|$)")
 
 
 def _dt_to_epoch_seconds(dt: datetime) -> int:
@@ -527,7 +530,7 @@ def _ensure_recovery_tool_options(job: ArchiveJob) -> bool:
     changed = False
 
     campaign_kind = str(cfg.get("campaign_kind") or "").strip().lower()
-    is_annual = campaign_kind == "annual"
+    is_annual = campaign_kind == "annual" or _infer_annual_campaign_year(job, cfg) is not None
 
     # Required for any monitor-driven recovery strategies.
     if not bool(tool.get("enable_monitoring", False)):
@@ -574,6 +577,79 @@ def _ensure_recovery_tool_options(job: ArchiveJob) -> bool:
 
     if changed:
         cfg["tool_options"] = tool
+        job.config = cfg
+    return changed
+
+
+def _infer_annual_campaign_year(job: ArchiveJob, cfg: dict) -> int | None:
+    """
+    Best-effort annual campaign year inference for legacy jobs.
+
+    Older annual jobs (created before campaign metadata was added) may not have:
+      - config.campaign_kind == "annual"
+      - config.campaign_year
+
+    In those cases we infer annual campaigns by the canonical YYYY0101 date suffix
+    in the job name or output_dir (e.g. "phac-20260101", "__phac-20260101").
+    """
+    try:
+        cfg_year = int(cfg.get("campaign_year") or 0)
+    except (TypeError, ValueError):
+        cfg_year = 0
+    if cfg_year >= 1970:
+        return cfg_year
+
+    candidates = [
+        str(getattr(job, "name", "") or ""),
+        str(getattr(job, "output_dir", "") or ""),
+    ]
+    output_dir = str(getattr(job, "output_dir", "") or "")
+    if output_dir:
+        candidates.append(Path(output_dir).name)
+
+    for text in candidates:
+        m = _ANNUAL_JOB_SUFFIX_RE.search(text)
+        if not m:
+            continue
+        try:
+            year = int(m.group("year"))
+        except (TypeError, ValueError):
+            continue
+        if year >= 1970:
+            return year
+    return None
+
+
+def _ensure_annual_campaign_metadata(job: ArchiveJob, *, campaign_year: int) -> bool:
+    """
+    Backfill missing annual campaign metadata for legacy jobs.
+
+    This makes annual automation (tiering + watchdogs) robust against older jobs
+    that predate config.campaign_kind/campaign_year.
+    """
+    cfg = dict(job.config or {})
+    changed = False
+
+    if str(cfg.get("campaign_kind") or "").strip().lower() != "annual":
+        cfg["campaign_kind"] = "annual"
+        changed = True
+    if cfg.get("campaign_year") != campaign_year:
+        cfg["campaign_year"] = campaign_year
+        changed = True
+
+    # These are informational but help operators/debugging consistency.
+    campaign_date = f"{campaign_year}-01-01"
+    if cfg.get("campaign_date") is None:
+        cfg["campaign_date"] = campaign_date
+        changed = True
+    if cfg.get("campaign_date_utc") is None:
+        cfg["campaign_date_utc"] = f"{campaign_date}T00:00:00Z"
+        changed = True
+    if cfg.get("scheduler_version") is None:
+        cfg["scheduler_version"] = "v1"
+        changed = True
+
+    if changed:
         job.config = cfg
     return changed
 
@@ -1233,18 +1309,35 @@ def main(argv: list[str] | None = None) -> int:
                 .all()
             )
 
-            candidate: tuple[int, str, str] | None = None
+            candidate: tuple[int, str, str, int, bool] | None = None
             for orm_job, source_code in rows:
                 cfg = orm_job.config or {}
-                if str(cfg.get("campaign_kind") or "") != "annual":
+                campaign_kind = str(cfg.get("campaign_kind") or "").strip().lower()
+                inferred_year = _infer_annual_campaign_year(orm_job, cfg)
+                if campaign_kind != "annual" and inferred_year is None:
                     continue
                 try:
                     cfg_year = int(cfg.get("campaign_year") or 0)
                 except (TypeError, ValueError):
                     cfg_year = 0
+                if cfg_year <= 0:
+                    cfg_year = int(inferred_year or 0)
                 if cfg_year != ensure_year:
                     continue
-                candidate = (int(orm_job.id), str(source_code), str(orm_job.status))
+                needs_backfill = (
+                    campaign_kind != "annual"
+                    or cfg.get("campaign_year") != ensure_year
+                    or cfg.get("campaign_date") is None
+                    or cfg.get("campaign_date_utc") is None
+                    or cfg.get("scheduler_version") is None
+                )
+                candidate = (
+                    int(orm_job.id),
+                    str(source_code),
+                    str(orm_job.status),
+                    cfg_year,
+                    needs_backfill,
+                )
                 break
 
         if candidate is None:
@@ -1261,7 +1354,13 @@ def main(argv: list[str] | None = None) -> int:
             )
             return 0
 
-        candidate_id, candidate_source, candidate_status = candidate
+        (
+            candidate_id,
+            candidate_source,
+            candidate_status,
+            candidate_campaign_year,
+            candidate_needs_backfill,
+        ) = candidate
 
         recent_starts = _count_recent_starts(state, candidate_id, since_utc=recent_cutoff)
         if recent_starts >= int(args.max_starts_per_job_per_day):
@@ -1319,12 +1418,20 @@ def main(argv: list[str] | None = None) -> int:
             )
             return 0
 
-        # Before starting, ensure annual self-healing options are set (idempotent).
+        # Before starting, ensure annual metadata + self-healing options are set (idempotent).
         try:
             with get_session() as session:
                 orm_job = session.get(ArchiveJob, candidate_id)
-                if orm_job is not None and _ensure_recovery_tool_options(orm_job):
-                    session.commit()
+                if orm_job is not None:
+                    changed = False
+                    if candidate_needs_backfill and _ensure_annual_campaign_metadata(
+                        orm_job, campaign_year=int(candidate_campaign_year)
+                    ):
+                        changed = True
+                    if _ensure_recovery_tool_options(orm_job):
+                        changed = True
+                    if changed:
+                        session.commit()
         except Exception as exc:
             print(f"WARNING: failed to update job config before auto-start: {exc}")
 

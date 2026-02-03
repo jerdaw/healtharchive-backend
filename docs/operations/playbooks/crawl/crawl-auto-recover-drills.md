@@ -186,6 +186,12 @@ Expected output includes:
 - `Planned actions (dry-run):`
 - `systemd-run ... ha-backend run-db-job --id ...`
 
+Notes:
+
+- Queue fill only targets **annual** jobs for the selected campaign year.
+- For legacy annual jobs missing `campaign_kind` / `campaign_year`, the watchdog infers annual jobs from the canonical `-YYYY0101` suffix (for example `phac-20260101`).
+  In `--apply` mode, it will also backfill missing campaign metadata before starting the job.
+
 Confirm the drill metrics were written:
 
 ```bash

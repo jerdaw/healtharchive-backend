@@ -13,6 +13,7 @@ Status: accepted
 
 - Extend `scripts/vps-crawl-auto-recover.py` to optionally **auto-start** queued/retryable *annual* jobs when the campaign is underfilled and no stalled jobs are detected.
 - Keep the behavior **opt-in** via a systemd flag (`--ensure-min-running-jobs`) and protected by safety rails (deploy lock, disk threshold, per-job daily cap).
+- Treat **legacy annual jobs** (created before `campaign_kind` / `campaign_year` existed) as eligible for queue fill when their name/output dir matches the canonical annual suffix `-YYYY0101` (e.g., `phac-20260101`), and backfill missing campaign metadata before auto-starting.
 
 ## Rationale
 
