@@ -1,7 +1,10 @@
 [Unit]
 Description=HealthArchive disk threshold cleanup
 Documentation=https://github.com/jerdaw/healtharchive-backend
+ConditionPathExists=/etc/healtharchive/backend.env
+ConditionPathExists=/etc/healtharchive/cleanup-automation-enabled
 ConditionPathExists=/opt/healtharchive-backend/ops/automation/cleanup-automation.toml
+ConditionPathExists=/opt/healtharchive-backend/.venv/bin/python3
 
 [Service]
 Type=oneshot

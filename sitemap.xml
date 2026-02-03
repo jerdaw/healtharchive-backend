@@ -17,6 +17,10 @@
          <lastmod>2026-02-03</lastmod>
     </url>
     <url>
+         <loc>https://docs.healtharchive.ca/contributing/</loc>
+         <lastmod>2026-02-03</lastmod>
+    </url>
+    <url>
          <loc>https://docs.healtharchive.ca/documentation-guidelines/</loc>
          <lastmod>2026-02-03</lastmod>
     </url>
@@ -105,6 +109,10 @@
          <lastmod>2026-02-03</lastmod>
     </url>
     <url>
+         <loc>https://docs.healtharchive.ca/decisions/2026-02-03-crawl-job-db-state-reconciliation/</loc>
+         <lastmod>2026-02-03</lastmod>
+    </url>
+    <url>
          <loc>https://docs.healtharchive.ca/deployment/</loc>
          <lastmod>2026-02-03</lastmod>
     </url>
@@ -169,7 +177,15 @@
          <lastmod>2026-02-03</lastmod>
     </url>
     <url>
+         <loc>https://docs.healtharchive.ca/development/playbooks/add-cli-command/</loc>
+         <lastmod>2026-02-03</lastmod>
+    </url>
+    <url>
          <loc>https://docs.healtharchive.ca/development/playbooks/change-to-production/</loc>
+         <lastmod>2026-02-03</lastmod>
+    </url>
+    <url>
+         <loc>https://docs.healtharchive.ca/development/playbooks/database-migrations/</loc>
          <lastmod>2026-02-03</lastmod>
     </url>
     <url>
@@ -206,6 +222,10 @@
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/operations/automation-verification-rituals/</loc>
+         <lastmod>2026-02-03</lastmod>
+    </url>
+    <url>
+         <loc>https://docs.healtharchive.ca/operations/automation/</loc>
          <lastmod>2026-02-03</lastmod>
     </url>
     <url>
@@ -470,6 +490,10 @@
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/operations/reports/2026-01-19-indexing-investigation/</loc>
+         <lastmod>2026-02-03</lastmod>
+    </url>
+    <url>
+         <loc>https://docs.healtharchive.ca/operations/runbooks/</loc>
          <lastmod>2026-02-03</lastmod>
     </url>
     <url>
