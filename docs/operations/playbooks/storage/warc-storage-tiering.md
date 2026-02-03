@@ -293,6 +293,8 @@ sudo systemctl stop healtharchive-worker.service
 ```bash
 sudo /opt/healtharchive-backend/.venv/bin/python3 /opt/healtharchive-backend/scripts/vps-annual-output-tiering.py \
   --apply \
+  --repair-stale-mounts \
+  --allow-repair-running-jobs \
   --year 2026 \
   --created-after "$(date -u -d '2 hours ago' +%Y-%m-%dT%H:%M:%SZ)"
 ```

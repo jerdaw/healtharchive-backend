@@ -14,7 +14,7 @@ EnvironmentFile=/etc/healtharchive/backend.env
 
 # Reduce race with the worker picking up newly enqueued annual jobs.
 ExecStartPre=-/bin/systemctl stop healtharchive-worker.service
-ExecStart=/opt/healtharchive-backend/.venv/bin/python3 /opt/healtharchive-backend/scripts/vps-annual-output-tiering.py --apply
+ExecStart=/opt/healtharchive-backend/.venv/bin/python3 /opt/healtharchive-backend/scripts/vps-annual-output-tiering.py --apply --repair-stale-mounts --allow-repair-running-jobs
 ExecStartPost=-/bin/systemctl start healtharchive-worker.service
 
 [Install]

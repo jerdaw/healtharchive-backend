@@ -371,6 +371,8 @@ def _write_metrics(
     last_apply_ok: int,
     last_apply_epoch: int,
     detected_targets: int,
+    deploy_lock_active: int,
+    deploy_lock_age_seconds: float | None,
 ) -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
     path = out_dir / out_file
@@ -416,6 +418,25 @@ def _write_metrics(
     )
     lines.append("# TYPE healtharchive_storage_hotpath_auto_recover_enabled gauge")
     lines.append(f"healtharchive_storage_hotpath_auto_recover_enabled {enabled}")
+
+    lines.append(
+        "# HELP healtharchive_storage_hotpath_auto_recover_deploy_lock_active 1 if the deploy lock is currently held (apply actions suppressed)."
+    )
+    lines.append("# TYPE healtharchive_storage_hotpath_auto_recover_deploy_lock_active gauge")
+    lines.append(
+        f"healtharchive_storage_hotpath_auto_recover_deploy_lock_active {int(deploy_lock_active)}"
+    )
+    lines.append(
+        "# HELP healtharchive_storage_hotpath_auto_recover_deploy_lock_age_seconds Age (mtime) of the deploy lock file, or -1 if missing/unreadable."
+    )
+    lines.append("# TYPE healtharchive_storage_hotpath_auto_recover_deploy_lock_age_seconds gauge")
+    if deploy_lock_age_seconds is None:
+        lines.append("healtharchive_storage_hotpath_auto_recover_deploy_lock_age_seconds -1")
+    else:
+        lines.append(
+            "healtharchive_storage_hotpath_auto_recover_deploy_lock_age_seconds "
+            f"{int(deploy_lock_age_seconds)}"
+        )
 
     lines.append(
         "# HELP healtharchive_storage_hotpath_auto_recover_detected_targets Number of targets currently detected as stale/unreadable (Errno 107)."
@@ -673,7 +694,12 @@ def main(argv: list[str] | None = None) -> int:
         now_utc=now,
         deploy_lock_max_age_seconds=float(args.deploy_lock_max_age_seconds),
     )
+    requested_apply = bool(args.apply)
+    apply_mode = requested_apply and (deploy_lock_active == 0)
     if deploy_lock_active == 1:
+        # Do not perform any recovery actions while a deploy is in progress, but still
+        # probe and record detection signals so operators can see what happened during
+        # the deploy window.
         state["last_skip_utc"] = now.replace(microsecond=0).isoformat()
         state["last_skip_reason"] = "deploy_lock"
         state["last_skip_deploy_lock_file"] = str(deploy_lock_file)
@@ -681,22 +707,6 @@ def main(argv: list[str] | None = None) -> int:
             state["last_skip_deploy_lock_age_seconds"] = None
         else:
             state["last_skip_deploy_lock_age_seconds"] = int(deploy_lock_age_seconds)
-        try:
-            _write_metrics(
-                out_dir=Path(str(args.textfile_out_dir)),
-                out_file=str(args.textfile_out_file),
-                sentinel_file=sentinel_file,
-                now_utc=now,
-                state=state,
-                metrics_ok=1,
-                last_apply_ok=int(state.get("last_apply_ok") or 0),
-                last_apply_epoch=int(state.get("last_apply_epoch") or 0),
-                detected_targets=0,
-            )
-        except Exception:
-            pass
-        _save_state(state_path, state)
-        return 0
 
     running_jobs: list[RunningJob] = []
     next_jobs: list[NextJob] = []
@@ -947,6 +957,8 @@ def main(argv: list[str] | None = None) -> int:
                 last_apply_ok=int(state.get("last_apply_ok") or last_apply_ok),
                 last_apply_epoch=int(state.get("last_apply_epoch") or last_apply_epoch),
                 detected_targets=(len(detected) + len(simulated)),
+                deploy_lock_active=int(deploy_lock_active),
+                deploy_lock_age_seconds=deploy_lock_age_seconds,
             )
         except Exception:
             pass
@@ -1015,9 +1027,11 @@ def main(argv: list[str] | None = None) -> int:
                 )
                 return finish(0)
 
+    mode_label = "APPLY" if apply_mode else "DRY-RUN"
+    if requested_apply and not apply_mode and deploy_lock_active == 1:
+        mode_label = "DRY-RUN (deploy lock active)"
     print(
-        f"{'APPLY' if args.apply else 'DRY-RUN'}: detected {len(eligible)} stale target(s) "
-        f"(Errno 107) eligible for recovery."
+        f"{mode_label}: detected {len(eligible)} stale target(s) (Errno 107) eligible for recovery."
     )
     for info in eligible:
         kind = str(info.get("kind") or "")
@@ -1064,21 +1078,20 @@ def main(argv: list[str] | None = None) -> int:
             }
         )
 
-    if not args.apply:
+    if not apply_mode:
         storage_ok, storage_errno = _probe_readable_dir(storagebox_mount)
         storage_unit_present = _is_unit_present(str(args.storagebox_unit))
         tiering_script = Path(str(args.tiering_apply_script))
         annual_tiering_script = Path(str(args.annual_output_tiering_script))
 
-        allow_annual_repair = bool(worker_was_active and impacted_sources) or (
-            running_jobs_query_ok and (not running_jobs)
+        should_quiesce_worker = worker_was_active and (
+            bool(impacted_sources) or (running_jobs_query_ok and (not running_jobs))
         )
+        allow_running_repairs = bool(should_quiesce_worker)
 
         print("")
         print("Planned actions (dry-run):")
-        if worker_was_active and (
-            impacted_sources or (running_jobs_query_ok and (not running_jobs))
-        ):
+        if should_quiesce_worker:
             print(
                 f"  1) systemctl stop {args.worker_unit} "
                 "(if a running job output dir is stale, or when there are no running jobs to prevent mount-repair races)"
@@ -1125,7 +1138,9 @@ def main(argv: list[str] | None = None) -> int:
         if annual_tiering_script.is_file():
             cmd = (
                 f"  5) /opt/healtharchive-backend/.venv/bin/python3 {annual_tiering_script} "
-                f"--apply {'--repair-stale-mounts ' if allow_annual_repair else ''}--year {now.year}"
+                f"--apply --repair-stale-mounts "
+                f"{'--allow-repair-running-jobs ' if allow_running_repairs else ''}"
+                f"--year {now.year}"
             )
             print(cmd)
         else:
@@ -1296,13 +1311,13 @@ def main(argv: list[str] | None = None) -> int:
 
         annual_tiering_script = str(args.annual_output_tiering_script)
         if Path(annual_tiering_script).is_file():
-            allow_annual_repair = worker_stopped or (running_jobs_query_ok and (not running_jobs))
             cp = _run_apply(
                 [
                     "/opt/healtharchive-backend/.venv/bin/python3",
                     annual_tiering_script,
                     "--apply",
-                    *(["--repair-stale-mounts"] if allow_annual_repair else []),
+                    "--repair-stale-mounts",
+                    *(["--allow-repair-running-jobs"] if worker_stopped else []),
                     "--year",
                     str(now.year),
                 ],

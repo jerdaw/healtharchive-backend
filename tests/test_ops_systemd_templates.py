@@ -12,6 +12,20 @@ def test_warc_tiering_systemd_template_repairs_stale_mounts() -> None:
     assert "vps-warc-tiering-bind-mounts.sh --apply --repair-stale-mounts" in text
 
 
+def test_annual_output_tiering_systemd_template_repairs_stale_mounts() -> None:
+    repo_root = Path(__file__).resolve().parents[1]
+    unit_path = (
+        repo_root
+        / "docs"
+        / "deployment"
+        / "systemd"
+        / "healtharchive-annual-output-tiering.service"
+    )
+    text = unit_path.read_text(encoding="utf-8")
+    assert "--repair-stale-mounts" in text
+    assert "--allow-repair-running-jobs" in text
+
+
 def test_storage_hotpath_auto_recover_systemd_template_requires_venv() -> None:
     repo_root = Path(__file__).resolve().parents[1]
     unit_path = (

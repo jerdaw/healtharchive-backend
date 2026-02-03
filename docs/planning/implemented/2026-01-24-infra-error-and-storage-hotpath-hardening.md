@@ -193,15 +193,15 @@ Problem:
 
 Fix:
 
-- In `vps-storage-hotpath-auto-recover.py`, when running in apply mode and the worker is already
-  quiesced (or there are no running jobs), call:
+- In `vps-storage-hotpath-auto-recover.py`, call annual output tiering with repair enabled:
   - `vps-annual-output-tiering.py --apply --repair-stale-mounts`
+- Only allow repairing mountpoints for jobs that are still marked `running` in the DB when the
+  worker has been quiesced:
+  - `vps-annual-output-tiering.py --apply --repair-stale-mounts --allow-repair-running-jobs`
 
 Safety gate:
 
-- Only run `--repair-stale-mounts` when we are certain it will not interrupt an in-flight crawl:
-  - either worker is stopped by the script *because the running job hot path is stale*, or
-  - there are no running jobs to begin with.
+- Never allow repairs for `running` jobs unless the worker is quiesced.
 
 Acceptance criteria:
 

@@ -93,6 +93,7 @@ class TierPlanItem:
     job_id: int
     source_code: str
     job_name: str
+    job_status: str
     output_dir: Path
     cold_dir: Path
     mount_present: bool
@@ -150,6 +151,7 @@ def _plan(
                     job_id=int(j.id),
                     source_code=str(src_by_id.get(int(j.source_id or 0), "unknown")),
                     job_name=str(j.name),
+                    job_status=str(j.status or ""),
                     output_dir=output_dir,
                     cold_dir=cold_dir,
                     mount_present=mount_present,
@@ -249,6 +251,16 @@ def main(argv: list[str] | None = None) -> int:
             "Use only during maintenance (stop the worker first)."
         ),
     )
+    p.add_argument(
+        "--allow-repair-running-jobs",
+        action="store_true",
+        default=False,
+        help=(
+            "Allow --repair-stale-mounts to unmount output_dir mountpoints even when the job status is "
+            "'running'. This is only safe if the worker has been stopped and the crawl is not actively "
+            "writing to that output directory."
+        ),
+    )
     args = p.parse_args(argv)
 
     year = int(args.year)
@@ -314,6 +326,8 @@ def main(argv: list[str] | None = None) -> int:
             if item.output_dir_errno == errno.ENOTCONN:
                 print(f"STALE job={item.job_id} {item.source_code} {item.job_name} (Errno 107)")
                 print(f"     hot={item.output_dir}")
+                if item.job_status:
+                    print(f"     status={item.job_status}")
                 print(
                     "     Hint: sudo umount -l <hot> then re-run tiering or the Phase 2 watchdog."
                 )
@@ -322,6 +336,12 @@ def main(argv: list[str] | None = None) -> int:
                 if not args.repair_stale_mounts:
                     errors.append(
                         f"stale mountpoint (Errno 107) at output_dir={item.output_dir} (job_id={item.job_id})"
+                    )
+                    continue
+                if str(item.job_status) == "running" and not bool(args.allow_repair_running_jobs):
+                    errors.append(
+                        "refusing to repair stale mountpoint for running job without "
+                        f"--allow-repair-running-jobs: job_id={item.job_id} output_dir={item.output_dir}"
                     )
                     continue
 

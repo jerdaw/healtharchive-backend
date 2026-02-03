@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import fcntl
 import importlib.util
 import subprocess
 import sys
@@ -59,6 +60,93 @@ def test_deploy_lock_probe_works_when_lock_file_is_readonly(tmp_path, monkeypatc
     )
     assert active == 0
     assert age_seconds is not None
+
+
+def test_storage_hotpath_watchdog_with_active_deploy_lock_records_detection_but_skips_actions(
+    tmp_path, monkeypatch, capsys
+) -> None:
+    mod = _load_script_module(
+        "vps-storage-hotpath-auto-recover.py",
+        module_name="ha_test_vps_storage_hotpath_auto_recover_deploy_lock_active",
+    )
+    _init_test_db(tmp_path, monkeypatch, "hotpath_deploy_lock_active.db")
+
+    jobs_root = tmp_path / "jobs"
+    output_dir = jobs_root / "hc" / "jobdir"
+    storagebox_mount = tmp_path / "storagebox"
+    storagebox_mount.mkdir(parents=True)
+
+    with get_session() as session:
+        seed_sources(session)
+        session.flush()
+        hc = session.query(Source).filter_by(code="hc").one()
+        session.add(
+            ArchiveJob(
+                source=hc,
+                name="hc-20260101",
+                status="running",
+                started_at=datetime.now(timezone.utc),
+                output_dir=str(output_dir),
+                config={},
+            )
+        )
+        session.flush()
+
+    def fake_probe(path: Path) -> tuple[int, int]:
+        if str(path) == str(output_dir):
+            return 0, 107
+        if str(path) == str(storagebox_mount):
+            return 1, -1
+        return 1, -1
+
+    monkeypatch.setattr(mod, "_probe_readable_dir", fake_probe)
+    monkeypatch.setattr(mod, "_systemctl_is_active", lambda _u: False)
+
+    # Create and hold an exclusive lock, simulating an active deploy.
+    deploy_lock = tmp_path / "deploy.lock"
+    deploy_lock.write_text("pid=123\n", encoding="utf-8")
+    with deploy_lock.open("a", encoding="utf-8") as f:
+        fcntl.flock(f.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+
+        state_file = tmp_path / "state.json"
+        lock_file = tmp_path / "lock"
+        out_dir = tmp_path / "out"
+        sentinel = tmp_path / "sentinel"
+
+        rc = mod.main(
+            [
+                "--apply",
+                "--jobs-root",
+                str(jobs_root),
+                "--storagebox-mount",
+                str(storagebox_mount),
+                "--state-file",
+                str(state_file),
+                "--lock-file",
+                str(lock_file),
+                "--sentinel-file",
+                str(sentinel),
+                "--deploy-lock-file",
+                str(deploy_lock),
+                "--textfile-out-dir",
+                str(out_dir),
+                "--textfile-out-file",
+                "hotpath.prom",
+                "--confirm-runs",
+                "1",
+                "--min-failure-age-seconds",
+                "0",
+            ]
+        )
+        assert rc == 0
+
+    captured = capsys.readouterr()
+    assert "DRY-RUN (deploy lock active)" in captured.out
+    assert "Planned actions (dry-run):" in captured.out
+
+    prom = (out_dir / "hotpath.prom").read_text(encoding="utf-8")
+    assert "healtharchive_storage_hotpath_auto_recover_detected_targets 1" in prom
+    assert "healtharchive_storage_hotpath_auto_recover_deploy_lock_active 1" in prom
 
 
 def test_storage_hotpath_watchdog_requires_confirm_runs(tmp_path, monkeypatch, capsys) -> None:
@@ -272,6 +360,7 @@ def test_storage_hotpath_watchdog_apply_stops_and_restarts_worker_when_active(
     assert any(
         c.startswith(f"/opt/healtharchive-backend/.venv/bin/python3 {annual_script}")
         and "--repair-stale-mounts" in c
+        and "--allow-repair-running-jobs" in c
         for c in flattened
     )
     assert any("recover-stale-jobs" in c and "--source" in c and "hc" in c for c in flattened)
@@ -633,14 +722,16 @@ def test_storage_hotpath_watchdog_repairs_next_job_output_dir_without_stopping_w
     assert any(c.startswith("umount ") and str(phac_out) in c for c in flattened)
     assert not any("recover-stale-jobs" in c for c in flattened)
 
-    # Safety: do not run annual output tiering with repair while a crawl is running and healthy.
+    # Safety: allow annual output tiering repairs, but do not allow repairing "running" jobs unless
+    # the worker has been quiesced.
     annual_calls = [
         c
         for c in flattened
         if c.startswith(f"/opt/healtharchive-backend/.venv/bin/python3 {annual_script}")
     ]
     assert annual_calls
-    assert not any("--repair-stale-mounts" in c for c in annual_calls)
+    assert any("--repair-stale-mounts" in c for c in annual_calls)
+    assert not any("--allow-repair-running-jobs" in c for c in annual_calls)
 
     prom = (out_dir / "hotpath.prom").read_text(encoding="utf-8")
     assert "healtharchive_storage_hotpath_auto_recover_last_apply_ok 1" in prom

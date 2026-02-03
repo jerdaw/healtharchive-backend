@@ -161,7 +161,7 @@ If you want the script to attempt targeted repair for stale mountpoints (Errno 1
 pass:
 
 ```bash
-sudo /opt/healtharchive-backend/.venv/bin/python3 /opt/healtharchive-backend/scripts/vps-annual-output-tiering.py --apply --repair-stale-mounts --year "$(date -u +%Y)"
+sudo /opt/healtharchive-backend/.venv/bin/python3 /opt/healtharchive-backend/scripts/vps-annual-output-tiering.py --apply --repair-stale-mounts --allow-repair-running-jobs --year "$(date -u +%Y)"
 ```
 
 Alternative (uses the systemd unit, which stops/starts the worker internally):
