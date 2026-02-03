@@ -334,7 +334,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--stall-threshold-seconds",
         type=int,
-        default=5400,
+        default=3600,
         help="Consider a running job stalled if no crawled-count increase for this long.",
     )
     parser.add_argument(

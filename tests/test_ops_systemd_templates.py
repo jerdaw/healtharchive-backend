@@ -43,6 +43,16 @@ def test_storage_hotpath_auto_recover_systemd_template_requires_venv() -> None:
     ) in text
 
 
+def test_crawl_auto_recover_systemd_template_sets_stall_threshold() -> None:
+    repo_root = Path(__file__).resolve().parents[1]
+    unit_path = (
+        repo_root / "docs" / "deployment" / "systemd" / "healtharchive-crawl-auto-recover.service"
+    )
+    text = unit_path.read_text(encoding="utf-8")
+    assert "vps-crawl-auto-recover.py --apply" in text
+    assert "--stall-threshold-seconds 3600" in text
+
+
 def test_storage_hotpath_auto_recover_script_has_no_top_level_backend_imports() -> None:
     repo_root = Path(__file__).resolve().parents[1]
     script_path = repo_root / "scripts" / "vps-storage-hotpath-auto-recover.py"
