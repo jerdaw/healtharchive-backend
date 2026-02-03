@@ -851,11 +851,16 @@ def main(argv: list[str] | None = None) -> int:
             if args.apply and not simulate_mode and drift_job_ids:
                 session.commit()
         if drift_job_ids:
-            mode = "APPLY" if args.apply and not simulate_mode else "DRY-RUN"
-            print(
-                f"{mode}: synced {len(drift_job_ids)} job(s) to status=running based on held job locks: "
-                + ", ".join(str(x) for x in drift_job_ids)
-            )
+            if args.apply and not simulate_mode:
+                print(
+                    f"APPLY: synced {len(drift_job_ids)} job(s) to status=running based on held job locks: "
+                    + ", ".join(str(x) for x in drift_job_ids)
+                )
+            else:
+                print(
+                    f"DRY-RUN: would sync {len(drift_job_ids)} job(s) to status=running based on held job locks: "
+                    + ", ".join(str(x) for x in drift_job_ids)
+                )
 
     running_jobs: list[RunningJob] = []
     try:
