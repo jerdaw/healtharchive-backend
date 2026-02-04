@@ -36,7 +36,10 @@ DEFAULT_START_DOCKER_MEMORY_LIMIT = "3g"
 DEFAULT_START_DISK_CHECK_PATH = "/srv/healtharchive/jobs"
 DEFAULT_START_MAX_DISK_USAGE_PERCENT = 90
 
-_ANNUAL_JOB_SUFFIX_RE = re.compile(r"-(?P<year>[0-9]{4})0101(?:\\b|$)")
+# NOTE: Use a real word boundary (\b), not a literal "\b" token.
+# This allows matching legacy job names like "phac-20260101-retry1" as well as
+# canonical "phac-20260101".
+_ANNUAL_JOB_SUFFIX_RE = re.compile(r"-(?P<year>[0-9]{4})0101(?:\b|$)")
 
 
 def _dt_to_epoch_seconds(dt: datetime) -> int:
@@ -1303,18 +1306,38 @@ def main(argv: list[str] | None = None) -> int:
         with get_session() as session:
             rows = (
                 session.query(ArchiveJob, Source.code)
-                .join(Source, ArchiveJob.source_id == Source.id)
+                .outerjoin(Source, ArchiveJob.source_id == Source.id)
                 .filter(ArchiveJob.status.in_(["queued", "retryable"]))
                 .order_by(ArchiveJob.queued_at.asc().nullsfirst(), ArchiveJob.created_at.asc())
                 .all()
             )
 
             candidate: tuple[int, str, str, int, bool] | None = None
+            debug_total = 0
+            debug_year_counts: dict[int, int] = {}
+            debug_examples: list[dict[str, object]] = []
             for orm_job, source_code in rows:
+                debug_total += 1
                 cfg = orm_job.config or {}
                 campaign_kind = str(cfg.get("campaign_kind") or "").strip().lower()
                 inferred_year = _infer_annual_campaign_year(orm_job, cfg)
+                if inferred_year is not None:
+                    debug_year_counts[int(inferred_year)] = debug_year_counts.get(int(inferred_year), 0) + 1
+
                 if campaign_kind != "annual" and inferred_year is None:
+                    if len(debug_examples) < 5:
+                        debug_examples.append(
+                            {
+                                "job_id": int(orm_job.id),
+                                "source": str(source_code) if source_code else "unknown",
+                                "status": str(orm_job.status),
+                                "reason": "non_annual",
+                                "campaign_kind": campaign_kind,
+                                "campaign_year": cfg.get("campaign_year"),
+                                "inferred_year": inferred_year,
+                                "name": getattr(orm_job, "name", None),
+                            }
+                        )
                     continue
                 try:
                     cfg_year = int(cfg.get("campaign_year") or 0)
@@ -1323,6 +1346,20 @@ def main(argv: list[str] | None = None) -> int:
                 if cfg_year <= 0:
                     cfg_year = int(inferred_year or 0)
                 if cfg_year != ensure_year:
+                    if len(debug_examples) < 5:
+                        debug_examples.append(
+                            {
+                                "job_id": int(orm_job.id),
+                                "source": str(source_code) if source_code else "unknown",
+                                "status": str(orm_job.status),
+                                "reason": "year_mismatch",
+                                "campaign_kind": campaign_kind,
+                                "campaign_year": cfg.get("campaign_year"),
+                                "inferred_year": inferred_year,
+                                "effective_year": cfg_year,
+                                "name": getattr(orm_job, "name", None),
+                            }
+                        )
                     continue
                 needs_backfill = (
                     campaign_kind != "annual"
@@ -1333,7 +1370,7 @@ def main(argv: list[str] | None = None) -> int:
                 )
                 candidate = (
                     int(orm_job.id),
-                    str(source_code),
+                    str(source_code) if source_code else "unknown",
                     str(orm_job.status),
                     cfg_year,
                     needs_backfill,
@@ -1345,6 +1382,33 @@ def main(argv: list[str] | None = None) -> int:
                 f"SKIP: underfilled running jobs ({running_count}/{ensure_min_running}), "
                 f"but no eligible annual queued/retryable jobs found for campaign_year={ensure_year}."
             )
+            if debug_total > 0:
+                years = ", ".join(
+                    f"{y}:{n}" for y, n in sorted(debug_year_counts.items(), key=lambda x: x[0])
+                )
+                print(
+                    "DEBUG: queued/retryable jobs scanned="
+                    f"{debug_total}; inferred_annual_year_counts={{{years}}}."
+                )
+                for ex in debug_examples:
+                    print(
+                        "DEBUG: skip_candidate "
+                        + " ".join(
+                            f"{k}={ex.get(k)!r}"
+                            for k in (
+                                "job_id",
+                                "source",
+                                "status",
+                                "reason",
+                                "campaign_kind",
+                                "campaign_year",
+                                "inferred_year",
+                                "effective_year",
+                                "name",
+                            )
+                            if ex.get(k) is not None
+                        )
+                    )
             write_metrics(
                 running_jobs=running_count,
                 stalled_jobs=0,
