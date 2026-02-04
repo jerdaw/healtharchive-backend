@@ -1322,7 +1322,9 @@ def main(argv: list[str] | None = None) -> int:
                 campaign_kind = str(cfg.get("campaign_kind") or "").strip().lower()
                 inferred_year = _infer_annual_campaign_year(orm_job, cfg)
                 if inferred_year is not None:
-                    debug_year_counts[int(inferred_year)] = debug_year_counts.get(int(inferred_year), 0) + 1
+                    debug_year_counts[int(inferred_year)] = (
+                        debug_year_counts.get(int(inferred_year), 0) + 1
+                    )
 
                 if campaign_kind != "annual" and inferred_year is None:
                     if len(debug_examples) < 5:

@@ -554,10 +554,7 @@ def test_auto_start_dry_run_accepts_legacy_annual_jobs_with_suffix_after_date(
         source_id=src_id,
         name="phac-20990101-retry1",
         status="retryable",
-        output_dir=tmp_path
-        / "jobs"
-        / "phac"
-        / "20990101T000000Z__phac-20990101-retry1",
+        output_dir=tmp_path / "jobs" / "phac" / "20990101T000000Z__phac-20990101-retry1",
     )
 
     sentinel = tmp_path / "enabled"
