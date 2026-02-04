@@ -26,7 +26,7 @@ Purpose: add a backend CLI command that is testable, documented, and safe to ope
 ## Steps
 
 1) Implement the command:
-   - Add/extend the CLI wiring in `../../src/ha_backend/cli.py`.
+   - Add/extend the CLI wiring in `../../../src/ha_backend/cli.py`.
 2) Add tests close to the behavior:
    - Prefer `tests/test_cli_*.py` style coverage for parsing and side-effects.
 3) Document the command:
@@ -45,4 +45,4 @@ Purpose: add a backend CLI command that is testable, documented, and safe to ope
 
 - Local testing flows: `../live-testing.md`
 - Documentation policy: `../../documentation-guidelines.md`
-- CLI implementation: `../../src/ha_backend/cli.py`
+- CLI implementation: `../../../src/ha_backend/cli.py`

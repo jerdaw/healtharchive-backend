@@ -49,4 +49,4 @@ Purpose: safely introduce schema changes and keep Alembic, tests, and docs align
 
 - Local dev flows: `../live-testing.md`
 - Production runbook: `../../deployment/production-single-vps.md`
-- Alembic config: `../../alembic.ini`, `../../alembic/`
+- Alembic config: `../../../alembic.ini`, `../../../alembic/`
