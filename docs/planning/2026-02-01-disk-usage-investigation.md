@@ -1,11 +1,23 @@
 # Investigation: VPS Disk Usage Mystery (48GB Discrepancy)
 
 **Created**: 2026-02-01
-**Status**: Active Investigation
+**Status**: Resolved (2026-02-04)
 **Priority**: P1 - Impacts crawler operations
 **Related**: [Operational Resilience Roadmap](./implemented/2026-02-01-operational-resilience-improvements.md)
 
 ---
+
+## Update (2026-02-04): Root cause found, investigation closed
+
+This “mystery discrepancy” turned out to be a **real storage placement problem**, not an ext4 accounting bug:
+
+- Annual crawl output directories (notably CIHR ~50GB, PHAC ~1.2GB) were present on the VPS **root filesystem** under `/srv/healtharchive/jobs/**` instead of being tiered/mounted to the Storage Box.
+- This pushed `/dev/sda1` to ~84–86% used and triggered the worker’s disk safety guardrail (≥85%), blocking crawl progress.
+- Recovery was to pause crawls, `rsync` the output dirs to the Storage Box, re-apply annual output tiering mounts, and delete the local copies. Root disk dropped to ~19% used afterwards.
+
+Incident note (with the exact commands + timeline):
+
+- `../operations/incidents/2026-02-04-annual-crawl-output-dirs-on-root-disk.md`
 
 ## Problem Statement
 

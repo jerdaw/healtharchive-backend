@@ -65,9 +65,9 @@ Keep this list short; prefer linking to the canonical doc that explains the item
   - Remaining: unify discovery methods, enhance show-job output, sync `scripts/vps-crawl-status.sh`
   - See: `2026-01-29-warc-discovery-consistency.md`
 
-- Resolve VPS root disk usage discrepancy (`df` vs `du`):
-  - Active investigation: `2026-02-01-disk-usage-investigation.md`
-  - Likely requires a maintenance window (`fsck`) if ext4 accounting is corrupted.
+- Prevent annual crawl output dirs landing on root disk:
+  - Incident note: `../operations/incidents/2026-02-04-annual-crawl-output-dirs-on-root-disk.md`
+  - Follow-ups: add guardrails + a clear “post-reboot tiering verify” runbook.
 
 - Consider whether a separate staging backend is worth it (increases ops surface; only do if it buys real safety).
   - See: `../deployment/environments-and-configuration.md`

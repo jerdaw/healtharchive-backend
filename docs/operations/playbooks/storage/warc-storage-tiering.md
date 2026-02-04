@@ -291,6 +291,10 @@ sudo systemctl stop healtharchive-worker.service
 3) Apply tiering for the jobs you just created (use a short window around “now”):
 
 ```bash
+# Ensure we target the production DB (Postgres), not a local fallback (SQLite):
+set -a; source /etc/healtharchive/backend.env; set +a
+systemctl is-active postgresql.service
+
 sudo /opt/healtharchive-backend/.venv/bin/python3 /opt/healtharchive-backend/scripts/vps-annual-output-tiering.py \
   --apply \
   --repair-stale-mounts \

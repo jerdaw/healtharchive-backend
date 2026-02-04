@@ -21,6 +21,9 @@ Keep the two synced copies of this file aligned:
 
 ## Current ops tasks (implementation already exists; enable/verify)
 
+- After any reboot/rescue/maintenance where mounts may drift:
+  - Verify Storage Box mount is active (`healtharchive-storagebox-sshfs.service`).
+  - Re-apply annual output tiering for the active campaign year and confirm job output dirs are on Storage Box (see incident: `incidents/2026-02-04-annual-crawl-output-dirs-on-root-disk.md`).
 - Verify the new Docker resource limit environment variables are set appropriately on VPS if defaults need adjustment:
   - `HEALTHARCHIVE_DOCKER_MEMORY_LIMIT` (default: 4g)
   - `HEALTHARCHIVE_DOCKER_CPU_LIMIT` (default: 1.5)
