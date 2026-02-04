@@ -538,6 +538,57 @@ def test_auto_start_dry_run_accepts_legacy_annual_jobs_by_name(
     )
 
 
+def test_auto_start_dry_run_accepts_legacy_annual_jobs_with_suffix_after_date(
+    tmp_path, monkeypatch, capsys
+) -> None:
+    _init_test_db(tmp_path, monkeypatch)
+    module = _load_script_module()
+
+    fixed_now = datetime(2026, 2, 3, 0, 0, 0, tzinfo=timezone.utc)
+    monkeypatch.setattr(module, "_utc_now", lambda: fixed_now)
+    monkeypatch.setattr(module, "_disk_usage_percent", lambda _path: 10)
+    monkeypatch.setattr(module, "_ps_snapshot", lambda: [])
+
+    src_id = _create_source(code="phac", name="PHAC")
+    job_id = _create_legacy_annual_job_missing_campaign_meta(
+        source_id=src_id,
+        name="phac-20990101-retry1",
+        status="retryable",
+        output_dir=tmp_path
+        / "jobs"
+        / "phac"
+        / "20990101T000000Z__phac-20990101-retry1",
+    )
+
+    sentinel = tmp_path / "enabled"
+    sentinel.write_text("", encoding="utf-8")
+    rc = module.main(
+        [
+            "--sentinel-file",
+            str(sentinel),
+            "--deploy-lock-file",
+            str(tmp_path / "deploy.lock"),
+            "--state-file",
+            str(tmp_path / "state.json"),
+            "--lock-file",
+            str(tmp_path / "watchdog.lock"),
+            "--textfile-out-dir",
+            str(tmp_path),
+            "--textfile-out-file",
+            "metrics.prom",
+            "--ensure-min-running-jobs",
+            "1",
+            "--ensure-campaign-year",
+            "2099",
+        ]
+    )
+    assert rc == 0
+
+    out = capsys.readouterr().out
+    assert f"DRY-RUN: would auto-start annual job_id={job_id}" in out
+    assert "systemd-run" in out
+
+
 def test_auto_start_apply_records_state_and_metrics(tmp_path, monkeypatch, capsys) -> None:
     _init_test_db(tmp_path, monkeypatch)
     module = _load_script_module()
