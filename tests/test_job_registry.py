@@ -56,16 +56,29 @@ def test_get_config_for_source_known_sources() -> None:
     assert hc_cfg.default_tool_options["skip_final_build"] is True
     assert hc_cfg.default_tool_options["docker_shm_size"] == "1g"
     assert hc_cfg.default_tool_options["initial_workers"] == 2
-    assert hc_cfg.default_tool_options["stall_timeout_minutes"] == 60
+    assert hc_cfg.default_tool_options["stall_timeout_minutes"] == 75
+    assert hc_cfg.default_tool_options["max_container_restarts"] == 24
+    assert hc_cfg.default_tool_options["error_threshold_timeout"] == 55
+    assert hc_cfg.default_tool_options["error_threshold_http"] == 55
+    assert hc_cfg.default_tool_options["backoff_delay_minutes"] == 2
 
     assert phac_cfg.default_tool_options["skip_final_build"] is True
     assert phac_cfg.default_tool_options["docker_shm_size"] == "1g"
     assert phac_cfg.default_tool_options["initial_workers"] == 2
-    assert phac_cfg.default_tool_options["stall_timeout_minutes"] == 60
+    assert phac_cfg.default_tool_options["stall_timeout_minutes"] == 90
+    assert phac_cfg.default_tool_options["max_container_restarts"] == 30
+    assert phac_cfg.default_tool_options["error_threshold_timeout"] == 65
+    assert phac_cfg.default_tool_options["error_threshold_http"] == 65
+    assert phac_cfg.default_tool_options["backoff_delay_minutes"] == 3
 
     assert cihr_cfg.default_tool_options["skip_final_build"] is True
     assert cihr_cfg.default_tool_options["docker_shm_size"] == "1g"
-    assert cihr_cfg.default_tool_options["initial_workers"] == 2
+    assert cihr_cfg.default_tool_options["initial_workers"] == 3
+    assert cihr_cfg.default_tool_options["stall_timeout_minutes"] == 45
+    assert cihr_cfg.default_tool_options["max_container_restarts"] == 20
+    assert cihr_cfg.default_tool_options["error_threshold_timeout"] == 35
+    assert cihr_cfg.default_tool_options["error_threshold_http"] == 35
+    assert cihr_cfg.default_tool_options["backoff_delay_minutes"] == 1
 
 
 def test_get_config_for_source_unknown() -> None:

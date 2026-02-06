@@ -135,6 +135,17 @@ groups:
           description: "A running job has performed many container restarts (adaptive restart). job_id={{ $labels.job_id }} source={{ $labels.source }} restarts={{ $value }}."
           runbook_url: "https://github.com/jerdaw/healtharchive-backend/blob/main/docs/tutorials/debug-crawl.md"
 
+      - alert: HealthArchiveCrawlNewPhaseChurn
+        expr: healtharchive_crawl_running_job_new_crawl_phase_count >= 3
+        for: 30m
+        labels:
+          severity: warning
+          service: healtharchive
+        annotations:
+          summary: "Repeated new crawl phase transitions"
+          description: "A running crawl job has repeatedly fallen back to 'New Crawl Phase' in the current combined-log window. This can indicate resume/frontier instability and can hurt long-run completeness efficiency. job_id={{ $labels.job_id }} source={{ $labels.source }} count={{ $value }}."
+          runbook_url: "https://github.com/jerdaw/healtharchive-backend/blob/main/docs/tutorials/debug-crawl.md"
+
       - alert: HealthArchiveIndexingNotStarted
         expr: healtharchive_indexing_pending_job_max_age_seconds > 3600
         for: 15m
@@ -146,18 +157,46 @@ groups:
           description: "At least one job has status=completed for over an hour (crawl done, indexing not done). Check healtharchive-worker.service and worker logs."
           runbook_url: "https://github.com/jerdaw/healtharchive-backend/blob/main/docs/operations/playbooks/annual-campaign.md"
 
-      - alert: HealthArchiveCrawlRateSlow
+      - alert: HealthArchiveCrawlRateSlowHC
         expr: |
-          healtharchive_crawl_running_job_progress_known == 1
-          and healtharchive_crawl_running_job_crawl_rate_ppm >= 0
-          and healtharchive_crawl_running_job_crawl_rate_ppm < 5
+          healtharchive_crawl_running_job_progress_known{source="hc"} == 1
+          and healtharchive_crawl_running_job_crawl_rate_ppm{source="hc"} >= 0
+          and healtharchive_crawl_running_job_crawl_rate_ppm{source="hc"} < 1.5
         for: 30m
         labels:
           severity: warning
           service: healtharchive
         annotations:
-          summary: "Crawl rate is very slow"
-          description: "A running crawl job has a very low crawl rate (<5 pages/min): source={{ $labels.source }} job_id={{ $labels.job_id }} rate={{ $value }}ppm. This may indicate network issues, VPN problems, or site-specific crawling difficulties."
+          summary: "HC crawl rate is very slow"
+          description: "A running HC crawl job has a very low crawl rate (<1.5 pages/min): source={{ $labels.source }} job_id={{ $labels.job_id }} rate={{ $value }}ppm. This can indicate network issues, storage instability, or resume/frontier churn."
+          runbook_url: "https://github.com/jerdaw/healtharchive-backend/blob/main/docs/tutorials/debug-crawl.md"
+
+      - alert: HealthArchiveCrawlRateSlowPHAC
+        expr: |
+          healtharchive_crawl_running_job_progress_known{source="phac"} == 1
+          and healtharchive_crawl_running_job_crawl_rate_ppm{source="phac"} >= 0
+          and healtharchive_crawl_running_job_crawl_rate_ppm{source="phac"} < 1.5
+        for: 30m
+        labels:
+          severity: warning
+          service: healtharchive
+        annotations:
+          summary: "PHAC crawl rate is very slow"
+          description: "A running PHAC crawl job has a very low crawl rate (<1.5 pages/min): source={{ $labels.source }} job_id={{ $labels.job_id }} rate={{ $value }}ppm. This can indicate persistent blocking/noise or infrastructure instability."
+          runbook_url: "https://github.com/jerdaw/healtharchive-backend/blob/main/docs/tutorials/debug-crawl.md"
+
+      - alert: HealthArchiveCrawlRateSlowCIHR
+        expr: |
+          healtharchive_crawl_running_job_progress_known{source="cihr"} == 1
+          and healtharchive_crawl_running_job_crawl_rate_ppm{source="cihr"} >= 0
+          and healtharchive_crawl_running_job_crawl_rate_ppm{source="cihr"} < 3
+        for: 30m
+        labels:
+          severity: warning
+          service: healtharchive
+        annotations:
+          summary: "CIHR crawl rate is very slow"
+          description: "A running CIHR crawl job has a very low crawl rate (<3 pages/min): source={{ $labels.source }} job_id={{ $labels.job_id }} rate={{ $value }}ppm. CIHR is expected to run faster than canada.ca profiles; sustained low rate warrants investigation."
           runbook_url: "https://github.com/jerdaw/healtharchive-backend/blob/main/docs/tutorials/debug-crawl.md"
 
       - alert: HealthArchiveInfraErrorsHigh

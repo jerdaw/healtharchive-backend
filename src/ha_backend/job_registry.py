@@ -89,17 +89,14 @@ SOURCE_JOB_CONFIGS: Dict[str, SourceJobConfig] = {
             "enable_adaptive_restart": True,
             "enable_vpn_rotation": False,
             "initial_workers": 2,
-            "stall_timeout_minutes": 60,
+            # HC is noisy but broad; prefer fewer false-positive stalls.
+            "stall_timeout_minutes": 75,
             "docker_shm_size": "1g",
-            # canada.ca is noisy (HTTP2/protocol errors + long tail timeouts).
-            # Keep the monitor-driven restart budget non-trivial to avoid
-            # repeated manual intervention on long annual runs.
-            "max_container_restarts": 20,
-            # The default adaptive thresholds are tuned for small crawls; for
-            # canada.ca annual runs we need to tolerate long-tail slowness
-            # without thrashing (restart loops + long backoffs).
-            "error_threshold_timeout": 50,
-            "error_threshold_http": 50,
+            # Keep a non-trivial restart budget for long annual runs.
+            "max_container_restarts": 24,
+            # Tolerate long-tail slowness without excessive churn.
+            "error_threshold_timeout": 55,
+            "error_threshold_http": 55,
             "backoff_delay_minutes": 2,
             "log_level": "INFO",
             "relax_perms": True,  # ensure WARCs are readable on host in dev
@@ -128,13 +125,13 @@ SOURCE_JOB_CONFIGS: Dict[str, SourceJobConfig] = {
             "enable_adaptive_restart": True,
             "enable_vpn_rotation": False,
             "initial_workers": 2,
-            "stall_timeout_minutes": 60,
+            # PHAC has shown the highest restart churn; be more tolerant.
+            "stall_timeout_minutes": 90,
             "docker_shm_size": "1g",
-            # canada.ca is noisy (HTTP2/protocol errors + long tail timeouts).
-            "max_container_restarts": 20,
-            "error_threshold_timeout": 50,
-            "error_threshold_http": 50,
-            "backoff_delay_minutes": 2,
+            "max_container_restarts": 30,
+            "error_threshold_timeout": 65,
+            "error_threshold_http": 65,
+            "backoff_delay_minutes": 3,
             "log_level": "INFO",
             "relax_perms": True,
         },
@@ -159,13 +156,14 @@ SOURCE_JOB_CONFIGS: Dict[str, SourceJobConfig] = {
             "enable_adaptive_workers": True,
             "enable_adaptive_restart": True,
             "enable_vpn_rotation": False,
-            "initial_workers": 2,
-            "stall_timeout_minutes": 60,  # Match HC/PHAC for consistency
+            # CIHR is typically cleaner/faster; start a bit more aggressively.
+            "initial_workers": 3,
+            "stall_timeout_minutes": 45,
             "docker_shm_size": "1g",
             "max_container_restarts": 20,
-            "error_threshold_timeout": 50,
-            "error_threshold_http": 50,
-            "backoff_delay_minutes": 2,
+            "error_threshold_timeout": 35,
+            "error_threshold_http": 35,
+            "backoff_delay_minutes": 1,
             "log_level": "INFO",
             "relax_perms": True,
         },

@@ -15,6 +15,7 @@ from pathlib import Path
 
 from ha_backend.crawl_stats import parse_crawl_log_progress
 from ha_backend.db import get_session
+from ha_backend.job_registry import SOURCE_JOB_CONFIGS
 from ha_backend.models import ArchiveJob, Source
 
 DEFAULT_DEPLOY_LOCK_FILE = "/tmp/healtharchive-backend-deploy.lock"
@@ -40,6 +41,52 @@ DEFAULT_START_MAX_DISK_USAGE_PERCENT = 90
 # This allows matching legacy job names like "phac-20260101-retry1" as well as
 # canonical "phac-20260101".
 _ANNUAL_JOB_SUFFIX_RE = re.compile(r"-(?P<year>[0-9]{4})0101(?:\b|$)")
+
+
+def _build_annual_source_recovery_profiles() -> dict[str, dict[str, int]]:
+    """
+    Build source-specific annual recovery profiles from job-registry defaults.
+
+    This keeps watchdog reconciliation in sync with the canonical crawl defaults.
+    """
+    profiles: dict[str, dict[str, int]] = {}
+    for source_code in ("hc", "phac", "cihr"):
+        cfg = SOURCE_JOB_CONFIGS.get(source_code)
+        if cfg is None:
+            continue
+        tool = dict(cfg.default_tool_options or {})
+        profile: dict[str, int] = {}
+        for key in (
+            "initial_workers",
+            "stall_timeout_minutes",
+            "error_threshold_timeout",
+            "error_threshold_http",
+            "backoff_delay_minutes",
+            "max_container_restarts",
+        ):
+            try:
+                profile[key] = int(tool[key])
+            except Exception:
+                profile = {}
+                break
+        if profile:
+            profiles[source_code] = profile
+    return profiles
+
+
+_ANNUAL_SOURCE_RECOVERY_PROFILES: dict[str, dict[str, int]] = (
+    _build_annual_source_recovery_profiles()
+)
+
+_LEGACY_ANNUAL_BASELINE_VALUES: dict[str, set[int]] = {
+    # Shared annual values from earlier campaigns (and pre-2026 updates).
+    "initial_workers": {1, 2},
+    "stall_timeout_minutes": {60},
+    "error_threshold_timeout": {50},
+    "error_threshold_http": {50},
+    "backoff_delay_minutes": {2},
+    "max_container_restarts": {20},
+}
 
 
 def _dt_to_epoch_seconds(dt: datetime) -> int:
@@ -563,10 +610,40 @@ def _ensure_recovery_tool_options(job: ArchiveJob) -> bool:
     - enables monitoring (required for adaptive restart)
     - enables adaptive restart (container restart on stall)
     - ensures annual jobs have non-trivial restart + monitoring thresholds
+    - for known annual sources, reconciles legacy baseline values to
+      source-specific profiles while preserving explicit non-baseline overrides
     - preserves any existing explicit operator overrides
 
     Returns True if the job config was modified.
     """
+
+    def _int_or_none(raw: object) -> int | None:
+        try:
+            return int(raw)
+        except (TypeError, ValueError):
+            return None
+
+    def _infer_source_code() -> str:
+        try:
+            source = getattr(job, "source", None)
+        except Exception:
+            source = None
+        if source is not None:
+            try:
+                code = str(getattr(source, "code", "") or "").strip().lower()
+            except Exception:
+                code = ""
+            if code:
+                return code
+
+        # Fallback for minimal objects in tests and legacy records without a loaded relation.
+        name = str(getattr(job, "name", "") or "").strip().lower()
+        for candidate in _ANNUAL_SOURCE_RECOVERY_PROFILES:
+            if name.startswith(f"{candidate}-") or name == candidate:
+                return candidate
+
+        return ""
+
     cfg = dict(job.config or {})
     tool = dict(cfg.get("tool_options") or {})
 
@@ -574,6 +651,8 @@ def _ensure_recovery_tool_options(job: ArchiveJob) -> bool:
 
     campaign_kind = str(cfg.get("campaign_kind") or "").strip().lower()
     is_annual = campaign_kind == "annual" or _infer_annual_campaign_year(job, cfg) is not None
+    source_code = _infer_source_code()
+    source_profile = _ANNUAL_SOURCE_RECOVERY_PROFILES.get(source_code) if is_annual else None
 
     # Required for any monitor-driven recovery strategies.
     if not bool(tool.get("enable_monitoring", False)):
@@ -584,11 +663,8 @@ def _ensure_recovery_tool_options(job: ArchiveJob) -> bool:
         tool["enable_adaptive_restart"] = True
         changed = True
 
-    try:
-        max_restarts = int(tool.get("max_container_restarts") or 0)
-    except (TypeError, ValueError):
-        max_restarts = 0
-    min_restarts = 20 if is_annual else 6
+    max_restarts = _int_or_none(tool.get("max_container_restarts")) or 0
+    min_restarts = int((source_profile or {}).get("max_container_restarts", 20 if is_annual else 6))
     if max_restarts < min_restarts:
         # Long annual crawls can exhaust a tiny restart budget early, leading to
         # repeated manual intervention. When recovering, bump low/missing values
@@ -617,6 +693,28 @@ def _ensure_recovery_tool_options(job: ArchiveJob) -> bool:
         if tool.get("backoff_delay_minutes") is None:
             tool["backoff_delay_minutes"] = 2
             changed = True
+
+        # Reconcile legacy shared annual defaults to source-specific profiles.
+        # This updates old campaign jobs that predate per-source tuning, while
+        # preserving explicit non-baseline operator overrides.
+        if source_profile is not None:
+            for key in (
+                "initial_workers",
+                "stall_timeout_minutes",
+                "error_threshold_timeout",
+                "error_threshold_http",
+                "backoff_delay_minutes",
+            ):
+                desired = int(source_profile[key])
+                current = _int_or_none(tool.get(key))
+                if current is None:
+                    tool[key] = desired
+                    changed = True
+                    continue
+                legacy_values = _LEGACY_ANNUAL_BASELINE_VALUES.get(key, set())
+                if current in legacy_values and current != desired:
+                    tool[key] = desired
+                    changed = True
 
     if changed:
         cfg["tool_options"] = tool

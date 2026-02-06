@@ -15,6 +15,7 @@ logger = logging.getLogger("healtharchive.crawl_stats")
 
 CrawlStatusLogContext = "crawlStatus"
 CrawlStatusLogMessage = "Crawl statistics"
+NewCrawlPhaseStageToken = "Starting Loop Iteration: Stage 'New Crawl Phase"
 
 
 def _parse_utc_timestamp(raw: str | None) -> datetime | None:
@@ -160,6 +161,40 @@ def parse_crawl_log_progress(
     )
 
 
+def count_new_crawl_phase_events_from_log_tail(
+    log_path: Path, *, max_bytes: int = 1024 * 1024
+) -> int | None:
+    """
+    Count "New Crawl Phase" stage starts from the tail of a combined crawl log.
+
+    Returns:
+      - count >= 0 when the log was readable
+      - None when the log could not be probed/read
+    """
+    if not log_path:
+        return None
+    try:
+        if not log_path.is_file():
+            return None
+    except OSError as exc:
+        logger.debug("Failed to stat crawl log path %s: %s", log_path, exc)
+        return None
+
+    try:
+        with open(log_path, "rb") as f:
+            f.seek(max(0, log_path.stat().st_size - max_bytes))
+            tail = f.read().decode("utf-8", errors="replace")
+    except Exception as exc:  # pragma: no cover - defensive
+        logger.debug("Failed to read crawl log tail from %s: %s", log_path, exc)
+        return None
+
+    count = 0
+    for line in tail.splitlines():
+        if NewCrawlPhaseStageToken in line:
+            count += 1
+    return count
+
+
 def _find_latest_combined_log(output_dir: Path) -> Optional[Path]:
     """
     Locate the most recent archive_*.combined.log file under a job's output
@@ -258,6 +293,7 @@ def update_job_stats_from_logs(job: ArchiveJob) -> None:
 __all__ = [
     "CrawlLogProgress",
     "CrawlStatusEvent",
+    "count_new_crawl_phase_events_from_log_tail",
     "parse_crawl_log_progress",
     "parse_crawl_status_events_from_log_tail",
     "update_job_stats_from_logs",

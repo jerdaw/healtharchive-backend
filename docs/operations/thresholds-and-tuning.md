@@ -2,7 +2,7 @@
 
 This document centralizes all operational thresholds used in HealthArchive automation, monitoring, and safeguards.
 
-**Last updated**: 2026-02-03
+**Last updated**: 2026-02-06
 
 ---
 
@@ -105,7 +105,7 @@ See: `docs/operations/disk-baseline-and-cleanup.md` (current baseline + cleanup 
 
 **Recovery enhancements** (auto-applied):
 - `enable_adaptive_restart=True`
-- `max_container_restarts=20` (annual jobs)
+- `max_container_restarts` floor from source profile (`hc=24`, `phac=30`, `cihr=20`)
 - See: `scripts/vps-crawl-auto-recover.py` (`_ensure_recovery_tool_options`)
 
 ---
@@ -222,32 +222,37 @@ See: `docs/planning/implemented/2026-01-24-infra-error-and-storage-hotpath-harde
 
 ## Archive Tool (Crawler) Adaptive Thresholds
 
-### Error Thresholds
+### Annual Per-Source Profiles
 
-| Parameter | Default | Annual Jobs Override | Location | Purpose |
-|-----------|---------|---------------------|----------|---------|
-| **Error threshold (timeout)** | 30 | 50 | Tool option | Timeout errors before triggering restart |
-| **Error threshold (HTTP)** | 30 | 50 | Tool option | HTTP errors before triggering restart |
-| **Backoff delay** | 5 min | 2 min | Tool option | Delay before resuming after restart |
+Annual jobs are source-tuned (not one-size-fits-all). Canonical values live in `src/ha_backend/job_registry.py` and are reconciled by `scripts/vps-crawl-auto-recover.py` during recovery/auto-start flows.
 
-**Tuning guidance**:
-- Annual jobs use higher thresholds (50) to tolerate noisy sites
-- Lower thresholds (20-25) for clean sites to detect issues faster
-- Don't set timeout threshold <10 - too aggressive for flaky networks
-
----
-
-### Container Restart Limits
-
-| Parameter | Default | Annual Jobs | Location | Purpose |
-|-----------|---------|-------------|----------|---------|
-| **Max restarts** | 6 | 20 | Tool option | Container restart budget |
-| **Stall timeout** | 30 min | 60 min | Tool option | Time without progress before restart |
+| Source | Initial workers | Stall timeout | Timeout/HTTP threshold | Backoff | Max restarts | Rationale |
+|--------|-----------------|---------------|------------------------|---------|--------------|-----------|
+| `hc` | 2 | 75 min | 55 / 55 | 2 min | 24 | Moderate tolerance for canada.ca long-tail behavior. |
+| `phac` | 2 | 90 min | 65 / 65 | 3 min | 30 | Highest tolerance due historically high restart churn. |
+| `cihr` | 3 | 45 min | 35 / 35 | 1 min | 20 | Faster/cleaner profile to improve throughput and fault detection. |
 
 **Tuning guidance**:
-- Annual jobs get higher restart budget (20) due to long runtime
-- Lower max restarts (3-5) for quick test jobs
-- Increase stall timeout to 90min for very slow sites
+- Change source profiles in `job_registry` first; keep watchdog reconciliation aligned.
+- For completeness-first posture, increase tolerance (stall/restart budget) before lowering scope.
+- Only reduce thresholds when repeated evidence shows low false-positive restart risk.
+
+### One-Time Annual Backfill/Reconciliation
+
+When migrating an existing campaign from shared defaults to per-source tuning, reconcile existing annual jobs in-place:
+
+```bash
+# Review changes first (dry-run)
+ha-backend reconcile-annual-tool-options --year 2026
+
+# Apply changes
+ha-backend reconcile-annual-tool-options --year 2026 --apply
+```
+
+What this command does:
+- Reconciles baseline annual values to source profile values (`hc`, `phac`, `cihr`)
+- Preserves explicit non-baseline overrides (except restart floor enforcement)
+- Ensures annual safety defaults (`enable_monitoring`, `enable_adaptive_restart`, `skip_final_build`, `docker_shm_size=1g`)
 
 See: `src/archive_tool/constants.py`, `scripts/vps-crawl-auto-recover.py`
 
@@ -262,6 +267,10 @@ See: `src/archive_tool/constants.py`, `scripts/vps-crawl-auto-recover.py`
 | | Alert critical | 92% for 10m | P0 | alerting YAML |
 | **Crawl** | Stall threshold | 60 min | P1 | `vps-crawl-auto-recover.py` |
 | | Recovery cap | 3/job/day | P1 | `vps-crawl-auto-recover.py` |
+| | New-crawl-phase churn | >=3 (30m) | P1 | alerting YAML |
+| | Slow-rate alert (HC) | <1.5 ppm (30m) | P1 | alerting YAML |
+| | Slow-rate alert (PHAC) | <1.5 ppm (30m) | P1 | alerting YAML |
+| | Slow-rate alert (CIHR) | <3 ppm (30m) | P1 | alerting YAML |
 | **Storage** | Stale mount age | 120s | P1 | `vps-storage-hotpath-auto-recover.py` |
 | | Recovery cooldown | 15 min | P1 | `vps-storage-hotpath-auto-recover.py` |
 | | Recovery cap | 6/day global | P1 | `vps-storage-hotpath-auto-recover.py` |
