@@ -64,7 +64,14 @@ def _job_lock(job_id: int) -> Iterator[Path]:
         lock_dir = Path("/tmp")
 
     lock_path = lock_dir / f"job-{int(job_id)}.lock"
-    fd = os.open(str(lock_path), os.O_CREAT | os.O_RDWR, 0o666)
+    try:
+        # Open without O_CREAT first to avoid fs.protected_regular (sysctl)
+        # restrictions in world-writable sticky directories like /tmp.
+        # When O_CREAT is used on an existing file in a sticky dir, the kernel
+        # returns EACCES if the caller doesn't own the file.
+        fd = os.open(str(lock_path), os.O_RDWR)
+    except FileNotFoundError:
+        fd = os.open(str(lock_path), os.O_CREAT | os.O_RDWR, 0o666)
     try:
         try:
             os.fchmod(fd, 0o666)
