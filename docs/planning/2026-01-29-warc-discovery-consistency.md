@@ -197,7 +197,7 @@ Replace inline Python block with call to new CLI command:
 - `src/ha_backend/archive_storage.py` - Add verification functions
 - `src/ha_backend/indexing/warc_discovery.py` - Add extended discovery result
 - `scripts/vps-crawl-status.sh` - Use CLI instead of inline Python
-- `CLAUDE.md` - Add new command to CLI examples
+- `AGENTS.md` - Add new command examples
 
 **Added**:
 - `tests/test_warc_discovery.py` - WARC discovery edge case tests
@@ -222,7 +222,7 @@ Replace inline Python block with call to new CLI command:
 | 5 | Enhance show-job with discovery source | 20 min |
 | 6 | Add edge case tests for warc_discovery | 30 min |
 | 7 | Update vps-crawl-status.sh | 15 min |
-| 8 | Update docs (CLAUDE.md) | 10 min |
+| 8 | Update docs (AGENTS.md) | 10 min |
 
 Total estimated: ~3.5 hours
 

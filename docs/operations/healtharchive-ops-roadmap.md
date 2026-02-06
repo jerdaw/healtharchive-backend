@@ -24,16 +24,18 @@ Keep the two synced copies of this file aligned:
 - After any reboot/rescue/maintenance where mounts may drift:
   - Verify Storage Box mount is active (`healtharchive-storagebox-sshfs.service`).
   - Re-apply annual output tiering for the active campaign year and confirm job output dirs are on Storage Box (see incident: `incidents/2026-02-04-annual-crawl-output-dirs-on-root-disk.md`).
+- After deploying new crawl tuning defaults (or if an annual campaign was started before the change):
+  - Reconcile already-created annual job configs so retries/restarts adopt the new per-source profiles:
+    - Dry-run: `ha-backend reconcile-annual-tool-options --year <YEAR>`
+    - Apply: `ha-backend reconcile-annual-tool-options --year <YEAR> --apply`
 - Verify the new Docker resource limit environment variables are set appropriately on VPS if defaults need adjustment:
   - `HEALTHARCHIVE_DOCKER_MEMORY_LIMIT` (default: 4g)
   - `HEALTHARCHIVE_DOCKER_CPU_LIMIT` (default: 1.5)
-- For already-created annual jobs, decide whether to patch `ArchiveJob.config.tool_options` to adopt:
-  - `skip_final_build=true`
-  - `docker_shm_size="1g"`
-  - `stall_timeout_minutes=60` (canada.ca sources)
-  - `initial_workers=2` (if you want it to take effect on retry/recovery)
 - Verify the new alerts are firing correctly in Grafana:
-  - `HealthArchiveCrawlRateSlow`
+  - `HealthArchiveCrawlRateSlowHC`
+  - `HealthArchiveCrawlRateSlowPHAC`
+  - `HealthArchiveCrawlRateSlowCIHR`
+  - `HealthArchiveCrawlNewPhaseChurn`
   - `HealthArchiveInfraErrorsHigh`
   - `HealthArchiveCrawlMetricsStale`
 

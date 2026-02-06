@@ -125,5 +125,5 @@ Four cascading bugs in the auto-recovery chain:
 - Auto-recover script: `scripts/vps-crawl-auto-recover.py`
 - Metrics exporter: `scripts/vps-crawl-metrics-textfile.py`
 - Test suite: `tests/test_ops_crawl_auto_recover_find_job_log.py`
-- Memory notes: `.claude/projects/.../memory/MEMORY.md`
+- Operator scratch notes: (local, not in repo)
 - Commits: 4bddb7c, 1648f74, e77212b, e073749
