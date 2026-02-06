@@ -485,6 +485,10 @@
          <lastmod>2026-02-06</lastmod>
     </url>
     <url>
+         <loc>https://docs.healtharchive.ca/operations/playbooks/validation/post-reboot-tiering-verify/</loc>
+         <lastmod>2026-02-06</lastmod>
+    </url>
+    <url>
          <loc>https://docs.healtharchive.ca/operations/playbooks/validation/replay-smoke-tests/</loc>
          <lastmod>2026-02-06</lastmod>
     </url>
@@ -630,6 +634,10 @@
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/planning/implemented/2026-02-01-operational-resilience-improvements/</loc>
+         <lastmod>2026-02-06</lastmod>
+    </url>
+    <url>
+         <loc>https://docs.healtharchive.ca/planning/implemented/2026-02-06-roadmap-backlog-items/</loc>
          <lastmod>2026-02-06</lastmod>
     </url>
     <url>
