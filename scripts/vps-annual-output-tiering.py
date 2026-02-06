@@ -117,49 +117,69 @@ def _plan(
         start = datetime(year, 1, 1, tzinfo=timezone.utc)
         end = datetime(year, 1, 3, tzinfo=timezone.utc)
 
-    with get_session() as session:
-        src_rows = session.query(Source).filter(Source.code.in_(sources)).all()
-        src_by_id = {int(s.id): str(s.code) for s in src_rows}
+    try:
+        with get_session() as session:
+            src_rows = session.query(Source).filter(Source.code.in_(sources)).all()
+            src_by_id = {int(s.id): str(s.code) for s in src_rows}
 
-        jobs = (
-            session.query(ArchiveJob)
-            .filter(ArchiveJob.source_id.in_(list(src_by_id.keys())))
-            .filter(ArchiveJob.created_at >= start)
-            .filter(ArchiveJob.created_at < end)
-            .order_by(ArchiveJob.created_at.asc())
-            .all()
-        )
-
-        plan: list[TierPlanItem] = []
-        for j in jobs:
-            cfg = j.config or {}
-            if cfg.get("campaign_kind") != "annual":
-                continue
-            if int(cfg.get("campaign_year") or 0) != int(year):
-                continue
-
-            output_dir = Path(str(j.output_dir))
-            cold_dir = _cold_path_for_output_dir(
-                output_dir=output_dir,
-                archive_root=archive_root,
-                campaign_archive_root=campaign_archive_root,
+            jobs = (
+                session.query(ArchiveJob)
+                .filter(ArchiveJob.source_id.in_(list(src_by_id.keys())))
+                .filter(ArchiveJob.created_at >= start)
+                .filter(ArchiveJob.created_at < end)
+                .order_by(ArchiveJob.created_at.asc())
+                .all()
             )
-            mount_present = _is_exact_mountpoint(output_dir)
-            ok, err = _probe_readable_dir(output_dir) if mount_present else (0, 0)
-            plan.append(
-                TierPlanItem(
-                    job_id=int(j.id),
-                    source_code=str(src_by_id.get(int(j.source_id or 0), "unknown")),
-                    job_name=str(j.name),
-                    job_status=str(j.status or ""),
+
+            plan: list[TierPlanItem] = []
+            for j in jobs:
+                cfg = j.config or {}
+                if cfg.get("campaign_kind") != "annual":
+                    continue
+                if int(cfg.get("campaign_year") or 0) != int(year):
+                    continue
+
+                output_dir = Path(str(j.output_dir))
+                cold_dir = _cold_path_for_output_dir(
                     output_dir=output_dir,
-                    cold_dir=cold_dir,
-                    mount_present=mount_present,
-                    output_dir_ok=int(ok),
-                    output_dir_errno=int(err),
+                    archive_root=archive_root,
+                    campaign_archive_root=campaign_archive_root,
                 )
+                mount_present = _is_exact_mountpoint(output_dir)
+                ok, err = _probe_readable_dir(output_dir) if mount_present else (0, 0)
+                plan.append(
+                    TierPlanItem(
+                        job_id=int(j.id),
+                        source_code=str(src_by_id.get(int(j.source_id or 0), "unknown")),
+                        job_name=str(j.name),
+                        job_status=str(j.status or ""),
+                        output_dir=output_dir,
+                        cold_dir=cold_dir,
+                        mount_present=mount_present,
+                        output_dir_ok=int(ok),
+                        output_dir_errno=int(err),
+                    )
+                )
+            return plan
+    except Exception as e:
+        # Detect common Postgres connection failures and provide helpful fix
+        error_msg = str(e).lower()
+        if (
+            "could not connect" in error_msg
+            or "connection refused" in error_msg
+            or "no such file" in error_msg
+        ):
+            print(
+                "ERROR: Cannot connect to database. This may indicate missing environment variables.",
+                file=sys.stderr,
             )
-        return plan
+            print(
+                "Fix: export $(cat /etc/healtharchive/env.production | xargs)",
+                file=sys.stderr,
+            )
+            raise RuntimeError("Database connection failed. See error above for fix.") from e
+        else:
+            raise
 
 
 def _mount_bind(cold_dir: Path, output_dir: Path) -> None:

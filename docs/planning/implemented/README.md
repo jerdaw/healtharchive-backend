@@ -25,6 +25,7 @@ Implemented plans:
 - `2026-01-28-patch-job-config-and-integration-tests.md`
 - `2026-01-29-warc-manifest-verification.md`
 - `2026-02-01-operational-resilience-improvements.md`
+- `2026-02-06-roadmap-backlog-items.md`
 
 ## Guidelines
 

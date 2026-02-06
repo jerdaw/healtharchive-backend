@@ -602,6 +602,71 @@ def cmd_index_job(args: argparse.Namespace) -> None:
         sys.exit(rc)
 
 
+def cmd_create_canary_job(args: argparse.Namespace) -> None:
+    """
+    Create, run, and index a canary job for replay smoke tests.
+
+    This creates a small, local-only job (never tiered) to baseline
+    pywb health vs storage tiering health. Idempotent: skips if
+    a canary job is already indexed.
+    """
+    from .jobs import JobAlreadyRunningError
+    from .models import ArchiveJob as ORMArchiveJob
+
+    # Check if canary job already exists and is indexed
+    with get_session() as session:
+        existing_canary = (
+            session.query(ORMArchiveJob)
+            .filter(ORMArchiveJob.name == "hc-canary")
+            .filter(ORMArchiveJob.status == "indexed")
+            .first()
+        )
+
+        if existing_canary:
+            print(f"Canary job {existing_canary.id} already exists and is indexed. Skipping.")
+            return
+
+    # Create the canary job
+    print("Creating canary job...")
+    with get_session() as session:
+        job_row: ORMArchiveJob = create_job_for_source(
+            "hc_canary",
+            session=session,
+        )
+        job_id = job_row.id
+        job_name = job_row.name
+        job_output_dir = job_row.output_dir
+
+    print(f"Created canary job {job_id}: {job_name}")
+
+    # Run the canary job
+    print("Running canary crawl...")
+    try:
+        rc = run_persistent_job(job_id)
+        if rc != 0:
+            print(f"ERROR: Canary crawl failed with exit code {rc}", file=sys.stderr)
+            sys.exit(rc)
+    except (JobAlreadyRunningError, ValueError) as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        sys.exit(1)
+
+    print("Canary crawl completed successfully.")
+
+    # Index the canary job
+    print("Indexing canary job...")
+    try:
+        rc = index_job(job_id)
+        if rc != 0:
+            print(f"ERROR: Canary indexing failed with exit code {rc}", file=sys.stderr)
+            sys.exit(rc)
+    except ValueError as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        sys.exit(1)
+
+    print(f"Canary job {job_id} created, crawled, and indexed successfully.")
+    print(f"  Output dir: {job_output_dir}")
+
+
 def cmd_seed_sources(args: argparse.Namespace) -> None:
     """
     Insert initial Source rows (hc, phac, cihr) if they are missing.
@@ -1771,6 +1836,69 @@ def cmd_recompute_page_signals(args: argparse.Namespace) -> None:
             print("Dry run complete (rolled back changes).")
 
 
+def cmd_dedupe_snapshots(args: argparse.Namespace) -> None:
+    """
+    Find and optionally deduplicate same-day duplicate snapshots.
+
+    Default: dry-run (only shows what would be deduped). Use --apply to execute.
+    """
+    from .indexing.deduplication import deduplicate_snapshots, find_same_day_duplicates
+
+    apply = bool(getattr(args, "apply", False))
+    job_id = getattr(args, "id", None)
+
+    with get_session() as session:
+        candidates = find_same_day_duplicates(
+            session,
+            job_id=job_id,
+        )
+
+        if not candidates:
+            print("No same-day duplicates found.")
+            return
+
+        result = deduplicate_snapshots(
+            session,
+            candidates,
+            dry_run=not apply,
+        )
+
+        mode = "APPLIED" if apply else "DRY-RUN"
+        print(f"Same-day deduplication ({mode}):")
+        print(f"  Duplicates found:    {len(candidates)}")
+        print(f"  Deduped:             {result.deduped_count}")
+        print(f"  Skipped:             {result.skipped_count}")
+
+        if not apply:
+            print()
+            print("Top duplicates (showing first 20):")
+            for c in candidates[:20]:
+                print(
+                    f"  Snapshot {c.duplicate_id} -> canonical {c.canonical_id} "
+                    f"({c.capture_date}, hash={c.content_hash[:12]}...)"
+                )
+            if len(candidates) > 20:
+                print(f"  ... and {len(candidates) - 20} more")
+            print()
+            print("Run with --apply to execute deduplication.")
+        else:
+            if not apply:
+                session.rollback()
+
+
+def cmd_restore_deduped_snapshots(args: argparse.Namespace) -> None:
+    """
+    Restore previously deduplicated snapshots.
+    """
+    from .indexing.deduplication import restore_deduped_snapshots
+
+    job_id = getattr(args, "id", None)
+
+    with get_session() as session:
+        restored = restore_deduped_snapshots(session, job_id=job_id)
+        print(f"Restored {restored} deduplicated snapshot(s).")
+
+
 def cmd_list_jobs(args: argparse.Namespace) -> None:
     """
     List recent ArchiveJob rows with optional filters.
@@ -1831,6 +1959,58 @@ def cmd_list_jobs(args: argparse.Namespace) -> None:
         )
 
 
+def cmd_list_warcs(args: argparse.Namespace) -> None:
+    """
+    List WARC files for a job (optimized for script integration).
+    """
+    import json
+
+    from .models import ArchiveJob as ORMArchiveJob
+
+    with get_session() as session:
+        job = session.get(ORMArchiveJob, args.id)
+        if job is None:
+            print(f"ERROR: Job {args.id} not found.", file=sys.stderr)
+            sys.exit(1)
+
+        try:
+            from .indexing.warc_discovery import discover_all_warcs_for_job
+
+            result = discover_all_warcs_for_job(job)
+        except Exception as e:
+            print(f"ERROR: Failed to discover WARCs: {e}", file=sys.stderr)
+            sys.exit(1)
+
+    warcs = result.warc_paths
+    if args.recent and args.recent > 0:
+        # Sort by mtime and take the most recent N
+
+        warcs_with_mtime = []
+        for warc_path in warcs:
+            try:
+                mtime = warc_path.stat().st_mtime
+                warcs_with_mtime.append((warc_path, mtime))
+            except OSError:
+                pass
+        warcs_with_mtime.sort(key=lambda x: x[1], reverse=True)
+        warcs = [path for path, _ in warcs_with_mtime[: args.recent]]
+
+    if args.json:
+        # JSON output: list of path strings
+        output = {
+            "job_id": args.id,
+            "source": result.source,
+            "manifest_valid": result.manifest_valid,
+            "count": result.count,
+            "warcs": [str(p) for p in warcs],
+        }
+        print(json.dumps(output, indent=2))
+    else:
+        # Plain output: one path per line
+        for warc_path in warcs:
+            print(str(warc_path))
+
+
 def cmd_show_job(args: argparse.Namespace) -> None:
     """
     Show detailed information about a single job.
@@ -1869,10 +2049,17 @@ def cmd_show_job(args: argparse.Namespace) -> None:
         # Best-effort, on-demand WARC discovery to avoid misleading "0" counts
         # for long-running crawls (job.warc_file_count is primarily updated by
         # the indexing pipeline).
+        warc_details = None
         try:
-            from .indexing.warc_discovery import discover_warcs_for_job
+            if args.warc_details:
+                from .indexing.warc_discovery import discover_all_warcs_for_job
 
-            discovered_warc_count = len(discover_warcs_for_job(job))
+                warc_details = discover_all_warcs_for_job(job)
+                discovered_warc_count = warc_details.count
+            else:
+                from .indexing.warc_discovery import discover_warcs_for_job
+
+                discovered_warc_count = len(discover_warcs_for_job(job))
         except Exception:
             discovered_warc_count = None
 
@@ -1893,6 +2080,36 @@ def cmd_show_job(args: argparse.Namespace) -> None:
         print("WARC files (discovered): (unknown)")
     else:
         print(f"WARC files (discovered): {discovered_warc_count}")
+
+    # Show detailed WARC info if requested
+    if warc_details is not None:
+        print(f"WARC source:     {warc_details.source}")
+        print(f"Manifest valid:  {warc_details.manifest_valid}")
+        if warc_details.warc_paths:
+            # Show 5 most recent WARCs by modification time
+
+            warcs_with_mtime = []
+            for warc_path in warc_details.warc_paths:
+                try:
+                    mtime = warc_path.stat().st_mtime
+                    size = warc_path.stat().st_size
+                    warcs_with_mtime.append((warc_path, mtime, size))
+                except OSError:
+                    pass
+
+            if warcs_with_mtime:
+                warcs_with_mtime.sort(key=lambda x: x[1], reverse=True)
+                total_size = sum(size for _, _, size in warcs_with_mtime)
+                total_gb = total_size / (1024**3)
+                print(f"Total size:      {total_gb:.2f} GB")
+                print("Recent WARCs (by mtime):")
+                for warc_path, mtime, size in warcs_with_mtime[:5]:
+                    from datetime import datetime
+
+                    mtime_str = datetime.fromtimestamp(mtime).strftime("%Y-%m-%d %H:%M")
+                    size_mb = size / (1024**2)
+                    print(f"  {warc_path.name} ({size_mb:.1f} MB, {mtime_str})")
+
     print(f"Indexed pages:   {indexed_page_count}")
     print("")
     print("Config:")
@@ -4407,6 +4624,13 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p_index.set_defaults(func=cmd_index_job)
 
+    # create-canary-job
+    p_canary = subparsers.add_parser(
+        "create-canary-job",
+        help="Create, run, and index a canary job for replay smoke tests (idempotent).",
+    )
+    p_canary.set_defaults(func=cmd_create_canary_job)
+
     # seed-sources
     p_seed = subparsers.add_parser(
         "seed-sources",
@@ -4683,6 +4907,36 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p_signals.set_defaults(func=cmd_recompute_page_signals)
 
+    # dedupe-snapshots
+    p_dedupe = subparsers.add_parser(
+        "dedupe-snapshots",
+        help="Find and optionally deduplicate same-day duplicate snapshots (default: dry-run).",
+    )
+    p_dedupe.add_argument(
+        "--id",
+        type=int,
+        help="Only deduplicate snapshots from this job ID.",
+    )
+    p_dedupe.add_argument(
+        "--apply",
+        action="store_true",
+        default=False,
+        help="Actually apply deduplication (default: dry-run).",
+    )
+    p_dedupe.set_defaults(func=cmd_dedupe_snapshots)
+
+    # restore-deduped-snapshots
+    p_restore_dedup = subparsers.add_parser(
+        "restore-deduped-snapshots",
+        help="Restore previously deduplicated snapshots.",
+    )
+    p_restore_dedup.add_argument(
+        "--id",
+        type=int,
+        help="Only restore snapshots from this job ID.",
+    )
+    p_restore_dedup.set_defaults(func=cmd_restore_deduped_snapshots)
+
     # list-jobs
     p_list = subparsers.add_parser(
         "list-jobs",
@@ -4716,7 +4970,35 @@ def build_parser() -> argparse.ArgumentParser:
         required=True,
         help="ArchiveJob ID to show.",
     )
+    p_show.add_argument(
+        "--warc-details",
+        action="store_true",
+        help="Show detailed WARC discovery information.",
+    )
     p_show.set_defaults(func=cmd_show_job)
+
+    # list-warcs
+    p_list_warcs = subparsers.add_parser(
+        "list-warcs",
+        help="List WARC files for a job (optimized for script integration).",
+    )
+    p_list_warcs.add_argument(
+        "--id",
+        type=int,
+        required=True,
+        help="ArchiveJob ID to list WARCs for.",
+    )
+    p_list_warcs.add_argument(
+        "--recent",
+        type=int,
+        help="Only show N most recent WARCs by modification time.",
+    )
+    p_list_warcs.add_argument(
+        "--json",
+        action="store_true",
+        help="Output as JSON instead of one path per line.",
+    )
+    p_list_warcs.set_defaults(func=cmd_list_warcs)
 
     # retry-job
     p_retry = subparsers.add_parser(

@@ -46,34 +46,15 @@ Supporting materials:
 
 Keep this list short; prefer linking to the canonical doc that explains the item.
 
-### Search & relevance (backend)
-
-- Authority signals for relevance (optional): outlinks / page signals feeding into ranking and/or tie-breakers.
-  - See: `../operations/search-quality.md` (“Backfill outlinks + authority signals”)
-
 ### Storage & retention (backend)
 
-- Same-day dedupe path (storage-only optimization; provenance-preserving).
-  - Requirements: dry-run mode, reversible/auditable log, and strict invariants (e.g., “same URL, same day, identical `Snapshot.content_hash`”).
-  - See: `../operations/search-quality.md`, `../operations/growth-constraints.md`
 - Storage/retention upgrades (only with a designed replay retention policy).
   - See: `../operations/growth-constraints.md`, `../deployment/replay-service-pywb.md`
 
 ### Crawling & indexing reliability (backend)
 
-- WARC discovery consistency improvements (partially done):
-  - Remaining: unify discovery methods, enhance show-job output, sync `scripts/vps-crawl-status.sh`
-  - See: `2026-01-29-warc-discovery-consistency.md`
-
-- Prevent annual crawl output dirs landing on root disk:
-  - Incident note: `../operations/incidents/2026-02-04-annual-crawl-output-dirs-on-root-disk.md`
-  - Follow-ups: add guardrails + a clear “post-reboot tiering verify” runbook.
-
 - Consider whether a separate staging backend is worth it (increases ops surface; only do if it buys real safety).
   - See: `../deployment/environments-and-configuration.md`
-- Canary replay job (replay smoke independence):
-  - Create a small, local-only replay job (no tiering) to use as a baseline smoke target.
-  - Distinguishes "pywb is broken" from "storage tiering is broken".
 
 ### Repo governance (future)
 

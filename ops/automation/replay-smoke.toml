@@ -1,4 +1,4 @@
-sources = ["hc", "phac", "cihr"]
+sources = ["hc", "phac", "cihr", "hc_canary"]
 
 # Request timeout for replay smoke checks.
 timeout_seconds = 20

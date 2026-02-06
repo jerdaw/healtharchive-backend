@@ -113,6 +113,7 @@ nav:
               - Dataset Release: operations/playbooks/validation/dataset-release.md
               - Coverage Guardrails: operations/playbooks/validation/coverage-guardrails.md
               - Replay Smoke Tests: operations/playbooks/validation/replay-smoke-tests.md
+              - Post-Reboot Tiering Verify: operations/playbooks/validation/post-reboot-tiering-verify.md
               - Healthchecks Parity: operations/playbooks/validation/healthchecks-parity.md
               - Security Posture: operations/playbooks/validation/security-posture.md
               - Automation Maintenance: operations/playbooks/validation/automation-maintenance.md

@@ -88,12 +88,55 @@ def _check_disk_headroom() -> tuple[bool, int]:
         return True, 0  # On error, allow crawl to proceed
 
 
+def _get_filesystem_device(path: Path) -> str | None:
+    """
+    Get the filesystem device for a given path using df.
+
+    Returns:
+        Device name (e.g., "/dev/sda1", "/dev/sdb1") or None on error.
+    """
+    try:
+        result = subprocess.run(
+            ["df", "--output=source", str(path)],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        lines = result.stdout.strip().split("\n")
+        if len(lines) >= 2:
+            return lines[1].strip()
+        return None
+    except (subprocess.CalledProcessError, OSError) as e:
+        logger.warning("Failed to get filesystem device for %s: %s", path, e)
+        return None
+
+
+def _is_on_root_device(path: Path) -> bool:
+    """
+    Check if a path is on the root device (/dev/sda1 on VPS).
+
+    This is used as a guardrail to ensure annual jobs don't fill the root disk.
+
+    Returns:
+        True if on root device, False if on another device or unknown.
+    """
+    device = _get_filesystem_device(path)
+    if device is None:
+        # If we can't determine the device, assume it's on root (fail-safe)
+        logger.warning("Cannot determine device for %s, assuming root device", path)
+        return True
+    return device == "/dev/sda1"
+
+
 def _tier_annual_job_if_needed(job: ArchiveJob) -> None:
     """
     Automatically tier annual campaign jobs to storagebox before they start crawling.
 
     This prevents disk pressure from large annual jobs consuming local disk.
     Only tiers if the job is an annual campaign and not already tiered.
+
+    Raises:
+        RuntimeError: If tiering succeeds but output dir is still on root device.
     """
     config = job.config or {}
     if config.get("campaign_kind") != "annual":
@@ -144,14 +187,32 @@ def _tier_annual_job_if_needed(job: ArchiveJob) -> None:
                 result.returncode,
                 result.stderr[:STDERR_LOG_TRUNCATE_LENGTH],
             )
+            raise RuntimeError(
+                f"Annual job {job.id} auto-tiering failed: RC={result.returncode}. "
+                "Cannot proceed with crawl on root disk."
+            )
         else:
             logger.info("Auto-tiering completed successfully for job %s", job.id)
+
+            # Verify that output_dir is no longer on the root device
+            if _is_on_root_device(output_dir):
+                raise RuntimeError(
+                    f"Annual job {job.id} output directory {output_dir} is still on "
+                    "/dev/sda1 after auto-tiering completed successfully. This is a "
+                    "configuration error - tiering script may have failed silently or "
+                    "bind mounts are not set up correctly. Cannot proceed to avoid "
+                    "filling root disk. Check Storage Box mount and bind mounts."
+                )
+
+            logger.info("Verified job %s output_dir is on non-root device after tiering", job.id)
     except subprocess.TimeoutExpired:
         logger.error(
             "Auto-tiering timed out for job %s after %ds", job.id, AUTO_TIERING_TIMEOUT_SEC
         )
+        raise
     except Exception as e:
         logger.error("Auto-tiering exception for job %s: %s", job.id, e)
+        raise
 
 
 def _select_next_crawl_job(session: Session, *, now_utc: datetime) -> Optional[ArchiveJob]:

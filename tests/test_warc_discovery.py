@@ -14,6 +14,8 @@ from pathlib import Path
 from unittest.mock import MagicMock
 
 from ha_backend.indexing.warc_discovery import (
+    WarcDiscoveryResult,
+    discover_all_warcs_for_job,
     discover_temp_warcs_for_job,
     discover_warcs_for_job,
 )
@@ -256,3 +258,79 @@ class TestDiscoveryEdgeCases:
         assert len(result) == 2
         names = sorted(p.name for p in result)
         assert names == ["compressed.warc.gz", "uncompressed.warc"]
+
+
+class TestDiscoverAllWarcsForJob:
+    """Tests for discover_all_warcs_for_job function with metadata."""
+
+    def test_stable_discovery_result(self, tmp_path: Path):
+        """Returns correct metadata for stable WARC discovery."""
+        output_dir = tmp_path / "job-out"
+        warcs_dir = output_dir / "warcs"
+        warcs_dir.mkdir(parents=True)
+
+        (warcs_dir / "warc-001.warc.gz").write_bytes(b"content1")
+        (warcs_dir / "warc-002.warc.gz").write_bytes(b"content2")
+
+        job = _create_job_mock(output_dir)
+        result = discover_all_warcs_for_job(job)
+
+        assert isinstance(result, WarcDiscoveryResult)
+        assert result.source == "stable"
+        assert result.manifest_valid is True
+        assert result.count == 2
+        assert len(result.warc_paths) == 2
+
+    def test_temp_discovery_result(self, tmp_path: Path):
+        """Returns correct metadata for temp WARC discovery."""
+        output_dir = tmp_path / "job-out"
+        temp_dir = output_dir / ".tmp12345"
+        collections_dir = temp_dir / "collections" / "crawl-1" / "archive"
+        collections_dir.mkdir(parents=True)
+
+        (collections_dir / "rec-001.warc.gz").write_bytes(b"temp warc")
+
+        state_file = output_dir / ".archive_state.json"
+        state_data = {
+            "temp_dirs_host_paths": [str(temp_dir)],
+            "current_workers": 2,
+        }
+        state_file.write_text(json.dumps(state_data), encoding="utf-8")
+
+        job = _create_job_mock(output_dir)
+        result = discover_all_warcs_for_job(job, allow_fallback=True)
+
+        assert result.source == "temp"
+        assert result.manifest_valid is True
+        assert result.count == 1
+
+    def test_fallback_discovery_result(self, tmp_path: Path):
+        """Returns correct metadata for fallback WARC discovery."""
+        output_dir = tmp_path / "job-out"
+        temp_dir = output_dir / ".tmp-latest"
+        collections_dir = temp_dir / "collections" / "crawl-1" / "archive"
+        collections_dir.mkdir(parents=True)
+
+        (collections_dir / "rec-001.warc.gz").write_bytes(b"fallback warc")
+
+        # No state file, so it will use fallback discovery
+
+        job = _create_job_mock(output_dir)
+        result = discover_all_warcs_for_job(job, allow_fallback=True)
+
+        assert result.source == "fallback"
+        assert result.manifest_valid is False
+        assert result.count == 1
+
+    def test_empty_discovery_result(self, tmp_path: Path):
+        """Returns empty result when no WARCs found."""
+        output_dir = tmp_path / "job-out"
+        output_dir.mkdir(parents=True)
+
+        job = _create_job_mock(output_dir)
+        result = discover_all_warcs_for_job(job, allow_fallback=False)
+
+        assert result.source == "stable"
+        assert result.manifest_valid is True
+        assert result.count == 0
+        assert result.warc_paths == []

@@ -174,6 +174,11 @@ def main(argv: list[str] | None = None) -> int:
     _emit(lines, "# TYPE healtharchive_replay_smoke_target_present gauge")
     _emit(lines, "# HELP healtharchive_replay_smoke_ok 1 if replay smoke check succeeded.")
     _emit(lines, "# TYPE healtharchive_replay_smoke_ok gauge")
+    _emit(
+        lines,
+        "# HELP healtharchive_replay_smoke_canary_ok 1 if canary replay check succeeded (subset of _ok for hc_canary only).",
+    )
+    _emit(lines, "# TYPE healtharchive_replay_smoke_canary_ok gauge")
     _emit(lines, "# HELP healtharchive_replay_smoke_status_code HTTP status code observed.")
     _emit(lines, "# TYPE healtharchive_replay_smoke_status_code gauge")
     _emit(lines, "# HELP healtharchive_replay_smoke_bytes Bytes read from response body (capped).")
@@ -228,6 +233,10 @@ def main(argv: list[str] | None = None) -> int:
         _emit(
             lines, f"healtharchive_replay_smoke_latency_seconds{{{labels_with_job}}} {latency:.3f}"
         )
+
+        # Emit separate canary metric for easy alerting
+        if source_code == "hc_canary":
+            _emit(lines, f"healtharchive_replay_smoke_canary_ok {ok}")
 
     out_dir = Path(args.out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)

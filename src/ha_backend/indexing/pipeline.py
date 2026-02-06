@@ -388,6 +388,24 @@ def index_job(job_id: int) -> int:
             except Exception as exc:
                 logger.warning("Failed to compute storage stats for job %s: %s", job_id, exc)
 
+            # Optional: auto-deduplicate same-day duplicates for this job.
+            if os.environ.get("HEALTHARCHIVE_AUTO_DEDUPE", "").lower() in ("1", "true", "yes"):
+                try:
+                    from .deduplication import deduplicate_snapshots, find_same_day_duplicates
+
+                    candidates = find_same_day_duplicates(session, job_id=job_id)
+                    if candidates:
+                        result = deduplicate_snapshots(session, candidates, dry_run=False)
+                        logger.info(
+                            "Auto-deduplication for job %s: %d duplicates marked",
+                            job_id,
+                            result.deduped_count,
+                        )
+                except Exception as exc:
+                    logger.warning(
+                        "Auto-deduplication failed for job %s (non-fatal): %s", job_id, exc
+                    )
+
             logger.info(
                 "Indexing for job %s completed successfully with %d snapshot(s).",
                 job_id,

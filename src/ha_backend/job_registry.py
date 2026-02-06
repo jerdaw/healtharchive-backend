@@ -171,6 +171,35 @@ SOURCE_JOB_CONFIGS: Dict[str, SourceJobConfig] = {
         },
         schedule_hint="annual",
     ),
+    "hc_canary": SourceJobConfig(
+        source_code="hc",  # Uses hc source for DB purposes
+        name_template="hc-canary",
+        default_seeds=[
+            "https://www.canada.ca/en.html",  # Small, stable entry page
+        ],
+        default_zimit_passthrough_args=[
+            "--limit",
+            "2",  # Crawl only 2 pages
+            "--maxDepth",
+            "0",  # Stay on seed page only
+        ],
+        default_tool_options={
+            "cleanup": False,
+            "overwrite": False,
+            "skip_final_build": True,
+            "enable_monitoring": False,  # Not needed for tiny canary
+            "enable_adaptive_workers": False,
+            "enable_adaptive_restart": False,
+            "enable_vpn_rotation": False,
+            "initial_workers": 1,
+            "stall_timeout_minutes": 10,
+            "docker_shm_size": "512m",
+            "max_container_restarts": 3,
+            "log_level": "WARNING",  # Reduce noise
+            "relax_perms": True,
+        },
+        schedule_hint=None,  # Not scheduled, created on-demand
+    ),
 }
 
 

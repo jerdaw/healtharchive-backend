@@ -9,12 +9,33 @@ Canonical refs:
 
 ## What this does
 
-- Picks the latest indexed job per source.
+- Picks the latest indexed job per source (including canary).
 - Uses the first seed URL as a replay target (or falls back to the source registry defaults for legacy jobs that lack seeds in `ArchiveJob.config`):
   - `https://replay.healtharchive.ca/job-<id>/<seed>`
 - Emits node_exporter textfile metrics:
   - `healtharchive_replay_smoke_target_present{source="hc"}`
   - `healtharchive_replay_smoke_ok{source="hc",job_id="123"}`
+  - `healtharchive_replay_smoke_canary_ok` (1 if canary passes, 0 otherwise)
+
+## Canary job
+
+The `hc_canary` source is a small, local-only job (2 pages, ~5 MB) that:
+- **Never gets tiered** to Storage Box (always stays on root disk)
+- **Baselines pywb health** vs storage tiering health
+
+**Metric interpretation:**
+
+- `canary_ok=1, prod_ok=0` → **Storage tiering issue** (annual job WARCs inaccessible)
+- `canary_ok=0, prod_ok=0` → **pywb service issue** (replay service down or broken)
+- `canary_ok=1, prod_ok=1` → All healthy
+
+**Creating the canary:**
+
+```bash
+ha-backend create-canary-job
+```
+
+This is idempotent and safe to re-run.
 
 ## Enablement (VPS)
 

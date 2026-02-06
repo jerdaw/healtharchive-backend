@@ -1107,6 +1107,10 @@ def _search_snapshots_inner(
             )
         )
 
+    # Exclude storage-level deduplicated snapshots unless duplicates are requested.
+    if not includeDuplicates:
+        base_query = base_query.filter(Snapshot.deduplicated.is_(False))
+
     offset = (page - 1) * pageSize
 
     # Fast path: when browsing pages without a search query or date range,

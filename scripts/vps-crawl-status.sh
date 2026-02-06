@@ -202,33 +202,19 @@ if [[ -x "${HA_BIN}" ]]; then
 
         echo ""
         echo "[recent warc.gz]"
-        if have_cmd python3; then
-          python3 - <<PY 2>/dev/null || true
-from __future__ import annotations
-
-import heapq
-import os
-from pathlib import Path
-
-root = Path(${JOBDIR@Q})
-items: list[tuple[float, int, str]] = []
-for path in root.rglob("*.warc.gz"):
-    try:
-        st = path.stat()
-    except OSError:
-        continue
-    item = (st.st_mtime, st.st_size, str(path))
-    if len(items) < 5:
-        heapq.heappush(items, item)
-    else:
-        heapq.heappushpop(items, item)
-
-for mtime, size, path in sorted(items):
-    print(f"{mtime:.0f} {size} {path}")
-PY
+        if have_cmd ha-backend; then
+          # Use unified WARC discovery to show 5 most recent WARCs
+          ha-backend list-warcs --id "${JOBID}" --recent 5 2>/dev/null | while IFS= read -r warc_path; do
+            if [[ -f "$warc_path" ]]; then
+              local mtime size
+              mtime=$(stat -c %Y "$warc_path" 2>/dev/null || echo "?")
+              size=$(stat -c %s "$warc_path" 2>/dev/null || echo "?")
+              echo "$mtime $size $warc_path"
+            fi
+          done
           echo "Note: mtime is UNIX seconds; newest should be last."
         else
-          warn "python3 not available; skipping WARC listing"
+          warn "ha-backend command not available; skipping WARC listing"
         fi
       else
         warn "no combined log found under job output dir: ${JOBDIR}"

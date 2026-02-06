@@ -262,6 +262,13 @@ class Snapshot(TimestampMixin, Base):
     # - False = not archived
     is_archived: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True)
 
+    # Storage-level deduplication flag.
+    # - False (default) = not deduplicated (canonical or unique)
+    # - True = same-day duplicate of another snapshot with identical content_hash
+    deduplicated: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=text("0"), index=True
+    )
+
     job: Mapped[Optional[ArchiveJob]] = relationship(back_populates="snapshots")
     source: Mapped[Optional[Source]] = relationship(back_populates="snapshots")
     outlinks: Mapped[List["SnapshotOutlink"]] = relationship(
@@ -271,6 +278,41 @@ class Snapshot(TimestampMixin, Base):
 
     def __repr__(self) -> str:
         return f"<Snapshot id={self.id!r} url={self.url!r}>"
+
+
+class SnapshotDeduplication(Base):
+    """
+    Audit log for snapshot deduplication operations.
+
+    Records which snapshots were marked as duplicates and their canonical counterparts.
+    Used for reversibility: restore-deduped-snapshots reads this table.
+    """
+
+    __tablename__ = "snapshot_deduplications"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+
+    snapshot_id: Mapped[int] = mapped_column(
+        ForeignKey("snapshots.id"),
+        nullable=False,
+        index=True,
+    )
+    canonical_snapshot_id: Mapped[int] = mapped_column(
+        ForeignKey("snapshots.id"),
+        nullable=False,
+        index=True,
+    )
+
+    deduped_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+    reason: Mapped[str] = mapped_column(
+        String(100),
+        nullable=False,
+        default="same_day_same_hash",
+    )
 
 
 class IssueReport(TimestampMixin, Base):
