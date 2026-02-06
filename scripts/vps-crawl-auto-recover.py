@@ -535,6 +535,17 @@ def _detect_job_runner(
         return JobRunner(kind="worker", unit="healtharchive-worker.service")
     if _output_dir_has_running_process(job.output_dir, ps_rows):
         return JobRunner(kind="unknown")
+
+    # No crawl process found, but check if the job lock is held.  The crawl
+    # subprocess may have died while the worker (or a run-db-job unit) still
+    # owns the job.  Soft recovery cannot work when the lock is held — the
+    # caller must stop the runner first.
+    held = _held_job_lock_job_ids(_get_job_lock_dir())
+    if int(job.job_id) in held:
+        if worker_pid is not None and worker_pid > 0:
+            return JobRunner(kind="worker", unit="healtharchive-worker.service")
+        return JobRunner(kind="unknown")
+
     return JobRunner(kind="none")
 
 
