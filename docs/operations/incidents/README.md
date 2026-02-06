@@ -45,6 +45,7 @@ Example:
 
 ## Incident notes index
 
+- [API search/changes 500 due to missing dedupe migration (2026-02-06)](2026-02-06-api-search-changes-500-missing-migration.md)
 - [Auto-recover stall detection bugs (2026-02-06)](2026-02-06-auto-recover-stall-detection-bugs.md)
 - [Annual crawl output dirs on root disk (2026-02-04)](2026-02-04-annual-crawl-output-dirs-on-root-disk.md)
 - [Storage watchdog unmount filter bug (2026-02-02)](2026-02-02-storage-watchdog-unmount-filter-bug.md)

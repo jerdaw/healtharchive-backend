@@ -121,4 +121,4 @@ These items are tracked in the parent plan:
 
 - Existing WARC verification: `docs/operations/playbooks/storage/warc-integrity-verification.md`
 - Archive storage: `src/ha_backend/archive_storage.py`
-- CLI reference: `CLAUDE.md`
+- Agent/CLI reference: `AGENTS.md`

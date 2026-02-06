@@ -70,7 +70,7 @@ ha-backend patch-job-config --id 42 \
 
 **Modified**:
 - `src/ha_backend/cli.py` - Added `cmd_patch_job_config` and helpers
-- `CLAUDE.md` - Added patch-job-config to CLI examples
+- `AGENTS.md` - Added patch-job-config to examples
 - `docs/planning/roadmap.md` - Removed completed integration tests item
 
 **Added**:
@@ -106,5 +106,5 @@ These items remain in the backlog per the original plan:
 
 - Implementation plan: This file
 - Roadmap: `docs/planning/roadmap.md` (updated)
-- CLI reference: `CLAUDE.md` (updated)
+- Agent/CLI reference: `AGENTS.md` (updated)
 - Archive tool internals: `src/archive_tool/docs/documentation.md`
