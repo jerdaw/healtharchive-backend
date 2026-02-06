@@ -30,6 +30,7 @@ ha-backend --help
 | **Direct Execution** | `run-job` |
 | **Inspection** | `list-jobs`, `show-job` |
 | **Maintenance** | `retry-job`, `cleanup-job`, `replay-index-job` |
+| **Annual Campaign** | `schedule-annual`, `annual-status`, `reconcile-annual-tool-options` |
 | **Seeding** | `seed-sources` |
 | **Worker** | `start-worker` |
 | **Change Tracking** | `compute-changes` |
@@ -484,7 +485,7 @@ ha-backend seed-sources
 ```
 
 **What it does**:
-- Inserts `Source` rows for `hc` and `phac`
+- Inserts `Source` rows for `hc`, `phac`, and `cihr`
 - Idempotent (safe to run multiple times)
 
 **Example**:
@@ -496,10 +497,76 @@ ha-backend seed-sources
 ```
 Seeded source: hc (Health Canada)
 Seeded source: phac (Public Health Agency of Canada)
+Seeded source: cihr (Canadian Institutes of Health Research)
 ```
 
 **Exit codes**:
 - `0` - Sources seeded or already exist
+
+---
+
+## Annual Campaign
+
+### schedule-annual
+
+Plan or enqueue Jan 01 (UTC) annual campaign jobs for `hc`, `phac`, and `cihr`.
+
+**Usage**:
+```bash
+ha-backend schedule-annual --year YEAR [--sources hc phac cihr] [--apply]
+```
+
+**Examples**:
+```bash
+# Show what would be created
+ha-backend schedule-annual --year 2026
+
+# Actually create jobs
+ha-backend schedule-annual --year 2026 --apply
+```
+
+**Notes**:
+- Dry-run by default
+- Idempotent for annual campaign metadata/name matches
+- Refuses to enqueue when a source already has an active non-indexed job
+
+### annual-status
+
+Report annual campaign progress and search-readiness for a given year.
+
+**Usage**:
+```bash
+ha-backend annual-status --year YEAR [--json] [--sources hc phac cihr]
+```
+
+**Examples**:
+```bash
+ha-backend annual-status --year 2026
+ha-backend annual-status --year 2026 --json
+```
+
+### reconcile-annual-tool-options
+
+Reconcile existing annual jobs to source-specific crawl profiles.
+
+**Usage**:
+```bash
+ha-backend reconcile-annual-tool-options --year YEAR [--sources ...] [--limit N] [--apply]
+```
+
+**Examples**:
+```bash
+# Dry-run reconciliation for all annual sources
+ha-backend reconcile-annual-tool-options --year 2026
+
+# Apply only to HC annual jobs
+ha-backend reconcile-annual-tool-options --year 2026 --sources hc --apply
+```
+
+**What it does**:
+- Reconciles legacy baseline tool options to per-source profiles
+- Preserves explicit non-baseline overrides
+- Enforces restart-budget floor and annual safety defaults
 
 ---
 

@@ -59,6 +59,18 @@ def test_metrics_emits_archive_state_counters(tmp_path, monkeypatch) -> None:
         + "\n",
         encoding="utf-8",
     )
+    (job_dir / "archive_new_crawl_phase_-_attempt_1_20260206_000001.combined.log").write_text(
+        "\n".join(
+            [
+                "2026-02-06 00:00:01 [INFO] --- Starting Loop Iteration: Stage 'Initial Crawl - Attempt 1' ---",
+                "2026-02-06 00:10:01 [INFO] --- Starting Loop Iteration: Stage 'New Crawl Phase - Attempt 2' ---",
+                "2026-02-06 00:20:01 [INFO] --- Starting Loop Iteration: Stage 'Resume Crawl - Attempt 3' ---",
+                "2026-02-06 00:30:01 [INFO] --- Starting Loop Iteration: Stage 'New Crawl Phase - Attempt 4' ---",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
 
     with get_session() as session:
         seed_sources(session)
@@ -89,6 +101,7 @@ def test_metrics_emits_archive_state_counters(tmp_path, monkeypatch) -> None:
     assert f"healtharchive_crawl_running_job_container_restarts_done{{{labels}}} 3" in content
     assert f"healtharchive_crawl_running_job_vpn_rotations_done{{{labels}}} 0" in content
     assert f"healtharchive_crawl_running_job_temp_dirs_count{{{labels}}} 2" in content
+    assert f"healtharchive_crawl_running_job_new_crawl_phase_count{{{labels}}} 2" in content
 
 
 def test_metrics_emits_indexing_pending_job_age(tmp_path, monkeypatch) -> None:

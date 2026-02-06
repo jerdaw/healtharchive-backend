@@ -11,7 +11,10 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from archive_tool.constants import STATE_FILE_NAME
-from ha_backend.crawl_stats import parse_crawl_log_progress
+from ha_backend.crawl_stats import (
+    count_new_crawl_phase_events_from_log_tail,
+    parse_crawl_log_progress,
+)
 from ha_backend.db import get_session
 from ha_backend.models import ArchiveJob, Source
 
@@ -468,6 +471,11 @@ def main(argv: list[str] | None = None) -> int:
     _emit(lines, "# TYPE healtharchive_crawl_running_job_crawl_rate_ppm gauge")
     _emit(
         lines,
+        "# HELP healtharchive_crawl_running_job_new_crawl_phase_count Number of 'New Crawl Phase' stage starts seen in the combined log tail window, or -1 when unknown.",
+    )
+    _emit(lines, "# TYPE healtharchive_crawl_running_job_new_crawl_phase_count gauge")
+    _emit(
+        lines,
         "# HELP healtharchive_crawl_running_job_errors_timeout Timeout error count from .archive_state.json, or -1 when unknown.",
     )
     _emit(lines, "# TYPE healtharchive_crawl_running_job_errors_timeout gauge")
@@ -535,6 +543,7 @@ def main(argv: list[str] | None = None) -> int:
         age_seconds = -1.0
         stalled = 0
         crawl_rate_ppm = -1.0
+        new_crawl_phase_count = -1
         if log_path is not None:
             try:
                 progress = parse_crawl_log_progress(log_path, max_bytes=int(args.max_log_bytes))
@@ -552,6 +561,11 @@ def main(argv: list[str] | None = None) -> int:
                     age_seconds = progress.last_progress_age_seconds(now_utc=now)
                     stalled = 1 if age_seconds >= float(args.stall_threshold_seconds) else 0
                     crawl_rate_ppm = progress.crawl_rate_ppm
+            new_phase_count = count_new_crawl_phase_events_from_log_tail(
+                log_path, max_bytes=int(args.max_log_bytes)
+            )
+            if new_phase_count is not None:
+                new_crawl_phase_count = int(new_phase_count)
 
         state_file_ok = 0
         state_file_errno = 0
@@ -628,6 +642,10 @@ def main(argv: list[str] | None = None) -> int:
         _emit(
             lines,
             f"healtharchive_crawl_running_job_crawl_rate_ppm{{{labels}}} {crawl_rate_ppm:.1f}",
+        )
+        _emit(
+            lines,
+            f"healtharchive_crawl_running_job_new_crawl_phase_count{{{labels}}} {new_crawl_phase_count}",
         )
         _emit(lines, f"healtharchive_crawl_running_job_output_dir_ok{{{labels}}} {output_dir_ok}")
         _emit(

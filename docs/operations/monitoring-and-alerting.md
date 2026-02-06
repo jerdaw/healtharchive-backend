@@ -1,6 +1,6 @@
 # Monitoring & Alerting Strategy - Annual Crawl Campaign
 
-**Last Updated:** 2026-01-27
+**Last Updated:** 2026-02-06
 
 ## Overview
 
@@ -39,8 +39,9 @@ Primary files (single-VPS annual campaign):
 | `healtharchive_crawl_running_job_stalled` | Gauge | 1 = Progress stalled > 1 hour. |
 | `healtharchive_crawl_running_job_output_dir_ok` | Gauge | 1 = Output directory is accessible. |
 | `healtharchive_crawl_running_job_log_probe_ok` | Gauge | 1 = Combined log file is readable. |
-| `healtharchive_crawl_running_job_crawl_rate_ppm` | Gauge | Pages per minute crawl rate (from state file). |
-| `healtharchive_crawl_running_job_progress_known` | Gauge | 1 = Progress metrics available from state file. |
+| `healtharchive_crawl_running_job_crawl_rate_ppm` | Gauge | Pages per minute crawl rate (from crawlStatus log window). |
+| `healtharchive_crawl_running_job_new_crawl_phase_count` | Gauge | Count of `New Crawl Phase` stage starts seen in the current combined-log tail window. |
+| `healtharchive_crawl_running_job_progress_known` | Gauge | 1 = Progress metrics parsed from crawlStatus logs. |
 | `healtharchive_crawl_metrics_timestamp_seconds` | Gauge | Unix timestamp when metrics were last written. |
 | `healtharchive_jobs_infra_error_recent_total{window="10m"}` | Gauge | Count of jobs with infra errors in rolling window. |
 
@@ -88,13 +89,16 @@ Alerts are defined in:
 - **Meaning:** The crawler is running but hasn't archived a new page in over an hour.
 - **Action:** Check if the crawler is stuck on a massive PDF or looped trap.
 
-### 5) Crawl Rate (throughput)
+### 5) Crawl Rate (per-source throughput)
 
-**Alert:** `HealthArchiveCrawlRateSlow`
+**Alerts:** `HealthArchiveCrawlRateSlowHC`, `HealthArchiveCrawlRateSlowPHAC`, `HealthArchiveCrawlRateSlowCIHR`
 
-- **Threshold:** `healtharchive_crawl_running_job_crawl_rate_ppm < 5` (for 30m, when progress is known).
-- **Meaning:** The crawler is running but archiving fewer than 5 pages per minute for an extended period.
-- **Action:** Check for network issues, site rate limiting, or resource constraints. Consider adjusting worker count or Docker resource limits.
+- **Thresholds (30m, when progress is known):**
+  - HC: `healtharchive_crawl_running_job_crawl_rate_ppm{source="hc"} < 1.5`
+  - PHAC: `healtharchive_crawl_running_job_crawl_rate_ppm{source="phac"} < 1.5`
+  - CIHR: `healtharchive_crawl_running_job_crawl_rate_ppm{source="cihr"} < 3`
+- **Meaning:** The crawler is running but source-specific throughput is below expected long-run baselines.
+- **Action:** Check combined logs for phase churn/retries, verify mount and network health, then tune source profile values in `job_registry.py` if sustained and reproducible.
 
 ### 6) Infrastructure Errors
 
@@ -104,7 +108,15 @@ Alerts are defined in:
 - **Meaning:** Multiple jobs are failing due to infrastructure errors (errno 107 stale mount, permission denied, etc.) in a short window.
 - **Action:** Check Storage Box mount health, run hot-path recovery, verify output directory permissions.
 
-### 7) Metrics Freshness
+### 7) New Crawl-Phase Churn
+
+**Alert:** `HealthArchiveCrawlNewPhaseChurn`
+
+- **Threshold:** `healtharchive_crawl_running_job_new_crawl_phase_count >= 3` (for 30m).
+- **Meaning:** The crawler is repeatedly falling back to `New Crawl Phase` in the current log window, which can indicate resume/frontier instability and long-run completeness efficiency risk.
+- **Action:** Review combined log transitions, resume YAML presence, and storage stability before adjusting crawler thresholds.
+
+### 8) Metrics Freshness
 
 **Alert:** `HealthArchiveCrawlMetricsStale`
 

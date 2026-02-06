@@ -169,7 +169,7 @@ def test_run_persistent_job_builds_monitoring_and_vpn_args(tmp_path, monkeypatch
         "60",
         "--enable-adaptive-restart",
         "--max-container-restarts",
-        "20",
+        str(int(SOURCE_JOB_CONFIGS["hc"].default_tool_options["max_container_restarts"])),
         "--backoff-delay-minutes",
         "15",
         "--relax-perms",

@@ -53,6 +53,7 @@ from .worker import run_worker_loop
 
 # Subprocess timeouts for status commands
 SYSTEM_STATUS_CHECK_TIMEOUT_SEC = 5  # Timeout for systemctl and findmnt checks
+ANNUAL_SOURCES_ORDERED = ("hc", "phac", "cihr")
 
 # === Command implementations ===
 
@@ -758,7 +759,7 @@ def cmd_schedule_annual(args: argparse.Namespace) -> None:
     campaign_dt = datetime(year, 1, 1, tzinfo=timezone.utc)
     campaign_date = campaign_dt.date().isoformat()
 
-    annual_sources_ordered = ("hc", "phac", "cihr")
+    annual_sources_ordered = ANNUAL_SOURCES_ORDERED
     allowed_sources = set(annual_sources_ordered)
 
     requested_sources = getattr(args, "sources", None) or list(annual_sources_ordered)
@@ -1021,7 +1022,7 @@ def cmd_annual_status(args: argparse.Namespace) -> None:
     campaign_dt = datetime(year, 1, 1, tzinfo=timezone.utc)
     campaign_date = campaign_dt.date().isoformat()
 
-    annual_sources_ordered = ("hc", "phac", "cihr")
+    annual_sources_ordered = ANNUAL_SOURCES_ORDERED
     allowed_sources = set(annual_sources_ordered)
 
     # Optional filter to match schedule-annual’s allowlist discipline.
@@ -1254,6 +1255,232 @@ def cmd_annual_status(args: argparse.Namespace) -> None:
             f"crawl_rc={job_data.get('crawlerExitCode')} crawl_status={job_data.get('crawlerStatus')} "
             f"name={job_data.get('jobName')}"
         )
+
+
+def cmd_reconcile_annual_tool_options(args: argparse.Namespace) -> None:
+    """
+    Reconcile existing annual jobs to source-specific crawl tool profiles.
+
+    Safe-by-default (dry-run). Intended for one-time backfills of older annual
+    jobs that predate per-source tuning.
+    """
+    from .archive_contract import ArchiveJobConfig, validate_tool_options
+    from .job_registry import SOURCE_JOB_CONFIGS
+    from .models import ArchiveJob as ORMArchiveJob
+    from .models import Source
+
+    def _int_or_none(raw: Any) -> int | None:
+        try:
+            return int(raw)
+        except (TypeError, ValueError):
+            return None
+
+    def _normalize_sources_or_exit(raw_sources: Sequence[str] | None) -> list[str]:
+        allowed = set(ANNUAL_SOURCES_ORDERED)
+        requested = raw_sources or list(ANNUAL_SOURCES_ORDERED)
+        normalized = [s.strip().lower() for s in requested if s and s.strip()]
+        invalid = sorted({s for s in normalized if s not in allowed})
+        if invalid:
+            print(
+                "ERROR: --sources contains unsupported codes: "
+                + ", ".join(invalid)
+                + ". Allowed: hc, phac, cihr.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+        requested_set = set(normalized)
+        return [s for s in ANNUAL_SOURCES_ORDERED if s in requested_set]
+
+    def _is_annual_job_for_year(
+        job: ORMArchiveJob,
+        *,
+        source_code: str,
+        year: int,
+    ) -> bool:
+        cfg = dict(job.config or {})
+        campaign_kind = str(cfg.get("campaign_kind") or "").strip().lower()
+        campaign_year = _int_or_none(cfg.get("campaign_year"))
+        if campaign_kind == "annual" and campaign_year == year:
+            return True
+
+        expected_name = f"{source_code}-{year}0101"
+        if str(job.name or "") == expected_name:
+            return True
+
+        output_dir = str(job.output_dir or "")
+        return expected_name in output_dir
+
+    year = int(getattr(args, "year", 0))
+    if year < 1970 or year > 2100:
+        print(
+            "ERROR: --year must be a four-digit year between 1970 and 2100.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    dry_run = not bool(getattr(args, "apply", False))
+    max_jobs = getattr(args, "limit", None)
+    if max_jobs is not None and int(max_jobs) < 0:
+        print("ERROR: --limit must be >= 0.", file=sys.stderr)
+        sys.exit(1)
+    max_jobs = int(max_jobs) if max_jobs is not None else None
+
+    sources_in_order = _normalize_sources_or_exit(getattr(args, "sources", None))
+    if not sources_in_order:
+        print("No sources selected; nothing to do.")
+        return
+
+    # Shared annual values from older campaigns; only these get reconciled to
+    # source-specific profiles. Explicit non-baseline overrides are preserved.
+    legacy_baseline_values: dict[str, set[int]] = {
+        "initial_workers": {1, 2},
+        "stall_timeout_minutes": {60},
+        "error_threshold_timeout": {50},
+        "error_threshold_http": {50},
+        "backoff_delay_minutes": {2},
+        "max_container_restarts": {20},
+    }
+    profile_keys = (
+        "initial_workers",
+        "stall_timeout_minutes",
+        "error_threshold_timeout",
+        "error_threshold_http",
+        "backoff_delay_minutes",
+        "max_container_restarts",
+    )
+
+    print("HealthArchive Backend – Reconcile Annual Tool Options")
+    print("-----------------------------------------------------")
+    print(f"Mode:            {'APPLY' if not dry_run else 'DRY-RUN'}")
+    print(f"Campaign year:   {year}")
+    print(f"Sources:         {', '.join(sources_in_order)}")
+    print(f"Job limit:       {max_jobs if max_jobs is not None else '(none)'}")
+    print("")
+
+    considered = 0
+    changed = 0
+    unchanged = 0
+    skipped_non_annual = 0
+    processed = 0
+
+    with get_session() as session:
+        rows = (
+            session.query(ORMArchiveJob)
+            .join(Source, ORMArchiveJob.source_id == Source.id)
+            .filter(Source.code.in_(sources_in_order))
+            .order_by(ORMArchiveJob.created_at.asc(), ORMArchiveJob.id.asc())
+            .all()
+        )
+
+        for job in rows:
+            if max_jobs is not None and processed >= max_jobs:
+                break
+
+            source = job.source
+            source_code = source.code if source is not None else ""
+            if source_code not in sources_in_order:
+                continue
+
+            if not _is_annual_job_for_year(job, source_code=source_code, year=year):
+                skipped_non_annual += 1
+                continue
+
+            profile_cfg = SOURCE_JOB_CONFIGS.get(source_code)
+            if profile_cfg is None:
+                continue
+
+            considered += 1
+            processed += 1
+            cfg = ArchiveJobConfig.from_dict(job.config or {})
+            old_opts = cfg.tool_options.to_dict()
+
+            # Annual safety defaults.
+            if not bool(cfg.tool_options.enable_monitoring):
+                cfg.tool_options.enable_monitoring = True
+            if not bool(cfg.tool_options.enable_adaptive_restart):
+                cfg.tool_options.enable_adaptive_restart = True
+            if cfg.tool_options.skip_final_build is False:
+                cfg.tool_options.skip_final_build = True
+            if not (cfg.tool_options.docker_shm_size or "").strip():
+                cfg.tool_options.docker_shm_size = "1g"
+
+            desired_profile = {
+                key: int(profile_cfg.default_tool_options[key])
+                for key in profile_keys
+                if key in profile_cfg.default_tool_options
+            }
+
+            for key in profile_keys:
+                desired = _int_or_none(desired_profile.get(key))
+                if desired is None:
+                    continue
+                current = _int_or_none(getattr(cfg.tool_options, key, None))
+                if current is None:
+                    setattr(cfg.tool_options, key, desired)
+                    continue
+                if key == "max_container_restarts":
+                    # Always enforce floor for restart budget; higher explicit
+                    # values remain untouched.
+                    if current < desired:
+                        setattr(cfg.tool_options, key, desired)
+                    continue
+                baseline = legacy_baseline_values.get(key, set())
+                if current in baseline and current != desired:
+                    setattr(cfg.tool_options, key, desired)
+
+            try:
+                validate_tool_options(cfg.tool_options)
+            except ValueError as exc:
+                print(
+                    f"{source_code}: ERROR job_id={job.id} name={job.name} validation failed: {exc}",
+                    file=sys.stderr,
+                )
+                continue
+
+            new_opts = cfg.tool_options.to_dict()
+            changes: list[tuple[str, object, object]] = []
+            for key in sorted(set(old_opts.keys()) | set(new_opts.keys())):
+                old_val = old_opts.get(key)
+                new_val = new_opts.get(key)
+                if old_val != new_val:
+                    changes.append((key, old_val, new_val))
+
+            if not changes:
+                unchanged += 1
+                print(
+                    f"{source_code}: UNCHANGED job_id={job.id} status={job.status} name={job.name}"
+                )
+                continue
+
+            changed += 1
+            action = "UPDATED" if not dry_run else "WOULD UPDATE"
+            print(f"{source_code}: {action} job_id={job.id} status={job.status} name={job.name}")
+            for key, old_val, new_val in changes:
+                print(
+                    f"  {key}: {_format_tool_option_value(old_val)} -> {_format_tool_option_value(new_val)}"
+                )
+
+            if not dry_run:
+                current_cfg = dict(job.config or {})
+                current_cfg["tool_options"] = new_opts
+                current_cfg.setdefault("campaign_kind", "annual")
+                current_cfg.setdefault("campaign_year", year)
+                current_cfg.setdefault("campaign_date", f"{year}-01-01")
+                current_cfg.setdefault("campaign_date_utc", f"{year}-01-01T00:00:00Z")
+                job.config = current_cfg
+
+        if not dry_run:
+            session.commit()
+
+    print("")
+    print(
+        "Summary: "
+        f"considered={considered} changed={changed} unchanged={unchanged} skipped_non_annual={skipped_non_annual}"
+    )
+    if dry_run:
+        print("Dry-run only; re-run with --apply to persist changes.")
+    else:
+        print("Applied reconciliation to matching annual jobs.")
 
 
 def cmd_backfill_search_vector(args: argparse.Namespace) -> None:
@@ -4730,6 +4957,38 @@ def build_parser() -> argparse.ArgumentParser:
         help="Subset of sources to report (allowlisted): hc phac cihr.",
     )
     p_annual_status.set_defaults(func=cmd_annual_status)
+
+    # reconcile-annual-tool-options
+    p_reconcile_annual = subparsers.add_parser(
+        "reconcile-annual-tool-options",
+        help=(
+            "Reconcile existing annual jobs to source-specific tool_options profiles "
+            "(safe-by-default dry-run)."
+        ),
+    )
+    p_reconcile_annual.add_argument(
+        "--year",
+        type=int,
+        required=True,
+        help="Campaign year to reconcile (e.g. 2026).",
+    )
+    p_reconcile_annual.add_argument(
+        "--sources",
+        nargs="+",
+        help="Subset of sources to reconcile (allowlisted): hc phac cihr.",
+    )
+    p_reconcile_annual.add_argument(
+        "--limit",
+        type=int,
+        help="Optional cap on number of matching jobs to process.",
+    )
+    p_reconcile_annual.add_argument(
+        "--apply",
+        action="store_true",
+        default=False,
+        help="Apply changes (default is dry-run).",
+    )
+    p_reconcile_annual.set_defaults(func=cmd_reconcile_annual_tool_options)
 
     # backfill-search-vector
     p_backfill_search = subparsers.add_parser(

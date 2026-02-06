@@ -106,3 +106,73 @@ def test_ensure_recovery_tool_options_fixes_bad_max_container_restarts() -> None
     assert changed is True
     assert job.config is not None
     assert job.config["tool_options"]["max_container_restarts"] == 20
+
+
+def test_ensure_recovery_tool_options_reconciles_legacy_hc_values() -> None:
+    module = _load_script_module()
+
+    job = ArchiveJob(
+        name="hc-20260101",
+        status="running",
+        config={
+            "campaign_kind": "annual",
+            "tool_options": {
+                "enable_monitoring": True,
+                "enable_adaptive_restart": True,
+                "initial_workers": 1,
+                "stall_timeout_minutes": 60,
+                "error_threshold_timeout": 50,
+                "error_threshold_http": 50,
+                "backoff_delay_minutes": 2,
+                "max_container_restarts": 20,
+            },
+        },
+    )
+
+    changed = module._ensure_recovery_tool_options(job)
+    assert changed is True
+    assert job.config is not None
+
+    tool = job.config["tool_options"]
+    assert tool["initial_workers"] == 2
+    assert tool["stall_timeout_minutes"] == 75
+    assert tool["error_threshold_timeout"] == 55
+    assert tool["error_threshold_http"] == 55
+    assert tool["backoff_delay_minutes"] == 2
+    assert tool["max_container_restarts"] == 24
+
+
+def test_ensure_recovery_tool_options_preserves_nonbaseline_hc_overrides() -> None:
+    module = _load_script_module()
+
+    job = ArchiveJob(
+        name="hc-20260101",
+        status="running",
+        config={
+            "campaign_kind": "annual",
+            "tool_options": {
+                "enable_monitoring": True,
+                "enable_adaptive_restart": True,
+                "initial_workers": 4,
+                "stall_timeout_minutes": 120,
+                "error_threshold_timeout": 70,
+                "error_threshold_http": 70,
+                "backoff_delay_minutes": 5,
+                "max_container_restarts": 40,
+                "skip_final_build": True,
+                "docker_shm_size": "1g",
+            },
+        },
+    )
+
+    changed = module._ensure_recovery_tool_options(job)
+    assert changed is False
+    assert job.config is not None
+
+    tool = job.config["tool_options"]
+    assert tool["initial_workers"] == 4
+    assert tool["stall_timeout_minutes"] == 120
+    assert tool["error_threshold_timeout"] == 70
+    assert tool["error_threshold_http"] == 70
+    assert tool["backoff_delay_minutes"] == 5
+    assert tool["max_container_restarts"] == 40
