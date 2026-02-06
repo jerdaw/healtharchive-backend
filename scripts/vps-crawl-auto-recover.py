@@ -295,13 +295,36 @@ def _find_latest_combined_log(output_dir: Path) -> Path | None:
 
 
 def _find_job_log(job: RunningJob) -> Path | None:
+    """
+    Find the most relevant combined log file for a running job.
+
+    Important: running jobs often have a stale ``combined_log_path`` (set during
+    a previous attempt), so we always check both the DB path and the newest log
+    on disk under ``output_dir`` and pick whichever is most recent by mtime.
+    """
+    by_path: Path | None = None
+    by_output: Path | None = None
+
     if job.combined_log_path:
         p = Path(job.combined_log_path)
-        if p.is_file():
-            return p
+        try:
+            if p.is_file():
+                by_path = p
+        except OSError:
+            by_path = None
+
     if job.output_dir:
-        return _find_latest_combined_log(Path(job.output_dir))
-    return None
+        by_output = _find_latest_combined_log(Path(job.output_dir))
+
+    if by_path is None:
+        return by_output
+    if by_output is None:
+        return by_path
+
+    try:
+        return by_output if by_output.stat().st_mtime >= by_path.stat().st_mtime else by_path
+    except OSError:
+        return by_output or by_path
 
 
 def _run(cmd: list[str]) -> None:
