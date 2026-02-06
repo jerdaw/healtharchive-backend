@@ -2091,6 +2091,9 @@ def cmd_recover_stale_jobs(args: argparse.Namespace) -> None:
             except JobAlreadyRunningError as exc:
                 skipped_locked.append(f"job_id={job.id} (lock held: {exc.lock_path})")
                 continue
+            except OSError as exc:
+                skipped_locked.append(f"job_id={job.id} (lock probe failed: {exc})")
+                continue
             filtered_jobs.append(job)
 
         if skipped_locked:

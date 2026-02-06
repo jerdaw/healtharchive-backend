@@ -137,6 +137,12 @@ def _held_job_lock_job_ids(lock_dir: Path) -> set[int]:
             continue
         try:
             fd = os.open(str(p), os.O_RDONLY)
+        except PermissionError:
+            # Cannot open the lock file (e.g. user mismatch).  Treat it as
+            # potentially held — the conservative choice for recovery decisions
+            # that avoids soft-recovering a job whose runner is still alive.
+            held.add(job_id)
+            continue
         except OSError:
             continue
         try:
