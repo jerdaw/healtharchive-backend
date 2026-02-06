@@ -117,6 +117,10 @@
          <lastmod>2026-02-06</lastmod>
     </url>
     <url>
+         <loc>https://docs.healtharchive.ca/decisions/2026-02-06-per-source-crawl-profiles-and-annual-reconciliation/</loc>
+         <lastmod>2026-02-06</lastmod>
+    </url>
+    <url>
          <loc>https://docs.healtharchive.ca/deployment/</loc>
          <lastmod>2026-02-06</lastmod>
     </url>
@@ -378,6 +382,10 @@
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/operations/incidents/2026-02-04-annual-crawl-output-dirs-on-root-disk/</loc>
+         <lastmod>2026-02-06</lastmod>
+    </url>
+    <url>
+         <loc>https://docs.healtharchive.ca/operations/incidents/2026-02-06-api-search-changes-500-missing-migration/</loc>
          <lastmod>2026-02-06</lastmod>
     </url>
     <url>
