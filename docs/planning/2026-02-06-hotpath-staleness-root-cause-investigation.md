@@ -1,6 +1,6 @@
 # 2026-02-06: Hot-Path Staleness Root-Cause Investigation
 
-**Plan Version**: v1.0
+**Plan Version**: v1.1
 **Status**: In Progress (Phases 0-1 implemented in repo; evidence capture requires operator execution on VPS when events occur)
 **Scope**: Determine and mitigate underlying causes of recurring hot-path stale mount events (Errno 107).
 **Batched items**: #6
