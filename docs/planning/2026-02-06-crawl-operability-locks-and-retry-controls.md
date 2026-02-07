@@ -5,6 +5,14 @@
 **Scope**: Improve crawl operability and safety around job locking, output-dir health visibility, and retry budget recovery UX.
 **Batched items**: #7, #8, #9
 
+## Maintenance Window Reminder (Operator)
+
+This plan is implemented in repo, but the production lock-dir cutover is only complete after you restart the services that read
+`/etc/healtharchive/backend.env` during a safe window.
+
+- Safe anytime (even mid-crawl): set `export HEALTHARCHIVE_JOB_LOCK_DIR=/srv/healtharchive/ops/locks/jobs` and create `/srv/healtharchive/ops/locks/jobs`.
+- Maintenance window only: restart `healtharchive-worker.service` (and API) to pick up the env change.
+
 ## Implementation Progress
 
 - **Phase 1**: Implemented in repository (migration-ready lock directory behavior).

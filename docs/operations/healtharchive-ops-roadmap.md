@@ -21,6 +21,9 @@ Keep the two synced copies of this file aligned:
 
 ## Current ops tasks (implementation already exists; enable/verify)
 
+- Maintenance window: complete the job lock-dir cutover by restarting services that read `/etc/healtharchive/backend.env`.
+  - This must wait until crawls are idle unless you explicitly accept interrupting them.
+  - Plan + commands: `../planning/2026-02-06-crawl-operability-locks-and-retry-controls.md` (Phase 4)
 - After any reboot/rescue/maintenance where mounts may drift:
   - Verify Storage Box mount is active (`healtharchive-storagebox-sshfs.service`).
   - Re-apply annual output tiering for the active campaign year and confirm job output dirs are on Storage Box (see incident: `incidents/2026-02-04-annual-crawl-output-dirs-on-root-disk.md`).
