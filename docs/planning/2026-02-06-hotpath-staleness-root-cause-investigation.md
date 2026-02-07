@@ -11,6 +11,8 @@
 - **Phase 1**: Implemented in repository (operator evidence capture script + playbook integration).
   - Evidence capture helper:
     - `scripts/vps-capture-hotpath-staleness-evidence.sh`
+  - Evidence diff helper:
+    - `scripts/vps-diff-hotpath-staleness-evidence.sh`
   - Recovery playbook now recommends capturing a bundle before state changes:
     - `docs/operations/playbooks/storage/storagebox-sshfs-stale-mount-recovery.md`
   - The playbook also recommends a post-repair evidence bundle (`--tag post-repair`) so you can diff pre/post state.
