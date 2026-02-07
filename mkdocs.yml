@@ -173,10 +173,6 @@ nav:
   - Planning & Roadmaps:
       - Active Work: planning/README.md
       - Active Investigations:
-          - Disk Usage Mystery: planning/2026-02-01-disk-usage-investigation.md
-          - Deploy Workflow Hardening: planning/2026-02-07-deploy-workflow-hardening.md
-          - CI Schema and Governance Guardrails: planning/2026-02-06-ci-schema-and-governance-guardrails.md
-          - Storage Watchdog Observability Hardening: planning/2026-02-06-storage-watchdog-observability-hardening.md
           - Crawl Operability (Locks and Retry Controls): planning/2026-02-06-crawl-operability-locks-and-retry-controls.md
           - Hot-Path Staleness Root-Cause Investigation: planning/2026-02-06-hotpath-staleness-root-cause-investigation.md
       - Future Roadmap: planning/roadmap.md
@@ -184,6 +180,11 @@ nav:
       - Implemented Plans:
           - Overview: planning/implemented/README.md
           - Operational Resilience (2026-02-01): planning/implemented/2026-02-01-operational-resilience-improvements.md
+          - Disk Usage Investigation (2026-02-01): planning/implemented/2026-02-01-disk-usage-investigation.md
+          - Deploy Workflow Hardening (2026-02-07): planning/implemented/2026-02-07-deploy-workflow-hardening.md
+          - CI Schema + Governance Guardrails (2026-02-06): planning/implemented/2026-02-06-ci-schema-and-governance-guardrails.md
+          - Storage Watchdog Observability (2026-02-06): planning/implemented/2026-02-06-storage-watchdog-observability-hardening.md
+          - WARC Discovery Consistency (2026-01-29): planning/implemented/2026-01-29-warc-discovery-consistency.md
   - About:
       - Multi-Repo Setup: project.md
       - Contributing: contributing.md

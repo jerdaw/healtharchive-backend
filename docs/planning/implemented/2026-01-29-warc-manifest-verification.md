@@ -115,7 +115,7 @@ The following items from the original WARC discovery consistency plan remain in 
 4. **Unified discovery method** - Reduce fragmentation between discovery entry points
 
 These items are tracked in the parent plan:
-- `docs/planning/2026-01-29-warc-discovery-consistency.md`
+- `docs/planning/implemented/2026-01-29-warc-discovery-consistency.md`
 
 ## Related Documentation
 

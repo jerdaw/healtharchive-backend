@@ -11,11 +11,6 @@ When complete, move them to `docs/planning/implemented/` and date them.
 
 Active plans:
 
-- Disk usage investigation (48GB discrepancy): `2026-02-01-disk-usage-investigation.md`
-- WARC discovery consistency improvements: `2026-01-29-warc-discovery-consistency.md`
-- Deploy workflow hardening (single VPS): `2026-02-07-deploy-workflow-hardening.md`
-- CI schema + governance guardrails: `2026-02-06-ci-schema-and-governance-guardrails.md`
-- Storage watchdog observability hardening: `2026-02-06-storage-watchdog-observability-hardening.md`
 - Crawl operability (locks, writability, retry controls): `2026-02-06-crawl-operability-locks-and-retry-controls.md`
 - Hot-path staleness root-cause investigation: `2026-02-06-hotpath-staleness-root-cause-investigation.md`
 
@@ -33,6 +28,11 @@ Current known items:
 
 - Implemented plans archive: `implemented/README.md`
 - Operational resilience improvements: `implemented/2026-02-01-operational-resilience-improvements.md`
+- Deploy workflow hardening (single VPS): `implemented/2026-02-07-deploy-workflow-hardening.md`
+- CI schema + governance guardrails: `implemented/2026-02-06-ci-schema-and-governance-guardrails.md`
+- Storage watchdog observability hardening: `implemented/2026-02-06-storage-watchdog-observability-hardening.md`
+- Disk usage investigation (48GB discrepancy): `implemented/2026-02-01-disk-usage-investigation.md`
+- WARC discovery consistency improvements (partial): `implemented/2026-01-29-warc-discovery-consistency.md`
 - WARC manifest verification: `implemented/2026-01-29-warc-manifest-verification.md`
 - Patch-job-config CLI + integration tests: `implemented/2026-01-28-patch-job-config-and-integration-tests.md`
 - archive_tool hardening + ops improvements: `implemented/2026-01-27-archive-tool-hardening-and-ops-improvements.md`
