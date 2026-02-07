@@ -11,6 +11,13 @@ set -euo pipefail
 REPO_DIR="/opt/healtharchive-backend"
 MODE="full" # full | backend-only
 
+if [[ "${EUID}" -eq 0 ]]; then
+  echo "ERROR: Do not run hetzdeploy as root." >&2
+  echo "Run as the operator user (e.g., haadmin); the underlying deploy will sudo when needed." >&2
+  echo "This avoids /opt repo/.venv permission drift and /tmp lockfile ownership mismatches." >&2
+  exit 2
+fi
+
 usage() {
   cat <<'EOF'
 HealthArchive VPS helper: hetzdeploy wrapper (safe defaults)
@@ -108,4 +115,3 @@ if [[ "${MODE}" == "backend-only" ]]; then
 fi
 
 exec ./scripts/vps-deploy.sh "${args[@]}" "${PASSTHROUGH[@]}"
-
