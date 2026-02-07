@@ -62,8 +62,7 @@ Status: accepted
   - `docs/operations/playbooks/core/deploy-and-verify.md`
   - `docs/deployment/production-single-vps.md`
 - Related implementation plans:
-  - `docs/planning/2026-02-07-deploy-workflow-hardening.md`
+  - `docs/planning/implemented/2026-02-07-deploy-workflow-hardening.md`
 - Related scripts:
   - `scripts/vps-deploy.sh`
   - `scripts/vps-hetzdeploy.sh`
-
