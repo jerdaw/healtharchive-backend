@@ -141,6 +141,18 @@ if [[ "${EUID}" -ne 0 ]]; then
   exit 1
 fi
 
+if ! getent group healtharchive >/dev/null 2>&1; then
+  echo "ERROR: group 'healtharchive' does not exist; cannot create ${NEW_LOCK_DIR} with correct perms." >&2
+  echo "Hint: create the group and add the operator user, or run: sudo ./scripts/vps-bootstrap-ops-dirs.sh" >&2
+  exit 1
+fi
+
+# Make the lock dir exist even if the operator hasn't run vps-bootstrap-ops-dirs.sh yet.
+if [[ ! -d "${NEW_LOCK_DIR}" ]]; then
+  install -d -m 2770 -o root -g healtharchive "$(dirname "${NEW_LOCK_DIR}")"
+  install -d -m 2770 -o root -g healtharchive "${NEW_LOCK_DIR}"
+fi
+
 ts="$(date -u +%Y%m%dT%H%M%SZ)"
 backup="${ENV_FILE}.bak.${ts}"
 cp -av "${ENV_FILE}" "${backup}" >/dev/null
@@ -153,4 +165,3 @@ fi
 
 echo "OK: updated env file. Backup: ${backup}"
 echo "Next: restart services during a safe window (see printed commands above)."
-

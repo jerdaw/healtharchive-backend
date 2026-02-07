@@ -32,6 +32,13 @@ This writes a timestamped directory under:
 
 - `/srv/healtharchive/ops/observability/hotpath-staleness/`
 
+Optional (recommended): after recovery actions complete, capture a second bundle for comparison:
+
+```bash
+cd /opt/healtharchive-backend
+./scripts/vps-capture-hotpath-staleness-evidence.sh --tag post-repair
+```
+
 1) Snapshot current crawl state:
 
 ```bash
