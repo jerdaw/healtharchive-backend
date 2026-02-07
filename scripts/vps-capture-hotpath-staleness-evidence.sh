@@ -19,6 +19,7 @@ Options:
   --out-root DIR        Base output directory (default: /srv/healtharchive/ops/observability/hotpath-staleness)
   --since-minutes N     Journal window to capture (default: 240)
   --tag TAG             Optional short label for the bundle (default: "manual")
+  --year YEAR           Campaign year for `vps-crawl-status.sh` capture (default: current UTC year)
 
 Notes:
   - This script does not source /etc/healtharchive/backend.env and does not print secrets.
@@ -29,6 +30,7 @@ EOF
 OUT_ROOT="/srv/healtharchive/ops/observability/hotpath-staleness"
 SINCE_MINUTES="240"
 TAG="manual"
+YEAR="$(date -u +%Y)"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -48,6 +50,10 @@ while [[ $# -gt 0 ]]; do
       TAG="${2:-}"
       shift 2
       ;;
+    --year)
+      YEAR="${2:-}"
+      shift 2
+      ;;
     *)
       echo "ERROR: Unknown argument: $1" >&2
       usage >&2
@@ -55,6 +61,16 @@ while [[ $# -gt 0 ]]; do
       ;;
   esac
 done
+
+if ! [[ "${YEAR}" =~ ^[0-9]{4}$ ]]; then
+  echo "ERROR: --year must be a 4-digit year (got: ${YEAR})" >&2
+  exit 2
+fi
+
+if ! [[ "${SINCE_MINUTES}" =~ ^[0-9]+$ ]]; then
+  echo "ERROR: --since-minutes must be an integer (got: ${SINCE_MINUTES})" >&2
+  exit 2
+fi
 
 umask 0007
 
@@ -123,6 +139,10 @@ meta="${out_dir}/meta.txt"
 # Repo state (non-secret)
 run_shell_to_file "repo.txt" \
   "cd /opt/healtharchive-backend && echo sha=\$(git rev-parse --short HEAD) && git status --porcelain=v1 || true"
+
+# Crawl status snapshot (non-secret; helps correlate staleness with live jobs)
+run_shell_to_file "vps-crawl-status.txt" \
+  "cd /opt/healtharchive-backend && ./scripts/vps-crawl-status.sh --year ${YEAR} || true"
 
 # systemd state
 run_to_file "systemctl-status.txt" systemctl status --no-pager -l \
@@ -210,4 +230,3 @@ run_to_file "ss-summary.txt" ss -s
 run_shell_to_file "ps-sshfs.txt" "ps auxww | rg -n 'sshfs|your-storagebox\\.de' || true"
 
 echo "OK: evidence bundle complete: ${out_dir}"
-
