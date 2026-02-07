@@ -11,6 +11,7 @@ on:
 
 jobs:
   test:
+    name: Backend CI / test
     runs-on: ubuntu-latest
     env:
       HEALTHARCHIVE_DATABASE_URL: sqlite:///./ci-healtharchive.db
@@ -42,6 +43,7 @@ jobs:
         run: make ci
 
   e2e-smoke:
+    name: Backend CI / e2e-smoke
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
 
