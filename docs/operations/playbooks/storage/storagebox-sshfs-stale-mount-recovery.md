@@ -21,6 +21,17 @@ For background and the full implementation plan (prevention + automation + integ
 
 On the VPS (`/opt/healtharchive-backend`):
 
+0) Capture an evidence bundle (recommended, read-only):
+
+```bash
+cd /opt/healtharchive-backend
+./scripts/vps-capture-hotpath-staleness-evidence.sh --tag pre-repair
+```
+
+This writes a timestamped directory under:
+
+- `/srv/healtharchive/ops/observability/hotpath-staleness/`
+
 1) Snapshot current crawl state:
 
 ```bash

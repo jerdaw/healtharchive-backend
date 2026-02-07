@@ -51,6 +51,7 @@
     - `docs/deployment/systemd/healtharchive-storage-watchdog-burnin-snapshot.timer`
     - `scripts/vps-storage-watchdog-burnin-snapshot.sh`
   - Remaining operator step: run one-week VPS burn-in capture and confirm clean end-of-week gate.
+    - Evidence: `python3 scripts/vps-storage-watchdog-burnin-report.py --window-hours 168 --require-clean` returned `Status: OK` on 2026-02-07 (exit 0).
 
 ## Phase 0 Decisions (Frozen)
 

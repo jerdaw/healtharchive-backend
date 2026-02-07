@@ -1,9 +1,20 @@
 # 2026-02-06: Hot-Path Staleness Root-Cause Investigation
 
-**Plan Version**: v1.0
-**Status**: Proposed (not started)
+**Plan Version**: v1.1
+**Status**: In Progress (Phases 0-1 implemented in repo; evidence capture requires operator execution on VPS when events occur)
 **Scope**: Determine and mitigate underlying causes of recurring hot-path stale mount events (Errno 107).
 **Batched items**: #6
+
+## Implementation Progress
+
+- **Phase 0**: Implemented in repository (hypothesis matrix + evidence criteria).
+- **Phase 1**: Implemented in repository (operator evidence capture script + playbook integration).
+  - Evidence capture helper:
+    - `scripts/vps-capture-hotpath-staleness-evidence.sh`
+  - Recovery playbook now recommends capturing a bundle before state changes:
+    - `docs/operations/playbooks/storage/storagebox-sshfs-stale-mount-recovery.md`
+- **Phase 2**: Pending (requires operator-run drills / event capture on the VPS).
+- **Phase 3-5**: Pending.
 
 ## Current State Summary
 
@@ -80,6 +91,24 @@ However, incident follow-ups still list a root-cause gap: why hot-path mounts go
 
 - Maintainer agrees criteria are sufficient to close open incident action items.
 
+#### Hypothesis matrix (initial)
+
+This matrix is intentionally pragmatic: it lists what we can actually observe on a single VPS without adding heavy telemetry.
+
+| Hypothesis | Observable signals | How to confirm / rule out |
+|---|---|---|
+| Transport instability (SSH/TCP) | storagebox sshfs logs show reconnects; kernel logs show TCP resets/timeouts; hot-path staleness coincides with network blips | Evidence bundle contains correlated `journal-storagebox.txt` + `dmesg-tail.txt` + timestamps from watchdog state/metrics |
+| sshfs/FUSE stale state under load | base mount stays readable but specific hot paths become stale; `fuse.sshfs` mounts persist in `findmnt` while ops hang | Evidence bundle contains `tiering-hotpath-probes.txt` showing per-path staleness while `findmnt-storagebox.txt` remains healthy |
+| Bind-mount propagation / tiering inconsistency | hot paths appear as direct `fuse.sshfs` mounts instead of bind mounts (unexpected layout) | Evidence bundle captures `mount.txt` / `findmnt` outputs that show whether hot paths are bind mounts or direct sshfs |
+| Recovery sequencing race with worker activity | staleness correlates with worker touching paths during tiering repair; repeated re-picks / infra-error thrash | Capture `journal-worker.txt` alongside `journal-hotpath-watchdog.txt`; look for tight loops at the same timestamps |
+| Deploy overlap / lock suppression hides apply attempts | watchdog detects targets but apply is suppressed by deploy lock; issue persists beyond expected window | Evidence bundle captures watchdog metrics + deploy lock metrics from `watchdog-metrics.prom` and node_exporter metrics |
+
+Evidence closure criteria:
+
+- Capture at least 2 real-world staleness events with bundles (or 1 real + 1 maintenance-window reproduction).
+- At least one event must clearly show whether the base mount was healthy while a hot path was stale.
+- At least one event must clearly show the mount topology at the time (bind mount vs direct sshfs).
+
 ### Phase 1: Low-Risk Instrumentation and Evidence Capture
 
 **Goal**: Improve event-level forensic context with minimal runtime risk.
@@ -103,6 +132,19 @@ However, incident follow-ups still list a root-cause gap: why hot-path mounts go
 
 - Synthetic drill produces complete evidence bundle.
 - Evidence bundle is usable for post-event analysis without ad hoc shell history.
+
+**Operator how-to (VPS)**:
+
+When you see Errno 107 alerts or symptoms (before unmounting/repairing):
+
+```bash
+cd /opt/healtharchive-backend
+./scripts/vps-capture-hotpath-staleness-evidence.sh --tag pre-repair
+```
+
+Then proceed with state-changing recovery steps in:
+
+- `docs/operations/playbooks/storage/storagebox-sshfs-stale-mount-recovery.md`
 
 ### Phase 2: Controlled Drill and Correlation Runs
 
