@@ -19,6 +19,16 @@ Active plans:
 - Crawl operability (locks, writability, retry controls): `2026-02-06-crawl-operability-locks-and-retry-controls.md`
 - Hot-path staleness root-cause investigation: `2026-02-06-hotpath-staleness-root-cause-investigation.md`
 
+## Operator Follow-Through (Maintenance Window)
+
+Some plans are "implemented in repo" but still require a short, operator-run maintenance step on the VPS.
+
+Current known items:
+
+- Job lock-dir cutover: restart services that read `/etc/healtharchive/backend.env` after crawls are idle.
+  - Plan: `2026-02-06-crawl-operability-locks-and-retry-controls.md` (Phase 4)
+  - Hard requirement: do not restart the worker mid-crawl unless you explicitly accept interrupting crawls.
+
 ## Implemented plans (history)
 
 - Implemented plans archive: `implemented/README.md`
