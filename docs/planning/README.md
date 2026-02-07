@@ -23,6 +23,10 @@ Current known items:
 - Job lock-dir cutover: restart services that read `/etc/healtharchive/backend.env` after crawls are idle.
   - Plan: `2026-02-06-crawl-operability-locks-and-retry-controls.md` (Phase 4)
   - Hard requirement: do not restart the worker mid-crawl unless you explicitly accept interrupting crawls.
+- Annual output-dir mount topology conversion (direct `sshfs` mounts → bind mounts):
+  - Current state: the active 2026 annual job output dirs are mounted directly via `sshfs` (higher Errno 107/staleness risk).
+  - Why maintenance-only: converting requires unmount/remount of job output dirs and can interrupt active crawls.
+  - Status tracking: `../operations/healtharchive-ops-roadmap.md`
 
 ## Implemented plans (history)
 
