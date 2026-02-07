@@ -13,6 +13,7 @@
     - `scripts/vps-capture-hotpath-staleness-evidence.sh`
   - Recovery playbook now recommends capturing a bundle before state changes:
     - `docs/operations/playbooks/storage/storagebox-sshfs-stale-mount-recovery.md`
+  - The playbook also recommends a post-repair evidence bundle (`--tag post-repair`) so you can diff pre/post state.
 - **Phase 2**: Pending (requires operator-run drills / event capture on the VPS).
 - **Phase 3-5**: Pending.
 
