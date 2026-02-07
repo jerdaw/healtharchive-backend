@@ -39,6 +39,15 @@ cd /opt/healtharchive-backend
 ./scripts/vps-capture-hotpath-staleness-evidence.sh --tag post-repair
 ```
 
+Optional: diff the latest pre-repair vs post-repair bundles:
+
+```bash
+root=/srv/healtharchive/ops/observability/hotpath-staleness
+before=$(ls -1dt "${root}"/*pre-repair 2>/dev/null | head -n 1)
+after=$(ls -1dt "${root}"/*post-repair 2>/dev/null | head -n 1)
+./scripts/vps-diff-hotpath-staleness-evidence.sh --before "${before}" --after "${after}"
+```
+
 1) Snapshot current crawl state:
 
 ```bash
