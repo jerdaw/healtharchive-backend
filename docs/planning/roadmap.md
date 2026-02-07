@@ -53,6 +53,9 @@ Keep this list short; prefer linking to the canonical doc that explains the item
 
 ### Crawling & indexing reliability (backend)
 
+- WARC discovery consistency follow-through (deferred Phase 2-4 work; keep behavior coherent across status, indexing, and cleanup).
+  - Historical context: `implemented/2026-01-29-warc-discovery-consistency.md`
+  - Already implemented: `implemented/2026-01-29-warc-manifest-verification.md`
 - Consider whether a separate staging backend is worth it (increases ops surface; only do if it buys real safety).
   - See: `../deployment/environments-and-configuration.md`
 

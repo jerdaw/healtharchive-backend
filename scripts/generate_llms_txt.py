@@ -9,8 +9,8 @@ CORE_DOCS = [
 
 
 def generate_llms_txt():
-    content = "# HealthArchive - AI Context\n\n"
-    content += "This file provides high-level context for AI agents working on HealthArchive.\n\n"
+    content = "# HealthArchive - Developer Assistant Context\n\n"
+    content += "This file provides high-level context for automated developer assistants working on HealthArchive.\n\n"
 
     for doc_path in CORE_DOCS:
         if os.path.exists(doc_path):

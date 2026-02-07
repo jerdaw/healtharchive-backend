@@ -60,8 +60,8 @@ docs/openapi.json
 # Local docs symlink (optional convenience)
 docs/frontend
 
-# Agent tooling (local development only)
-.claude/
+# Local assistant tooling (local development only)
+.assistant/
 
 # UV lock file (auto-generated, should not be committed)
 uv.lock

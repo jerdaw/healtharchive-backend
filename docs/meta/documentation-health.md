@@ -166,7 +166,7 @@ Documents not updated in >180 days: **TBD** (requires git analysis)
 
 **Steps**:
 1. Generate OpenAPI spec (`scripts/export_openapi.py`)
-2. Generate AI context (`scripts/generate_llms_txt.py`)
+2. Generate developer assistant context (`scripts/generate_llms_txt.py`)
 3. Build MkDocs site
 4. Run advisory checks (refs, coverage)
 5. Link checking (Lychee)
@@ -236,7 +236,7 @@ Located in `docs/_templates/`:
 
 **Long-term** (Future):
 - [ ] Multilingual documentation (French)
-- [ ] Documentation chatbot (AI-powered search)
+- [ ] Documentation chatbot (assistant-powered search)
 - [ ] Automated screenshot updates
 - [ ] Doc contribution gamification
 
@@ -322,7 +322,7 @@ Every 3 months, review:
 | `mkdocs.yml` | MkDocs configuration |
 | `docs/_templates/` | Document templates |
 | `scripts/export_openapi.py` | Generate API spec |
-| `scripts/generate_llms_txt.py` | Generate AI context |
+| `scripts/generate_llms_txt.py` | Generate developer assistant context |
 | `scripts/check_docs_references.py` | Validate links |
 | `scripts/check_docs_coverage.py` | Report coverage |
 
