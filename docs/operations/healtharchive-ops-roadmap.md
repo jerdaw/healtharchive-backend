@@ -24,6 +24,12 @@ Keep the two synced copies of this file aligned:
 - Maintenance window: complete the job lock-dir cutover by restarting services that read `/etc/healtharchive/backend.env`.
   - This must wait until crawls are idle unless you explicitly accept interrupting them.
   - Plan + commands: `../planning/2026-02-06-crawl-operability-locks-and-retry-controls.md` (Phase 4)
+- Maintenance window (after 2026 annual crawl is idle): convert annual output dirs from direct `sshfs` mounts to bind mounts.
+  - Why defer: unmount/re-mount of a live job output dir can interrupt in-progress crawls; benefit is reduced Errno 107 blast radius,
+    but not worth forced interruption mid-campaign.
+  - Detection (crawl-safe): `python3 /opt/healtharchive-backend/scripts/vps-annual-output-tiering.py --year 2026`
+  - Repair (maintenance only): stop the worker and ensure crawl containers are stopped, then:
+    - `sudo python3 /opt/healtharchive-backend/scripts/vps-annual-output-tiering.py --year 2026 --apply --repair-unexpected-mounts --allow-repair-running-jobs`
 - After any reboot/rescue/maintenance where mounts may drift:
   - Verify Storage Box mount is active (`healtharchive-storagebox-sshfs.service`).
   - Re-apply annual output tiering for the active campaign year and confirm job output dirs are on Storage Box (see incident: `incidents/2026-02-04-annual-crawl-output-dirs-on-root-disk.md`).

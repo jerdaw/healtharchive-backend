@@ -1,9 +1,28 @@
 # 2026-02-06: Hot-Path Staleness Root-Cause Investigation
 
-**Plan Version**: v1.2
+**Plan Version**: v1.3
 **Status**: In Progress (Phases 0-2 implemented in repo; evidence capture + drills require operator execution on VPS)
 **Scope**: Determine and mitigate underlying causes of recurring hot-path stale mount events (Errno 107).
 **Batched items**: #6
+
+## Current Operator Decision (as of 2026-02-07)
+
+During the active 2026 annual crawl, we are **not** converting existing annual job output dirs from direct `sshfs` mounts into
+bind mounts yet, even though this is likely a contributor to hot-path staleness risk.
+
+**Why we are holding off**:
+
+- Converting mount topology requires an unmount + re-mount of the job output dir.
+- If a crawler container is actively writing to that output dir, this can interrupt the crawl and/or create confusing partial
+  failure modes.
+- The watchdog + playbooks already provide bounded recovery for Errno 107; the incremental benefit of a topology conversion is
+  real, but not worth intentionally interrupting an in-progress annual crawl.
+
+**What we will do instead (crawl-safe)**:
+
+- Keep capturing pre/post evidence bundles on any Errno 107 event.
+- Run Phase 2 dry-run drills (simulation only) to ensure planned recovery remains sensible.
+- Schedule the mount-topology conversion for a maintenance window after the campaign is idle.
 
 ## Implementation Progress
 
@@ -20,6 +39,9 @@
   - Phase 2 drill helper:
     - `scripts/vps-hotpath-staleness-drill.sh`
   - Evidence bundles now include a crawl-status snapshot (`vps-crawl-status.txt`) to correlate mount issues with live jobs.
+- **Phase 2.5**: Implemented in repository (tiering UX improvement: detect + optionally repair "unexpected mount type" for annual output dirs).
+  - `scripts/vps-annual-output-tiering.py` now warns when an annual output dir is mounted but not as a bind mount, and can repair it
+    during a maintenance window (`--apply --repair-unexpected-mounts`).
 - **Phase 3-5**: Pending.
 
 ## Current State Summary
