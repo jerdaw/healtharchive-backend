@@ -19,6 +19,17 @@ Keep the two synced copies of this file aligned:
 - **Quarterly:** confirm core timers are enabled and succeeding (recommended: on the VPS run `cd /opt/healtharchive-backend && ./scripts/verify_ops_automation.sh`; then spot-check `journalctl -u <service>`).
 - **Quarterly:** docs drift skim: re-read the production runbook + incident response and fix any drift you notice (keep docs matching reality).
 
+## Current status (as of 2026-02-07)
+
+- 2026 annual crawl is actively running on the VPS (jobs: `hc`/`phac`/`cihr`; see `./scripts/vps-crawl-status.sh --year 2026`).
+- Deploy-lock suppression is cleared (the stale `/tmp/healtharchive-backend-deploy.lock` was removed; auto-recover apply actions are no longer skipped due to deploy lock).
+- Job lock-dir cutover is **staged** (non-disruptive) but not fully complete:
+  - `/etc/healtharchive/backend.env` now sets `HEALTHARCHIVE_JOB_LOCK_DIR=/srv/healtharchive/ops/locks/jobs`
+  - `/srv/healtharchive/ops/locks/jobs` exists with intended perms
+  - Maintenance-window restart of services is still required to pick up the env change.
+- Annual output-dir mount topology is currently **unexpected** (direct `sshfs` mounts instead of bind mounts) for the active 2026 jobs.
+  - We are intentionally deferring conversion to bind mounts until a maintenance window to avoid interrupting in-progress crawls.
+
 ## Current ops tasks (implementation already exists; enable/verify)
 
 - Maintenance window: complete the job lock-dir cutover by restarting services that read `/etc/healtharchive/backend.env`.

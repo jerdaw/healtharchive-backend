@@ -13,6 +13,14 @@ This plan is implemented in repo, but the production lock-dir cutover is only co
 - Safe anytime (even mid-crawl): set `export HEALTHARCHIVE_JOB_LOCK_DIR=/srv/healtharchive/ops/locks/jobs` and create `/srv/healtharchive/ops/locks/jobs`.
 - Maintenance window only: restart `healtharchive-worker.service` (and API) to pick up the env change.
 
+## Operator status (as of 2026-02-07)
+
+- ✅ Non-disruptive staging completed on the VPS:
+  - `/etc/healtharchive/backend.env` updated to set `HEALTHARCHIVE_JOB_LOCK_DIR=/srv/healtharchive/ops/locks/jobs`
+  - `/srv/healtharchive/ops/locks/jobs` created with intended perms
+- ⏳ Cutover still pending (maintenance window):
+  - restart `healtharchive-worker.service` and `healtharchive-api.service` once crawls are idle.
+
 ## Implementation Progress
 
 - **Phase 1**: Implemented in repository (migration-ready lock directory behavior).

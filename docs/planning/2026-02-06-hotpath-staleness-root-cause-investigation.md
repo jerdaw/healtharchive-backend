@@ -1,6 +1,6 @@
 # 2026-02-06: Hot-Path Staleness Root-Cause Investigation
 
-**Plan Version**: v1.3
+**Plan Version**: v1.4
 **Status**: In Progress (Phases 0-2 implemented in repo; evidence capture + drills require operator execution on VPS)
 **Scope**: Determine and mitigate underlying causes of recurring hot-path stale mount events (Errno 107).
 **Batched items**: #6
@@ -23,6 +23,17 @@ bind mounts yet, even though this is likely a contributor to hot-path staleness 
 - Keep capturing pre/post evidence bundles on any Errno 107 event.
 - Run Phase 2 dry-run drills (simulation only) to ensure planned recovery remains sensible.
 - Schedule the mount-topology conversion for a maintenance window after the campaign is idle.
+
+## Current observations (as of 2026-02-07)
+
+- The active 2026 annual job output dirs are mounted directly as `sshfs` mountpoints (not bind mounts):
+  - This was confirmed via `findmnt` and via `scripts/vps-annual-output-tiering.py --year 2026` warnings
+    (`reason=unexpected_mount_type`).
+  - Benefit of fixing: reduce Errno 107 blast radius and make hot-path recovery simpler/more deterministic.
+  - Why deferred: fixing requires unmount/re-mount of job output dirs and risks interrupting active crawls.
+- Deploy-lock suppression was observed and cleared:
+  - A stale `/tmp/healtharchive-backend-deploy.lock` existed and caused apply-mode watchdogs to skip.
+  - The lock file was removed; metrics now show deploy lock inactive.
 
 ## Implementation Progress
 
