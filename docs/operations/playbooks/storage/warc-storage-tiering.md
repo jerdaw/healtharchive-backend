@@ -224,6 +224,29 @@ mount | rg /srv/healtharchive/jobs/imports/legacy- || true
 Note: the template service runs `vps-warc-tiering-bind-mounts.sh --apply --repair-stale-mounts` so it can automatically
 unmount stale Errno 107 mountpoints and re-apply bind mounts.
 
+### If `healtharchive-warc-tiering.service` is failed (or alert is firing)
+
+First, gather a read-only diagnostic report (safe while crawls are running):
+
+```bash
+cd /opt/healtharchive-backend
+./scripts/vps-diagnose-warc-tiering.sh
+```
+
+Then, during a safe window (recommended: no active replay indexing and no ongoing maintenance), clear the failed state and re-apply tiering:
+
+```bash
+sudo systemctl reset-failed healtharchive-warc-tiering.service
+sudo systemctl start healtharchive-warc-tiering.service
+systemctl status healtharchive-warc-tiering.service --no-pager -l
+```
+
+If it fails again, run the tiering script directly (shows the most actionable error output):
+
+```bash
+sudo /opt/healtharchive-backend/scripts/vps-warc-tiering-bind-mounts.sh --apply --repair-stale-mounts
+```
+
 If the unit is in a `failed` state from a prior incident, clear it before retrying:
 
 ```bash

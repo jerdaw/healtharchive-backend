@@ -253,7 +253,11 @@ Once production is healthy, tie this back to:
 
 - **CI & branch protection** (see `hosting-and-live-server-to-dos.md` §7):
   - Ensure GitHub Actions workflows are enabled and passing.
-  - Configure branch protection on `main` to require CI checks before merging.
+  - Verify backend `main` protection still matches the solo-dev ruleset profile in
+    `../operations/monitoring-and-ci-checklist.md` §3.2:
+    - required check: `Backend CI / test`
+    - keep `Backend CI / e2e-smoke` and `Backend CI (Full) / test-full` non-required
+    - keep `Restrict deletions` and `Block force pushes` enabled
 
 With this in place, `main` deploys cleanly to production, and you have health
 and metrics coverage for both the API and the frontend.

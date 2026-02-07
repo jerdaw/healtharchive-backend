@@ -29,7 +29,7 @@ ha-backend --help
 | **Job Management** | `create-job`, `run-db-job`, `index-job`, `register-job-dir` |
 | **Direct Execution** | `run-job` |
 | **Inspection** | `list-jobs`, `show-job` |
-| **Maintenance** | `retry-job`, `cleanup-job`, `replay-index-job` |
+| **Maintenance** | `retry-job`, `reset-retry-count`, `cleanup-job`, `replay-index-job` |
 | **Annual Campaign** | `schedule-annual`, `annual-status`, `reconcile-annual-tool-options` |
 | **Seeding** | `seed-sources` |
 | **Worker** | `start-worker` |
@@ -402,6 +402,43 @@ ha-backend retry-job --id 42
 **Exit codes**:
 - `0` - Job marked for retry
 - `1` - Job not in retryable state
+
+---
+
+### reset-retry-count
+
+Reset a crawl job's retry budget by setting `retry_count` to a lower value.
+
+Safe-by-default: dry-run unless `--apply` is passed.
+
+**Usage**:
+```bash
+ha-backend reset-retry-count --id JOB_ID [--apply] [--reason "note"]
+```
+
+**Arguments**:
+- `--id` - One or more Job IDs to modify
+- `--apply` - Persist changes (default: dry-run)
+- `--reason` - Optional note printed in output (required for multi-job apply)
+- `--new-count` - New value for `retry_count` (default: `0`)
+- `--min-retry-count` - Only match jobs with retry_count >= this (default: `1`)
+
+**Examples**:
+```bash
+# Dry-run (prints what would change)
+ha-backend reset-retry-count --id 42
+
+# Apply for one job
+ha-backend reset-retry-count --id 42 --apply --reason "storage recovered; re-attempt crawl"
+
+# Bulk mode (requires --source, --status, and --limit)
+ha-backend reset-retry-count --source hc --status failed retryable --limit 25 --apply --reason "post-incident retry budget reset"
+```
+
+**Safety guardrails**:
+- Skips jobs in `running` status.
+- Skips jobs whose lock file appears held (job runner likely still active).
+- Only supports statuses: `queued`, `retryable`, `failed`.
 
 ---
 

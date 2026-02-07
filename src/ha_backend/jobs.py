@@ -51,13 +51,28 @@ def _get_job_lock_dir() -> Path:
     return DEFAULT_JOB_LOCK_DIR
 
 
+def _should_enforce_tmp_lock_dir_perms(lock_dir: Path) -> bool:
+    """
+    We only harden permissions for lock dirs under /tmp.
+
+    For dedicated lock dirs (e.g. under /srv/healtharchive/ops/**), operators
+    typically want group/setgid semantics rather than a world-writable sticky dir.
+    """
+    try:
+        p = str(lock_dir)
+    except Exception:
+        return False
+    return p == "/tmp" or p.startswith("/tmp/")
+
+
 @contextmanager
 def _job_lock(job_id: int) -> Iterator[Path]:
     lock_dir = _get_job_lock_dir()
     try:
         lock_dir.mkdir(parents=True, exist_ok=True)
         try:
-            lock_dir.chmod(0o1777)
+            if _should_enforce_tmp_lock_dir_perms(lock_dir):
+                lock_dir.chmod(0o1777)
         except OSError:
             pass
     except OSError:

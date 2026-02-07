@@ -66,18 +66,17 @@ Verification:
 
 - GitHub Actions shows the backend CI workflow completing successfully on `main`.
 
-#### Check name inventory (for future branch protection)
+#### Check name inventory (branch protection)
 
-If/when you enable branch protection required checks, use the stable workflow/job check names shown
-in GitHub’s UI. Avoid renaming workflow/job IDs after you start requiring them.
+Use stable workflow/job check names shown in GitHub’s UI. Avoid renaming workflow/job IDs after
+you start requiring them.
 
-As of 2026-01-17, the checks typically appear as:
+As of 2026-02-06 (solo-dev profile), the checks are used as follows:
 
-- Backend repo:
-  - `Backend CI / test` (recommended required PR gate)
-  - `Backend CI / e2e-smoke` (post-merge / optional)
-- Frontend repo: `Frontend CI / lint-and-test`, `Frontend CI / e2e-smoke`
-- Datasets repo: `Datasets CI / lint`
+- Backend repo (required on `main`): `Backend CI / test`
+- Backend repo (not required): `Backend CI / e2e-smoke` (push/manual only), `Backend CI (Full) / test-full` (nightly/manual)
+- Frontend repo (when protecting frontend `main`): `Frontend CI / lint-and-test` (required), `Frontend CI / e2e-smoke` (optional)
+- Datasets repo (when protecting datasets `main`): `Datasets CI / lint` (required)
 
 ### Step 1b — End-to-end smoke checks (CI)
 
@@ -534,24 +533,50 @@ Checklist:
   - If you see “Workflows are disabled for this fork”, click **Enable**.
 - [ ] Verify that pushing to `main` or opening a PR triggers the workflows.
 
-### 3.2 Branch protection on `main`
+### 3.2 Branch protection on `main` (backend repo, solo-dev profile)
 
-In each repo:
+Backend enforcement is currently maintained as a GitHub ruleset.
 
-1. Go to **Settings → Branches → Branch protection rules**.
-2. Add or edit a rule for the `main` branch:
-   - Enable **Require a pull request before merging**.
-   - Enable **Require status checks to pass before merging**.
-   - Select:
-     - The backend CI workflow for the backend repo.
-     - The frontend CI workflow for the frontend repo.
-   - Enable **Include administrators** (recommended best practice).
-   - Enable **Require review from Code Owners** (recommended; requires `.github/CODEOWNERS`).
+As configured on 2026-02-06:
 
-This ensures:
+- Ruleset name: `main-protection`
+- Target branch: `main`
+- Enforcement status: `Active`
+- Bypass list: `Repository admin Role` (always allow)
+- Enabled rules:
+  - `Restrict deletions`
+  - `Require status checks to pass` with required check `Backend CI / test`
+  - `Block force pushes`
+- Disabled rules (intentional for solo-dev speed):
+  - `Require a pull request before merging`
+  - Review/approval requirements
+  - Code owner requirements
+  - Extra code scanning/code quality gates
 
-- No changes reach `main` without passing tests and linting.
-- Every `main` deploy (to staging/production) is backed by green CI.
+Important check-selection notes:
+
+- Do not require `Backend CI / e2e-smoke` in branch protection (it does not run on pull requests).
+- Do not require `Backend CI (Full) / test-full` (nightly/manual workflow).
+
+Verification ritual (operator, monthly or after workflow edits):
+
+1. Open **GitHub → Repository → Settings → Rules → Rulesets → `main-protection`**.
+2. Confirm required check list still contains only `Backend CI / test`.
+3. Confirm `Block force pushes` and `Restrict deletions` remain enabled.
+4. Open **Actions** and confirm the latest `Backend CI` run on `main` is green.
+5. Log any changes in an ops report note (date + what changed + why).
+6. Review `.github/migration-guard-exceptions.txt`:
+   - remove expired rules,
+   - ensure any active rule has a short-lived expiry and clear reason.
+
+Latest evidence snapshot:
+
+- 2026-02-06: `main-protection` ruleset verified active with required check `Backend CI / test`,
+  `Restrict deletions` enabled, and `Block force pushes` enabled.
+
+Future tighten-up trigger:
+
+- If a second regular committer is added, enable PR-required merges and approval rules, then update this section.
 
 ---
 

@@ -2371,6 +2371,183 @@ def cmd_retry_job(args: argparse.Namespace) -> None:
             )
 
 
+def cmd_reset_retry_count(args: argparse.Namespace) -> None:
+    """
+    Reset a job's crawl retry budget by setting retry_count back to a lower value.
+
+    Safe-by-default: dry-run unless --apply is passed.
+    """
+    from datetime import datetime, timezone
+
+    from sqlalchemy.orm import joinedload
+
+    from .jobs import JobAlreadyRunningError, _job_lock
+    from .models import ArchiveJob as ORMArchiveJob
+    from .models import Source
+
+    apply_mode = bool(getattr(args, "apply", False))
+    new_count = int(getattr(args, "new_count", 0) or 0)
+    if new_count < 0:
+        print("ERROR: --new-count must be >= 0.", file=sys.stderr)
+        sys.exit(2)
+
+    ids = [int(x) for x in (getattr(args, "id", None) or [])]
+    source_filter = (getattr(args, "source", None) or "").strip().lower() or None
+    statuses = [
+        str(s).strip().lower() for s in (getattr(args, "status", None) or []) if str(s).strip()
+    ]
+    limit = getattr(args, "limit", None)
+    if limit is not None:
+        limit = int(limit)
+        if limit <= 0:
+            print("ERROR: --limit must be > 0.", file=sys.stderr)
+            sys.exit(2)
+
+    min_retry_count = int(getattr(args, "min_retry_count", 1) or 0)
+    if min_retry_count < 0:
+        print("ERROR: --min-retry-count must be >= 0.", file=sys.stderr)
+        sys.exit(2)
+
+    reason = (getattr(args, "reason", None) or "").strip() or None
+
+    allowed_statuses = {"queued", "retryable", "failed"}
+    if statuses:
+        unknown = [s for s in statuses if s not in allowed_statuses]
+        if unknown:
+            print(
+                f"ERROR: unsupported --status value(s): {', '.join(sorted(set(unknown)))}. "
+                f"Supported: {', '.join(sorted(allowed_statuses))}.",
+                file=sys.stderr,
+            )
+            sys.exit(2)
+
+    if not ids:
+        # Bulk mode guardrails: require source, status, and limit.
+        if not source_filter:
+            print("ERROR: must pass --id or (bulk) --source.", file=sys.stderr)
+            sys.exit(2)
+        if not statuses:
+            print(
+                "ERROR: bulk mode requires --status (one or more) to avoid overly broad changes.",
+                file=sys.stderr,
+            )
+            sys.exit(2)
+        if limit is None:
+            print("ERROR: bulk mode requires --limit.", file=sys.stderr)
+            sys.exit(2)
+
+    if apply_mode and reason is None and len(ids) != 1:
+        print(
+            "ERROR: refusing to apply without --reason for multi-job changes. "
+            'Re-run with --reason "...".',
+            file=sys.stderr,
+        )
+        sys.exit(2)
+
+    now = datetime.now(timezone.utc).replace(microsecond=0)
+    print("HealthArchive Backend – Reset Retry Count")
+    print("-----------------------------------------")
+    print(f"Mode:          {'APPLY' if apply_mode else 'DRY-RUN'}")
+    print(f"Generated UTC: {now.isoformat()}")
+    print(f"Target ids:    {', '.join(str(i) for i in ids) if ids else '(bulk query)'}")
+    print(f"Source filter: {source_filter or '(none)'}")
+    print(f"Status filter: {', '.join(statuses) if statuses else '(none)'}")
+    print(f"Min retries:   {min_retry_count}")
+    print(f"New retries:   {new_count}")
+    print(f"Reason:        {reason or '(none)'}")
+    if not ids:
+        print(f"Limit:         {limit}")
+    print("")
+
+    with get_session() as session:
+        query = session.query(ORMArchiveJob).options(joinedload(ORMArchiveJob.source))
+        if ids:
+            query = query.filter(ORMArchiveJob.id.in_(ids))
+        else:
+            query = query.join(Source).filter(Source.code == source_filter)
+            query = query.filter(ORMArchiveJob.status.in_(statuses))
+
+        if min_retry_count > 0:
+            query = query.filter(ORMArchiveJob.retry_count >= min_retry_count)
+
+        if not ids:
+            query = query.order_by(ORMArchiveJob.created_at.asc(), ORMArchiveJob.id.asc()).limit(
+                limit
+            )
+
+        jobs = query.all()
+
+        if ids:
+            found_ids = {int(j.id) for j in jobs}
+            missing = [str(i) for i in ids if i not in found_ids]
+            if missing:
+                print(f"ERROR: job(s) not found: {', '.join(missing)}", file=sys.stderr)
+                sys.exit(1)
+
+        if not jobs:
+            print("No jobs matched.")
+            return
+
+        # Safety: refuse jobs that appear to still be running (status or lock).
+        skipped: list[str] = []
+        eligible: list[ORMArchiveJob] = []
+        for job in jobs:
+            source_code = job.source.code if job.source else "?"
+            if job.status == "running":
+                skipped.append(f"job_id={job.id} source={source_code} (status=running)")
+                continue
+            if job.status not in allowed_statuses:
+                skipped.append(
+                    f"job_id={job.id} source={source_code} (status={job.status!r} not allowed)"
+                )
+                continue
+            try:
+                with _job_lock(int(job.id)):
+                    pass
+            except JobAlreadyRunningError as exc:
+                skipped.append(f"job_id={job.id} source={source_code} (lock held: {exc.lock_path})")
+                continue
+            except OSError as exc:
+                skipped.append(f"job_id={job.id} source={source_code} (lock probe failed: {exc})")
+                continue
+            eligible.append(job)
+
+        if skipped:
+            print("Skipping jobs that are not safe to modify:")
+            for line in skipped:
+                print(f"- {line}")
+            print("")
+
+        if not eligible:
+            print("No eligible jobs matched safety checks.")
+            return
+
+        changed = 0
+        for job in eligible:
+            source_code = job.source.code if job.source else "?"
+            before = int(job.retry_count or 0)
+            after = new_count
+            if before == after:
+                print(
+                    f"job_id={job.id} source={source_code} status={job.status} retry_count={before} (no-op)"
+                )
+                continue
+            print(
+                f"job_id={job.id} source={source_code} status={job.status} retry_count {before} -> {after}"
+            )
+            if apply_mode:
+                job.retry_count = after
+                changed += 1
+
+        if not apply_mode:
+            print("")
+            print("Dry-run only; re-run with --apply to persist changes.")
+            return
+
+        print("")
+        print(f"Applied: updated retry_count for {changed} job(s).")
+
+
 def cmd_recover_stale_jobs(args: argparse.Namespace) -> None:
     """
     Recover jobs that appear stuck in status='running'.
@@ -5271,6 +5448,55 @@ def build_parser() -> argparse.ArgumentParser:
         help="ArchiveJob ID to retry.",
     )
     p_retry.set_defaults(func=cmd_retry_job)
+
+    # reset-retry-count
+    p_reset = subparsers.add_parser(
+        "reset-retry-count",
+        help="Reset crawl retry budget by setting retry_count lower (default: dry-run).",
+    )
+    p_reset.add_argument(
+        "--id",
+        type=int,
+        nargs="+",
+        help="One or more ArchiveJob IDs to modify.",
+    )
+    p_reset.add_argument(
+        "--source",
+        help="Bulk mode: filter by source code (requires --status and --limit).",
+    )
+    p_reset.add_argument(
+        "--status",
+        nargs="+",
+        help="Bulk mode: filter by one or more statuses (supported: queued retryable failed).",
+    )
+    p_reset.add_argument(
+        "--limit",
+        type=int,
+        help="Bulk mode: maximum number of jobs to modify (required in bulk mode).",
+    )
+    p_reset.add_argument(
+        "--min-retry-count",
+        type=int,
+        default=1,
+        help="Only match jobs with retry_count >= this value (default: 1).",
+    )
+    p_reset.add_argument(
+        "--new-count",
+        type=int,
+        default=0,
+        help="Set retry_count to this value (default: 0).",
+    )
+    p_reset.add_argument(
+        "--reason",
+        help="Optional reason note printed in the audit output (required for multi-job apply).",
+    )
+    p_reset.add_argument(
+        "--apply",
+        action="store_true",
+        default=False,
+        help="Apply changes (default is dry-run).",
+    )
+    p_reset.set_defaults(func=cmd_reset_retry_count)
 
     # recover-stale-jobs
     p_recover = subparsers.add_parser(
