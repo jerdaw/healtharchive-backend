@@ -44,6 +44,24 @@ ls -la /etc/healtharchive/worker-auto-start-enabled 2>/dev/null || true
 cat /srv/healtharchive/ops/watchdog/worker-auto-start.json 2>/dev/null || true
 ```
 
+### Watchdog failure-mode matrix (deterministic triage)
+
+Use this matrix before manual repair so you can classify the watchdog state quickly.
+
+Primary evidence commands:
+
+```bash
+cat /srv/healtharchive/ops/watchdog/storage-hotpath-auto-recover.json 2>/dev/null || true
+curl -s http://127.0.0.1:9100/metrics | rg '^healtharchive_storage_hotpath_auto_recover_(metrics_ok|detected_targets|deploy_lock_active|last_apply_ok|last_apply_timestamp_seconds|apply_total)'
+```
+
+| Failure class | Typical signals | Meaning | Operator action |
+|---|---|---|---|
+| Stale targets detected, no apply attempted yet | `detected_targets > 0`, `apply_total` unchanged, no fresh `last_apply_timestamp_seconds` | Target not yet eligible (confirm-runs/min-age/rate-limit gate) | Keep observing for a short window; if persistent, run dry-run drill and then manual recovery steps below |
+| Deploy-lock suppression | `deploy_lock_active == 1`, state has `last_skip_reason=deploy_lock` | Apply mode intentionally downgraded to safe dry-run during deploy | Finish deploy first, then re-check watchdog state; do not force overlapping recovery |
+| Apply attempted and failed | `apply_total > 0`, `last_apply_ok == 0` (especially if older than 24h) | Recovery ran but post-check failed (mount not restored/readable) | Follow full recovery sequence in this playbook; inspect `last_apply_errors` and `last_apply_warnings` in watchdog state JSON |
+| Watchdog metrics stale/missing | `metrics_ok == 0` or metric timestamp stale alert firing | Timer or script is failing before/while writing metrics | Check timer/service logs, fix watchdog execution first, then re-run dry-run drill |
+
 2) Confirm Storage Box base mount health:
 
 ```bash
@@ -276,6 +294,13 @@ sudo systemctl restart healtharchive-storagebox-sshfs.service
 If this becomes a recurring pattern, treat it as an infrastructure incident and follow:
 
 - `../core/incident-response.md`
+
+If the persistent failed-apply alert is active (`HealthArchiveStorageHotpathApplyFailedPersistent`):
+
+1. Capture `last_apply_errors` / `last_apply_warnings` from:
+   - `/srv/healtharchive/ops/watchdog/storage-hotpath-auto-recover.json`
+2. Run this playbook’s ordered recovery sequence (worker quiesce -> targeted unmount -> tiering re-apply -> stale job recover -> worker restart).
+3. Run the dry-run drill from `storagebox-sshfs-stale-mount-drills.md` to confirm planned actions are now sane.
 
 ---
 

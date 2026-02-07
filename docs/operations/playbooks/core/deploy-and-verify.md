@@ -23,6 +23,10 @@ Canonical references:
 
    - `./scripts/vps-deploy.sh --apply --baseline-mode live`
 
+   Recommended wrapper (routine use):
+
+   - `./scripts/vps-hetzdeploy.sh`
+
    This includes:
 
    - DB migrations
@@ -35,8 +39,21 @@ Canonical references:
 
    - `./scripts/vps-deploy.sh --apply --baseline-mode live --install-systemd-units --apply-alerting`
 
+   If the public frontend is externally down (e.g., Vercel `402 Payment required`), you can deploy backend-only:
+
+   - `./scripts/vps-hetzdeploy.sh --mode backend-only`
+
+   Optional: install the wrapper outside the repo so it never dirties `/opt/healtharchive-backend`:
+
+   - `sudo ./scripts/vps-install-hetzdeploy.sh --apply`
+   - Then run: `hetzdeploy` or `hetzdeploy --mode backend-only`
+
    Notes:
 
+   - Prefer a real command over an alias; aliases can accidentally persist `set -euo pipefail` in your interactive shell.
+   - If `hetzdeploy --mode backend-only` errors with `syntax error near unexpected token`, you probably still have an alias named `hetzdeploy`.
+     - Check: `type hetzdeploy`
+     - Remove: `unalias hetzdeploy 2>/dev/null || true` and delete the alias line from your shell startup files.
    - `--apply-alerting` requires alerting to be configured on the VPS (webhook secret present at
      `/etc/healtharchive/observability/alertmanager_webhook_url`).
 

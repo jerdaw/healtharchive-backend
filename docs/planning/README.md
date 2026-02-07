@@ -13,6 +13,11 @@ Active plans:
 
 - Disk usage investigation (48GB discrepancy): `2026-02-01-disk-usage-investigation.md`
 - WARC discovery consistency improvements: `2026-01-29-warc-discovery-consistency.md`
+- Deploy workflow hardening (single VPS): `2026-02-07-deploy-workflow-hardening.md`
+- CI schema + governance guardrails: `2026-02-06-ci-schema-and-governance-guardrails.md`
+- Storage watchdog observability hardening: `2026-02-06-storage-watchdog-observability-hardening.md`
+- Crawl operability (locks, writability, retry controls): `2026-02-06-crawl-operability-locks-and-retry-controls.md`
+- Hot-path staleness root-cause investigation: `2026-02-06-hotpath-staleness-root-cause-investigation.md`
 
 ## Implemented plans (history)
 

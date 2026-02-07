@@ -169,6 +169,20 @@ returns to running because the worker is already busy with another crawl.
 - Increase hourly/daily caps cautiously - investigate root cause instead
 - Don't bypass caps in automation - they prevent pathological loops
 
+### Persistent Failed-Apply Alert
+
+| Parameter | Value | Location | Rationale |
+|-----------|-------|----------|-----------|
+| **Failed-apply age threshold** | >24h | `ops/observability/alerting/healtharchive-alerts.yml` (`HealthArchiveStorageHotpathApplyFailedPersistent`) | Catch long-lived failed recovery state |
+| **Startup guard** | `apply_total > 0` | Same alert expr | Avoid first-run/startup false positives |
+| **Alert duration** | 30m | Same alert rule (`for: 30m`) | Avoid transient signal noise |
+| **Initial severity** | warning | Same alert rule | Tune in burn-in before considering escalation |
+
+**Tuning guidance**:
+- Keep age threshold at 24h until burn-in confirms clear signal quality.
+- If alert is too noisy, investigate watchdog state churn first; do not hide failures by increasing to multiple days.
+- Escalate to `critical` only after at least one week of clean behavior and verified operator response path.
+
 ---
 
 ## SSHFS Mount Options
@@ -217,6 +231,26 @@ See: `docs/planning/implemented/2026-02-01-operational-resilience-improvements.m
 - Decrease to 5min if false positives are common (careful!)
 
 See: `docs/planning/implemented/2026-01-24-infra-error-and-storage-hotpath-hardening.md`
+
+---
+
+### Annual Output Dir Writability Probe
+
+These checks detect permission drift for queued/retryable annual jobs before a
+crawl attempt consumes retries.
+
+| Parameter | Value | Location | Rationale |
+|-----------|-------|----------|-----------|
+| **Probe cadence** | every 1 minute | `docs/deployment/systemd/healtharchive-crawl-metrics.timer` | Early warning without paging storms |
+| **Probe target** | queued/retryable annual jobs | `scripts/vps-crawl-metrics-textfile.py` | Bounded cardinality (annual jobs only) |
+| **Probe identity** | `haadmin` | `scripts/vps-crawl-metrics-textfile.py` (`--annual-writability-probe-user`) | Matches worker runtime user |
+| **Alert duration** | 10m | `ops/observability/alerting/healtharchive-alerts.yml` (`HealthArchiveAnnualOutputDirNotWritable`) | Avoid transient noise |
+| **Severity** | warning | same alert rule | Fix before retries are consumed |
+
+Triage signals:
+
+- `..._errno == 13`: permission drift (output dir not writable for worker user)
+- `..._errno == 107`: stale sshfs hot path (follow storage hot-path recovery)
 
 ---
 
@@ -274,6 +308,7 @@ See: `src/archive_tool/constants.py`, `scripts/vps-crawl-auto-recover.py`
 | **Storage** | Stale mount age | 120s | P1 | `vps-storage-hotpath-auto-recover.py` |
 | | Recovery cooldown | 15 min | P1 | `vps-storage-hotpath-auto-recover.py` |
 | | Recovery cap | 6/day global | P1 | `vps-storage-hotpath-auto-recover.py` |
+| | Failed apply persistence alert | >24h + 30m | P1 | alerting YAML |
 | **Infra** | Retry cooldown | 10 min | P1 | `worker/main.py` |
 | **SSHFS** | Keepalive interval | 15s | P1 | systemd service |
 

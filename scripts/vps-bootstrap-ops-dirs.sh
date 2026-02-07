@@ -10,6 +10,8 @@ This is a one-time (or idempotent) helper so ops scripts can write artifacts to:
   - /srv/healtharchive/ops/restore-tests
   - /srv/healtharchive/ops/adoption
   - /srv/healtharchive/ops/automation
+  - /srv/healtharchive/ops/burnin/storage-watchdog
+  - /srv/healtharchive/ops/locks/jobs
   - /srv/healtharchive/ops/search-eval
 
 Usage (on the VPS):
@@ -73,6 +75,10 @@ subdirs=(
   restore-tests
   adoption
   automation
+  burnin
+  burnin/storage-watchdog
+  locks
+  locks/jobs
   search-eval
 )
 

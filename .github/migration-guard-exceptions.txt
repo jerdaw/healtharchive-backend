@@ -1,0 +1,12 @@
+# Temporary exceptions for scripts/ci_migration_guard.py
+#
+# Format (pipe-delimited; 4 fields):
+# path_glob|signal_regex|expires_yyyy-mm-dd|reason
+#
+# Guardrails:
+# - Expiry must be today..today+30 days.
+# - Keep entries narrowly scoped and remove as soon as migration/logic is fixed.
+# - Prefer adding the real Alembic migration whenever possible.
+#
+# Example:
+# src/ha_backend/search.py|app DDL detected: .*CREATE TEMP TABLE.*|2026-02-20|False positive: temp-table query plan change does not persist schema

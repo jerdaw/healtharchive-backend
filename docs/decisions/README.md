@@ -57,6 +57,7 @@ If a decision changes later, create a new decision record and mark the old one a
 
 ## Decision records
 
+- `2026-02-07-git-first-vps-changes.md`
 - `2026-02-06-per-source-crawl-profiles-and-annual-reconciliation.md`
 - `2026-02-03-crawl-auto-recover-queue-fill.md`
 - `2026-02-03-crawl-job-db-state-reconciliation.md`

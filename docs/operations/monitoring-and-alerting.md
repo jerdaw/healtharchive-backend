@@ -38,6 +38,7 @@ Primary files (single-VPS annual campaign):
 | `healtharchive_crawl_running_job_last_progress_age_seconds` | Gauge | Time since the last "pages crawled" increment in the logs. |
 | `healtharchive_crawl_running_job_stalled` | Gauge | 1 = Progress stalled > 1 hour. |
 | `healtharchive_crawl_running_job_output_dir_ok` | Gauge | 1 = Output directory is accessible. |
+| `healtharchive_crawl_annual_pending_job_output_dir_writable{source,job_id,status,year}` | Gauge | 1 = Queued/retryable annual job output dir would be writable by the worker user (permission drift detection). |
 | `healtharchive_crawl_running_job_log_probe_ok` | Gauge | 1 = Combined log file is readable. |
 | `healtharchive_crawl_running_job_crawl_rate_ppm` | Gauge | Pages per minute crawl rate (from crawlStatus log window). |
 | `healtharchive_crawl_running_job_new_crawl_phase_count` | Gauge | Count of `New Crawl Phase` stage starts seen in the current combined-log tail window. |
@@ -67,11 +68,23 @@ Alerts are defined in:
 - **Meaning:** A running crawl job cannot access its output directory. Errno 107 typically means a stale SSHFS/FUSE mount.
 - **Action:** Follow the Storage Box stale mount recovery playbook and/or ensure hot-path auto-recover is enabled and succeeding.
 
+**Alert:** `HealthArchiveAnnualOutputDirNotWritable`
+
+- **Threshold:** `healtharchive_crawl_annual_pending_job_output_dir_writable == 0` for 10m (probe-user gated).
+- **Meaning:** A queued/retryable annual job output dir is not writable for the worker user. This typically indicates permission drift (Errno 13) or a stale mount (Errno 107) and can consume retry budget if not fixed before the job starts.
+- **Action:** Run crawl preflight checks for the specific job output dir mount and writability; re-apply annual output tiering if needed.
+
 **Alert:** `HealthArchiveStorageHotpathStaleUnrecovered`
 
 - **Threshold:** `healtharchive_storage_hotpath_auto_recover_detected_targets > 0` for 10m (when the automation is enabled).
 - **Meaning:** Hot-path auto-recover still sees stale/unreadable paths after 10 minutes.
 - **Action:** Inspect `/srv/healtharchive/ops/watchdog/storage-hotpath-auto-recover.json` and consider manual unmount + tiering re-apply.
+
+**Alert:** `HealthArchiveStorageHotpathApplyFailedPersistent`
+
+- **Threshold:** watchdog enabled, at least one apply attempt, `last_apply_ok == 0`, and last apply timestamp older than 24h (for 30m).
+- **Meaning:** Hot-path auto-recover apply mode has remained in a failed terminal state for over a day.
+- **Action:** Inspect `/srv/healtharchive/ops/watchdog/storage-hotpath-auto-recover.json` (`last_apply_errors`, `last_apply_warnings`), then follow stale mount recovery playbook steps and re-run a controlled dry-run/apply verification.
 
 ### 3) Restart stability
 
