@@ -1,7 +1,7 @@
 # 2026-02-06: Hot-Path Staleness Root-Cause Investigation
 
-**Plan Version**: v1.1
-**Status**: In Progress (Phases 0-1 implemented in repo; evidence capture requires operator execution on VPS when events occur)
+**Plan Version**: v1.2
+**Status**: In Progress (Phases 0-2 implemented in repo; evidence capture + drills require operator execution on VPS)
 **Scope**: Determine and mitigate underlying causes of recurring hot-path stale mount events (Errno 107).
 **Batched items**: #6
 
@@ -16,7 +16,10 @@
   - Recovery playbook now recommends capturing a bundle before state changes:
     - `docs/operations/playbooks/storage/storagebox-sshfs-stale-mount-recovery.md`
   - The playbook also recommends a post-repair evidence bundle (`--tag post-repair`) so you can diff pre/post state.
-- **Phase 2**: Pending (requires operator-run drills / event capture on the VPS).
+- **Phase 2**: Implemented in repository (Phase 2 drill helper + investigation log format; still requires operator-run execution on the VPS).
+  - Phase 2 drill helper:
+    - `scripts/vps-hotpath-staleness-drill.sh`
+  - Evidence bundles now include a crawl-status snapshot (`vps-crawl-status.txt`) to correlate mount issues with live jobs.
 - **Phase 3-5**: Pending.
 
 ## Current State Summary
@@ -174,6 +177,24 @@ Then proceed with state-changing recovery steps in:
 
 - At least one complete event lifecycle captured with full telemetry.
 - At least one hypothesis downgraded or eliminated by evidence.
+
+**Operator how-to (VPS) (safe, dry-run)**:
+
+Use this to capture pre/post bundles and optionally run the watchdog in **dry-run simulation mode** (no service changes, no unmounts).
+
+```bash
+cd /opt/healtharchive-backend
+./scripts/vps-hotpath-staleness-drill.sh \
+  --simulate-broken-path /srv/healtharchive/jobs/hc/<JOB_DIR> \
+  --note "phase2 drill (dry-run)"
+```
+
+Outputs:
+
+- `drill-pre` and `drill-post` evidence bundles under:
+  - `/srv/healtharchive/ops/observability/hotpath-staleness/`
+- A small correlation log line appended to:
+  - `/srv/healtharchive/ops/observability/hotpath-staleness/investigation-log.tsv`
 
 ### Phase 3: Mitigation Candidate Definition and Risk Assessment
 

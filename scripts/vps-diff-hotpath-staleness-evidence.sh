@@ -106,14 +106,26 @@ diff_one() {
 # Keep this small and high-signal: focus on mounts, systemd state, and probes.
 diff_one meta.txt || true
 diff_one repo.txt || true
+diff_one vps-crawl-status.txt || true
 diff_one systemctl-status.txt || true
+diff_one systemctl-show-storagebox.txt || true
+diff_one systemctl-cat-storagebox.txt || true
+diff_one systemctl-cat-tiering.txt || true
 diff_one mount.txt || true
 diff_one findmnt-storagebox.txt || true
 diff_one tiering-binds.txt || true
 diff_one tiering-hotpath-probes.txt || true
 diff_one path-probes.txt || true
+diff_one journal-storagebox.txt || true
+diff_one journal-tiering.txt || true
+diff_one journal-hotpath-watchdog.txt || true
+diff_one journal-worker.txt || true
+diff_one dmesg-tail.txt || true
 diff_one watchdog-metrics.prom || true
 diff_one watchdog-state.json || true
+diff_one ip-addr.txt || true
+diff_one ip-route.txt || true
+diff_one ss-summary.txt || true
+diff_one ps-sshfs.txt || true
 
 echo "Done."
-

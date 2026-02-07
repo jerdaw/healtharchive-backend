@@ -28,6 +28,13 @@ cd /opt/healtharchive-backend
 ./scripts/vps-capture-hotpath-staleness-evidence.sh --tag pre-repair
 ```
 
+Optional: if the affected crawl campaign year differs from the current UTC year, pass it explicitly:
+
+```bash
+cd /opt/healtharchive-backend
+./scripts/vps-capture-hotpath-staleness-evidence.sh --tag pre-repair --year 2026
+```
+
 This writes a timestamped directory under:
 
 - `/srv/healtharchive/ops/observability/hotpath-staleness/`

@@ -54,6 +54,28 @@ sudo bash -lc 'set -a; source /etc/healtharchive/backend.env; set +a; \
 
 If this looks wrong, fix the watchdog logic **before** enabling the production timer.
 
+## 1.5) Drill: hot-path staleness evidence + correlation (Phase 2 investigation helper)
+
+This drill is also safe on production (read-only bundles + optional dry-run simulation).
+
+It captures a **pre** and **post** evidence bundle and diffs them. It also appends a
+single TSV line you can use later for correlation across multiple drills/incidents.
+
+```bash
+cd /opt/healtharchive-backend
+./scripts/vps-hotpath-staleness-drill.sh \
+  --simulate-broken-path /srv/healtharchive/jobs/hc/<JOB_DIR> \
+  --note "phase2 drill (dry-run)"
+```
+
+Artifacts:
+
+- Evidence bundles:
+  - `/srv/healtharchive/ops/observability/hotpath-staleness/hotpath-staleness-<ts>-drill-pre/`
+  - `/srv/healtharchive/ops/observability/hotpath-staleness/hotpath-staleness-<ts>-drill-post/`
+- Correlation log:
+  - `/srv/healtharchive/ops/observability/hotpath-staleness/investigation-log.tsv`
+
 ## 2) Drill: persistent failed-apply alert condition (safe, no paging)
 
 Goal: validate the Phase 2 alert condition logic for
