@@ -1,0 +1,20 @@
+[Unit]
+Description=HealthArchive storage watchdog burn-in daily snapshot (read-only)
+Wants=network-online.target
+After=network-online.target
+ConditionPathExists=/etc/healtharchive/storage-watchdog-burnin-enabled
+ConditionPathExists=/opt/healtharchive-backend/scripts/vps-storage-watchdog-burnin-report.py
+ConditionPathExists=/opt/healtharchive-backend/scripts/vps-storage-watchdog-burnin-snapshot.sh
+
+[Service]
+Type=oneshot
+User=haadmin
+Group=healtharchive
+WorkingDirectory=/opt/healtharchive-backend
+
+# Keep impact low on the single VPS.
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=6
+
+ExecStart=/usr/bin/bash -lc '/opt/healtharchive-backend/scripts/vps-storage-watchdog-burnin-snapshot.sh --out-dir /srv/healtharchive/ops/burnin/storage-watchdog --keep-days 30'

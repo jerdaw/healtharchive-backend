@@ -23,6 +23,44 @@ Assumptions (adjust paths/user if your VPS differs):
 - Backend env file: `/etc/healtharchive/backend.env`
 - Backend system user: `haadmin`
 
+## Job lock directory (recommended)
+
+The backend uses per-job `flock` lock files to prevent double-running a job and
+to help watchdog scripts classify whether a job is still actively running.
+
+By default, lock files live under `/tmp/healtharchive-job-locks`, which can be
+fragile on hardened systems and during cross-user incident response.
+
+Recommended production lock directory:
+
+- `/srv/healtharchive/ops/locks/jobs`
+
+Enablement (on the VPS):
+
+1. Ensure ops dirs exist:
+
+   - `cd /opt/healtharchive-backend && sudo ./scripts/vps-bootstrap-ops-dirs.sh`
+2. Set the env var in `/etc/healtharchive/backend.env`:
+
+   - `export HEALTHARCHIVE_JOB_LOCK_DIR=/srv/healtharchive/ops/locks/jobs`
+3. Restart the worker and any watchdog timers/services that read `backend.env`
+   during a safe window.
+
+Hard requirement: do not restart the worker while crawls are running unless you accept interruption. Confirm `ha-backend list-jobs --status running` is empty before restarting.
+
+Recommended (safe, copy/paste checklist):
+
+- `cd /opt/healtharchive-backend && ./scripts/vps-job-lock-dir-cutover.sh`
+
+If the script is missing on the VPS, your `/opt/healtharchive-backend` checkout is behind the repo. You can either deploy/pull first,
+or stage the cutover manually (no restarts required until your maintenance window):
+
+- `sudo cp -av /etc/healtharchive/backend.env /etc/healtharchive/backend.env.bak.$(date -u +%Y%m%dT%H%M%SZ)`
+- Add/update:
+  - `export HEALTHARCHIVE_JOB_LOCK_DIR=/srv/healtharchive/ops/locks/jobs`
+- Ensure the lock dir exists (some older `vps-bootstrap-ops-dirs.sh` versions did not create it):
+  - `sudo install -d -m 2770 -o root -g healtharchive /srv/healtharchive/ops/locks/jobs`
+
 ---
 
 ## Files
@@ -106,6 +144,10 @@ Assumptions (adjust paths/user if your VPS differs):
   - Optional automation to recover **stale/unreadable hot paths** caused by `sshfs`/FUSE mount failures (Errno 107).
   - Gated by `ConditionPathExists=/etc/healtharchive/storage-hotpath-auto-recover-enabled`.
   - Disabled by default; enable only after dry-run validation and only if you’re comfortable with the safety caps in `scripts/vps-storage-hotpath-auto-recover.py`.
+- `healtharchive-storage-watchdog-burnin-snapshot.service` + `.timer`
+  - Optional read-only daily snapshot of the storage hot-path watchdog burn-in summary.
+  - Gated by `ConditionPathExists=/etc/healtharchive/storage-watchdog-burnin-enabled`.
+  - Writes dated JSON artifacts under `/srv/healtharchive/ops/burnin/storage-watchdog/` (and `latest.json`).
 - `healtharchive-storagebox-sshfs.service`
   - Mounts a Hetzner Storage Box at `/srv/healtharchive/storagebox` via `sshfs`.
   - Reads configuration from `/etc/healtharchive/storagebox.env`.
@@ -151,6 +193,8 @@ matches your operational readiness.
 - **Storage hot-path auto-recover** (`healtharchive-storage-hotpath-auto-recover.timer`)
   - Dangerous if misconfigured; only enable after you’ve validated Phase 1 alerts and run the watchdog in dry-run mode.
   - The unit is gated by a venv presence check and the watchdog skips runs while the deploy lock is *held* (to avoid flapping during active deploys).
+- **Storage watchdog burn-in snapshots** (`healtharchive-storage-watchdog-burnin-snapshot.timer`)
+  - Read-only; safe to enable during rollout/burn-in weeks so evidence is captured automatically.
 - **Worker auto-start watchdog** (`healtharchive-worker-auto-start.timer`)
   - Recommended once you’re confident in the single-VPS production automation stack.
   - The unit is sentinel-gated and refuses to start the worker if the Storage Box mount is unreadable or if the DB indicates a `status=running` job while the worker is down.
@@ -638,6 +682,46 @@ The watchdog writes state under:
 and emits node_exporter textfile metrics via:
 
 - `healtharchive_storage_hotpath_auto_recover.prom`
+
+---
+
+## Enable storage watchdog burn-in snapshots (optional; low impact)
+
+This automation captures a daily read-only snapshot of the storage watchdog
+burn-in report so you have evidence artifacts even if nobody remembers to run
+the command manually.
+
+Precondition: ops directories exist (idempotent):
+
+```bash
+cd /opt/healtharchive-backend
+sudo ./scripts/vps-bootstrap-ops-dirs.sh
+```
+
+Create the sentinel file:
+
+```bash
+sudo install -m 0644 -o root -g root /dev/null /etc/healtharchive/storage-watchdog-burnin-enabled
+```
+
+Enable the timer:
+
+```bash
+sudo systemctl enable --now healtharchive-storage-watchdog-burnin-snapshot.timer
+systemctl list-timers | rg healtharchive-storage-watchdog-burnin-snapshot || systemctl list-timers | grep healtharchive-storage-watchdog-burnin-snapshot
+```
+
+Artifacts:
+
+- `/srv/healtharchive/ops/burnin/storage-watchdog/latest.json`
+- `/srv/healtharchive/ops/burnin/storage-watchdog/storage-watchdog-burnin-YYYYMMDD.json`
+
+Rollback:
+
+```bash
+sudo systemctl disable --now healtharchive-storage-watchdog-burnin-snapshot.timer
+sudo rm -f /etc/healtharchive/storage-watchdog-burnin-enabled
+```
 
 ---
 

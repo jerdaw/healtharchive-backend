@@ -1,0 +1,9 @@
+[Unit]
+Description=Daily HealthArchive storage watchdog burn-in snapshot
+
+[Timer]
+OnCalendar=*-*-* 04:25:00 UTC
+Persistent=true
+
+[Install]
+WantedBy=timers.target

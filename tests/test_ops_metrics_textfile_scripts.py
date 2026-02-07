@@ -136,3 +136,58 @@ def test_vps_tiering_metrics_textfile_reports_errno_for_hot_path(tmp_path, monke
     assert "healtharchive_tiering_manifest_ok 1" in prom
     assert f'healtharchive_tiering_hot_path_ok{{hot="{hot_path}"}} 0' in prom
     assert f'healtharchive_tiering_hot_path_errno{{hot="{hot_path}"}} 107' in prom
+
+
+def test_vps_crawl_metrics_textfile_reports_pending_annual_output_dir_not_writable(
+    tmp_path: Path, monkeypatch
+) -> None:
+    import getpass
+
+    mod = _load_script_module(
+        "vps-crawl-metrics-textfile.py",
+        module_name="ha_test_vps_crawl_metrics_textfile_annual_writability",
+    )
+    _init_test_db(tmp_path, monkeypatch, "crawl_metrics_annual.db")
+    monkeypatch.setenv("HEALTHARCHIVE_ARCHIVE_ROOT", str(tmp_path / "jobs"))
+
+    output_dir = tmp_path / "annual_out"
+    output_dir.mkdir(parents=True)
+    os.chmod(output_dir, 0o555)  # readable/executable but not writable for the current user
+
+    with get_session() as session:
+        seed_sources(session)
+        session.flush()
+        phac = session.query(Source).filter_by(code="phac").one()
+        job = ArchiveJob(
+            source=phac,
+            name="phac-20260101",
+            status="queued",
+            output_dir=str(output_dir),
+            config={},
+        )
+        session.add(job)
+        session.flush()
+        job_id = int(job.id)
+
+    out_dir = tmp_path / "out"
+    rc = mod.main(
+        [
+            "--out-dir",
+            str(out_dir),
+            "--out-file",
+            "crawl.prom",
+            "--annual-writability-probe-user",
+            getpass.getuser(),
+            "--annual-writability-probe-max-jobs",
+            "10",
+        ]
+    )
+    assert rc == 0
+
+    prom = (out_dir / "crawl.prom").read_text(encoding="utf-8")
+    assert "healtharchive_crawl_annual_pending_output_dir_probe_user_ok 1" in prom
+    labels = f'job_id="{job_id}",source="phac",status="queued",year="2026"'
+    assert f"healtharchive_crawl_annual_pending_job_output_dir_writable{{{labels}}} 0" in prom
+    assert (
+        f"healtharchive_crawl_annual_pending_job_output_dir_writable_errno{{{labels}}} 13" in prom
+    )

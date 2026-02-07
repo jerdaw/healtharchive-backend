@@ -31,13 +31,32 @@ Purpose: safely introduce schema changes and keep Alembic, tests, and docs align
    - `alembic upgrade head`
 5) Run the test suite:
    - `make ci`
-6) Update docs if the change affects operators or contributors.
-7) Commit the migration + any code/docs changes together.
+6) Run the schema-parity guard explicitly (recommended for schema-sensitive API work):
+   - `pytest -q tests/test_ci_schema_parity.py`
+7) Run the migration-required guard against your branch diff (recommended before opening PR):
+   - `make migration-guard MIGRATION_GUARD_BASE=origin/main MIGRATION_GUARD_HEAD=HEAD`
+8) Update docs if the change affects operators or contributors.
+9) Commit the migration + any code/docs changes together.
+
+## Temporary exceptions (false-positive handling)
+
+Use this only when `make migration-guard` fails but you have confirmed there is no real persisted schema
+change (for example, query code introducing temporary-table SQL that does not alter app schema).
+
+1) Add a narrowly-scoped temporary rule in `.github/migration-guard-exceptions.txt`:
+   - format: `path_glob|signal_regex|expires_yyyy-mm-dd|reason`
+2) Keep expiry short (the guard enforces max 30 days).
+3) Prefer fixing the underlying heuristic quickly and removing the exception.
+4) Include the exception rationale in the PR description.
+
+Never use this to bypass a real schema migration requirement.
 
 ## Verification (“done” criteria)
 
 - `alembic upgrade head` succeeds on a clean local DB.
 - `make ci` passes.
+- `tests/test_ci_schema_parity.py` passes for schema-sensitive API/model changes.
+- `make migration-guard MIGRATION_GUARD_BASE=origin/main MIGRATION_GUARD_HEAD=HEAD` passes.
 - Any new/changed behavior is documented in the appropriate canonical doc (dev/deploy/ops).
 
 ## Rollback / recovery (if needed)

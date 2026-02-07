@@ -3,6 +3,7 @@ from __future__ import annotations
 import errno
 import fcntl
 import os
+import shutil
 from pathlib import Path
 
 import pytest
@@ -356,3 +357,25 @@ def test_run_persistent_job_refuses_to_run_when_lock_held(tmp_path, monkeypatch)
         assert stored.status in {"queued", "retryable"}
         assert stored.started_at is None
         assert stored.finished_at is None
+
+
+def test_job_lock_does_not_force_1777_outside_tmp(tmp_path, monkeypatch) -> None:
+    from ha_backend.jobs import _job_lock
+
+    base = Path("/var/tmp")
+    if not base.is_dir():
+        pytest.skip("/var/tmp not available on this platform")
+
+    lock_dir = base / f"healtharchive-locks-test-{os.getpid()}"
+    try:
+        lock_dir.mkdir(parents=True, exist_ok=True)
+        os.chmod(lock_dir, 0o2770)
+        monkeypatch.setenv("HEALTHARCHIVE_JOB_LOCK_DIR", str(lock_dir))
+
+        with _job_lock(123):
+            pass
+
+        mode = lock_dir.stat().st_mode & 0o7777
+        assert mode == 0o2770
+    finally:
+        shutil.rmtree(lock_dir, ignore_errors=True)

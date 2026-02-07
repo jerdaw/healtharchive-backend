@@ -1,4 +1,4 @@
-.PHONY: venv format format-check lint precommit typecheck test-fast test-all test security audit check check-full ci docs-serve docs-build docs-build-strict docs-refs docs-coverage docs-coverage-strict docs-check
+.PHONY: venv format format-check lint precommit typecheck test-fast test-all test security audit migration-guard check check-full ci docs-serve docs-build docs-build-strict docs-refs docs-coverage docs-coverage-strict docs-check
 
 VENV ?= .venv
 VENV_BIN := $(VENV)/bin
@@ -14,6 +14,8 @@ HAS_PYTHON := $(shell command -v python >/dev/null 2>&1 && echo 1 || echo 0)
 PYTHON_FALLBACK := $(if $(filter 1,$(HAS_PYTHON)),python,$(PYTHON))
 PYTHON_RUN := $(if $(wildcard $(VENV_BIN)/python3),$(VENV_BIN)/python3,$(PYTHON_FALLBACK))
 MKDOCS := $(if $(wildcard $(VENV_BIN)/mkdocs),$(VENV_BIN)/mkdocs,mkdocs)
+MIGRATION_GUARD_BASE ?= origin/main
+MIGRATION_GUARD_HEAD ?= HEAD
 
 venv:
 	$(PYTHON) -m venv $(VENV)
@@ -37,6 +39,8 @@ typecheck:
 
 test-fast:
 	$(PYTEST) -q \
+		tests/test_ci_migration_guard.py \
+		tests/test_ci_schema_parity.py \
 		tests/test_archive_tool_*.py \
 		tests/test_cli_*.py \
 		tests/test_db_models_and_seeds.py \
@@ -56,6 +60,11 @@ security:
 
 audit:
 	$(PIP_AUDIT) || true
+
+migration-guard:
+	$(PYTHON_RUN) scripts/ci_migration_guard.py \
+		--base-ref $(MIGRATION_GUARD_BASE) \
+		--head-ref $(MIGRATION_GUARD_HEAD)
 
 docs-serve:
 	PYTHONPATH=src $(PYTHON_RUN) scripts/export_openapi.py

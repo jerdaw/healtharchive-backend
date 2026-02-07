@@ -2,13 +2,16 @@
 from __future__ import annotations
 
 import argparse
+import errno
 import json
 import os
+import re
 import stat
 import subprocess
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from typing import Iterable
 
 from archive_tool.constants import STATE_FILE_NAME
 from ha_backend.crawl_stats import (
@@ -33,6 +36,18 @@ class PendingIndexJob:
     job_id: int
     source_code: str
     finished_at: datetime | None
+
+
+@dataclass(frozen=True)
+class PendingCrawlAnnualJob:
+    job_id: int
+    source_code: str
+    status: str
+    year: int
+    output_dir: str
+
+
+_ANNUAL_JOB_SUFFIX_RE = re.compile(r"-(?P<year>[0-9]{4})0101(?:\b|$)")
 
 
 def _dt_to_epoch_seconds(dt: datetime) -> int:
@@ -154,6 +169,72 @@ def _systemctl_is_active(unit: str) -> int:
     return 1 if r.stdout.strip() == "active" else 0
 
 
+def _safe_int(value: object, *, default: int) -> int:
+    try:
+        return int(value)  # type: ignore[arg-type]
+    except Exception:
+        return int(default)
+
+
+def _resolve_user_identity(username: str) -> tuple[int, set[int]] | None:
+    """
+    Return (uid, gids) for username, or None if the user does not exist.
+
+    This is used so a root-run metrics writer can estimate whether the worker
+    user would be able to write into a directory (permission drift detection).
+    """
+    username = (username or "").strip()
+    if not username:
+        return None
+    try:
+        import grp
+        import pwd
+
+        pw = pwd.getpwnam(username)
+    except Exception:
+        return None
+
+    gids: set[int] = {int(pw.pw_gid)}
+    try:
+        for gr in grp.getgrall():
+            try:
+                if username in (gr.gr_mem or []):
+                    gids.add(int(gr.gr_gid))
+            except Exception:
+                continue
+    except Exception:
+        # Best-effort only. Primary group is still meaningful.
+        pass
+    return int(pw.pw_uid), gids
+
+
+def _has_dir_write_and_exec_perms(st: os.stat_result, *, uid: int, gids: Iterable[int]) -> bool:
+    mode = int(st.st_mode)
+
+    if int(st.st_uid) == int(uid):
+        return bool(mode & 0o200) and bool(mode & 0o100)
+    if int(st.st_gid) in {int(g) for g in gids}:
+        return bool(mode & 0o020) and bool(mode & 0o010)
+    return bool(mode & 0o002) and bool(mode & 0o001)
+
+
+def _probe_dir_writable_for_user(path: Path, *, uid: int, gids: set[int]) -> tuple[int, int]:
+    """
+    Return (ok, errno) where:
+      ok=1 means "exists, is dir, and would be writable by (uid,gids)"
+      errno=-1 means "ok", otherwise best-effort errno (or 0 for non-error non-ok states).
+    """
+    try:
+        st = path.stat()
+    except OSError as exc:
+        return 0, int(exc.errno or -1)
+    if not stat.S_ISDIR(st.st_mode):
+        return 0, 0
+    if not _has_dir_write_and_exec_perms(st, uid=uid, gids=gids):
+        return 0, int(errno.EACCES)
+    return 1, -1
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description=(
@@ -198,6 +279,17 @@ def main(argv: list[str] | None = None) -> int:
         default=10,
         help="Window for 'recent infra_error jobs' metrics (default: 10 minutes).",
     )
+    parser.add_argument(
+        "--annual-writability-probe-user",
+        default="haadmin",
+        help="User name to check pending annual job output_dir writability against (default: haadmin).",
+    )
+    parser.add_argument(
+        "--annual-writability-probe-max-jobs",
+        type=int,
+        default=20,
+        help="Max number of queued/retryable annual jobs to probe per run (default: 20).",
+    )
     args = parser.parse_args(argv)
 
     out_dir = Path(args.out_dir)
@@ -207,6 +299,7 @@ def main(argv: list[str] | None = None) -> int:
     metrics_ok = 1
     jobs: list[tuple[RunningJob, str]] = []
     pending_index_jobs: list[PendingIndexJob] = []
+    pending_annual_jobs: list[PendingCrawlAnnualJob] = []
     pending_crawl_jobs = 0
     recent_infra_error_jobs = 0
     try:
@@ -268,16 +361,58 @@ def main(argv: list[str] | None = None) -> int:
                 .filter(ArchiveJob.updated_at >= infra_cutoff)
                 .count()
             )
+
+            max_annual_jobs = max(0, _safe_int(args.annual_writability_probe_max_jobs, default=0))
+            if max_annual_jobs > 0:
+                pending_rows = (
+                    session.query(
+                        ArchiveJob.id,
+                        Source.code,
+                        ArchiveJob.status,
+                        ArchiveJob.name,
+                        ArchiveJob.output_dir,
+                    )
+                    .join(Source, ArchiveJob.source_id == Source.id)
+                    .filter(ArchiveJob.status.in_(["queued", "retryable"]))
+                    .order_by(ArchiveJob.id.asc())
+                    .limit(max_annual_jobs * 5)  # filter in Python; keep DB query small.
+                    .all()
+                )
+                for job_id, source_code, status, name, output_dir in pending_rows:
+                    if not output_dir:
+                        continue
+                    m = _ANNUAL_JOB_SUFFIX_RE.search(str(name or ""))
+                    if not m:
+                        continue
+                    year = _safe_int(m.group("year"), default=0)
+                    if year <= 0:
+                        continue
+                    pending_annual_jobs.append(
+                        PendingCrawlAnnualJob(
+                            job_id=int(job_id),
+                            source_code=str(source_code),
+                            status=str(status),
+                            year=int(year),
+                            output_dir=str(output_dir),
+                        )
+                    )
+                    if len(pending_annual_jobs) >= max_annual_jobs:
+                        break
     except Exception:
         metrics_ok = 0
         jobs = []
         pending_index_jobs = []
+        pending_annual_jobs = []
         pending_crawl_jobs = 0
         recent_infra_error_jobs = 0
 
     worker_active = _systemctl_is_active(str(args.worker_unit))
     storagebox_ok, _storagebox_errno = _probe_readable_dir(Path(str(args.storagebox_mount)))
     worker_should_be_running = 1 if (pending_crawl_jobs > 0 and storagebox_ok == 1) else 0
+
+    probe_identity = _resolve_user_identity(str(args.annual_writability_probe_user))
+    probe_user_ok = 1 if probe_identity is not None else 0
+    probe_uid, probe_gids = probe_identity if probe_identity is not None else (-1, set())
 
     lines: list[str] = []
     _emit(
@@ -489,6 +624,49 @@ def main(argv: list[str] | None = None) -> int:
         "# HELP healtharchive_crawl_running_job_errors_other Other error count from .archive_state.json, or -1 when unknown.",
     )
     _emit(lines, "# TYPE healtharchive_crawl_running_job_errors_other gauge")
+
+    _emit(
+        lines,
+        "# HELP healtharchive_crawl_annual_pending_output_dir_probe_user_ok 1 if the configured annual writability probe user exists on the host.",
+    )
+    _emit(lines, "# TYPE healtharchive_crawl_annual_pending_output_dir_probe_user_ok gauge")
+    _emit(lines, f"healtharchive_crawl_annual_pending_output_dir_probe_user_ok {probe_user_ok}")
+
+    _emit(
+        lines,
+        "# HELP healtharchive_crawl_annual_pending_jobs_probed Number of queued/retryable annual jobs probed for output_dir writability.",
+    )
+    _emit(lines, "# TYPE healtharchive_crawl_annual_pending_jobs_probed gauge")
+    _emit(lines, f"healtharchive_crawl_annual_pending_jobs_probed {len(pending_annual_jobs)}")
+
+    _emit(
+        lines,
+        "# HELP healtharchive_crawl_annual_pending_job_output_dir_writable 1 if the annual queued/retryable job output_dir would be writable by the configured probe user.",
+    )
+    _emit(lines, "# TYPE healtharchive_crawl_annual_pending_job_output_dir_writable gauge")
+    _emit(
+        lines,
+        "# HELP healtharchive_crawl_annual_pending_job_output_dir_writable_errno Errno observed when probing output_dir, or -1 when OK.",
+    )
+    _emit(lines, "# TYPE healtharchive_crawl_annual_pending_job_output_dir_writable_errno gauge")
+
+    if probe_user_ok == 1:
+        for j in pending_annual_jobs:
+            labels = (
+                f'job_id="{int(j.job_id)}",source="{j.source_code}",'
+                f'status="{j.status}",year="{int(j.year)}"'
+            )
+            ok, err = _probe_dir_writable_for_user(
+                Path(j.output_dir), uid=int(probe_uid), gids=set(probe_gids)
+            )
+            _emit(
+                lines,
+                f"healtharchive_crawl_annual_pending_job_output_dir_writable{{{labels}}} {ok}",
+            )
+            _emit(
+                lines,
+                f"healtharchive_crawl_annual_pending_job_output_dir_writable_errno{{{labels}}} {err}",
+            )
 
     for job, source_code in jobs:
         labels = f'job_id="{int(job.job_id)}",source="{source_code}"'

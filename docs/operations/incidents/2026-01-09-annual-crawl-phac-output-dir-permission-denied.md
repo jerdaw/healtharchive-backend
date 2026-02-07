@@ -113,7 +113,7 @@ Recovery restored a writable output directory and reset the job’s retry budget
 ## Action items (TODOs)
 
 - [ ] Identify why this job’s `output_dir` was not writable (mount type + UID/GID expectations) and document the invariant we rely on. (priority=high)
-- [ ] Add an operator-safe command to reset a crawl job’s retry budget (e.g., `ha-backend reset-retry-count --id ID`, or extend `retry-job` to reset `retry_count` when status is `retryable`). (priority=medium)
+- [x] Add an operator-safe command to reset a crawl job’s retry budget: `ha-backend reset-retry-count` (dry-run by default; `--apply` required; skips running/lock-held jobs). (implemented 2026-02-06)
 - [ ] Consider treating “output dir not writable” as an `infra_error` class so it does not consume retry budget. (priority=medium)
 - [ ] Add a short ops note: when `psql` roles are missing, use the DB session method (Python snippet) rather than forcing `psql` as root. (priority=low)
 
