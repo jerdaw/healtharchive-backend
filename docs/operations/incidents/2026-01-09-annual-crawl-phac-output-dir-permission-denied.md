@@ -75,7 +75,7 @@ Recovery restored a writable output directory and reset the job’s retry budget
   - Verified writability with a host-level probe:
     - `touch /srv/healtharchive/jobs/phac/20260101T000502Z__phac-20260101/.writable_test && rm /srv/healtharchive/jobs/phac/20260101T000502Z__phac-20260101/.writable_test`
   - Validated annual tiering state for `phac`:
-    - `/opt/healtharchive-backend/.venv/bin/python3 /opt/healtharchive-backend/scripts/vps-annual-output-tiering.py --year 2026 --sources phac --apply`
+    - `sudo /opt/healtharchive-backend/.venv/bin/python3 /opt/healtharchive-backend/scripts/vps-annual-output-tiering.py --year 2026 --sources phac --apply`
 - Validated job configuration:
   - `ha-backend validate-job-config --id 7`
 - Reset the job retry budget:

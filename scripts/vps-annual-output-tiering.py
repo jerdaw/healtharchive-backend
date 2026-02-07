@@ -18,6 +18,55 @@ def _now_year_utc() -> int:
     return datetime.now(timezone.utc).year
 
 
+def _get_mount_info(path: Path) -> dict[str, str] | None:
+    """
+    Return mount info for the mount containing `path` (best-effort), or None.
+
+    Uses findmnt when available; falls back to parsing `mount` output.
+    """
+    try:
+        r = subprocess.run(
+            ["findmnt", "-T", str(path), "-o", "SOURCE,TARGET,FSTYPE,OPTIONS", "-n"],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        if r.returncode == 0 and r.stdout.strip():
+            parts = r.stdout.strip().split(None, 3)
+            if len(parts) >= 4:
+                return {
+                    "source": parts[0],
+                    "target": parts[1],
+                    "fstype": parts[2],
+                    "options": parts[3],
+                }
+    except FileNotFoundError:
+        pass
+
+    out = subprocess.run(["mount"], check=False, capture_output=True, text=True).stdout
+    needle = f" on {path} "
+    for line in out.splitlines():
+        if needle not in line:
+            continue
+        # Example: SRC on TARGET type FSTYPE (opts)
+        try:
+            left, rest = line.split(" on ", 1)
+            target_part, rest2 = rest.split(" type ", 1)
+            fstype_part, opts_part = rest2.split(" ", 1)
+            opts_part = opts_part.strip()
+            if opts_part.startswith("(") and opts_part.endswith(")"):
+                opts_part = opts_part[1:-1]
+        except ValueError:
+            continue
+        return {
+            "source": left.strip(),
+            "target": target_part.strip(),
+            "fstype": fstype_part.strip(),
+            "options": opts_part.strip(),
+        }
+    return None
+
+
 def _is_exact_mountpoint(path: Path) -> bool:
     """
     Return True if `path` itself is a mountpoint target.
@@ -97,6 +146,9 @@ class TierPlanItem:
     output_dir: Path
     cold_dir: Path
     mount_present: bool
+    mount_source: str | None
+    mount_fstype: str | None
+    mount_options: str | None
     output_dir_ok: int
     output_dir_errno: int
 
@@ -146,6 +198,10 @@ def _plan(
                     campaign_archive_root=campaign_archive_root,
                 )
                 mount_present = _is_exact_mountpoint(output_dir)
+                mount_info = _get_mount_info(output_dir) if mount_present else None
+                mount_source = str(mount_info.get("source")) if mount_info else None
+                mount_fstype = str(mount_info.get("fstype")) if mount_info else None
+                mount_options = str(mount_info.get("options")) if mount_info else None
                 ok, err = _probe_readable_dir(output_dir) if mount_present else (0, 0)
                 plan.append(
                     TierPlanItem(
@@ -156,6 +212,9 @@ def _plan(
                         output_dir=output_dir,
                         cold_dir=cold_dir,
                         mount_present=mount_present,
+                        mount_source=mount_source,
+                        mount_fstype=mount_fstype,
+                        mount_options=mount_options,
                         output_dir_ok=int(ok),
                         output_dir_errno=int(err),
                     )
@@ -183,6 +242,8 @@ def _plan(
 
 
 def _mount_bind(cold_dir: Path, output_dir: Path) -> None:
+    if os.geteuid() != 0:
+        raise RuntimeError("mount requires root (use sudo)")
     try:
         output_dir.mkdir(parents=True, exist_ok=True)
     except OSError as e:
@@ -263,6 +324,16 @@ def main(argv: list[str] | None = None) -> int:
         "--apply", action="store_true", help="Actually perform bind mounts (default: dry-run)."
     )
     p.add_argument(
+        "--repair-unexpected-mounts",
+        action="store_true",
+        default=False,
+        help=(
+            "If an output_dir is already mounted but is not a bind mount from the expected cold_dir, "
+            "attempt a targeted unmount and re-bind. This is only safe during maintenance "
+            "(stop the worker first)."
+        ),
+    )
+    p.add_argument(
         "--repair-stale-mounts",
         action="store_true",
         default=False,
@@ -335,13 +406,56 @@ def main(argv: list[str] | None = None) -> int:
 
     errors: list[str] = []
     changed = 0
+    warnings = 0
     for item in plan:
         if item.mount_present:
             if item.output_dir_ok == 1:
+                opts = str(item.mount_options or "")
+                is_bind = "bind" in {o.strip().lower() for o in opts.split(",") if o.strip()}
+                if is_bind:
+                    print(
+                        f"OK   job={item.job_id} {item.source_code} {item.job_name} (already mounted)"
+                    )
+                    continue
+
+                warnings += 1
+                print(f"WARN job={item.job_id} {item.source_code} {item.job_name}")
+                print(f"     hot={item.output_dir}")
+                print(f"     cold={item.cold_dir}")
+                if item.mount_source or item.mount_fstype or item.mount_options:
+                    print(
+                        "     mount="
+                        f"source={item.mount_source or '?'} "
+                        f"fstype={item.mount_fstype or '?'} "
+                        f"options={item.mount_options or '?'}"
+                    )
+                print("     reason=unexpected_mount_type (expected a bind mount)")
+                print("     Hint: this increases staleness risk and makes recovery harder.")
                 print(
-                    f"OK   job={item.job_id} {item.source_code} {item.job_name} (already mounted)"
+                    "     Fix (maintenance only): stop the worker, then run this script with "
+                    "--apply --repair-unexpected-mounts."
                 )
-                continue
+                if not args.apply or not args.repair_unexpected_mounts:
+                    continue
+                if os.geteuid() != 0:
+                    errors.append(
+                        f"repair requires root (use sudo): job_id={item.job_id} output_dir={item.output_dir}"
+                    )
+                    continue
+                if str(item.job_status) == "running" and not bool(args.allow_repair_running_jobs):
+                    errors.append(
+                        "refusing to repair unexpected mount for running job without "
+                        f"--allow-repair-running-jobs: job_id={item.job_id} output_dir={item.output_dir}"
+                    )
+                    continue
+                r = subprocess.run(["umount", str(item.output_dir)], check=False)
+                if r.returncode != 0:
+                    r2 = subprocess.run(["umount", "-l", str(item.output_dir)], check=False)
+                    if r2.returncode != 0:
+                        errors.append(
+                            f"failed to unmount unexpected mountpoint at {item.output_dir} (rc={r2.returncode})"
+                        )
+                        continue
 
             if item.output_dir_errno == errno.ENOTCONN:
                 print(f"STALE job={item.job_id} {item.source_code} {item.job_name} (Errno 107)")
@@ -356,6 +470,11 @@ def main(argv: list[str] | None = None) -> int:
                 if not args.repair_stale_mounts:
                     errors.append(
                         f"stale mountpoint (Errno 107) at output_dir={item.output_dir} (job_id={item.job_id})"
+                    )
+                    continue
+                if os.geteuid() != 0:
+                    errors.append(
+                        f"repair requires root (use sudo): job_id={item.job_id} output_dir={item.output_dir}"
                     )
                     continue
                 if str(item.job_status) == "running" and not bool(args.allow_repair_running_jobs):
@@ -395,8 +514,8 @@ def main(argv: list[str] | None = None) -> int:
                 continue
         changed += 1
 
-    print("")
-    print(f"planned={len(plan)} mounted_now={changed}")
+        print("")
+    print(f"planned={len(plan)} mounted_now={changed} warnings={warnings}")
     if errors:
         print("ERROR: one or more mounts failed:", file=sys.stderr)
         for e in errors:

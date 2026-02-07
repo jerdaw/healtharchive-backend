@@ -108,6 +108,8 @@ ha-backend show-job --id <annual_job_id> --warc-details
 **Expected output**:
 - No database connection errors
 - All annual jobs show `OK (already mounted)` or are correctly identified for tiering
+- If you see `WARN ... reason=unexpected_mount_type`, the output dir is mounted but not as a bind mount (higher staleness risk).
+  - Plan a maintenance window to convert it (stop the worker first).
 
 **If tiering script fails with database error**:
 ```bash
@@ -129,11 +131,20 @@ If step 5 shows `STALE (Errno 107)` entries:
 sudo systemctl stop healtharchive-worker
 
 # Run tiering script with repair flag
-/opt/healtharchive-backend/.venv/bin/python3 \
+sudo /opt/healtharchive-backend/.venv/bin/python3 \
   /opt/healtharchive-backend/scripts/vps-annual-output-tiering.py \
   --year 2025 \
   --apply \
   --repair-stale-mounts \
+  --allow-repair-running-jobs
+
+# If step 5 shows `WARN ... reason=unexpected_mount_type` entries:
+# (maintenance only; converts direct sshfs mounts into bind mounts)
+sudo /opt/healtharchive-backend/.venv/bin/python3 \
+  /opt/healtharchive-backend/scripts/vps-annual-output-tiering.py \
+  --year 2025 \
+  --apply \
+  --repair-unexpected-mounts \
   --allow-repair-running-jobs
 ```
 
@@ -187,7 +198,7 @@ export $(cat /etc/healtharchive/env.production | xargs)
 sudo umount -l /srv/healtharchive/jobs/2025_annual_hc
 
 # Re-run tiering script
-/opt/healtharchive-backend/.venv/bin/python3 \
+sudo /opt/healtharchive-backend/.venv/bin/python3 \
   /opt/healtharchive-backend/scripts/vps-annual-output-tiering.py \
   --year 2025 \
   --apply

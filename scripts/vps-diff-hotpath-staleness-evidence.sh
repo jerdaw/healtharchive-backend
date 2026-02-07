@@ -75,15 +75,15 @@ count_hits() {
   if command -v rg >/dev/null 2>&1; then
     rg -n "${pat}" "${dir}"/*.txt 2>/dev/null | wc -l | tr -d ' '
   else
-    grep -RIn -- "${pat}" "${dir}"/*.txt 2>/dev/null | wc -l | tr -d ' '
+    grep -RInE -- "${pat}" "${dir}"/*.txt 2>/dev/null | wc -l | tr -d ' '
   fi
 }
 
 echo "Quick signals (counts):"
 echo "  before errno107_hits=$(count_hits "${BEFORE}" 'Errno 107|Transport endpoint is not connected')"
 echo "  after  errno107_hits=$(count_hits "${AFTER}" 'Errno 107|Transport endpoint is not connected')"
-echo "  before fuse_mounts=$(count_hits "${BEFORE}" 'fuse\\.sshfs')"
-echo "  after  fuse_mounts=$(count_hits "${AFTER}" 'fuse\\.sshfs')"
+echo "  before fuse_mounts=$(count_hits "${BEFORE}" 'fuse\.sshfs|fuse\.s')"
+echo "  after  fuse_mounts=$(count_hits "${AFTER}" 'fuse\.sshfs|fuse\.s')"
 echo ""
 
 diff_one() {
