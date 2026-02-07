@@ -541,31 +541,11 @@
          <lastmod>2026-02-07</lastmod>
     </url>
     <url>
-         <loc>https://docs.healtharchive.ca/planning/2026-01-29-warc-discovery-consistency/</loc>
-         <lastmod>2026-02-07</lastmod>
-    </url>
-    <url>
-         <loc>https://docs.healtharchive.ca/planning/2026-02-01-disk-usage-investigation/</loc>
-         <lastmod>2026-02-07</lastmod>
-    </url>
-    <url>
-         <loc>https://docs.healtharchive.ca/planning/2026-02-06-ci-schema-and-governance-guardrails/</loc>
-         <lastmod>2026-02-07</lastmod>
-    </url>
-    <url>
          <loc>https://docs.healtharchive.ca/planning/2026-02-06-crawl-operability-locks-and-retry-controls/</loc>
          <lastmod>2026-02-07</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/planning/2026-02-06-hotpath-staleness-root-cause-investigation/</loc>
-         <lastmod>2026-02-07</lastmod>
-    </url>
-    <url>
-         <loc>https://docs.healtharchive.ca/planning/2026-02-06-storage-watchdog-observability-hardening/</loc>
-         <lastmod>2026-02-07</lastmod>
-    </url>
-    <url>
-         <loc>https://docs.healtharchive.ca/planning/2026-02-07-deploy-workflow-hardening/</loc>
          <lastmod>2026-02-07</lastmod>
     </url>
     <url>
@@ -661,7 +641,15 @@
          <lastmod>2026-02-07</lastmod>
     </url>
     <url>
+         <loc>https://docs.healtharchive.ca/planning/implemented/2026-01-29-warc-discovery-consistency/</loc>
+         <lastmod>2026-02-07</lastmod>
+    </url>
+    <url>
          <loc>https://docs.healtharchive.ca/planning/implemented/2026-01-29-warc-manifest-verification/</loc>
+         <lastmod>2026-02-07</lastmod>
+    </url>
+    <url>
+         <loc>https://docs.healtharchive.ca/planning/implemented/2026-02-01-disk-usage-investigation/</loc>
          <lastmod>2026-02-07</lastmod>
     </url>
     <url>
@@ -669,7 +657,19 @@
          <lastmod>2026-02-07</lastmod>
     </url>
     <url>
+         <loc>https://docs.healtharchive.ca/planning/implemented/2026-02-06-ci-schema-and-governance-guardrails/</loc>
+         <lastmod>2026-02-07</lastmod>
+    </url>
+    <url>
          <loc>https://docs.healtharchive.ca/planning/implemented/2026-02-06-roadmap-backlog-items/</loc>
+         <lastmod>2026-02-07</lastmod>
+    </url>
+    <url>
+         <loc>https://docs.healtharchive.ca/planning/implemented/2026-02-06-storage-watchdog-observability-hardening/</loc>
+         <lastmod>2026-02-07</lastmod>
+    </url>
+    <url>
+         <loc>https://docs.healtharchive.ca/planning/implemented/2026-02-07-deploy-workflow-hardening/</loc>
          <lastmod>2026-02-07</lastmod>
     </url>
     <url>
