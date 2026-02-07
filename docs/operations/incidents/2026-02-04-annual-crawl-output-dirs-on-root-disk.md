@@ -222,7 +222,7 @@ None. (No observed user-facing downtime; annual campaign internal pipeline issue
 
 ## References / Artifacts
 
-- Related investigation: `../../planning/2026-02-01-disk-usage-investigation.md`
+- Related investigation: `../../planning/implemented/2026-02-01-disk-usage-investigation.md`
 - Related playbooks:
   - `../playbooks/storage/warc-storage-tiering.md`
   - `../playbooks/storage/storagebox-sshfs-stale-mount-recovery.md`
