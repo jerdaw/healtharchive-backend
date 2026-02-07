@@ -100,6 +100,19 @@ groups:
           description: "A running crawl job has an unreadable output_dir: source={{ $labels.source }} job_id={{ $labels.job_id }}. Check healtharchive_crawl_running_job_output_dir_errno (Errno 107 usually indicates a stale sshfs mount)."
           runbook_url: "https://github.com/jerdaw/healtharchive-backend/blob/main/docs/operations/playbooks/storagebox-sshfs-stale-mount-recovery.md"
 
+      - alert: HealthArchiveAnnualOutputDirNotWritable
+        expr: |
+          healtharchive_crawl_annual_pending_output_dir_probe_user_ok == 1
+          and healtharchive_crawl_annual_pending_job_output_dir_writable == 0
+        for: 10m
+        labels:
+          severity: warning
+          service: healtharchive
+        annotations:
+          summary: "Annual job output dir not writable (queued/retryable)"
+          description: "A queued/retryable annual job output_dir is not writable: source={{ $labels.source }} job_id={{ $labels.job_id }} status={{ $labels.status }} year={{ $labels.year }}. Check healtharchive_crawl_annual_pending_job_output_dir_writable_errno (Errno 13 indicates permissions; Errno 107 indicates stale sshfs)."
+          runbook_url: "https://github.com/jerdaw/healtharchive-backend/blob/main/docs/operations/playbooks/crawl/crawl-preflight.md"
+
       - alert: HealthArchiveCrawlStateFileParseFailed
         expr: |
           healtharchive_crawl_running_job_state_file_ok == 1
@@ -245,6 +258,21 @@ groups:
         annotations:
           summary: "Storage hot path stale/unrecovered (Errno 107 likely)"
           description: "The Storage Box hot-path auto-recover script is enabled but still detects stale/unreadable hot paths (Errno 107) after 10m. Check /srv/healtharchive/ops/watchdog/storage-hotpath-auto-recover.json and consider manual unmount + tiering re-apply."
+          runbook_url: "https://github.com/jerdaw/healtharchive-backend/blob/main/docs/operations/playbooks/storagebox-sshfs-stale-mount-recovery.md"
+
+      - alert: HealthArchiveStorageHotpathApplyFailedPersistent
+        expr: |
+          healtharchive_storage_hotpath_auto_recover_enabled == 1
+          and healtharchive_storage_hotpath_auto_recover_apply_total > 0
+          and healtharchive_storage_hotpath_auto_recover_last_apply_ok == 0
+          and (time() - healtharchive_storage_hotpath_auto_recover_last_apply_timestamp_seconds) > 86400
+        for: 30m
+        labels:
+          severity: warning
+          service: healtharchive
+        annotations:
+          summary: "Storage hot-path auto-recover apply failed for >24h"
+          description: "The last apply-mode hot-path recovery failed and no successful apply has replaced it for over 24 hours. Check /srv/healtharchive/ops/watchdog/storage-hotpath-auto-recover.json (last_apply_errors, last_apply_warnings), then run stale-mount recovery playbook steps."
           runbook_url: "https://github.com/jerdaw/healtharchive-backend/blob/main/docs/operations/playbooks/storagebox-sshfs-stale-mount-recovery.md"
 
       - alert: HealthArchiveTieringHotPathUnreadable

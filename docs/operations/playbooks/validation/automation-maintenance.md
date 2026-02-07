@@ -31,3 +31,22 @@ Follow the enable/rollback steps in `../../../deployment/systemd/README.md`.
 - `./scripts/verify_ops_automation.sh`
 - Spot-check logs:
   - `journalctl -u <service> -n 200`
+
+## Storage watchdog cadence (monthly)
+
+For stale-mount watchdog reliability, include this in the periodic automation review:
+
+1. Re-run a safe dry-run watchdog drill:
+   - `../storage/storagebox-sshfs-stale-mount-drills.md` (Section 1)
+2. Re-run the safe persistent failed-apply alert-condition drill:
+   - `../storage/storagebox-sshfs-stale-mount-drills.md` (Section 2)
+3. Review watchdog state + key metrics:
+   - `/srv/healtharchive/ops/watchdog/storage-hotpath-auto-recover.json`
+   - `healtharchive_storage_hotpath_auto_recover_last_apply_ok`
+   - `healtharchive_storage_hotpath_auto_recover_apply_total`
+4. If `HealthArchiveStorageHotpathApplyFailedPersistent` fired recently, follow:
+   - `../storage/storagebox-sshfs-stale-mount-recovery.md`
+
+Burn-in helper command (safe, read-only summary):
+
+- `python3 scripts/vps-storage-watchdog-burnin-report.py --window-hours 168 --json`

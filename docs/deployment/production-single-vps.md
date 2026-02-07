@@ -254,6 +254,21 @@ cd /opt/healtharchive-backend
 ./scripts/vps-deploy.sh --apply --ref <GIT_SHA>
 ```
 
+Recommended wrapper (routine use):
+
+```bash
+./scripts/vps-hetzdeploy.sh
+```
+
+Recommended: install `hetzdeploy` as a real command (avoid fragile aliases):
+
+```bash
+sudo ./scripts/vps-install-hetzdeploy.sh --apply
+
+# Then you can run it from anywhere:
+hetzdeploy
+```
+
 Notes:
 
 - The deploy script runs a **baseline drift check** by default to catch
@@ -271,6 +286,9 @@ Notes:
 - The deploy script runs a **public-surface smoke verify** by default (public API + frontend + replay + usage):
   - `./scripts/verify_public_surface.py` (defaults to `https://api.healtharchive.ca` and `https://www.healtharchive.ca`)
   - You can skip in emergencies: `./scripts/vps-deploy.sh --apply --skip-public-surface-verify`
+  - If the public frontend is externally down (e.g., Vercel `402 Payment required`), use:
+    - `./scripts/vps-hetzdeploy.sh --mode backend-only`
+    - Or (if installed): `hetzdeploy --mode backend-only`
 - Crawl-safety: if any jobs are `status=running`, the deploy helper will restart `healtharchive-api` but will
   **skip restarting `healtharchive-worker`** by default (to avoid SIGTERMing an active crawl).
   - To force a worker restart (only when you are OK interrupting crawls): `./scripts/vps-deploy.sh --apply --force-worker-restart`
