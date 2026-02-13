@@ -14,7 +14,7 @@ from threading import BoundedSemaphore, Lock
 from typing import Any, Dict, Iterable, Iterator, List, Optional, Sequence
 from urllib.parse import urlencode, urlsplit, urlunsplit
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Response
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, StreamingResponse
 from sqlalchemy import String, and_, case, cast, func, inspect, literal, or_, text
 from sqlalchemy.orm import Session, joinedload, load_only
@@ -65,6 +65,12 @@ from ha_backend.models import (
     Snapshot,
     SnapshotChange,
     Source,
+)
+from ha_backend.rate_limiting import (
+    RATE_LIMIT_EXPORTS,
+    RATE_LIMIT_REPORTS,
+    RATE_LIMIT_SEARCH,
+    limiter,
 )
 from ha_backend.runtime_metrics import observe_search_request
 from ha_backend.search import TS_CONFIG, build_search_vector
@@ -2142,8 +2148,11 @@ def _build_compare_snapshot(
 
 
 @router.post("/reports", response_model=IssueReportReceiptSchema, status_code=201)
+@limiter.limit(RATE_LIMIT_REPORTS)
 def submit_issue_report(
-    payload: IssueReportCreateSchema, db: Session = Depends(get_db)
+    request: Request,
+    payload: IssueReportCreateSchema,
+    db: Session = Depends(get_db),
 ) -> IssueReportReceiptSchema:
     """
     Accept a public issue report submission.
@@ -2267,7 +2276,9 @@ def get_exports_manifest() -> ExportManifestSchema:
 
 
 @router.get("/exports/snapshots")
+@limiter.limit(RATE_LIMIT_EXPORTS)
 def export_snapshots(
+    request: Request,
     format: str = Query(default="jsonl"),
     compressed: bool = Query(default=True),
     source: Optional[str] = Query(default=None),
@@ -2351,7 +2362,9 @@ def export_snapshots_head(
 
 
 @router.get("/exports/changes")
+@limiter.limit(RATE_LIMIT_EXPORTS)
 def export_changes(
+    request: Request,
     format: str = Query(default="jsonl"),
     compressed: bool = Query(default=True),
     source: Optional[str] = Query(default=None),
@@ -3580,7 +3593,9 @@ def resolve_replay_url(
 
 
 @router.get("/search", response_model=SearchResponseSchema)
+@limiter.limit(RATE_LIMIT_SEARCH)
 def search_snapshots(
+    request: Request,
     q: Optional[str] = Query(default=None, min_length=1, max_length=256),
     source: Optional[str] = Query(
         default=None, min_length=1, max_length=16, pattern=r"^[a-z0-9-]+$"

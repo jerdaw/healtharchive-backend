@@ -195,7 +195,7 @@ def recompute_page_signals(
             rows.append(mapping)
 
         if rows:
-            session.bulk_insert_mappings(PageSignal, rows)  # type: ignore[arg-type]
+            session.bulk_insert_mappings(PageSignal, rows)
             inserted = len(rows)
 
         return int(deleted) + inserted
