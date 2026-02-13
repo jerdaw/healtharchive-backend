@@ -2,698 +2,698 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
     <url>
          <loc>https://docs.healtharchive.ca/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/api-consumer-guide/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/api/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/architecture/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/contributing/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/documentation-guidelines/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/documentation-process-audit/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/project/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/quickstart/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/roadmap-process/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/_templates/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/_templates/adoption-signals-log-template/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/_templates/decision-template/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/_templates/incident-template/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/_templates/mentions-log-template/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/_templates/ops-ui-friction-log-template/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/_templates/playbook-template/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/_templates/restore-test-log-template/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/_templates/runbook-template/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/datasets-external/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/decisions/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/decisions/2026-01-09-public-incident-disclosure-posture/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/decisions/2026-01-18-search-ranking-v3/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/decisions/2026-01-19-annual-crawl-resiliency-and-queue-order/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/decisions/2026-01-19-ops-first-monitoring/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/decisions/2026-01-23-annual-crawl-throughput-and-artifacts/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/decisions/2026-01-24-single-vps-ops-automation-guardrails-for-crawl-and-storage/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/decisions/2026-02-03-crawl-auto-recover-queue-fill/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/decisions/2026-02-03-crawl-job-db-state-reconciliation/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/decisions/2026-02-06-per-source-crawl-profiles-and-annual-reconciliation/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/decisions/2026-02-07-git-first-vps-changes/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/deployment/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/deployment/disaster-recovery/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/deployment/environments-and-configuration/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/deployment/hosting-and-live-server-to-dos/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/deployment/pages-table-rollout/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/deployment/production-rollout-checklist/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/deployment/production-single-vps/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/deployment/replay-service-pywb/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/deployment/search-rollout/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/deployment/staging-rollout-checklist/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/deployment/systemd/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/development/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/development/dev-environment-setup/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/development/live-testing/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/development/testing-guidelines/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/development/playbooks/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/development/playbooks/add-cli-command/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/development/playbooks/change-to-production/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/development/playbooks/database-migrations/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/frontend-external/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/frontend-external/i18n/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/frontend-external/implementation-guide/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/meta/documentation-health/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/operations/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/operations/agent-handoff-guidelines/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/operations/annual-campaign/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/operations/automation-implementation-plan/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/operations/automation-verification-rituals/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/operations/automation/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/operations/baseline-drift/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/operations/citation-handout/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/operations/claims-registry/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/operations/data-handling-retention/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/operations/dataset-release-runbook/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/operations/disk-baseline-and-cleanup/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/operations/escalation-procedures/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/operations/export-integrity-contract/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/operations/exports-data-dictionary/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/operations/growth-constraints/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/operations/healtharchive-ops-roadmap/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/operations/legacy-crawl-imports/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/operations/mentions-log/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/operations/methods-note-outline/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/operations/monitoring-and-alerting/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/operations/monitoring-and-ci-checklist/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/operations/observability-and-private-stats/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/operations/one-page-brief/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/operations/ops-cadence-checklist/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/operations/outreach-templates/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/operations/partner-kit/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/operations/replay-and-preview-automation-plan/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/operations/restore-test-procedure/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/operations/risk-register/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/operations/search-golden-queries/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/operations/search-quality/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/operations/service-levels/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/operations/thresholds-and-tuning/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/operations/verification-packet/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/operations/incidents/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/operations/incidents/2026-01-08-storage-hotpath-sshfs-stale-mount/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/operations/incidents/2026-01-09-annual-crawl-hc-job-stalled/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/operations/incidents/2026-01-09-annual-crawl-phac-output-dir-permission-denied/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/operations/incidents/2026-01-16-replay-smoke-503-and-warctieringfailed/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/operations/incidents/2026-01-24-infra-error-107-hotpath-thrash-and-worker-stop/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/operations/incidents/2026-02-02-storage-watchdog-unmount-filter-bug/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/operations/incidents/2026-02-04-annual-crawl-output-dirs-on-root-disk/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/operations/incidents/2026-02-06-api-search-changes-500-missing-migration/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/operations/incidents/2026-02-06-auto-recover-stall-detection-bugs/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/operations/incidents/severity/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/operations/playbooks/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/operations/playbooks/core/admin-proxy/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/operations/playbooks/core/deploy-and-verify/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/operations/playbooks/core/incident-response/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/operations/playbooks/core/operator-responsibilities/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/operations/playbooks/core/replay-service/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/operations/playbooks/crawl/2026-01-annual-campaign-controlled-restart/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/operations/playbooks/crawl/annual-campaign/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/operations/playbooks/crawl/cleanup-automation/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/operations/playbooks/crawl/crawl-auto-recover-drills/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/operations/playbooks/crawl/crawl-preflight/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/operations/playbooks/crawl/crawl-stalls/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/operations/playbooks/external/adoption-signals/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/operations/playbooks/external/outreach-and-verification/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/operations/playbooks/observability/monitoring-and-alerting/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/operations/playbooks/observability/observability-guide/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/operations/playbooks/storage/storagebox-sshfs-stale-mount-drills/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/operations/playbooks/storage/storagebox-sshfs-stale-mount-recovery/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/operations/playbooks/storage/warc-integrity-verification/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/operations/playbooks/storage/warc-storage-tiering/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/operations/playbooks/validation/automation-maintenance/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/operations/playbooks/validation/coverage-guardrails/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/operations/playbooks/validation/dataset-release/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/operations/playbooks/validation/healthchecks-parity/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/operations/playbooks/validation/post-reboot-tiering-verify/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/operations/playbooks/validation/replay-smoke-tests/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/operations/playbooks/validation/restore-test/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/operations/playbooks/validation/security-posture/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/operations/reports/2026-01-19-deployment-log/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/operations/reports/2026-01-19-indexing-investigation/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/operations/runbooks/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/operations/runbooks/crawl-restart-budget-low/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/operations/runbooks/crawl-state-file-probe-failure/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/operations/runbooks/indexing-not-started/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/planning/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/planning/2026-02-06-crawl-operability-locks-and-retry-controls/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/planning/2026-02-06-hotpath-staleness-root-cause-investigation/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/planning/roadmap/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/planning/implemented/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/planning/implemented/2025-12-24-6-phase-upgrade-roadmap-2025/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/planning/implemented/2025-12-24-ops-observability-and-private-usage/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/planning/implemented/2025-12-24-sequential-implementation-plan/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/planning/implemented/2025-12-25-compare-live/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/planning/implemented/2026-01-03-ci-e2e-smoke-hardening/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/planning/implemented/2026-01-03-ci-e2e-smoke/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/planning/implemented/2026-01-03-crawl-safe-roadmap-batch/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/planning/implemented/2026-01-03-ops-automation-verification-json/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/planning/implemented/2026-01-03-ops-automation-verifier-improvements/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/planning/implemented/2026-01-03-search-ranking-and-snippets-v3/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/planning/implemented/2026-01-08-storagebox-sshfs-stale-mount-recovery-and-integrity/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/planning/implemented/2026-01-17-disaster-recovery-and-escalation-procedures/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/planning/implemented/2026-01-17-documentation-architecture-improvements/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/planning/implemented/2026-01-17-ops-tiering-alerting-and-incident-followups/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/planning/implemented/2026-01-17-sla-and-service-commitments/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/planning/implemented/2026-01-17-test-coverage-critical-business-logic/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/planning/implemented/2026-01-19-annual-crawl-resiliency-hardening/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/planning/implemented/2026-01-23-annual-crawl-throughput-and-artifacts/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/planning/implemented/2026-01-24-infra-error-and-storage-hotpath-hardening/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/planning/implemented/2026-01-27-archive-tool-hardening-and-ops-improvements/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/planning/implemented/2026-01-28-patch-job-config-and-integration-tests/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/planning/implemented/2026-01-29-warc-discovery-consistency/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/planning/implemented/2026-01-29-warc-manifest-verification/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/planning/implemented/2026-02-01-disk-usage-investigation/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/planning/implemented/2026-02-01-operational-resilience-improvements/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/planning/implemented/2026-02-06-ci-schema-and-governance-guardrails/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/planning/implemented/2026-02-06-roadmap-backlog-items/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/planning/implemented/2026-02-06-storage-watchdog-observability-hardening/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/planning/implemented/2026-02-07-deploy-workflow-hardening/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/reference/archive-tool/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/reference/cli-commands/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/reference/data-model/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/tutorials/architecture-walkthrough/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/tutorials/debug-crawl/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/tutorials/first-contribution/</loc>
-         <lastmod>2026-02-07</lastmod>
+         <lastmod>2026-02-13</lastmod>
     </url>
 </urlset>
