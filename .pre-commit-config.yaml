@@ -1,6 +1,7 @@
 repos:
+  # General file quality checks
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v5.0.0
+    rev: v6.0.0
     hooks:
       - id: trailing-whitespace
       - id: end-of-file-fixer
@@ -10,3 +11,24 @@ repos:
       - id: check-added-large-files
         args: ["--maxkb=500"]
       - id: detect-private-key
+
+  # Python formatting with ruff
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.9.3
+    hooks:
+      # Run the formatter
+      - id: ruff-format
+      # Run the linter
+      - id: ruff
+        args: [--fix, --exit-non-zero-on-fix]
+
+  # Python type checking with mypy
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.17.1
+    hooks:
+      - id: mypy
+        additional_dependencies:
+          - types-requests
+          - types-python-dateutil
+        args: [--config-file=pyproject.toml]
+        exclude: ^(tests/|scripts/|alembic/|src/archive_tool/)
