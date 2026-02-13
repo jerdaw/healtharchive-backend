@@ -46,6 +46,9 @@ def test_health_endpoint(tmp_path, monkeypatch) -> None:
     assert resp.headers["Referrer-Policy"] == "strict-origin-when-cross-origin"
     assert resp.headers["X-Frame-Options"] == "SAMEORIGIN"
 
+    # API version header should be present on all responses.
+    assert resp.headers["X-API-Version"] == "1"
+
     head_resp = client.head("/api/health")
     assert head_resp.status_code == 200
 

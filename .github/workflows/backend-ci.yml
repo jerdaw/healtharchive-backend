@@ -42,6 +42,74 @@ jobs:
       - name: Check
         run: make ci
 
+      - name: Security audit (pip-audit)
+        run: pip-audit
+
+  api-health:
+    name: Backend CI / api-health
+    runs-on: ubuntu-latest
+    env:
+      HEALTHARCHIVE_DATABASE_URL: sqlite:///./ci-api-health.db
+      HEALTHARCHIVE_ARCHIVE_ROOT: /tmp/healtharchive-api-health
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev]"
+
+      - name: Create archive root
+        run: mkdir -p "${HEALTHARCHIVE_ARCHIVE_ROOT}"
+
+      - name: Initialize database
+        run: |
+          alembic upgrade head
+          ha-backend seed-sources
+
+      - name: Start backend server
+        run: |
+          uvicorn ha_backend.api:app --host 127.0.0.1 --port 8765 --log-level warning &
+          echo $! > /tmp/uvicorn.pid
+          # Wait for server to be ready
+          for i in {1..30}; do
+            if curl -s http://127.0.0.1:8765/api/health > /dev/null 2>&1; then
+              echo "Backend server ready"
+              break
+            fi
+            if [ $i -eq 30 ]; then
+              echo "Backend server failed to start"
+              exit 1
+            fi
+            sleep 1
+          done
+
+      - name: Verify API endpoints
+        run: |
+          python scripts/verify_public_surface.py \
+            --api-base http://127.0.0.1:8765 \
+            --timeout 10 \
+            --skip-frontend \
+            --allow-usage-disabled \
+            --allow-exports-disabled \
+            --allow-changes-disabled
+
+      - name: Stop backend server
+        if: always()
+        run: |
+          if [ -f /tmp/uvicorn.pid ]; then
+            kill $(cat /tmp/uvicorn.pid) || true
+          fi
+
   e2e-smoke:
     name: Backend CI / e2e-smoke
     if: github.event_name != 'pull_request'

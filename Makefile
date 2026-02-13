@@ -55,11 +55,32 @@ test-all:
 
 test: test-all
 
+coverage:
+	$(PYTEST) --cov=src --cov-report=term-missing --cov-report=html
+
+coverage-critical:
+	$(PYTEST) \
+		--cov=src/ha_backend/api \
+		--cov=src/ha_backend/indexing \
+		--cov=src/ha_backend/worker \
+		--cov-fail-under=75 \
+		--cov-report=term-missing:skip-covered \
+		--cov-report=html:htmlcov-critical
+
+coverage-target:
+	@echo "Current coverage target: 75%"
+	@echo "Path to 80%: improve indexing/pipeline.py (currently 22.55%)"
+	@echo "Run 'make coverage-critical' to check"
+
+coverage-report:
+	@echo "Full coverage report: file://$(shell pwd)/htmlcov/index.html"
+	@echo "Critical modules coverage: file://$(shell pwd)/htmlcov-critical/index.html"
+
 security:
 	$(BANDIT) -r src/ha_backend -q
 
 audit:
-	$(PIP_AUDIT) || true
+	$(PIP_AUDIT)
 
 migration-guard:
 	$(PYTHON_RUN) scripts/ci_migration_guard.py \
@@ -98,4 +119,4 @@ check: format-check lint typecheck test-fast
 ci: check
 
 # Full suite: deeper / slower / more opinionated checks (run before deploys or when tightening quality).
-check-full: format-check lint typecheck test-all precommit security audit docs-check
+check-full: format-check lint typecheck test-all coverage-critical precommit security audit docs-check

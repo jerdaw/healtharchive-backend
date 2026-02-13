@@ -5,14 +5,25 @@ from typing import Iterator
 
 from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import PlainTextResponse
+from fastapi.responses import JSONResponse, PlainTextResponse
+from slowapi.errors import RateLimitExceeded
 from sqlalchemy import func, inspect
 from sqlalchemy.orm import Session
 
-from ha_backend.config import get_cors_origins, get_pages_fastpath_enabled
+from ha_backend.config import (
+    get_cors_origins,
+    get_csp_enabled,
+    get_hsts_enabled,
+    get_hsts_max_age,
+    get_max_query_string_length,
+    get_max_request_body_size,
+    get_pages_fastpath_enabled,
+)
 from ha_backend.db import get_session
 from ha_backend.logging_config import configure_logging
 from ha_backend.models import ArchiveJob, Page, Snapshot, Source
+from ha_backend.rate_limiting import limiter
+from ha_backend.request_context import generate_request_id, set_request_id
 from ha_backend.runtime_metrics import render_search_metrics_prometheus
 
 from .deps import require_admin
@@ -21,16 +32,122 @@ from .routes_public import router as public_router
 
 configure_logging()
 
+# API version for X-API-Version header (semantic versioning)
+API_VERSION = "1"
+
 app = FastAPI(
     title="HealthArchive Backend API",
     version="0.1.0",
 )
 
+# Register rate limiter with the app
+app.state.limiter = limiter
+
+
+# Custom rate limit exception handler that satisfies type checking
+async def rate_limit_handler(request: Request, exc: Exception) -> JSONResponse:
+    """Handle rate limit exceeded errors with proper response format."""
+    if isinstance(exc, RateLimitExceeded):
+        return JSONResponse(
+            status_code=429,
+            content={"error": "Rate limit exceeded", "detail": str(exc.detail)},
+            headers=getattr(exc, "headers", {}),
+        )
+    # Fallback for unexpected exceptions
+    return JSONResponse(
+        status_code=429,
+        content={"error": "Rate limit exceeded"},
+    )
+
+
+app.add_exception_handler(RateLimitExceeded, rate_limit_handler)
+
+
+@app.middleware("http")
+async def request_id_middleware(request: Request, call_next):
+    """
+    Generate and inject a unique request ID for correlation tracking.
+
+    Honors incoming X-Request-Id headers for pass-through, or generates
+    a new UUIDv4 if none is provided. The request ID is:
+    - Set in request context for logging
+    - Returned as X-Request-Id response header
+    """
+    # Use incoming request ID if provided, otherwise generate new one
+    request_id = request.headers.get("X-Request-Id") or generate_request_id()
+    set_request_id(request_id)
+
+    response = await call_next(request)
+    response.headers["X-Request-Id"] = request_id
+    return response
+
+
+@app.middleware("http")
+async def request_size_limit_middleware(request: Request, call_next):
+    """
+    Enforce request size limits to prevent abuse.
+
+    Checks:
+    - Query string length (return 414 URI Too Long if exceeded)
+    - Request body size (return 413 Payload Too Large if exceeded)
+
+    Size limits are configurable via environment variables:
+    - HEALTHARCHIVE_MAX_QUERY_STRING_LENGTH (default: 8KB)
+    - HEALTHARCHIVE_MAX_REQUEST_BODY_SIZE (default: 1MB)
+    """
+    # Check query string length
+    max_query_len = get_max_query_string_length()
+    query_string = request.url.query or ""
+    if len(query_string) > max_query_len:
+        return JSONResponse(
+            status_code=414,
+            content={
+                "error": "URI Too Long",
+                "detail": f"Query string exceeds maximum length of {max_query_len} characters",
+            },
+        )
+
+    # Check request body size (if Content-Length header is present)
+    max_body_size = get_max_request_body_size()
+    content_length = request.headers.get("content-length")
+    if content_length:
+        try:
+            body_size = int(content_length)
+            if body_size > max_body_size:
+                return JSONResponse(
+                    status_code=413,
+                    content={
+                        "error": "Payload Too Large",
+                        "detail": f"Request body exceeds maximum size of {max_body_size} bytes",
+                    },
+                )
+        except ValueError:
+            pass  # Invalid Content-Length header, let the framework handle it
+
+    response = await call_next(request)
+    return response
+
+
+@app.middleware("http")
+async def api_version_middleware(request: Request, call_next):
+    """
+    Inject API version header on all responses.
+
+    This allows clients to detect API version and handle compatibility.
+    Version is semantic: major version changes indicate breaking changes.
+    """
+    response = await call_next(request)
+    response.headers["X-API-Version"] = API_VERSION
+    return response
+
 
 @app.middleware("http")
 async def security_headers_middleware(request: Request, call_next):
     """
-    Inject a small set of security-related headers on all HTTP responses.
+    Inject security-related headers on all HTTP responses.
+
+    Includes: X-Content-Type-Options, Referrer-Policy, X-Frame-Options,
+    Permissions-Policy, Content-Security-Policy, and Strict-Transport-Security.
 
     Note: we implement this as function-based middleware (rather than
     BaseHTTPMiddleware) to avoid known edge cases in Starlette's
@@ -38,18 +155,53 @@ async def security_headers_middleware(request: Request, call_next):
     """
     response = await call_next(request)
     headers = response.headers
+
+    # Basic security headers
     headers.setdefault("X-Content-Type-Options", "nosniff")
     headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
-    # Keep X-Frame-Options for most responses, but allow the raw snapshot
-    # endpoint to be embedded in the frontend iframe. The raw snapshot
-    # route is a controlled HTML replay endpoint and is additionally
-    # sandboxed on the frontend side.
-    if not request.url.path.startswith("/api/snapshots/raw/"):
+
+    # X-Frame-Options: Allow raw snapshot endpoint to be iframed by frontend
+    # The raw snapshot route is a controlled HTML replay endpoint and is
+    # additionally sandboxed on the frontend side.
+    is_raw_snapshot = request.url.path.startswith("/api/snapshots/raw/")
+    if not is_raw_snapshot:
         headers.setdefault("X-Frame-Options", "SAMEORIGIN")
+
+    # Permissions-Policy: Disable sensitive browser features
     headers.setdefault(
         "Permissions-Policy",
         "geolocation=(), microphone=(), camera=()",
     )
+
+    # Content-Security-Policy: Prevent XSS and injection attacks
+    if get_csp_enabled():
+        if is_raw_snapshot:
+            # Archived HTML replay needs permissive CSP for inline scripts/styles
+            # and external resources (images, fonts, etc.)
+            csp_policy = (
+                "default-src 'none'; "
+                "script-src 'unsafe-inline' 'unsafe-eval'; "
+                "style-src 'unsafe-inline' *; "
+                "img-src * data: blob:; "
+                "font-src * data:; "
+                "connect-src *; "
+                "media-src *; "
+                "object-src 'none'; "
+                "frame-src *; "
+                "base-uri 'self'; "
+                "form-action 'self'"
+            )
+        else:
+            # JSON API endpoints: very restrictive CSP
+            csp_policy = "default-src 'none'; frame-ancestors 'none'"
+
+        headers.setdefault("Content-Security-Policy", csp_policy)
+
+    # HSTS: Enforce HTTPS for 1 year (only meaningful when served over HTTPS)
+    if get_hsts_enabled():
+        max_age = get_hsts_max_age()
+        headers.setdefault("Strict-Transport-Security", f"max-age={max_age}; includeSubDomains")
+
     return response
 
 

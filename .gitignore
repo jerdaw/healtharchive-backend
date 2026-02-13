@@ -49,6 +49,9 @@ tmp-*.warc.gz
 .tmp/
 .pytest_cache/
 .coverage
+.coverage.*
+htmlcov/
+htmlcov-critical/
 .mypy_cache/
 .ruff_cache/
 

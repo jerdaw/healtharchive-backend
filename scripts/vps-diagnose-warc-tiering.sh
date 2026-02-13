@@ -134,4 +134,3 @@ cat <<EOF
   - Manual repair/apply (will modify mounts; do this during a safe window):
       sudo /opt/healtharchive-backend/scripts/vps-warc-tiering-bind-mounts.sh --apply --repair-stale-mounts
 EOF
-
