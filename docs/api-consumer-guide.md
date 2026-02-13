@@ -93,6 +93,127 @@ Search results can be returned in two views:
 
 ---
 
+## API Versioning & Response Headers
+
+### Versioning Strategy
+
+The HealthArchive API uses **header-based versioning** for forward compatibility:
+
+- **Current Version**: `1` (major version only)
+- **Header**: `X-API-Version: 1`
+- **Stability**: Version 1 is stable; breaking changes will increment to version 2
+
+**Version Header** (returned on all responses):
+```
+X-API-Version: 1
+```
+
+**Versioning Policy**:
+- **Major version changes** (1 → 2): Breaking changes to request/response format, removed endpoints
+- **Minor updates** (within v1): Additive only (new fields, new optional parameters, new endpoints)
+- **Clients should**: Inspect `X-API-Version` header to detect version; log warnings if unexpected
+
+**Deprecation**: If breaking changes are needed, we will:
+1. Announce deprecation at least 6 months in advance
+2. Run both versions in parallel during transition
+3. Provide migration guide in this documentation
+
+### Standard Response Headers
+
+All API responses include these headers:
+
+| Header | Purpose | Example |
+|--------|---------|---------|
+| `X-API-Version` | API major version | `1` |
+| `X-Request-Id` | Request correlation ID | `a3f2e1d0-...` |
+| `X-Content-Type-Options` | Security: prevent MIME sniffing | `nosniff` |
+| `X-Frame-Options` | Security: clickjacking protection | `SAMEORIGIN` |
+| `Referrer-Policy` | Privacy: control referrer info | `strict-origin-when-cross-origin` |
+
+**Security headers** (all responses):
+
+| Header | Purpose | Value |
+|--------|---------|-------|
+| `Content-Security-Policy` | XSS/injection prevention | See CSP section below |
+| `Strict-Transport-Security` | Enforce HTTPS | `max-age=31536000; includeSubDomains` |
+| `Permissions-Policy` | Disable sensitive browser features | `geolocation=(), microphone=(), camera=()` |
+
+**Rate-limited endpoints also include**:
+
+| Header | Purpose | Example |
+|--------|---------|---------|
+| `X-RateLimit-Limit` | Maximum requests allowed in window | `60` |
+| `X-RateLimit-Remaining` | Requests remaining in current window | `57` |
+
+**Using Request IDs**:
+- Include `X-Request-Id` from response when reporting issues
+- Pass custom `X-Request-Id` in request to trace across systems
+- IDs are UUIDv4 format and logged server-side for debugging
+
+### Content Security Policy (CSP)
+
+The API implements **Content Security Policy** headers to prevent XSS and code injection attacks.
+
+**For JSON endpoints** (most of the API):
+```
+Content-Security-Policy: default-src 'none'; frame-ancestors 'none'
+```
+- Blocks all resource loading by default
+- Prevents the API from being embedded in iframes
+
+**For HTML replay endpoints** (`/api/snapshots/raw/*`):
+```
+Content-Security-Policy: default-src 'none'; script-src 'unsafe-inline' 'unsafe-eval';
+  style-src 'unsafe-inline' *; img-src * data: blob:; font-src * data:;
+  connect-src *; media-src *; object-src 'none'; frame-src *;
+  base-uri 'self'; form-action 'self'
+```
+- Allows inline scripts/styles (required for archived HTML)
+- Allows external resources (images, fonts, media)
+- Still blocks dangerous features (object/embed tags)
+
+**Why this matters for API consumers**:
+- CSP headers are informational for JSON API consumers (your code isn't affected)
+- If you're embedding `/api/snapshots/raw/*` in iframes, CSP allows it with proper sandboxing
+- CSP is automatically relaxed for archived content replay while maintaining security for JSON endpoints
+
+### Request Size Limits
+
+The API enforces size limits to prevent abuse and ensure system stability:
+
+| Limit | Default | Max | Configurable |
+|-------|---------|-----|--------------|
+| Request body size | 1 MB | 10 MB | Yes |
+| Query string length | 8 KB | 64 KB | Yes |
+
+**Error Responses**:
+- `413 Payload Too Large`: Request body exceeds size limit
+- `414 URI Too Long`: Query string exceeds length limit
+
+**Example 413 response**:
+```json
+{
+  "error": "Payload Too Large",
+  "detail": "Request body exceeds maximum size of 1048576 bytes"
+}
+```
+
+**Example 414 response**:
+```json
+{
+  "error": "URI Too Long",
+  "detail": "Query string exceeds maximum length of 8192 characters"
+}
+```
+
+**Best Practices**:
+- Keep issue reports concise (under 1MB)
+- Use pagination for large result sets instead of increasing page size
+- Filter search queries to reduce result count rather than fetching everything
+- The 1MB body limit is sufficient for all standard API operations
+
+---
+
 ## Common Use Cases
 
 ### 1. Get Archive Statistics
@@ -383,12 +504,39 @@ curl "https://api.healtharchive.ca/api/search?q=vaccins&language=fr"
 
 ### Rate Limiting
 
-**Current policy**: No rate limits (subject to change)
+**Rate limits are enforced per client IP address** to ensure fair resource allocation and prevent abuse.
+
+| Endpoint | Limit | Window |
+|----------|-------|--------|
+| `POST /api/reports` | 5 requests | per minute |
+| `GET /api/exports/*` | 10 requests | per minute |
+| `GET /api/search` | 60 requests | per minute |
+| All other endpoints | 120 requests | per minute |
+
+**Rate limit headers** (included in responses to limited endpoints):
+```http
+X-RateLimit-Limit: 60
+X-RateLimit-Remaining: 57
+```
+
+**When limits are exceeded**:
+- HTTP status: `429 Too Many Requests`
+- Response includes `Retry-After` header (seconds until limit resets)
+- Example error response:
+```json
+{
+  "error": "Rate limit exceeded",
+  "detail": "60 per 1 minute"
+}
+```
 
 **Best practices**:
-- Cache responses when appropriate
-- Use `pageSize` wisely (larger pages = slower)
-- Implement exponential backoff if you encounter errors
+- Monitor `X-RateLimit-Remaining` header to avoid hitting limits
+- Implement exponential backoff when you receive 429 responses
+- Cache responses when appropriate to reduce request volume
+- Use `pageSize` wisely (larger pages = slower but fewer requests)
+- For bulk exports, use the `/api/exports/*` endpoints instead of paginating search
+- Contact the maintainers if you need higher limits for legitimate research
 
 ### Pagination Best Practices
 

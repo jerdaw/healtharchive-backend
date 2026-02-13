@@ -349,6 +349,52 @@ def get_usage_metrics_window_days() -> int:
     return max(1, min(value, 365))
 
 
+# === Request size limits ===
+
+# Maximum request body size in bytes (1MB default)
+# POST /api/reports is the primary endpoint that accepts request bodies
+DEFAULT_MAX_REQUEST_BODY_SIZE = 1 * 1024 * 1024  # 1 MB
+
+# Maximum query string length in characters
+DEFAULT_MAX_QUERY_STRING_LENGTH = 8192  # 8KB
+
+
+def get_max_request_body_size() -> int:
+    """
+    Return the maximum allowed request body size in bytes.
+
+    Controlled via HEALTHARCHIVE_MAX_REQUEST_BODY_SIZE. Defaults to 1MB.
+    """
+    raw = os.environ.get(
+        "HEALTHARCHIVE_MAX_REQUEST_BODY_SIZE",
+        str(DEFAULT_MAX_REQUEST_BODY_SIZE),
+    ).strip()
+    try:
+        value = int(raw)
+    except ValueError:
+        value = DEFAULT_MAX_REQUEST_BODY_SIZE
+    # Enforce reasonable bounds: 1KB to 10MB
+    return max(1024, min(value, 10 * 1024 * 1024))
+
+
+def get_max_query_string_length() -> int:
+    """
+    Return the maximum allowed query string length in characters.
+
+    Controlled via HEALTHARCHIVE_MAX_QUERY_STRING_LENGTH. Defaults to 8KB.
+    """
+    raw = os.environ.get(
+        "HEALTHARCHIVE_MAX_QUERY_STRING_LENGTH",
+        str(DEFAULT_MAX_QUERY_STRING_LENGTH),
+    ).strip()
+    try:
+        value = int(raw)
+    except ValueError:
+        value = DEFAULT_MAX_QUERY_STRING_LENGTH
+    # Enforce reasonable bounds: 1KB to 64KB
+    return max(1024, min(value, 64 * 1024))
+
+
 def get_change_tracking_enabled() -> bool:
     """
     Return whether change tracking (diff computation + feeds) is enabled.
@@ -517,3 +563,73 @@ def get_public_site_base_url() -> str:
         DEFAULT_PUBLIC_SITE_BASE_URL,
     ).strip()
     return raw.rstrip("/") if raw else DEFAULT_PUBLIC_SITE_BASE_URL
+
+
+# === Rate Limiting ===
+
+# Rate limiting is enabled by default in production/staging. It can be disabled
+# in development environments by setting HEALTHARCHIVE_RATE_LIMITING_ENABLED=0.
+DEFAULT_RATE_LIMITING_ENABLED = True
+
+
+def get_rate_limiting_enabled() -> bool:
+    """
+    Return whether rate limiting middleware is enabled.
+
+    Controlled via HEALTHARCHIVE_RATE_LIMITING_ENABLED (truthy/falsey).
+    Defaults to enabled.
+    """
+    default = "1" if DEFAULT_RATE_LIMITING_ENABLED else "0"
+    raw = os.environ.get("HEALTHARCHIVE_RATE_LIMITING_ENABLED", default).strip().lower()
+    return raw not in ("0", "false", "no", "off")
+
+
+# === Content Security Policy (CSP) ===
+
+# CSP is enabled by default in production/staging to prevent XSS and injection attacks.
+# Can be disabled in development if needed.
+DEFAULT_CSP_ENABLED = True
+
+# HSTS (HTTP Strict Transport Security) is enabled by default to enforce HTTPS.
+# Only applies when the application is served over HTTPS.
+DEFAULT_HSTS_ENABLED = True
+DEFAULT_HSTS_MAX_AGE = 31536000  # 1 year in seconds
+
+
+def get_csp_enabled() -> bool:
+    """
+    Return whether Content Security Policy headers are enabled.
+
+    Controlled via HEALTHARCHIVE_CSP_ENABLED (truthy/falsey).
+    Defaults to enabled.
+    """
+    default = "1" if DEFAULT_CSP_ENABLED else "0"
+    raw = os.environ.get("HEALTHARCHIVE_CSP_ENABLED", default).strip().lower()
+    return raw not in ("0", "false", "no", "off")
+
+
+def get_hsts_enabled() -> bool:
+    """
+    Return whether HSTS (Strict-Transport-Security) headers are enabled.
+
+    Controlled via HEALTHARCHIVE_HSTS_ENABLED (truthy/falsey).
+    Defaults to enabled.
+    """
+    default = "1" if DEFAULT_HSTS_ENABLED else "0"
+    raw = os.environ.get("HEALTHARCHIVE_HSTS_ENABLED", default).strip().lower()
+    return raw not in ("0", "false", "no", "off")
+
+
+def get_hsts_max_age() -> int:
+    """
+    Return the HSTS max-age value in seconds.
+
+    Controlled via HEALTHARCHIVE_HSTS_MAX_AGE. Defaults to 1 year.
+    """
+    raw = os.environ.get("HEALTHARCHIVE_HSTS_MAX_AGE", str(DEFAULT_HSTS_MAX_AGE)).strip()
+    try:
+        value = int(raw)
+    except ValueError:
+        value = DEFAULT_HSTS_MAX_AGE
+    # Enforce reasonable bounds: 1 hour to 2 years
+    return max(3600, min(value, 63072000))

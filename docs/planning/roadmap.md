@@ -70,6 +70,8 @@ The following items can be completed nearly autonomously by AI coding agents wit
 
 **Priority order reflects admissions/portfolio value, not implementation effort.**
 
+**NOTE**: Items #8-22 (excluding #15, #23-24) were implemented as part of the "Governance, SEO, and Security Foundations" implementation plan (2026-02-12), now archived in `docs/planning/implemented/2026-02-12-governance-seo-and-security-foundations.md`.
+
 ### Governance & Open Source Standards (Immediate Priority)
 
 **STATUS: Items #1-6 deferred due to AI content filtering constraints (2026-02-12)**
@@ -84,7 +86,7 @@ The following items can be completed nearly autonomously by AI coding agents wit
    - Makes project citable in academic work; GitHub renders "Cite this repository" button
    - Evidence: Scholar contribution, research-grade project
    - Category: Scholarship/Evaluation
-   - Commit: 239cd49 (frontend)
+   - Commit: 9818c0c (frontend)
 
 2. **Add SECURITY.md with vulnerability disclosure policy** (S: 1-2h) **[COMPLETED 2026-02-12 - Frontend]**
    - ✅ Frontend: SECURITY.md created with supported versions, reporting process, response timeline, scope, safe harbor
@@ -92,7 +94,7 @@ The following items can be completed nearly autonomously by AI coding agents wit
    - ⏳ Datasets: Pending
    - Evidence: Professional security posture, visible on GitHub Security tab
    - Category: Privacy/Security/Ethics
-   - Commit: 239cd49 (frontend)
+   - Commit: 9818c0c (frontend)
 
 3. **Add CODE_OF_CONDUCT.md** (S: 1h) **[DEFERRED]**
    - Contributor Covenant (standard) to all 3 repos
@@ -137,7 +139,7 @@ The following items can be completed nearly autonomously by AI coding agents wit
    - ✅ Enhanced buildPageMetadata() in src/lib/metadata.ts with full OG/Twitter support
    - Evidence: Rich previews on social media, professional sharing
    - Category: Communication/Documentation
-   - Commit: 239cd49
+   - Commit: 9818c0c
 
 9. **Add sitemap.xml and robots.txt** (S: 2-3h) **[COMPLETED 2026-02-12]**
    - ✅ Implemented dynamic sitemap.xml in src/app/sitemap.ts
@@ -146,7 +148,7 @@ The following items can be completed nearly autonomously by AI coding agents wit
    - ⏳ Submit to Google Search Console (manual step pending)
    - Evidence: Search engine discoverability, indexing
    - Category: Communication/Documentation
-   - Commit: 239cd49
+   - Commit: 9818c0c
 
 10. **Add JSON-LD structured data for datasets** (S: 2-3h) **[COMPLETED 2026-02-12]**
     - ✅ Created DatasetJsonLd component with Schema.org Dataset markup
@@ -156,7 +158,7 @@ The following items can be completed nearly autonomously by AI coding agents wit
     - ✅ Test coverage added (tests/datasetJsonLd.test.tsx)
     - Evidence: Dataset discoverable in Google Dataset Search
     - Category: Scholarship/Evaluation
-    - Commit: 239cd49
+    - Commit: 9818c0c
 
 11. **Add RSS/Atom feed discovery meta tags** (S: 1h) **[COMPLETED 2026-02-12]**
     - ✅ Added RSS feed auto-discovery link in src/app/[locale]/layout.tsx
@@ -165,7 +167,7 @@ The following items can be completed nearly autonomously by AI coding agents wit
     - ⏳ Validate with W3C Feed Validator (manual step pending)
     - Evidence: RSS auto-discovery in browsers
     - Category: Communication/Documentation
-    - Commit: 239cd49
+    - Commit: 9818c0c
 
 ### Backend Quality & Testing (Engineering Excellence)
 
@@ -260,7 +262,7 @@ The following items can be completed nearly autonomously by AI coding agents wit
     - ⏳ Document dependency update policy in CONTRIBUTING.md (pending)
     - Evidence: Proactive security management
     - Category: Privacy/Security/Ethics
-    - Commit: 239cd49 (frontend)
+    - Commit: 9818c0c (frontend)
 
 ### Accessibility & Inclusive Design (Health Advocate)
 
@@ -274,7 +276,7 @@ The following items can be completed nearly autonomously by AI coding agents wit
     - ✅ All 84 tests passing including 12 a11y tests
     - Evidence: Automated a11y testing with axe-core, ESLint a11y linting, formal documentation
     - Category: Privacy/Security/Ethics
-    - Commit: 893b0ca (frontend)
+    - Commit: 2bb1f7b (frontend), 37820b0 (backend roadmap update)
 
 23. **Create formal accessibility audit document** (M: 1-2 days)
     - Run axe-core or Lighthouse accessibility audit on all public pages
