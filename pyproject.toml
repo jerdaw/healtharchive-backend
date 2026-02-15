@@ -25,7 +25,7 @@ ha-backend = "ha_backend.cli:main"
 
 [project.optional-dependencies]
 dev = [
-  "ruff==0.15.0",
+  "ruff==0.15.1",
   "mypy",
   "pytest",
   "pytest-cov",
