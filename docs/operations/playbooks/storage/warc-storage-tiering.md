@@ -233,6 +233,15 @@ cd /opt/healtharchive-backend
 ./scripts/vps-diagnose-warc-tiering.sh
 ```
 
+If storage hot-path auto-recover automation is enabled
+(`healtharchive-storage-hotpath-auto-recover.timer` + sentinel), it will also
+attempt to reconcile a stale failed tiering unit state (`reset-failed` +
+`start`) when no stale targets are currently eligible and the base Storage Box
+mount is readable.
+
+If the alert does not clear after a couple of timer cycles, run the manual
+reconcile steps below.
+
 Then, during a safe window (recommended: no active replay indexing and no ongoing maintenance), clear the failed state and re-apply tiering:
 
 ```bash
