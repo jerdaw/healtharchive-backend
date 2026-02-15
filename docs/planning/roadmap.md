@@ -128,6 +128,7 @@ Completed items were removed from this backlog and archived in:
 15. **Add API health integration tests to PR CI** (M: 1 day)
 18. **Finish dependency-audit blocking in CI** (S: 2-3h)
   - Remaining work: clear current vulnerabilities and keep `pip-audit` / `npm audit` blocking.
+  - Current caveat: `Backend CI` temporarily ignores `CVE-2026-25990` (`pillow`) because of a docs-tooling transitive constraint (`mkdocs-material[imaging]`); remove ignore once upstream allows a fixed version.
 23. **Create formal accessibility audit document** (M: 1-2 days)
 24. **Add frontend error boundary components** (M: 1 day)
 
