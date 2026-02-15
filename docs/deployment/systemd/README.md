@@ -647,6 +647,12 @@ It also probes the output dirs of the next queued/retryable jobs to prevent
 infra-error retry storms (a stale mountpoint for a retryable job should be
 repaired before the worker selects it).
 
+If no stale targets are currently eligible but
+`healtharchive-warc-tiering.service` is stuck in `failed`, the watchdog will
+attempt a conservative reconcile (`reset-failed` + `start`) when the base
+Storage Box mount is readable. This helps clear persistent `HealthArchiveWarcTieringFailed`
+alerts caused by stale historical unit state.
+
 After successful mount recovery it restarts replay (best-effort) so replay sees
 a clean view of `/srv/healtharchive/jobs`.
 

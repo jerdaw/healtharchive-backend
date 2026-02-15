@@ -1315,3 +1315,120 @@ def test_storage_hotpath_watchdog_apply_sets_last_apply_ok_zero_when_mount_stays
 
     prom = (out_dir / "hotpath.prom").read_text(encoding="utf-8")
     assert "healtharchive_storage_hotpath_auto_recover_last_apply_ok 0" in prom
+
+
+def test_storage_hotpath_watchdog_reconciles_failed_tiering_unit_when_no_stale_targets(
+    tmp_path, monkeypatch
+) -> None:
+    mod = _load_script_module(
+        "vps-storage-hotpath-auto-recover.py",
+        module_name="ha_test_vps_storage_hotpath_auto_recover_reconcile_tiering_unit",
+    )
+    _init_test_db(tmp_path, monkeypatch, "hotpath_reconcile_tiering_unit.db")
+
+    jobs_root = tmp_path / "jobs"
+    storagebox_mount = tmp_path / "storagebox"
+    storagebox_mount.mkdir(parents=True)
+
+    calls: list[list[str]] = []
+
+    def fake_run_apply(cmd: list[str], *, timeout_seconds: float | None = None):
+        del timeout_seconds
+        calls.append(cmd)
+        return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
+
+    monkeypatch.setattr(mod, "_run_apply", fake_run_apply)
+    monkeypatch.setattr(mod, "_is_unit_present", lambda _u: True)
+    monkeypatch.setattr(mod, "_systemctl_is_failed", lambda _u: True)
+    monkeypatch.setattr(mod, "_probe_readable_dir", lambda _p: (1, -1))
+
+    state_file = tmp_path / "state.json"
+    lock_file = tmp_path / "lock"
+    out_dir = tmp_path / "out"
+    sentinel = tmp_path / "sentinel"
+
+    rc = mod.main(
+        [
+            "--apply",
+            "--jobs-root",
+            str(jobs_root),
+            "--storagebox-mount",
+            str(storagebox_mount),
+            "--state-file",
+            str(state_file),
+            "--lock-file",
+            str(lock_file),
+            "--sentinel-file",
+            str(sentinel),
+            "--textfile-out-dir",
+            str(out_dir),
+            "--textfile-out-file",
+            "hotpath.prom",
+        ]
+    )
+    assert rc == 0
+
+    flattened = [" ".join(c) for c in calls]
+    assert any(c == "systemctl reset-failed healtharchive-warc-tiering.service" for c in flattened)
+    assert any(c == "systemctl start healtharchive-warc-tiering.service" for c in flattened)
+
+    state_payload = json.loads(state_file.read_text(encoding="utf-8"))
+    assert int(state_payload.get("last_tiering_unit_reconcile_ok") or 0) == 1
+
+
+def test_storage_hotpath_watchdog_does_not_reconcile_failed_tiering_unit_when_storage_unreadable(
+    tmp_path, monkeypatch
+) -> None:
+    mod = _load_script_module(
+        "vps-storage-hotpath-auto-recover.py",
+        module_name="ha_test_vps_storage_hotpath_auto_recover_reconcile_tiering_unit_skip_storage",
+    )
+    _init_test_db(tmp_path, monkeypatch, "hotpath_reconcile_tiering_unit_skip_storage.db")
+
+    jobs_root = tmp_path / "jobs"
+    storagebox_mount = tmp_path / "storagebox"
+    storagebox_mount.mkdir(parents=True)
+
+    calls: list[list[str]] = []
+
+    def fake_run_apply(cmd: list[str], *, timeout_seconds: float | None = None):
+        del timeout_seconds
+        calls.append(cmd)
+        return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
+
+    def fake_probe(path: Path) -> tuple[int, int]:
+        if str(path) == str(storagebox_mount):
+            return 0, 107
+        return 1, -1
+
+    monkeypatch.setattr(mod, "_run_apply", fake_run_apply)
+    monkeypatch.setattr(mod, "_is_unit_present", lambda _u: True)
+    monkeypatch.setattr(mod, "_systemctl_is_failed", lambda _u: True)
+    monkeypatch.setattr(mod, "_probe_readable_dir", fake_probe)
+
+    state_file = tmp_path / "state.json"
+    lock_file = tmp_path / "lock"
+    out_dir = tmp_path / "out"
+    sentinel = tmp_path / "sentinel"
+
+    rc = mod.main(
+        [
+            "--apply",
+            "--jobs-root",
+            str(jobs_root),
+            "--storagebox-mount",
+            str(storagebox_mount),
+            "--state-file",
+            str(state_file),
+            "--lock-file",
+            str(lock_file),
+            "--sentinel-file",
+            str(sentinel),
+            "--textfile-out-dir",
+            str(out_dir),
+            "--textfile-out-file",
+            "hotpath.prom",
+        ]
+    )
+    assert rc == 0
+    assert calls == []

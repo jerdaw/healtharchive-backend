@@ -225,6 +225,11 @@ def _systemctl_is_active(unit: str) -> bool:
     return r.stdout.strip() == "active"
 
 
+def _systemctl_is_failed(unit: str) -> bool:
+    r = _run_read(["systemctl", "is-failed", unit])
+    return r.stdout.strip() == "failed"
+
+
 def _file_age_seconds(path: Path, *, now_utc: datetime) -> float | None:
     try:
         st = path.stat()
@@ -640,6 +645,17 @@ def main(argv: list[str] | None = None) -> int:
         help="Path to ha-backend CLI (used for recover-stale-jobs).",
     )
     p.add_argument(
+        "--tiering-unit",
+        default="healtharchive-warc-tiering.service",
+        help="Tiering oneshot unit to reconcile if stuck in failed state.",
+    )
+    p.add_argument(
+        "--tiering-unit-reconcile-cooldown-seconds",
+        type=int,
+        default=15 * 60,
+        help="Minimum time between failed-tiering-unit reconcile attempts.",
+    )
+    p.add_argument(
         "--deploy-lock-file",
         default=DEFAULT_DEPLOY_LOCK_FILE,
         help="If this file exists (and is not stale), skip the run to avoid flapping during deploys.",
@@ -944,6 +960,9 @@ def main(argv: list[str] | None = None) -> int:
 
     last_apply_ok = int(state.get("last_apply_ok") or 0)
     last_apply_epoch = int(state.get("last_apply_epoch") or 0)
+    tiering_unit = str(args.tiering_unit)
+    tiering_unit_present = _is_unit_present(tiering_unit)
+    tiering_unit_failed = tiering_unit_present and _systemctl_is_failed(tiering_unit)
 
     def finish(rc: int) -> int:
         try:
@@ -966,6 +985,76 @@ def main(argv: list[str] | None = None) -> int:
         return rc
 
     if not eligible:
+        # Separate recovery path:
+        # if stale targets are not currently eligible but the tiering oneshot unit
+        # is stuck in failed state, reconcile it so warning alerts can self-clear.
+        if tiering_unit_failed:
+            storage_ok, storage_errno = _probe_readable_dir(storagebox_mount)
+            mode_label = "DRY-RUN"
+            if requested_apply and not apply_mode and deploy_lock_active == 1:
+                mode_label = "DRY-RUN (deploy lock active)"
+            elif apply_mode:
+                mode_label = "APPLY"
+
+            print(
+                f"{mode_label}: no stale targets eligible; tiering unit is failed: {tiering_unit}."
+            )
+            if storage_ok != 1:
+                print(
+                    f"SKIP: not reconciling {tiering_unit}; base Storage Box mount is unreadable "
+                    f"(errno={storage_errno})."
+                )
+                return finish(0)
+
+            if not apply_mode:
+                print(
+                    f"  Planned action: systemctl reset-failed {tiering_unit} && "
+                    f"systemctl start {tiering_unit}"
+                )
+                return finish(0)
+
+            last_reconcile = _parse_utc(str(state.get("last_tiering_unit_reconcile_utc") or ""))
+            if last_reconcile is not None:
+                cooldown_age = (now - last_reconcile).total_seconds()
+                if cooldown_age < float(args.tiering_unit_reconcile_cooldown_seconds):
+                    print(
+                        f"SKIP: recent tiering-unit reconcile attempt {cooldown_age:.0f}s ago "
+                        f"(cooldown={int(args.tiering_unit_reconcile_cooldown_seconds)}s)."
+                    )
+                    return finish(0)
+
+            state["last_tiering_unit_reconcile_utc"] = now.replace(microsecond=0).isoformat()
+
+            cp_reset = _run_apply(["systemctl", "reset-failed", tiering_unit], timeout_seconds=30)
+            if cp_reset.returncode != 0:
+                state["last_tiering_unit_reconcile_ok"] = 0
+                state["last_tiering_unit_reconcile_error"] = (
+                    f"reset-failed failed rc={cp_reset.returncode} {cp_reset.stderr.strip()[:400]}"
+                )
+                print(
+                    f"WARNING: failed to reset failed state for {tiering_unit}: "
+                    f"rc={cp_reset.returncode}",
+                    file=sys.stderr,
+                )
+                return finish(0)
+
+            cp_start = _run_apply(["systemctl", "start", tiering_unit], timeout_seconds=60)
+            if cp_start.returncode != 0:
+                state["last_tiering_unit_reconcile_ok"] = 0
+                state["last_tiering_unit_reconcile_error"] = (
+                    f"start failed rc={cp_start.returncode} {cp_start.stderr.strip()[:400]}"
+                )
+                print(
+                    f"WARNING: failed to start {tiering_unit}: rc={cp_start.returncode}",
+                    file=sys.stderr,
+                )
+                return finish(0)
+
+            state["last_tiering_unit_reconcile_ok"] = 1
+            state["last_tiering_unit_reconcile_error"] = ""
+            print(f"APPLY: reconciled failed tiering unit: {tiering_unit}")
+            return finish(0)
+
         if not simulate_mode and (len(detected) + len(simulated)) == 0:
             state["last_healthy_utc"] = now.replace(microsecond=0).isoformat()
             state["last_healthy_epoch"] = _dt_to_epoch_seconds(now)
