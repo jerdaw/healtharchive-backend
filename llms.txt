@@ -72,6 +72,12 @@ From the repo root (Python project):
   make ci
   ```
 
+- Run the local pre-push parity gate (recommended before any push):
+
+  ```bash
+  make prepush
+  ```
+
 - Optional full suite (slower / stricter):
 
   ```bash
@@ -108,7 +114,7 @@ Guidelines:
 
 - If asked to commit: prefer small, logically grouped commits over big “catch-all” commits.
 - Use the existing message style (e.g., `fix: ...`, `docs: ...`, `ops: ...`).
-- Run the closest relevant local checks before pushing (usually `make ci`; use `make check-full` before deploys).
+- Run the closest relevant local checks before pushing (use `make prepush` by default; use `make check-full` before deploys).
 - Never commit secrets, `.env` files, or machine-specific artifacts.
 
 ---
