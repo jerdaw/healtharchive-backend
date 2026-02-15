@@ -1827,7 +1827,7 @@ def cmd_refresh_snapshot_metadata(args: argparse.Namespace) -> None:
                     )
 
                 if len(updates) >= batch_size:
-                    session.bulk_update_mappings(Snapshot, updates)  # type: ignore[arg-type]
+                    session.bulk_update_mappings(Snapshot.__mapper__, updates)
                     if not dry_run:
                         session.commit()
                     updated_count += len(updates)
@@ -1837,7 +1837,7 @@ def cmd_refresh_snapshot_metadata(args: argparse.Namespace) -> None:
                 break
 
         if updates:
-            session.bulk_update_mappings(Snapshot, updates)  # type: ignore[arg-type]
+            session.bulk_update_mappings(Snapshot.__mapper__, updates)
             if not dry_run:
                 session.commit()
             updated_count += len(updates)
@@ -2010,7 +2010,7 @@ def cmd_backfill_outlinks(args: argparse.Namespace) -> None:
                         )
 
                 if len(pending) >= batch_size:
-                    session.bulk_insert_mappings(SnapshotOutlink, pending)  # type: ignore[arg-type]
+                    session.bulk_insert_mappings(SnapshotOutlink.__mapper__, pending)
                     if not dry_run:
                         session.flush()
                     inserted_rows += len(pending)
@@ -2020,7 +2020,7 @@ def cmd_backfill_outlinks(args: argparse.Namespace) -> None:
                 break
 
         if pending:
-            session.bulk_insert_mappings(SnapshotOutlink, pending)  # type: ignore[arg-type]
+            session.bulk_insert_mappings(SnapshotOutlink.__mapper__, pending)
             if not dry_run:
                 session.flush()
             inserted_rows += len(pending)
