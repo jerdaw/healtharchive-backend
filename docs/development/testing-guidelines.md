@@ -11,6 +11,7 @@ If you want step-by-step “run the app and click it” workflows, use:
 From the repo root:
 
 - `make check` (fast CI gate: format check, lint, typecheck, tests)
+- `make prepush` (GitHub-parity pre-push gate: `make check` + local API-health verification + CI-aligned `pip-audit` policy)
 - `make check-full` (optional: pre-commit, security scan, docs build/lint)
 
 `make check` is intentionally kept low-friction so it can run constantly without blocking development.

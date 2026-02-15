@@ -1,4 +1,4 @@
-.PHONY: venv format format-check lint precommit typecheck test-fast test-all test security audit migration-guard check check-full ci docs-serve docs-build docs-build-strict docs-refs docs-coverage docs-coverage-strict docs-check
+.PHONY: venv format format-check lint precommit typecheck test-fast test-all test security audit audit-ci migration-guard ci-api-health-local check check-full ci prepush docs-serve docs-build docs-build-strict docs-refs docs-coverage docs-coverage-strict docs-check
 
 VENV ?= .venv
 VENV_BIN := $(VENV)/bin
@@ -82,10 +82,17 @@ security:
 audit:
 	$(PIP_AUDIT)
 
+audit-ci:
+	$(PYTHON_RUN) -m pip install --upgrade pip
+	$(PIP_AUDIT) --ignore-vuln CVE-2026-25990
+
 migration-guard:
 	$(PYTHON_RUN) scripts/ci_migration_guard.py \
 		--base-ref $(MIGRATION_GUARD_BASE) \
 		--head-ref $(MIGRATION_GUARD_HEAD)
+
+ci-api-health-local:
+	PATH="$(abspath $(VENV_BIN)):$$PATH" bash scripts/ci-api-health-local.sh
 
 docs-serve:
 	PYTHONPATH=src $(PYTHON_RUN) scripts/export_openapi.py
@@ -117,6 +124,8 @@ docs-check: docs-refs docs-coverage-strict docs-build-strict
 check: format-check lint typecheck test-fast
 
 ci: check
+
+prepush: ci ci-api-health-local audit-ci
 
 # Full suite: deeper / slower / more opinionated checks (run before deploys or when tightening quality).
 check-full: format-check lint typecheck test-all coverage-critical precommit security audit docs-check

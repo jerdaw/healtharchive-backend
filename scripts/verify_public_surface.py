@@ -147,6 +147,13 @@ def main(argv: list[str] | None = None) -> int:
         default=False,
         help="Do not fail if /api/changes reports enabled=false.",
     )
+    # Backward-compatible alias used by older CI scripts.
+    parser.add_argument(
+        "--allow-changes-disabled",
+        action="store_true",
+        dest="allow_change_tracking_disabled",
+        help=argparse.SUPPRESS,
+    )
     parser.add_argument(
         "--skip-exports",
         action="store_true",
@@ -176,6 +183,12 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         default=False,
         help="Skip frontend page checks (Phase 5 and Phase 7).",
+    )
+    parser.add_argument(
+        "--allow-empty-index",
+        action="store_true",
+        default=False,
+        help="Allow empty /api/sources and /api/search results (for fresh DB smoke checks).",
     )
 
     args = parser.parse_args(argv)
@@ -213,10 +226,16 @@ def main(argv: list[str] | None = None) -> int:
             _ok(f"api stats status=200 snapshotsTotal={snapshots_total!r}")
 
     sources, sources_json = _http_json(f"{api_base}/api/sources", timeout_s=timeout_s)
-    if sources.status != 200 or not isinstance(sources_json, list) or not sources_json:
-        _fail(f"api sources status={sources.status} (expected non-empty list)")
+    if sources.status != 200 or not isinstance(sources_json, list):
+        _fail(f"api sources status={sources.status} (expected list)")
         failures += 1
         sources_json = []
+    elif not sources_json:
+        if args.allow_empty_index:
+            _ok("api sources status=200 count=0 (allowed for empty index)")
+        else:
+            _fail("api sources status=200 but list is empty (expected non-empty list)")
+            failures += 1
     else:
         _ok(f"api sources status=200 count={len(sources_json)}")
         bad_rows = [
@@ -308,8 +327,11 @@ def main(argv: list[str] | None = None) -> int:
 
         results = search_json.get("results")
         if not isinstance(results, list) or not results:
-            _fail(f"api search returned no results url={search_url}")
-            failures += 1
+            if args.allow_empty_index:
+                _ok(f"api search returned no results (allowed) url={search_url}")
+            else:
+                _fail(f"api search returned no results url={search_url}")
+                failures += 1
         else:
             row = results[0] if isinstance(results[0], dict) else {}
             first_snapshot_id = row.get("id") if isinstance(row.get("id"), int) else None
@@ -380,8 +402,11 @@ def main(argv: list[str] | None = None) -> int:
             else:
                 _ok(f"replay browseUrl status=200 url={browse_url}")
     else:
-        _fail("no snapshot id available to test /api/snapshot, raw HTML, or replay URL")
-        failures += 1
+        if args.allow_empty_index:
+            _ok("no snapshot id available (allowed for empty index)")
+        else:
+            _fail("no snapshot id available to test /api/snapshot, raw HTML, or replay URL")
+            failures += 1
 
     usage, usage_json = _http_json(f"{api_base}/api/usage", timeout_s=timeout_s)
     if usage.status != 200 or not isinstance(usage_json, dict):
@@ -418,7 +443,9 @@ def main(argv: list[str] | None = None) -> int:
                 content_type = (
                     rss.headers.get("Content-Type") or rss.headers.get("content-type") or ""
                 ).lower()
-                if rss.status != 200 or ("xml" not in content_type and "rss" not in content_type):
+                if rss.status == 404 and args.allow_empty_index and "json" in content_type:
+                    _ok("api changes rss status=404 (allowed for empty index)")
+                elif rss.status != 200 or ("xml" not in content_type and "rss" not in content_type):
                     _fail(
                         f"api changes rss status={rss.status} content-type={content_type!r} url={api_base}/api/changes/rss"
                     )
