@@ -53,6 +53,14 @@ bind mounts yet, even though this is likely a contributor to hot-path staleness 
 - **Phase 2.5**: Implemented in repository (tiering UX improvement: detect + optionally repair "unexpected mount type" for annual output dirs).
   - `scripts/vps-annual-output-tiering.py` now warns when an annual output dir is mounted but not as a bind mount, and can repair it
     during a maintenance window (`--apply --repair-unexpected-mounts`).
+- **Phase 2.6**: Implemented in repository (auto-reconcile stale failed tiering-unit state).
+  - `scripts/vps-storage-hotpath-auto-recover.py` now detects when
+    `healtharchive-warc-tiering.service` is stuck in `failed` even though no
+    stale targets are currently eligible, and performs a conservative
+    reconcile (`systemctl reset-failed` + `systemctl start`) when the base
+    Storage Box mount is readable.
+  - This reduces persistent `HealthArchiveWarcTieringFailed` alert noise from
+    historical oneshot unit failures.
 - **Phase 3-5**: Pending.
 
 ## Current State Summary

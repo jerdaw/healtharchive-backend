@@ -108,6 +108,7 @@ Available templates:
 - **Registry**: New critical docs should be added to the `nav` section of `mkdocs.yml`. All docs should be added to their directory's `README.md` index.
 - Use MkDocs Material features like **Admonitions** (`!!! note`), **Tabs**, and **Mermaid** diagrams.
 - Documentation should be English-only; do not duplicate it in other languages.
+- Do not include AI-assistant authorship attribution in docs metadata/prose; document only human authors/contributors.
 - Avoid "phase" labels or other implementation-ordering labels outside `docs/planning/roadmap.md` and `docs/planning/implemented/`. The order that something was implemented in is not something that needs documentation; rather documentation should focus on key elements of what was implemented, how it was implemented, and how it is to be used.
 - Keep public copy public-safe (no secrets, private emails, or internal IPs).
 - If you sync your workspace via Syncthing, treat `.stignore` as "sync ignore" (like `.gitignore`) and ensure it excludes build artifacts and machine-local dev artifacts (e.g., `.venv/`, `node_modules/`, `.dev-archive-root/`). Secrets may sync via Syncthing, but must remain git-ignored.

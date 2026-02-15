@@ -111,6 +111,13 @@ Guidelines:
 
 - `AGENTS.md` is the canonical agent instruction file for this repo.
 - `CLAUDE.md` is committed as a symlink to `AGENTS.md` for tool compatibility.
+- `GEMINI.md` is committed as a symlink to `AGENTS.md` for tool compatibility.
+
+## Attribution and authorship policy
+
+- Commits, docs, code comments, and release notes must list only human contributors as authors.
+- Do not add AI-assistant attribution (for example: Codex/Claude/Gemini/ChatGPT) in authored-by/co-authored-by notes, prose, or metadata.
+- If tooling is used, describe technical changes directly without attributing authorship to tools.
 
 ---
 

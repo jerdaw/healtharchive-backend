@@ -20,6 +20,7 @@ Notes:
 
 - `make check` runs `make test-fast` (a curated subset).
 - `make test-all` runs the full test suite.
+- Browser automation suites (for example Playwright in related repos) should run in CI by default; only run them locally when you explicitly need interactive debugging.
 
 ## End-to-end smoke (public surface)
 
