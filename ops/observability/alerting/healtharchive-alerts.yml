@@ -138,14 +138,20 @@ groups:
           runbook_url: "https://github.com/jerdaw/healtharchive-backend/blob/main/docs/operations/playbooks/crawl-stalls.md"
 
       - alert: HealthArchiveCrawlContainerRestartsHigh
-        expr: healtharchive_crawl_running_job_container_restarts_done >= 10
-        for: 15m
+        expr: |
+          (
+            healtharchive_crawl_running_job_container_restarts_done{source="hc"} >= 19
+            or healtharchive_crawl_running_job_container_restarts_done{source="phac"} >= 24
+            or healtharchive_crawl_running_job_container_restarts_done{source="cihr"} >= 16
+          )
+          or healtharchive_crawl_running_job_container_restarts_done{source!~"hc|phac|cihr"} >= 16
+        for: 30m
         labels:
           severity: warning
           service: healtharchive
         annotations:
-          summary: "High container restart count during crawl"
-          description: "A running job has performed many container restarts (adaptive restart). job_id={{ $labels.job_id }} source={{ $labels.source }} restarts={{ $value }}."
+          summary: "Container restart budget running low during crawl"
+          description: "A running job has consumed most of its adaptive restart budget. job_id={{ $labels.job_id }} source={{ $labels.source }} restarts={{ $value }}. Investigate recurring timeout/storage instability before budget exhaustion."
           runbook_url: "https://github.com/jerdaw/healtharchive-backend/blob/main/docs/tutorials/debug-crawl.md"
 
       - alert: HealthArchiveCrawlNewPhaseChurn
@@ -187,15 +193,17 @@ groups:
       - alert: HealthArchiveCrawlRateSlowPHAC
         expr: |
           healtharchive_crawl_running_job_progress_known{source="phac"} == 1
+          and on(job_id, source) healtharchive_crawl_running_job_output_dir_ok{source="phac"} == 1
+          and on(job_id, source) healtharchive_crawl_running_job_log_probe_ok{source="phac"} == 1
           and healtharchive_crawl_running_job_crawl_rate_ppm{source="phac"} >= 0
-          and healtharchive_crawl_running_job_crawl_rate_ppm{source="phac"} < 1.5
-        for: 30m
+          and healtharchive_crawl_running_job_crawl_rate_ppm{source="phac"} < 1.0
+        for: 90m
         labels:
           severity: warning
           service: healtharchive
         annotations:
           summary: "PHAC crawl rate is very slow"
-          description: "A running PHAC crawl job has a very low crawl rate (<1.5 pages/min): source={{ $labels.source }} job_id={{ $labels.job_id }} rate={{ $value }}ppm. This can indicate persistent blocking/noise or infrastructure instability."
+          description: "A running PHAC crawl job has a very low crawl rate (<1.0 pages/min for 90m): source={{ $labels.source }} job_id={{ $labels.job_id }} rate={{ $value }}ppm. This can indicate persistent blocking/noise or infrastructure instability."
           runbook_url: "https://github.com/jerdaw/healtharchive-backend/blob/main/docs/tutorials/debug-crawl.md"
 
       - alert: HealthArchiveCrawlRateSlowCIHR

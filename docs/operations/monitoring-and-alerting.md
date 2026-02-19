@@ -90,9 +90,12 @@ Alerts are defined in:
 
 **Alert:** `HealthArchiveCrawlContainerRestartsHigh`
 
-- **Threshold:** `healtharchive_crawl_running_job_container_restarts_done >= 10` (for 15m).
-- **Meaning:** The crawler is requiring many adaptive container restarts; this can be a normal resiliency mechanism, but sustained growth can indicate timeouts or I/O instability.
-- **Action:** Review worker logs and combined logs around restarts; check for repeated timeouts on the same URL or storage errors.
+- **Threshold:** restart budget near exhaustion (for 30m):
+  - HC: `healtharchive_crawl_running_job_container_restarts_done{source="hc"} >= 19` (budget 24)
+  - PHAC: `healtharchive_crawl_running_job_container_restarts_done{source="phac"} >= 24` (budget 30)
+  - CIHR: `healtharchive_crawl_running_job_container_restarts_done{source="cihr"} >= 16` (budget 20)
+- **Meaning:** The crawler has consumed most of its adaptive restart budget and is at higher risk of hard failure if churn continues.
+- **Action:** Review worker logs and combined logs around restarts; check for repeated timeouts on the same URL or storage errors before the job exhausts its restart budget.
 
 ### 4) Progress Stalls
 
@@ -106,9 +109,9 @@ Alerts are defined in:
 
 **Alerts:** `HealthArchiveCrawlRateSlowHC`, `HealthArchiveCrawlRateSlowPHAC`, `HealthArchiveCrawlRateSlowCIHR`
 
-- **Thresholds (30m, when progress is known):**
+- **Thresholds (when progress is known):**
   - HC: `healtharchive_crawl_running_job_crawl_rate_ppm{source="hc"} < 1.5`
-  - PHAC: `healtharchive_crawl_running_job_crawl_rate_ppm{source="phac"} < 1.5`
+  - PHAC: `healtharchive_crawl_running_job_crawl_rate_ppm{source="phac"} < 1.0` (for 90m; only when output dir + log probes are healthy)
   - CIHR: `healtharchive_crawl_running_job_crawl_rate_ppm{source="cihr"} < 3`
 - **Meaning:** The crawler is running but source-specific throughput is below expected long-run baselines.
 - **Action:** Check combined logs for phase churn/retries, verify mount and network health, then tune source profile values in `job_registry.py` if sustained and reproducible.

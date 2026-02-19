@@ -76,3 +76,36 @@ def test_annual_output_dir_not_writable_alert_semantics() -> None:
     assert "healtharchive_crawl_annual_pending_job_output_dir_writable == 0" in body
     assert re.search(r"^\s*for:\s*10m\s*$", body, re.MULTILINE)
     assert re.search(r"^\s*severity:\s*warning\s*$", body, re.MULTILINE)
+
+
+def test_crawl_container_restarts_high_alert_semantics() -> None:
+    text = _rules_text()
+    body = _extract_alert_block(text, "HealthArchiveCrawlContainerRestartsHigh")
+
+    assert 'healtharchive_crawl_running_job_container_restarts_done{source="hc"} >= 19' in body
+    assert 'healtharchive_crawl_running_job_container_restarts_done{source="phac"} >= 24' in body
+    assert 'healtharchive_crawl_running_job_container_restarts_done{source="cihr"} >= 16' in body
+    assert (
+        'healtharchive_crawl_running_job_container_restarts_done{source!~"hc|phac|cihr"} >= 16'
+        in body
+    )
+    assert re.search(r"^\s*for:\s*30m\s*$", body, re.MULTILINE)
+    assert re.search(r"^\s*severity:\s*warning\s*$", body, re.MULTILINE)
+
+
+def test_crawl_rate_slow_phac_alert_semantics() -> None:
+    text = _rules_text()
+    body = _extract_alert_block(text, "HealthArchiveCrawlRateSlowPHAC")
+
+    assert 'healtharchive_crawl_running_job_progress_known{source="phac"} == 1' in body
+    assert (
+        'and on(job_id, source) healtharchive_crawl_running_job_output_dir_ok{source="phac"} == 1'
+        in body
+    )
+    assert (
+        'and on(job_id, source) healtharchive_crawl_running_job_log_probe_ok{source="phac"} == 1'
+        in body
+    )
+    assert 'healtharchive_crawl_running_job_crawl_rate_ppm{source="phac"} < 1.0' in body
+    assert re.search(r"^\s*for:\s*90m\s*$", body, re.MULTILINE)
+    assert re.search(r"^\s*severity:\s*warning\s*$", body, re.MULTILINE)
