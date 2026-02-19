@@ -185,8 +185,15 @@ for cand in "prometheus-alertmanager.service" "alertmanager.service"; do
   fi
 done
 if [[ -z "${AM_UNIT}" ]]; then
-  echo "ERROR: Could not find Alertmanager systemd unit after install." >&2
-  exit 1
+  if [[ "${APPLY}" != "true" ]]; then
+    # Non-root dry-runs may not be able to inspect units via systemctl cat.
+    # Keep preview mode non-blocking and use the common Ubuntu unit name.
+    AM_UNIT="prometheus-alertmanager.service"
+    echo "WARN: Could not discover Alertmanager unit in dry-run; using ${AM_UNIT} for preview output." >&2
+  else
+    echo "ERROR: Could not find Alertmanager systemd unit after install." >&2
+    exit 1
+  fi
 fi
 
 ensure_service_user_in_group "${AM_UNIT}" "${OPS_GROUP}"
