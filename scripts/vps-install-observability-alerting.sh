@@ -206,7 +206,9 @@ global:
   resolve_timeout: 5m
 
 route:
-  receiver: healtharchive-webhook
+  # Default receiver is tuned for non-critical alerts (warning/info):
+  # lower-notification pressure, no resolved events.
+  receiver: healtharchive-webhook-noncritical
   routes:
     # Drill-only alerts should not page operators by default. They still appear
     # in Prometheus/Alertmanager UIs for verification during drills.
@@ -217,17 +219,29 @@ route:
       group_wait: 0s
       group_interval: 1m
       repeat_interval: 1h
+    # Critical alerts stay high-urgency and include resolved notifications.
+    - matchers:
+        - severity="critical"
+      receiver: healtharchive-webhook-critical
+      group_by: ["alertname"]
+      group_wait: 15s
+      group_interval: 5m
+      repeat_interval: 6h
   group_by: ["alertname"]
-  group_wait: 30s
-  group_interval: 5m
-  repeat_interval: 12h
+  group_wait: 60s
+  group_interval: 15m
+  repeat_interval: 24h
 
 receivers:
   - name: healtharchive-null
-  - name: healtharchive-webhook
+  - name: healtharchive-webhook-critical
     webhook_configs:
       - url: ${webhook_url}
         send_resolved: true
+  - name: healtharchive-webhook-noncritical
+    webhook_configs:
+      - url: ${webhook_url}
+        send_resolved: false
 EOF
 
   am_user="$(systemctl show -p User --value "${AM_UNIT}" 2>/dev/null || true)"

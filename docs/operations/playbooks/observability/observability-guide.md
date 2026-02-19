@@ -300,6 +300,16 @@ sudo ./scripts/vps-install-observability-alerting.sh --apply
 - Tiering hot path unreadable
 - Annual campaign sentinel failed (Jan 01 UTC)
 
+### Default Routing Behavior
+
+`scripts/vps-install-observability-alerting.sh` installs Alertmanager routing with:
+
+- `severity=critical`: includes `resolved` notifications, repeats every 6h.
+- `severity=warning`/`severity=info`: no `resolved` notifications, repeats every 24h.
+- `severity=drill`: routed to null receiver (visible in UI, no operator notification).
+
+This keeps critical outage signals immediate while reducing warning-level notification churn.
+
 ### Verify
 
 ```bash
