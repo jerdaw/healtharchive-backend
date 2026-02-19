@@ -31,6 +31,7 @@ Current known items:
 ## Implemented plans (history)
 
 - Implemented plans archive: `implemented/README.md`
+- Alerting noise reduction + routing tuning: `implemented/2026-02-19-alerting-noise-reduction-and-routing-tuning.md`
 - Operational resilience improvements: `implemented/2026-02-01-operational-resilience-improvements.md`
 - Deploy workflow hardening (single VPS): `implemented/2026-02-07-deploy-workflow-hardening.md`
 - CI schema + governance guardrails: `implemented/2026-02-06-ci-schema-and-governance-guardrails.md`

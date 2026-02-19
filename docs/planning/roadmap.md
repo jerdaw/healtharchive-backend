@@ -97,6 +97,9 @@ Keep this list short; prefer linking to the canonical doc that explains the item
 - WARC discovery consistency follow-through (deferred Phase 2-4 work; keep behavior coherent across status, indexing, and cleanup).
   - Historical context: `implemented/2026-01-29-warc-discovery-consistency.md`
   - Already implemented: `implemented/2026-01-29-warc-manifest-verification.md`
+- Continue per-source crawl-alert threshold calibration from live annual-crawl telemetry (keep warnings actionable, low-noise).
+  - Current focus: validate whether `HealthArchiveCrawlRateSlowCIHR` threshold/duration should be tuned after observing post-2026-02-19 alert outcomes.
+  - Related docs: `../operations/monitoring-and-alerting.md`, `../operations/healtharchive-ops-roadmap.md`
 - Consider whether a separate staging backend is worth it (increases ops surface; only do if it buys real safety).
   - See: `../deployment/environments-and-configuration.md`
 
@@ -125,7 +128,6 @@ Completed items were removed from this backlog and archived in:
 
 ### Reliability, security, and CI
 
-15. **Add API health integration tests to PR CI** (M: 1 day)
 18. **Finish dependency-audit blocking in CI** (S: 2-3h)
   - Remaining work: clear current vulnerabilities and keep `pip-audit` / `npm audit` blocking.
   - Current caveat: `Backend CI` temporarily ignores `CVE-2026-25990` (`pillow`) because of a docs-tooling transitive constraint (`mkdocs-material[imaging]`); remove ignore once upstream allows a fixed version.

@@ -19,7 +19,7 @@ Keep the two synced copies of this file aligned:
 - **Quarterly:** confirm core timers are enabled and succeeding (recommended: on the VPS run `cd /opt/healtharchive-backend && ./scripts/verify_ops_automation.sh`; then spot-check `journalctl -u <service>`).
 - **Quarterly:** docs drift skim: re-read the production runbook + incident response and fix any drift you notice (keep docs matching reality).
 
-## Current status (as of 2026-02-07)
+## Current status (as of 2026-02-19)
 
 - 2026 annual crawl is actively running on the VPS (jobs: `hc`/`phac`/`cihr`; see `./scripts/vps-crawl-status.sh --year 2026`).
 - Deploy-lock suppression is cleared (the stale `/tmp/healtharchive-backend-deploy.lock` was removed; auto-recover apply actions are no longer skipped due to deploy lock).
@@ -29,6 +29,11 @@ Keep the two synced copies of this file aligned:
   - Maintenance-window restart of services is still required to pick up the env change.
 - Annual output-dir mount topology is currently **unexpected** (direct `sshfs` mounts instead of bind mounts) for the active 2026 jobs.
   - We are intentionally deferring conversion to bind mounts until a maintenance window to avoid interrupting in-progress crawls.
+- Alerting noise-reduction tuning is deployed and verified:
+  - Alertmanager routing is severity-aware (`critical` keeps resolved notifications, non-critical suppresses resolved and repeats less often).
+  - Crawl alerts were tuned to reduce non-actionable churn:
+    - `HealthArchiveCrawlContainerRestartsHigh` now triggers near restart-budget exhaustion.
+    - `HealthArchiveCrawlRateSlowPHAC` now requires `<1.0 ppm` sustained for `90m` with healthy log/output-dir probes.
 
 ## Current ops tasks (implementation already exists; enable/verify)
 
@@ -51,13 +56,9 @@ Keep the two synced copies of this file aligned:
 - Verify the new Docker resource limit environment variables are set appropriately on VPS if defaults need adjustment:
   - `HEALTHARCHIVE_DOCKER_MEMORY_LIMIT` (default: 4g)
   - `HEALTHARCHIVE_DOCKER_CPU_LIMIT` (default: 1.5)
-- Verify the new alerts are firing correctly in Grafana:
-  - `HealthArchiveCrawlRateSlowHC`
-  - `HealthArchiveCrawlRateSlowPHAC`
-  - `HealthArchiveCrawlRateSlowCIHR`
-  - `HealthArchiveCrawlNewPhaseChurn`
-  - `HealthArchiveInfraErrorsHigh`
-  - `HealthArchiveCrawlMetricsStale`
+- Post-deploy follow-through (alerting):
+  - Review notification volume and alert outcomes after 7 days (firing + resolved counts by alertname/severity).
+  - Decide whether `HealthArchiveCrawlRateSlowCIHR` needs threshold/duration adjustment based on observed baseline vs operator actionability.
 
 ## IRL / external validation (pending)
 
