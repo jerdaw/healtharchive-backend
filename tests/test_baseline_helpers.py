@@ -116,3 +116,40 @@ def test_baseline_drift_does_not_warn_on_tailscale_only_listeners() -> None:
     _required, warned = check_baseline_drift.evaluate(policy, observed)
     warn_keys = {f.key for f in warned}
     assert "network:tcp:unexpected_non_loopback_ports" not in warn_keys
+
+
+def test_baseline_drift_checks_dependencies() -> None:
+    _add_scripts_to_path()
+    import check_baseline_drift
+
+    policy: dict[str, Any] = {"dependencies": {"required_packages": ["slowapi", "FastAPI"]}}
+
+    # All dependencies present (case insensitive check)
+    observed_ok: dict[str, Any] = {
+        "inputs": {"mode": "local"},
+        "dependencies": {
+            "python_packages": {"slowapi": "0.1.0", "fastapi": "0.100.0", "other": "1.0.0"}
+        },
+    }
+    required, _warned = check_baseline_drift.evaluate(policy, observed_ok)
+    keys = {f.key for f in required}
+    assert "dependencies" not in keys
+    assert "dependencies:slowapi" not in keys
+
+    # Missing one dependency
+    observed_missing: dict[str, Any] = {
+        "inputs": {"mode": "local"},
+        "dependencies": {"python_packages": {"fastapi": "0.100.0"}},
+    }
+    required2, _warned2 = check_baseline_drift.evaluate(policy, observed_missing)
+    keys2 = {f.key for f in required2}
+    assert "dependencies:slowapi" in keys2
+
+    # Cannot read .venv packages
+    observed_none: dict[str, Any] = {
+        "inputs": {"mode": "local"},
+        "dependencies": {"python_packages": None},
+    }
+    required3, _warned3 = check_baseline_drift.evaluate(policy, observed_none)
+    keys3 = {f.key for f in required3}
+    assert "dependencies" in keys3
