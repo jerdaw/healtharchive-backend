@@ -128,6 +128,7 @@ nav:
           - Adding New CLI Commands: development/playbooks/add-cli-command.md
       - Deployment:
           - Deployment Overview: deployment/README.md
+          - Production Runbook: deployment/runbook-vps-deploy.md
           - Production Setup: deployment/production-single-vps.md
           - Configure Environments: deployment/environments-and-configuration.md
           - Deploy to Production: deployment/hosting-and-live-server-to-dos.md
