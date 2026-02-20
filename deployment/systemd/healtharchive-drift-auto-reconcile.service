@@ -1,0 +1,17 @@
+[Unit]
+Description=HealthArchive backend drift auto-reconcile watchdog
+ConditionPathExists=/etc/healtharchive/drift-auto-reconcile-enabled
+After=network.target
+
+[Service]
+Type=oneshot
+User=root
+Group=root
+EnvironmentFile=-/etc/healtharchive/backend.env
+EnvironmentFile=-/etc/healtharchive/healthchecks.env
+WorkingDirectory=/opt/healtharchive-backend
+# First, force a fresh local baseline drift report
+# We use '-' prefix because the script exits 1 if drift is found, and we want to continue.
+ExecStartPre=-/usr/bin/env sudo -u haadmin /opt/healtharchive-backend/.venv/bin/python3 /opt/healtharchive-backend/scripts/check_baseline_drift.py --mode local
+# Then evaluate the active drift report and apply recovery if required (running as root to allow vps-deploy.sh to manage systemd units)
+ExecStart=/usr/bin/env python3 /opt/healtharchive-backend/scripts/vps-drift-auto-reconcile.py --apply
