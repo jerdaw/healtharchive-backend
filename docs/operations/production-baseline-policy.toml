@@ -325,3 +325,17 @@ loopback_only_tcp_ports = [3000, 5432, 8001, 8002, 9090, 9093, 9094, 9100, 9187,
 # A minimal allowlist of ports that may listen on non-loopback interfaces.
 # Note: SSH may listen on all interfaces but is firewalled to tailnet-only in the runbook.
 allowed_non_loopback_tcp_ports = [22, 80, 443]
+
+[dependencies]
+# Required pipeline and API dependencies to catch incomplete deployments
+required_packages = [
+  "slowapi",
+  "fastapi",
+  "warcio",
+  "sqlalchemy",
+  "psycopg",
+  "alembic",
+  "beautifulsoup4",
+  "uvicorn",
+  "httpx",
+]

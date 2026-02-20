@@ -248,6 +248,40 @@ def _expect_path(
         )
 
 
+def _check_dependencies(
+    findings: list[Finding],
+    *,
+    level: str,
+    policy_deps: dict[str, Any],
+    observed_packages: dict[str, str] | None,
+) -> None:
+    required = policy_deps.get("required_packages", [])
+    if not required:
+        return
+
+    if observed_packages is None:
+        findings.append(
+            Finding(
+                level=level,
+                key="dependencies",
+                message="python packages could not be read from .venv",
+            )
+        )
+        return
+
+    for pkg in required:
+        if not isinstance(pkg, str):
+            continue
+        if pkg.lower() not in observed_packages:
+            findings.append(
+                Finding(
+                    level=level,
+                    key=f"dependencies:{pkg}",
+                    message=f"required package {pkg!r} is missing from .venv",
+                )
+            )
+
+
 def evaluate(
     policy: dict[str, Any], observed: dict[str, Any]
 ) -> tuple[list[Finding], list[Finding]]:
@@ -450,6 +484,17 @@ def evaluate(
                 policy_entry=entry,
                 observed_entry=fs_obs_paths.get(path),
             )
+
+    # Dependencies (virtual environment packages)
+    deps_policy = policy.get("dependencies", {})
+    deps_obs = observed.get("dependencies", {})
+    if isinstance(deps_policy, dict) and isinstance(deps_obs, dict):
+        _check_dependencies(
+            required,
+            level="FAIL",
+            policy_deps=deps_policy,
+            observed_packages=deps_obs.get("python_packages"),
+        )
 
     # systemd units
     units_policy = policy.get("systemd", {}).get("units", [])

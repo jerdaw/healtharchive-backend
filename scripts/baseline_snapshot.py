@@ -200,6 +200,27 @@ def _user_in_group(user: str, group: str) -> bool:
     return user in gr.gr_mem
 
 
+def _collect_python_packages(venv_dir: Path | None) -> dict[str, str] | None:
+    if venv_dir is None or not venv_dir.exists():
+        return None
+    venv_pip = venv_dir / "bin" / "pip"
+    if not venv_pip.exists():
+        return None
+    try:
+        proc = subprocess.run(
+            [str(venv_pip), "list", "--format=json", "--disable-pip-version-check"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if proc.returncode != 0:
+            return None
+        data = json.loads(proc.stdout)
+        return {item["name"].lower(): item["version"] for item in data}
+    except Exception:  # noqa: BLE001
+        return None
+
+
 @dataclass(frozen=True)
 class HstsCheck:
     configured_in_caddy: bool
@@ -357,6 +378,9 @@ def collect_observed(*, policy: dict[str, Any], mode: str = "local") -> dict[str
     caddyfile = Path(policy.get("files", {}).get("caddyfile", "/etc/caddy/Caddyfile"))
     api_domain = api_base.replace("https://", "").replace("http://", "").split("/", 1)[0]
 
+    venv_path_str = policy.get("files", {}).get("venv_dir", "/opt/healtharchive-backend/.venv")
+    venv_dir = Path(venv_path_str)
+
     env: dict[str, Any] = {"backend_env_file": str(backend_env_file)}
     raw_env: dict[str, str] = {}
     env_read_error: str | None = None
@@ -466,6 +490,9 @@ def collect_observed(*, policy: dict[str, Any], mode: str = "local") -> dict[str
             "api_base": api_base,
             "admin_checks": admin_http,
             "cors_checks": cors_http,
+        },
+        "dependencies": {
+            "python_packages": _collect_python_packages(venv_dir),
         },
     }
 
