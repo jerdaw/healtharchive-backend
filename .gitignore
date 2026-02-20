@@ -68,3 +68,4 @@ docs/frontend
 
 # UV lock file (auto-generated, should not be committed)
 uv.lock
+ci-api-health.db
