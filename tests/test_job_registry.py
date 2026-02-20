@@ -60,7 +60,7 @@ def test_get_config_for_source_known_sources() -> None:
     assert hc_cfg.default_tool_options["max_container_restarts"] == 24
     assert hc_cfg.default_tool_options["error_threshold_timeout"] == 55
     assert hc_cfg.default_tool_options["error_threshold_http"] == 55
-    assert hc_cfg.default_tool_options["backoff_delay_minutes"] == 2
+    assert hc_cfg.default_tool_options["backoff_delay_minutes"] == 15
 
     assert phac_cfg.default_tool_options["skip_final_build"] is True
     assert phac_cfg.default_tool_options["docker_shm_size"] == "1g"

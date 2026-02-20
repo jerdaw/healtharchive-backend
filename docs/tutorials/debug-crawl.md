@@ -372,7 +372,7 @@ ha-backend create-job --source hc \
 - `stall_timeout_minutes: 60` → Abort if no progress for 60 mins
 - `error_threshold_timeout: 50` → Tolerate more timeouts before adaptations
 - `error_threshold_http: 50` → Tolerate more HTTP/network errors before adaptations
-- `backoff_delay_minutes: 2` → Shorten post-adaptation sleep on single-worker hosts
+- `backoff_delay_minutes: 15` → Wait longer for WAF tarpits to clear (previously 2)
 - `page_limit: 1000` → Limit crawl scope for development/testing (avoid for annual campaign completeness)
 
 ### Resume Existing Crawl

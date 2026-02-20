@@ -316,7 +316,7 @@ These control `CrawlMonitor` behaviour:
 
   * Minimum time between rotations. If last rotation < this interval ago, rotation is skipped.
 
-* `--backoff-delay-minutes` (default `15`)
+* `--backoff-delay-minutes` (default `5`)
 
   * Used for **time-based backoff** when:
 
