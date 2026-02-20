@@ -140,6 +140,10 @@ or stage the cutover manually (no restarts required until your maintenance windo
   - Optional automation to ensure the worker is running when it should be (jobs pending + storage OK).
   - Gated by `ConditionPathExists=/etc/healtharchive/worker-auto-start-enabled`.
   - Conservative by default; prefers a “do nothing” skip over unsafe starts.
+- `healtharchive-drift-auto-reconcile.service` + `.timer`
+  - Optional automation to recover from deployment dependency drift (calls `vps-deploy.sh`).
+  - Read-only unless drift is found in baseline report; triggered every 5 minutes.
+  - Gated by `ConditionPathExists=/etc/healtharchive/drift-auto-reconcile-enabled`.
 - `healtharchive-storage-hotpath-auto-recover.service` + `.timer`
   - Optional automation to recover **stale/unreadable hot paths** caused by `sshfs`/FUSE mount failures (Errno 107).
   - Gated by `ConditionPathExists=/etc/healtharchive/storage-hotpath-auto-recover-enabled`.
@@ -198,6 +202,9 @@ matches your operational readiness.
 - **Worker auto-start watchdog** (`healtharchive-worker-auto-start.timer`)
   - Recommended once you’re confident in the single-VPS production automation stack.
   - The unit is sentinel-gated and refuses to start the worker if the Storage Box mount is unreadable or if the DB indicates a `status=running` job while the worker is down.
+- **Drift auto-reconcile watchdog** (`healtharchive-drift-auto-reconcile.timer`)
+  - Recommended for self-healing missing pip dependencies that cause API 502s.
+  - Runs every 5 minutes and invokes `vps-deploy.sh` if the baseline report catches virtual environment drift.
 
 If a timer is enabled, also ensure its sentinel file exists under
 `/etc/healtharchive/` (see the enablement sections below).
@@ -306,6 +313,14 @@ sudo install -m 0644 -o root -g root \
 sudo install -m 0644 -o root -g root \
   /opt/healtharchive-backend/docs/deployment/systemd/healtharchive-public-surface-verify.timer \
   /etc/systemd/system/healtharchive-public-surface-verify.timer
+
+sudo install -m 0644 -o root -g root \
+  /opt/healtharchive-backend/docs/deployment/systemd/healtharchive-drift-auto-reconcile.service \
+  /etc/systemd/system/healtharchive-drift-auto-reconcile.service
+
+sudo install -m 0644 -o root -g root \
+  /opt/healtharchive-backend/docs/deployment/systemd/healtharchive-drift-auto-reconcile.timer \
+  /etc/systemd/system/healtharchive-drift-auto-reconcile.timer
 ```
 
 Install the worker priority drop-in:
@@ -772,6 +787,42 @@ The watchdog writes state under:
 and emits node_exporter textfile metrics via:
 
 - `healtharchive_worker_auto_start.prom`
+
+---
+
+## Enable drift auto-reconcile watchdog (recommended)
+
+This automation prevents “API 502 Bad Gateway” API crashes that occur when dependencies (like Python packages in `.venv`) drift from the desired codebase following an incomplete/manual code update.
+
+It reads the results from `healtharchive-baseline-drift-check.timer`'s periodic checks to decide if an infrastructure environment rebuild (via `scripts/vps-deploy.sh`) is needed, applying cooldowns to avoid flapping.
+
+Create the sentinel file:
+
+```bash
+sudo install -m 0644 -o root -g root /dev/null /etc/healtharchive/drift-auto-reconcile-enabled
+```
+
+Enable the timer:
+
+```bash
+sudo systemctl enable --now healtharchive-drift-auto-reconcile.timer
+systemctl list-timers | rg healtharchive-drift-auto-reconcile || systemctl list-timers | grep healtharchive-drift-auto-reconcile
+```
+
+Rollback:
+
+```bash
+sudo systemctl disable --now healtharchive-drift-auto-reconcile.timer
+sudo rm -f /etc/healtharchive/drift-auto-reconcile-enabled
+```
+
+The watchdog writes state under:
+
+- `/srv/healtharchive/ops/watchdog/drift-auto-reconcile.json`
+
+and emits node_exporter textfile metrics via:
+
+- `healtharchive_drift_auto_reconcile.prom`
 
 ---
 

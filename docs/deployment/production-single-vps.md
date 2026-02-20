@@ -371,6 +371,26 @@ This can break:
 - archive job output dirs under `/srv/healtharchive/jobs/**`,
 - and the worker/job lifecycle.
 
+## Updating
+
+Standard fast-forward to latest `main`:
+
+```bash
+cd /opt/healtharchive-backend
+./scripts/vps-deploy.sh --apply
+```
+
+> [!WARNING]
+> DO NOT manually run `git pull` on the VPS. Always use `./scripts/vps-deploy.sh` or the `hetzdeploy` alias. This ensures that new dependencies (e.g., Python packages in `.venv`) are installed and services like the API are restarted cleanly, preventing `ModuleNotFoundError` crashes.
+
+This does:
+
+- `git fetch origin main && git merge origin/main --ff-only`
+- `pip install -r requirements.txt` (into `.venv`)
+- `alembic upgrade head`
+- `systemctl restart healtharchive-api` (if not skipping)
+- `systemctl restart healtharchive-worker` (if not skipping/forcing)
+
 Fast triage:
 
 ```bash

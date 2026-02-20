@@ -26,9 +26,9 @@ Options:
   --require-coverage-guardrails  Fail if coverage guardrails timer isn't enabled
   --require-replay-smoke         Fail if replay smoke timer isn't enabled
   --require-cleanup-automation   Fail if cleanup automation timer isn't enabled
-  --require-public-verify        Fail if public surface verify timer isn't enabled
   --require-storage-hotpath-auto-recover Fail if storage hot-path auto-recover timer isn't enabled
   --require-worker-auto-start    Fail if worker auto-start timer isn't enabled
+  --require-drift-auto-reconcile Fail if drift auto-reconcile watchdog timer isn't enabled
   --allow-missing-worker-override Do not fail if worker override isn't present
   --quiet                       Suppress human-readable output (useful for cron artifacts)
   --json                        Emit a single JSON summary to stdout (human logs go to stderr)
@@ -47,10 +47,10 @@ REQUIRE_ANNUAL_SENTINEL="false"
 REQUIRE_ANNUAL_SEARCH_VERIFY="false"
 REQUIRE_COVERAGE_GUARDRAILS="false"
 REQUIRE_REPLAY_SMOKE="false"
-REQUIRE_CLEANUP_AUTOMATION="false"
 REQUIRE_PUBLIC_VERIFY="false"
 REQUIRE_STORAGE_HOTPATH_AUTO_RECOVER="false"
 REQUIRE_WORKER_AUTO_START="false"
+REQUIRE_DRIFT_AUTO_RECONCILE="false"
 ALLOW_MISSING_WORKER_OVERRIDE="false"
 REQUIRE_ALL_PRESENT="false"
 REQUIRE_ALL_ENABLED="false"
@@ -103,12 +103,12 @@ while [[ $# -gt 0 ]]; do
       REQUIRE_PUBLIC_VERIFY="true"
       shift 1
       ;;
-    --require-storage-hotpath-auto-recover)
-      REQUIRE_STORAGE_HOTPATH_AUTO_RECOVER="true"
-      shift 1
-      ;;
     --require-worker-auto-start)
       REQUIRE_WORKER_AUTO_START="true"
+      shift 1
+      ;;
+    --require-drift-auto-reconcile)
+      REQUIRE_DRIFT_AUTO_RECONCILE="true"
       shift 1
       ;;
     --allow-missing-worker-override)
@@ -368,11 +368,11 @@ expected_timer_specs=(
   "healtharchive-annual-campaign-sentinel.timer|automation-enabled|false|REQUIRE_ANNUAL_SENTINEL"
   "healtharchive-annual-search-verify.timer|automation-enabled|false|REQUIRE_ANNUAL_SEARCH_VERIFY"
   "healtharchive-coverage-guardrails.timer|coverage-guardrails-enabled|false|REQUIRE_COVERAGE_GUARDRAILS"
-  "healtharchive-replay-smoke.timer|replay-smoke-enabled|false|REQUIRE_REPLAY_SMOKE"
   "healtharchive-cleanup-automation.timer|cleanup-automation-enabled|false|REQUIRE_CLEANUP_AUTOMATION"
   "healtharchive-public-surface-verify.timer|public-verify-enabled|false|REQUIRE_PUBLIC_VERIFY"
   "healtharchive-storage-hotpath-auto-recover.timer|storage-hotpath-auto-recover-enabled|false|REQUIRE_STORAGE_HOTPATH_AUTO_RECOVER"
   "healtharchive-worker-auto-start.timer|worker-auto-start-enabled|false|REQUIRE_WORKER_AUTO_START"
+  "healtharchive-drift-auto-reconcile.timer|drift-auto-reconcile-enabled|false|REQUIRE_DRIFT_AUTO_RECONCILE"
 )
 
 for spec in "${expected_timer_specs[@]}"; do
