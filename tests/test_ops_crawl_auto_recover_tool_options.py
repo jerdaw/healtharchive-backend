@@ -138,7 +138,7 @@ def test_ensure_recovery_tool_options_reconciles_legacy_hc_values() -> None:
     assert tool["stall_timeout_minutes"] == 75
     assert tool["error_threshold_timeout"] == 55
     assert tool["error_threshold_http"] == 55
-    assert tool["backoff_delay_minutes"] == 2
+    assert tool["backoff_delay_minutes"] == 15
     assert tool["max_container_restarts"] == 24
 
 
