@@ -97,7 +97,7 @@ SOURCE_JOB_CONFIGS: Dict[str, SourceJobConfig] = {
             # Tolerate long-tail slowness without excessive churn.
             "error_threshold_timeout": 55,
             "error_threshold_http": 55,
-            "backoff_delay_minutes": 2,
+            "backoff_delay_minutes": 15,
             "log_level": "INFO",
             "relax_perms": True,  # ensure WARCs are readable on host in dev
         },

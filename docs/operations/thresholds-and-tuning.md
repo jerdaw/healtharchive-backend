@@ -262,7 +262,7 @@ Annual jobs are source-tuned (not one-size-fits-all). Canonical values live in `
 
 | Source | Initial workers | Stall timeout | Timeout/HTTP threshold | Backoff | Max restarts | Rationale |
 |--------|-----------------|---------------|------------------------|---------|--------------|-----------|
-| `hc` | 2 | 75 min | 55 / 55 | 2 min | 24 | Moderate tolerance for canada.ca long-tail behavior. |
+| `hc` | 2 | 75 min | 55 / 55 | 15 min | 24 | Moderate tolerance for canada.ca long-tail behavior. |
 | `phac` | 2 | 90 min | 65 / 65 | 3 min | 30 | Highest tolerance due historically high restart churn. |
 | `cihr` | 3 | 45 min | 35 / 35 | 1 min | 20 | Faster/cleaner profile to improve throughput and fault detection. |
 
