@@ -319,3 +319,6 @@ def test_worker_auto_start_starts_worker_when_pending_jobs_and_safe(tmp_path, mo
     assert (
         'healtharchive_worker_auto_start_last_result{result="ok",reason="started_worker"} 1' in prom
     )
+    assert "healtharchive_worker_auto_start_start_attempts_total 1" in prom
+    assert "healtharchive_worker_auto_start_start_success_total 1" in prom
+    assert "healtharchive_worker_auto_start_start_fail_total 0" in prom

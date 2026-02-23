@@ -27,3 +27,13 @@ def test_alertmanager_unit_detection_dry_run_fallback_exists() -> None:
     assert 'if [[ "${APPLY}" != "true" ]]; then' in text
     assert 'AM_UNIT="prometheus-alertmanager.service"' in text
     assert "Could not discover Alertmanager unit in dry-run" in text
+
+
+def test_alertmanager_groups_by_crawl_identity_and_has_inhibit_rules() -> None:
+    text = _script_text()
+
+    assert 'group_by: ["alertname", "source", "job_id"]' in text
+    assert "inhibit_rules:" in text
+    assert 'alertname="HealthArchiveStorageBoxMountDown"' in text
+    assert 'alertname="HealthArchiveStorageHotpathStaleUnrecovered"' in text
+    assert 'equal: ["service"]' in text

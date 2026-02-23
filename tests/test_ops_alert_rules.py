@@ -38,7 +38,7 @@ def test_alert_rule_names_are_unique() -> None:
     assert not dupes, f"duplicate alert names found: {dupes}"
 
 
-def test_crawl_rate_alerts_are_source_specific() -> None:
+def test_crawl_rate_alerts_removed_in_favor_of_dashboard_signals() -> None:
     text = _rules_text()
 
     names: set[str] = set()
@@ -47,10 +47,11 @@ def test_crawl_rate_alerts_are_source_specific() -> None:
         if m:
             names.add(m.group(1))
 
-    assert "HealthArchiveCrawlRateSlowHC" in names
-    assert "HealthArchiveCrawlRateSlowPHAC" in names
-    assert "HealthArchiveCrawlRateSlowCIHR" in names
+    assert "HealthArchiveCrawlRateSlowHC" not in names
+    assert "HealthArchiveCrawlRateSlowPHAC" not in names
+    assert "HealthArchiveCrawlRateSlowCIHR" not in names
     assert "HealthArchiveCrawlRateSlow" not in names
+    assert "HealthArchiveCrawlNewPhaseChurn" not in names
 
 
 def test_storage_hotpath_apply_failed_persistent_alert_semantics() -> None:
@@ -74,6 +75,7 @@ def test_annual_output_dir_not_writable_alert_semantics() -> None:
 
     assert "healtharchive_crawl_annual_pending_output_dir_probe_user_ok == 1" in body
     assert "healtharchive_crawl_annual_pending_job_output_dir_writable == 0" in body
+    assert "healtharchive_crawl_annual_pending_job_output_dir_writable_errno != 107" in body
     assert re.search(r"^\s*for:\s*10m\s*$", body, re.MULTILINE)
     assert re.search(r"^\s*severity:\s*warning\s*$", body, re.MULTILINE)
 
@@ -93,19 +95,38 @@ def test_crawl_container_restarts_high_alert_semantics() -> None:
     assert re.search(r"^\s*severity:\s*warning\s*$", body, re.MULTILINE)
 
 
-def test_crawl_rate_slow_phac_alert_semantics() -> None:
+def test_worker_down_alert_is_automation_aware() -> None:
     text = _rules_text()
-    body = _extract_alert_block(text, "HealthArchiveCrawlRateSlowPHAC")
+    body = _extract_alert_block(text, "HealthArchiveWorkerDownWhileJobsPending")
 
-    assert 'healtharchive_crawl_running_job_progress_known{source="phac"} == 1' in body
-    assert (
-        'and on(job_id, source) healtharchive_crawl_running_job_output_dir_ok{source="phac"} == 1'
-        in body
-    )
-    assert (
-        'and on(job_id, source) healtharchive_crawl_running_job_log_probe_ok{source="phac"} == 1'
-        in body
-    )
-    assert 'healtharchive_crawl_running_job_crawl_rate_ppm{source="phac"} < 1.0' in body
-    assert re.search(r"^\s*for:\s*90m\s*$", body, re.MULTILINE)
-    assert re.search(r"^\s*severity:\s*warning\s*$", body, re.MULTILINE)
+    assert "healtharchive_worker_should_be_running == 1" in body
+    assert "healtharchive_worker_active == 0" in body
+    assert "healtharchive_worker_auto_start_enabled == 1" in body
+    assert "healtharchive_worker_auto_start_last_run_timestamp_seconds" in body
+    assert "healtharchive_worker_auto_start_deploy_lock_present == 0" in body
+    assert "absent(healtharchive_worker_auto_start_enabled)" in body
+    assert re.search(r"^\s*for:\s*20m\s*$", body, re.MULTILINE)
+    assert re.search(r"^\s*severity:\s*critical\s*$", body, re.MULTILINE)
+
+
+def test_crawl_output_dir_unreadable_excludes_errno_107() -> None:
+    text = _rules_text()
+    body = _extract_alert_block(text, "HealthArchiveCrawlOutputDirUnreadable")
+
+    assert "healtharchive_crawl_running_job_output_dir_ok == 0" in body
+    assert "healtharchive_crawl_running_job_output_dir_errno != 107" in body
+    assert re.search(r"^\s*for:\s*2m\s*$", body, re.MULTILINE)
+
+
+def test_watchdog_metrics_freshness_alerts_exist() -> None:
+    text = _rules_text()
+    worker = _extract_alert_block(text, "HealthArchiveWorkerAutoStartMetricsStale")
+    crawl = _extract_alert_block(text, "HealthArchiveCrawlAutoRecoverMetricsStale")
+
+    assert "healtharchive_worker_auto_start_enabled == 1" in worker
+    assert "healtharchive_worker_auto_start_last_run_timestamp_seconds" in worker
+    assert re.search(r"^\s*for:\s*5m\s*$", worker, re.MULTILINE)
+
+    assert "healtharchive_crawl_auto_recover_enabled == 1" in crawl
+    assert "healtharchive_crawl_auto_recover_last_run_timestamp_seconds" in crawl
+    assert re.search(r"^\s*for:\s*10m\s*$", crawl, re.MULTILINE)
