@@ -19,7 +19,7 @@ Keep the two synced copies of this file aligned:
 - **Quarterly:** confirm core timers are enabled and succeeding (recommended: on the VPS run `cd /opt/healtharchive-backend && ./scripts/verify_ops_automation.sh`; then spot-check `journalctl -u <service>`).
 - **Quarterly:** docs drift skim: re-read the production runbook + incident response and fix any drift you notice (keep docs matching reality).
 
-## Current status (as of 2026-02-19)
+## Current status (as of 2026-02-23)
 
 - 2026 annual crawl is actively running on the VPS (jobs: `hc`/`phac`/`cihr`; see `./scripts/vps-crawl-status.sh --year 2026`).
 - Deploy-lock suppression is cleared (the stale `/tmp/healtharchive-backend-deploy.lock` was removed; auto-recover apply actions are no longer skipped due to deploy lock).
@@ -31,9 +31,11 @@ Keep the two synced copies of this file aligned:
   - We are intentionally deferring conversion to bind mounts until a maintenance window to avoid interrupting in-progress crawls.
 - Alerting noise-reduction tuning is deployed and verified:
   - Alertmanager routing is severity-aware (`critical` keeps resolved notifications, non-critical suppresses resolved and repeats less often).
-  - Crawl alerts were tuned to reduce non-actionable churn:
-    - `HealthArchiveCrawlContainerRestartsHigh` now triggers near restart-budget exhaustion.
-    - `HealthArchiveCrawlRateSlowPHAC` now requires `<1.0 ppm` sustained for `90m` with healthy log/output-dir probes.
+  - Crawl alerting is now automation-first and dashboard-driven:
+    - Crawl-rate/churn notifications were removed (tracked in Grafana instead).
+    - `Errno 107` job-level unreadable/writability symptom alerts are split out so storage watchdog alerts are the primary stale-mount signal.
+    - Worker-down alerting waits for the worker auto-start watchdog window and suppresses during active deploy locks.
+    - Watchdog freshness alerts were added for worker auto-start and crawl auto-recover timers.
 
 ## Current ops tasks (implementation already exists; enable/verify)
 
@@ -58,7 +60,8 @@ Keep the two synced copies of this file aligned:
   - `HEALTHARCHIVE_DOCKER_CPU_LIMIT` (default: 1.5)
 - Post-deploy follow-through (alerting):
   - Review notification volume and alert outcomes after 7 days (firing + resolved counts by alertname/severity).
-  - Decide whether `HealthArchiveCrawlRateSlowCIHR` needs threshold/duration adjustment based on observed baseline vs operator actionability.
+  - Confirm crawl throughput/churn investigations are being done via Grafana (`HealthArchive - Pipeline Health`) and not missed due to notification removal.
+  - Consider a future composite crawl-degradation alert only if dashboard review repeatedly reveals actionable issues that are not otherwise alerted.
 
 ## IRL / external validation (pending)
 

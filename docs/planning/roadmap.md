@@ -100,16 +100,6 @@ Keep this list short; prefer linking to the canonical doc that explains the item
 - Continue crawl telemetry calibration from live annual-crawl runs, but use dashboard trends (crawl rate / phase churn / progress age) rather than direct throughput alerts.
   - Current focus: validate dashboard thresholds/visual cues and only promote a signal back into Alertmanager if it becomes clearly actionable.
   - Related docs: `../operations/monitoring-and-alerting.md`, `../operations/healtharchive-ops-roadmap.md`
-- Automation-aware alerting rollout hardening (post-2026 noise reduction).
-  - Goal: ensure alert suppression/demotion is only enabled when the relevant watchdog automation is actually deployed and verifiably healthy.
-  - Checklist to standardize:
-    - watchdog exists (script + systemd unit) and is documented
-    - sentinel enabled on VPS
-    - timer running
-    - textfile metrics present and fresh in Prometheus
-    - dry-run/drill evidence captured
-    - only then enable automation-first alert suppression for that failure class
-  - Follow-up: keep worker auto-start watchdog metrics/counters sufficient for “automation attempted and failed” alerting logic.
 - Consider whether a separate staging backend is worth it (increases ops surface; only do if it buys real safety).
   - See: `../deployment/environments-and-configuration.md`
 

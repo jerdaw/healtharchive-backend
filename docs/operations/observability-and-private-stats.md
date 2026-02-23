@@ -91,6 +91,80 @@ Bootstrap helper (VPS only):
 
 ---
 
+## 2.2 Grafana access quickstart (operator)
+
+Use this when monitoring docs tell you to "check the dashboard" and you just need
+to get in quickly.
+
+### Quick sanity checks on the VPS (read-only)
+
+```bash
+systemctl status grafana-server --no-pager -l
+curl -s http://127.0.0.1:3000/api/health
+ls -l /etc/grafana/provisioning/dashboards/healtharchive.yaml
+```
+
+Expected:
+
+- `grafana-server.service` is `active (running)`
+- `/api/health` returns JSON with `"database":"ok"`
+- provisioning file exists at `/etc/grafana/provisioning/dashboards/healtharchive.yaml`
+
+### Preferred access (recommended): SSH port-forward
+
+This is the simplest and most private option. It does not require changing VPS
+network exposure and is safe to use during active crawls.
+
+From your laptop:
+
+```bash
+ssh -L 3000:127.0.0.1:3000 haadmin@<vps-ssh-host>
+```
+
+Then open:
+
+- `http://127.0.0.1:3000`
+
+Notes:
+
+- Keep the SSH session open while you use Grafana.
+- `<vps-ssh-host>` can be your Tailscale hostname/IP (preferred) or your normal SSH host.
+
+### Optional access: Tailscale Serve helper (tailnet-only HTTPS)
+
+Use this if you want a tailnet-only HTTPS URL instead of an SSH tunnel.
+
+On the VPS:
+
+```bash
+cd /opt/healtharchive-backend
+./scripts/vps-enable-tailscale-serve-grafana.sh          # Dry-run
+sudo ./scripts/vps-enable-tailscale-serve-grafana.sh --apply
+tailscale serve status
+```
+
+Then open the HTTPS URL shown by `tailscale serve status`.
+
+Rollback:
+
+```bash
+sudo tailscale serve reset
+```
+
+### What to open in Grafana
+
+- Folder: `HealthArchive`
+- Dashboard: `HealthArchive - Pipeline Health`
+
+This dashboard includes crawl-rate trend panels and watchdog activity/freshness
+panels used by the automation-first alerting workflow.
+
+For the full observability install + configuration flow, see:
+
+- `playbooks/observability/observability-guide.md`
+
+---
+
 ## 3) Data collection contract (privacy-preserving)
 
 ### 3.1 What we collect (allowed)

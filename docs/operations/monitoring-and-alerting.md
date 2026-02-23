@@ -169,6 +169,8 @@ These are still monitored, but via Grafana trend panels instead of Alertmanager 
 Use:
 
 - `ops/observability/dashboards/healtharchive-pipeline-health.json`
+- Grafana access quickstart (SSH port-forward preferred): `observability-and-private-stats.md`
+- Full observability setup/runbook: `playbooks/observability/observability-guide.md`
 
 The dashboard includes longitudinal crawl-rate panels (raw + 30m average) and watchdog activity/freshness panels to support investigation without alert spam.
 

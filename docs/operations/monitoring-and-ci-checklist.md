@@ -195,6 +195,8 @@ Verification:
 - All monitors show “Up”.
 - Alerting routes work (optional test: intentionally break a monitor briefly).
 - Crawl-performance investigations use Grafana dashboard trends (crawl rate / progress age / restarts) rather than direct throughput alerts.
+  - Grafana access quickstart (SSH port-forward preferred): `observability-and-private-stats.md`
+  - Full observability setup/runbook: `playbooks/observability/observability-guide.md`
 
 ---
 
