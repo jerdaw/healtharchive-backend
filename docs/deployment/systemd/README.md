@@ -136,10 +136,12 @@ or stage the cutover manually (no restarts required until your maintenance windo
   - Optional automation to recover stalled crawl jobs by marking stale running jobs as retryable (and restarting the worker when needed).
   - Gated by `ConditionPathExists=/etc/healtharchive/crawl-auto-recover-enabled`.
   - Disabled by default; enable only after you’re comfortable with the thresholds/caps in `scripts/vps-crawl-auto-recover.py`.
+  - Note: automation-first alerting for crawl stalls assumes this watchdog is enabled **and** its textfile metrics are fresh.
 - `healtharchive-worker-auto-start.service` + `.timer`
   - Optional automation to ensure the worker is running when it should be (jobs pending + storage OK).
   - Gated by `ConditionPathExists=/etc/healtharchive/worker-auto-start-enabled`.
   - Conservative by default; prefers a “do nothing” skip over unsafe starts.
+  - Note: automation-first worker-down alert suppression assumes this watchdog is enabled **and** its textfile metrics are fresh.
 - `healtharchive-drift-auto-reconcile.service` + `.timer`
   - Optional automation to recover from deployment dependency drift (calls `vps-deploy.sh`).
   - Read-only unless drift is found in baseline report; triggered every 5 minutes.
@@ -148,6 +150,7 @@ or stage the cutover manually (no restarts required until your maintenance windo
   - Optional automation to recover **stale/unreadable hot paths** caused by `sshfs`/FUSE mount failures (Errno 107).
   - Gated by `ConditionPathExists=/etc/healtharchive/storage-hotpath-auto-recover-enabled`.
   - Disabled by default; enable only after dry-run validation and only if you’re comfortable with the safety caps in `scripts/vps-storage-hotpath-auto-recover.py`.
+  - Note: automation-first suppression of `Errno 107` symptom alerts assumes this watchdog is enabled **and** its textfile metrics are fresh.
 - `healtharchive-storage-watchdog-burnin-snapshot.service` + `.timer`
   - Optional read-only daily snapshot of the storage hot-path watchdog burn-in summary.
   - Gated by `ConditionPathExists=/etc/healtharchive/storage-watchdog-burnin-enabled`.
@@ -675,6 +678,7 @@ Keep it **disabled by default** and enable only after:
 
 - Phase 1 alerting/metrics are working (you have visibility),
 - you have validated the watchdog in dry-run mode first.
+- If you plan to rely on automation-first alert suppression for stale-mount symptoms, also verify the watchdog textfile metrics stay fresh in Prometheus after enablement.
 
 Create the sentinel file:
 
@@ -759,6 +763,9 @@ It will only start the worker when all of these are true:
 - the Storage Box mount is readable,
 - the deploy lock is not present (or is stale),
 - **and** there are **no** DB jobs in `status=running` (conservative safety gate).
+
+If you plan to rely on automation-first suppression for worker-down notifications,
+also verify the watchdog textfile metrics are present/fresh in Prometheus after enablement.
 
 Create the sentinel file:
 

@@ -125,6 +125,76 @@ def _save_state_file(path: Path, data: dict) -> None:
     tmp.replace(path)
 
 
+def _load_state_file(path: Path) -> dict:
+    """Best-effort state loader (backward-compatible with older schemas)."""
+    if not path.is_file():
+        return {}
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return {}
+    if not isinstance(data, dict):
+        return {}
+    return data
+
+
+def _state_int(state: dict, key: str) -> int:
+    try:
+        return int(state.get(key) or 0)
+    except Exception:
+        return 0
+
+
+def _update_run_state(
+    state: dict,
+    *,
+    now_utc: datetime,
+    result: str,
+    reason: str,
+    worker_active: int,
+    running_jobs: int,
+    pending_jobs: int,
+    exception: str | None = None,
+    rc: int | None = None,
+    stdout: str | None = None,
+    stderr: str | None = None,
+) -> None:
+    state["last_run_utc"] = now_utc.replace(microsecond=0).isoformat()
+    state["result"] = result
+    state["reason"] = reason
+    state["worker_active"] = int(worker_active)
+    state["running_jobs"] = int(running_jobs)
+    state["pending_jobs"] = int(pending_jobs)
+    if exception:
+        state["exception"] = str(exception)[:400]
+    else:
+        state.pop("exception", None)
+    if rc is not None:
+        state["rc"] = int(rc)
+    else:
+        state.pop("rc", None)
+    if stdout:
+        state["stdout"] = str(stdout)[:400]
+    else:
+        state.pop("stdout", None)
+    if stderr:
+        state["stderr"] = str(stderr)[:400]
+    else:
+        state.pop("stderr", None)
+
+
+def _record_start_attempt(state: dict, *, now_utc: datetime, ok: bool) -> None:
+    now_epoch = _dt_to_epoch_seconds(now_utc)
+    state["start_attempts_total"] = _state_int(state, "start_attempts_total") + 1
+    state["last_start_attempt_epoch"] = now_epoch
+    if ok:
+        state["start_success_total"] = _state_int(state, "start_success_total") + 1
+        state["last_start_success_epoch"] = now_epoch
+    else:
+        state["start_fail_total"] = _state_int(state, "start_fail_total") + 1
+        state["last_start_fail_epoch"] = now_epoch
+
+
 def _write_textfile_metrics(
     *,
     out_dir: Path,
@@ -137,6 +207,12 @@ def _write_textfile_metrics(
     storagebox_ok: int,
     storagebox_errno: int,
     deploy_lock_present: int,
+    start_attempts_total: int,
+    start_success_total: int,
+    start_fail_total: int,
+    last_start_attempt_epoch: int,
+    last_start_success_epoch: int,
+    last_start_fail_epoch: int,
     result: str,
     reason: str,
 ) -> None:
@@ -210,6 +286,51 @@ def _write_textfile_metrics(
     emit("# TYPE healtharchive_worker_auto_start_last_result gauge")
     emit(f'healtharchive_worker_auto_start_last_result{{result="{result}",reason="{reason}"}} 1')
 
+    emit(
+        "# HELP healtharchive_worker_auto_start_start_attempts_total Total number of worker start attempts made by the watchdog."
+    )
+    emit("# TYPE healtharchive_worker_auto_start_start_attempts_total counter")
+    emit(f"healtharchive_worker_auto_start_start_attempts_total {int(start_attempts_total)}")
+
+    emit(
+        "# HELP healtharchive_worker_auto_start_start_success_total Total number of successful worker start attempts made by the watchdog."
+    )
+    emit("# TYPE healtharchive_worker_auto_start_start_success_total counter")
+    emit(f"healtharchive_worker_auto_start_start_success_total {int(start_success_total)}")
+
+    emit(
+        "# HELP healtharchive_worker_auto_start_start_fail_total Total number of failed worker start attempts made by the watchdog."
+    )
+    emit("# TYPE healtharchive_worker_auto_start_start_fail_total counter")
+    emit(f"healtharchive_worker_auto_start_start_fail_total {int(start_fail_total)}")
+
+    emit(
+        "# HELP healtharchive_worker_auto_start_last_start_attempt_timestamp_seconds UNIX timestamp of the last worker start attempt (0 if none)."
+    )
+    emit("# TYPE healtharchive_worker_auto_start_last_start_attempt_timestamp_seconds gauge")
+    emit(
+        "healtharchive_worker_auto_start_last_start_attempt_timestamp_seconds "
+        f"{int(last_start_attempt_epoch)}"
+    )
+
+    emit(
+        "# HELP healtharchive_worker_auto_start_last_start_success_timestamp_seconds UNIX timestamp of the last successful worker start attempt (0 if none)."
+    )
+    emit("# TYPE healtharchive_worker_auto_start_last_start_success_timestamp_seconds gauge")
+    emit(
+        "healtharchive_worker_auto_start_last_start_success_timestamp_seconds "
+        f"{int(last_start_success_epoch)}"
+    )
+
+    emit(
+        "# HELP healtharchive_worker_auto_start_last_start_fail_timestamp_seconds UNIX timestamp of the last failed worker start attempt (0 if none)."
+    )
+    emit("# TYPE healtharchive_worker_auto_start_last_start_fail_timestamp_seconds gauge")
+    emit(
+        "healtharchive_worker_auto_start_last_start_fail_timestamp_seconds "
+        f"{int(last_start_fail_epoch)}"
+    )
+
     tmp.write_text("\n".join(lines) + "\n", encoding="utf-8")
     tmp.chmod(0o644)
     tmp.replace(path)
@@ -279,6 +400,14 @@ def main(argv: list[str] | None = None) -> int:
     now = _utc_now()
     sentinel_file = Path(args.sentinel_file)
     enabled = 1 if sentinel_file.is_file() else 0
+    state_path = Path(args.state_file)
+    state_snapshot = _load_state_file(state_path)
+    start_attempts_total = _state_int(state_snapshot, "start_attempts_total")
+    start_success_total = _state_int(state_snapshot, "start_success_total")
+    start_fail_total = _state_int(state_snapshot, "start_fail_total")
+    last_start_attempt_epoch = _state_int(state_snapshot, "last_start_attempt_epoch")
+    last_start_success_epoch = _state_int(state_snapshot, "last_start_success_epoch")
+    last_start_fail_epoch = _state_int(state_snapshot, "last_start_fail_epoch")
 
     # Disabled by default unless the operator creates the sentinel.
     if enabled != 1:
@@ -294,6 +423,12 @@ def main(argv: list[str] | None = None) -> int:
                 storagebox_ok=0,
                 storagebox_errno=0,
                 deploy_lock_present=0,
+                start_attempts_total=start_attempts_total,
+                start_success_total=start_success_total,
+                start_fail_total=start_fail_total,
+                last_start_attempt_epoch=last_start_attempt_epoch,
+                last_start_success_epoch=last_start_success_epoch,
+                last_start_fail_epoch=last_start_fail_epoch,
                 result="skip",
                 reason="disabled",
             )
@@ -309,8 +444,8 @@ def main(argv: list[str] | None = None) -> int:
     except BlockingIOError:
         return 0
 
-    state_path = Path(args.state_file)
     state_path.parent.mkdir(parents=True, exist_ok=True)
+    state = _load_state_file(state_path)
 
     result = "skip"
     reason = "no_action"
@@ -337,6 +472,12 @@ def main(argv: list[str] | None = None) -> int:
                 storagebox_ok=0,
                 storagebox_errno=0,
                 deploy_lock_present=deploy_lock_present,
+                start_attempts_total=_state_int(state, "start_attempts_total"),
+                start_success_total=_state_int(state, "start_success_total"),
+                start_fail_total=_state_int(state, "start_fail_total"),
+                last_start_attempt_epoch=_state_int(state, "last_start_attempt_epoch"),
+                last_start_success_epoch=_state_int(state, "last_start_success_epoch"),
+                last_start_fail_epoch=_state_int(state, "last_start_fail_epoch"),
                 result="skip",
                 reason=reason,
             )
@@ -361,6 +502,12 @@ def main(argv: list[str] | None = None) -> int:
                 storagebox_ok=int(storagebox_ok),
                 storagebox_errno=int(storagebox_errno),
                 deploy_lock_present=deploy_lock_present,
+                start_attempts_total=_state_int(state, "start_attempts_total"),
+                start_success_total=_state_int(state, "start_success_total"),
+                start_fail_total=_state_int(state, "start_fail_total"),
+                last_start_attempt_epoch=_state_int(state, "last_start_attempt_epoch"),
+                last_start_success_epoch=_state_int(state, "last_start_success_epoch"),
+                last_start_fail_epoch=_state_int(state, "last_start_fail_epoch"),
                 result="skip",
                 reason=reason,
             )
@@ -384,15 +531,17 @@ def main(argv: list[str] | None = None) -> int:
     except Exception as exc:
         # Prefer to skip rather than flap the worker on partial DB visibility.
         reason = "db_error"
-        _save_state_file(
-            state_path,
-            {
-                "last_run_utc": now.replace(microsecond=0).isoformat(),
-                "result": "skip",
-                "reason": reason,
-                "exception": str(exc),
-            },
+        _update_run_state(
+            state,
+            now_utc=now,
+            result="skip",
+            reason=reason,
+            worker_active=worker_active,
+            running_jobs=0,
+            pending_jobs=0,
+            exception=str(exc),
         )
+        _save_state_file(state_path, state)
         try:
             _write_textfile_metrics(
                 out_dir=Path(str(args.textfile_out_dir)),
@@ -405,6 +554,12 @@ def main(argv: list[str] | None = None) -> int:
                 storagebox_ok=int(storagebox_ok),
                 storagebox_errno=int(storagebox_errno),
                 deploy_lock_present=deploy_lock_present,
+                start_attempts_total=_state_int(state, "start_attempts_total"),
+                start_success_total=_state_int(state, "start_success_total"),
+                start_fail_total=_state_int(state, "start_fail_total"),
+                last_start_attempt_epoch=_state_int(state, "last_start_attempt_epoch"),
+                last_start_success_epoch=_state_int(state, "last_start_success_epoch"),
+                last_start_fail_epoch=_state_int(state, "last_start_fail_epoch"),
                 result="skip",
                 reason=reason,
             )
@@ -438,34 +593,37 @@ def main(argv: list[str] | None = None) -> int:
             if cp.returncode == 0:
                 result = "ok"
                 reason = "started_worker"
+                _record_start_attempt(state, now_utc=now, ok=True)
             else:
                 result = "fail"
                 reason = "systemctl_start_failed"
-                _save_state_file(
-                    state_path,
-                    {
-                        "last_run_utc": now.replace(microsecond=0).isoformat(),
-                        "result": result,
-                        "reason": reason,
-                        "rc": int(cp.returncode),
-                        "stdout": (cp.stdout or "")[:400],
-                        "stderr": (cp.stderr or "")[:400],
-                    },
+                _record_start_attempt(state, now_utc=now, ok=False)
+                _update_run_state(
+                    state,
+                    now_utc=now,
+                    result=result,
+                    reason=reason,
+                    worker_active=worker_active,
+                    running_jobs=int(running_jobs),
+                    pending_jobs=int(pending_jobs),
+                    rc=int(cp.returncode),
+                    stdout=cp.stdout or "",
+                    stderr=cp.stderr or "",
                 )
+                _save_state_file(state_path, state)
 
     # Always write state (best-effort) for forensics.
     try:
-        _save_state_file(
-            state_path,
-            {
-                "last_run_utc": now.replace(microsecond=0).isoformat(),
-                "result": result,
-                "reason": reason,
-                "worker_active": int(worker_active),
-                "running_jobs": int(running_jobs),
-                "pending_jobs": int(pending_jobs),
-            },
+        _update_run_state(
+            state,
+            now_utc=now,
+            result=result,
+            reason=reason,
+            worker_active=worker_active,
+            running_jobs=int(running_jobs),
+            pending_jobs=int(pending_jobs),
         )
+        _save_state_file(state_path, state)
     except Exception:
         pass
 
@@ -481,6 +639,12 @@ def main(argv: list[str] | None = None) -> int:
             storagebox_ok=int(storagebox_ok),
             storagebox_errno=int(storagebox_errno),
             deploy_lock_present=deploy_lock_present,
+            start_attempts_total=_state_int(state, "start_attempts_total"),
+            start_success_total=_state_int(state, "start_success_total"),
+            start_fail_total=_state_int(state, "start_fail_total"),
+            last_start_attempt_epoch=_state_int(state, "last_start_attempt_epoch"),
+            last_start_success_epoch=_state_int(state, "last_start_success_epoch"),
+            last_start_fail_epoch=_state_int(state, "last_start_fail_epoch"),
             result=result,
             reason=reason,
         )

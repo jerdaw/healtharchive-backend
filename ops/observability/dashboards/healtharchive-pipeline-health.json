@@ -314,6 +314,380 @@
       ],
       "title": "Archive Storage Totals (bytes)",
       "type": "timeseries"
+    },
+    {
+      "datasource": "prometheus",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 22
+      },
+      "id": 8,
+      "targets": [
+        {
+          "expr": "healtharchive_crawl_running_job_crawl_rate_ppm{source=~\"$source\",job_id=~\"$job_id\"}",
+          "refId": "A",
+          "legendFormat": "{{source}} job={{job_id}}"
+        }
+      ],
+      "title": "Running Crawl Rate (ppm, raw)",
+      "type": "timeseries",
+      "description": "Longitudinal per-job crawl rate from crawlStatus logs. Use with the 30m average panel to separate noise from sustained slowdown.",
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "datasource": "prometheus",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 22
+      },
+      "id": 9,
+      "targets": [
+        {
+          "expr": "avg_over_time(healtharchive_crawl_running_job_crawl_rate_ppm{source=~\"$source\",job_id=~\"$job_id\"}[30m])",
+          "refId": "A",
+          "legendFormat": "{{source}} job={{job_id}}"
+        }
+      ],
+      "title": "Running Crawl Rate (ppm, 30m avg)",
+      "type": "timeseries",
+      "description": "30-minute smoothed crawl-rate trend for comparing sources and spotting sustained throughput degradation.",
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "datasource": "prometheus",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 30
+      },
+      "id": 10,
+      "targets": [
+        {
+          "expr": "healtharchive_crawl_running_job_last_progress_age_seconds{source=~\"$source\",job_id=~\"$job_id\"} / 60",
+          "refId": "A",
+          "legendFormat": "{{source}} job={{job_id}}"
+        }
+      ],
+      "title": "Last Progress Age (minutes)",
+      "type": "timeseries",
+      "description": "Minutes since the last crawled-count increase for running jobs.",
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "datasource": "prometheus",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 30
+      },
+      "id": 11,
+      "targets": [
+        {
+          "expr": "healtharchive_crawl_running_job_container_restarts_done{source=~\"$source\",job_id=~\"$job_id\"}",
+          "refId": "A",
+          "legendFormat": "{{source}} job={{job_id}}"
+        }
+      ],
+      "title": "Container Restarts (running jobs)",
+      "type": "timeseries",
+      "description": "Adaptive restart budget consumption per running crawl job.",
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "datasource": "prometheus",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 30
+      },
+      "id": 12,
+      "targets": [
+        {
+          "expr": "healtharchive_crawl_running_job_new_crawl_phase_count{source=~\"$source\",job_id=~\"$job_id\"}",
+          "refId": "A",
+          "legendFormat": "{{source}} job={{job_id}}"
+        }
+      ],
+      "title": "New Crawl Phase Count (tail window)",
+      "type": "timeseries",
+      "description": "Count of \"New Crawl Phase\" transitions seen in the current combined-log tail window.",
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "datasource": "prometheus",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 38
+      },
+      "id": 13,
+      "targets": [
+        {
+          "expr": "increase(healtharchive_crawl_auto_recover_recoveries_total[24h])",
+          "refId": "A",
+          "legendFormat": "recoveries_24h"
+        },
+        {
+          "expr": "increase(healtharchive_crawl_auto_recover_starts_total[24h])",
+          "refId": "B",
+          "legendFormat": "starts_24h"
+        }
+      ],
+      "title": "Crawl Auto-Recover Activity (24h)",
+      "type": "timeseries",
+      "description": "Crawl auto-recover watchdog recovery and auto-start activity over the last 24 hours.",
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "datasource": "prometheus",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 38
+      },
+      "id": 14,
+      "targets": [
+        {
+          "expr": "increase(healtharchive_worker_auto_start_start_attempts_total[24h])",
+          "refId": "A",
+          "legendFormat": "attempts_24h"
+        },
+        {
+          "expr": "increase(healtharchive_worker_auto_start_start_success_total[24h])",
+          "refId": "B",
+          "legendFormat": "successes_24h"
+        },
+        {
+          "expr": "increase(healtharchive_worker_auto_start_start_fail_total[24h])",
+          "refId": "C",
+          "legendFormat": "fails_24h"
+        }
+      ],
+      "title": "Worker Auto-Start Activity (24h)",
+      "type": "timeseries",
+      "description": "Worker auto-start watchdog start-attempt outcomes in the last 24 hours.",
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "datasource": "prometheus",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 38
+      },
+      "id": 15,
+      "targets": [
+        {
+          "expr": "healtharchive_storage_hotpath_auto_recover_detected_targets",
+          "refId": "A",
+          "legendFormat": "detected_targets"
+        },
+        {
+          "expr": "healtharchive_storage_hotpath_auto_recover_apply_1h",
+          "refId": "B",
+          "legendFormat": "apply_1h"
+        },
+        {
+          "expr": "healtharchive_storage_hotpath_auto_recover_last_apply_ok",
+          "refId": "C",
+          "legendFormat": "last_apply_ok"
+        }
+      ],
+      "title": "Storage Hot-Path Auto-Recover (status/activity)",
+      "type": "timeseries",
+      "description": "Storage hot-path watchdog detection count and recent apply-mode recovery activity.",
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "datasource": "prometheus",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 16,
+        "x": 0,
+        "y": 46
+      },
+      "id": 16,
+      "targets": [
+        {
+          "expr": "(time() - healtharchive_storage_hotpath_auto_recover_last_run_timestamp_seconds) / 60",
+          "refId": "A",
+          "legendFormat": "storage_hotpath_auto_recover"
+        },
+        {
+          "expr": "(time() - healtharchive_worker_auto_start_last_run_timestamp_seconds) / 60",
+          "refId": "B",
+          "legendFormat": "worker_auto_start"
+        },
+        {
+          "expr": "(time() - healtharchive_crawl_auto_recover_last_run_timestamp_seconds) / 60",
+          "refId": "C",
+          "legendFormat": "crawl_auto_recover"
+        }
+      ],
+      "title": "Watchdog Freshness (minutes since last run)",
+      "type": "timeseries",
+      "description": "Minutes since each watchdog last emitted metrics. Large values indicate stale automation telemetry.",
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "datasource": "prometheus",
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 46
+      },
+      "id": 17,
+      "targets": [
+        {
+          "expr": "healtharchive_storage_hotpath_auto_recover_enabled",
+          "refId": "A",
+          "legendFormat": "storage_hotpath_auto_recover_enabled",
+          "instant": true
+        },
+        {
+          "expr": "healtharchive_worker_auto_start_enabled",
+          "refId": "B",
+          "legendFormat": "worker_auto_start_enabled",
+          "instant": true
+        },
+        {
+          "expr": "healtharchive_crawl_auto_recover_enabled",
+          "refId": "C",
+          "legendFormat": "crawl_auto_recover_enabled",
+          "instant": true
+        }
+      ],
+      "title": "Watchdog Enablement (instant)",
+      "type": "stat",
+      "description": "Sentinel-gated enablement state for the major crawl automation watchdogs (1=enabled).",
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      }
     }
   ],
   "refresh": "1m",
@@ -324,7 +698,52 @@
     "pipeline"
   ],
   "templating": {
-    "list": []
+    "list": [
+      {
+        "allValue": ".*",
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        },
+        "datasource": "prometheus",
+        "definition": "label_values(healtharchive_crawl_running_job_crawl_rate_ppm, source)",
+        "hide": 0,
+        "includeAll": true,
+        "label": "Source",
+        "multi": true,
+        "name": "source",
+        "options": [],
+        "query": "label_values(healtharchive_crawl_running_job_crawl_rate_ppm, source)",
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "allValue": ".*",
+        "current": {
+          "selected": true,
+          "text": "All",
+          "value": "$__all"
+        },
+        "datasource": "prometheus",
+        "definition": "label_values(healtharchive_crawl_running_job_crawl_rate_ppm{source=~\"$source\"}, job_id)",
+        "hide": 0,
+        "includeAll": true,
+        "label": "Job ID",
+        "multi": true,
+        "name": "job_id",
+        "options": [],
+        "query": "label_values(healtharchive_crawl_running_job_crawl_rate_ppm{source=~\"$source\"}, job_id)",
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
+      }
+    ]
   },
   "time": {
     "from": "now-7d",
@@ -334,5 +753,5 @@
   "timezone": "utc",
   "title": "HealthArchive - Pipeline Health",
   "uid": "ha-pipeline-health",
-  "version": 1
+  "version": 2
 }

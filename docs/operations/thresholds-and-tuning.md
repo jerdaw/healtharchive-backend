@@ -89,6 +89,9 @@ See: `docs/operations/disk-baseline-and-cleanup.md` (current baseline + cleanup 
 - Lower to 1800s (30min) for fast sites (e.g., small test crawls)
 - Raise to 5400s (90min) or 7200s (120min) for very slow sites or flaky networks
 - Don't lower below 1800s (30min) — risks false positives during normal slow periods
+- Automation-first alerting note: `HealthArchiveCrawlStalled` should be treated as a
+  post-watchdog/manual-review signal only if the crawl auto-recover watchdog is
+  enabled and its metrics are fresh in Prometheus.
 
 ---
 
@@ -132,6 +135,9 @@ returns to running because the worker is already busy with another crawl.
 - Auto-start runs the job using `systemd-run` (detached) and applies Docker caps via env vars:
   - `HEALTHARCHIVE_DOCKER_CPU_LIMIT` (default: 1.0; configurable via `--start-docker-cpu-limit`)
   - `HEALTHARCHIVE_DOCKER_MEMORY_LIMIT` (default: 3g; configurable via `--start-docker-memory-limit`)
+- Alerting integration note: worker-down notifications can be delayed/suppressed
+  based on worker auto-start automation only when `healtharchive-worker-auto-start.timer`
+  is enabled and `healtharchive_worker_auto_start.prom` metrics are fresh.
 
 ---
 
@@ -168,6 +174,9 @@ returns to running because the worker is already busy with another crawl.
 - Increase cooldown to 30min if recovery attempts fail repeatedly
 - Increase hourly/daily caps cautiously - investigate root cause instead
 - Don't bypass caps in automation - they prevent pathological loops
+- Alerting integration note: job-level `Errno 107` unreadable/writability symptom alerts
+  can be demoted/suppressed only if the storage hot-path watchdog is enabled and
+  `healtharchive_storage_hotpath_auto_recover.prom` metrics are fresh.
 
 ### Persistent Failed-Apply Alert
 

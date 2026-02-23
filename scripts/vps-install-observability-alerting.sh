@@ -216,13 +216,17 @@ route:
   # Default receiver is tuned for non-critical alerts (warning/info):
   # lower-notification pressure, no resolved events.
   receiver: healtharchive-webhook-noncritical
+  group_by: ["alertname", "source", "job_id"]
+  group_wait: 60s
+  group_interval: 15m
+  repeat_interval: 24h
   routes:
     # Drill-only alerts should not page operators by default. They still appear
     # in Prometheus/Alertmanager UIs for verification during drills.
     - matchers:
         - severity="drill"
       receiver: healtharchive-null
-      group_by: ["alertname"]
+      group_by: ["alertname", "source", "job_id"]
       group_wait: 0s
       group_interval: 1m
       repeat_interval: 1h
@@ -230,14 +234,22 @@ route:
     - matchers:
         - severity="critical"
       receiver: healtharchive-webhook-critical
-      group_by: ["alertname"]
+      group_by: ["alertname", "source", "job_id"]
       group_wait: 15s
       group_interval: 5m
       repeat_interval: 6h
-  group_by: ["alertname"]
-  group_wait: 60s
-  group_interval: 15m
-  repeat_interval: 24h
+
+inhibit_rules:
+  - source_matchers:
+      - alertname="HealthArchiveStorageBoxMountDown"
+    target_matchers:
+      - alertname=~"HealthArchiveStorageHotpathStaleUnrecovered|HealthArchiveTieringHotPathUnreadable|HealthArchiveWarcTieringFailed|HealthArchiveCrawlOutputDirUnreadable"
+    equal: ["service"]
+  - source_matchers:
+      - alertname="HealthArchiveStorageHotpathStaleUnrecovered"
+    target_matchers:
+      - alertname=~"HealthArchiveInfraErrorsHigh|HealthArchiveTieringHotPathUnreadable|HealthArchiveCrawlOutputDirUnreadable"
+    equal: ["service"]
 
 receivers:
   - name: healtharchive-null

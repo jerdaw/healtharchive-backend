@@ -39,6 +39,9 @@ settings drift”.
 2. Decide alert routing:
    - Which alerts should page you vs. just email (recommended: only “site down”
      pages; everything else emails).
+   - Recommended ops rule: only notify on conditions that usually require human action.
+     - Prefer dashboard-only for crawl throughput/churn trends.
+     - Prefer post-auto-recovery alerts (notify after watchdog attempts fail/persist), not first-symptom alerts.
 3. Decide the `main` branch policy:
    - **Mode A — Solo-fast (recommended for this project right now): direct pushes to `main`**.
      - CI still runs on every push to `main`.
@@ -191,6 +194,7 @@ Verification:
   - `./scripts/smoke-external-monitors.sh`
 - All monitors show “Up”.
 - Alerting routes work (optional test: intentionally break a monitor briefly).
+- Crawl-performance investigations use Grafana dashboard trends (crawl rate / progress age / restarts) rather than direct throughput alerts.
 
 ---
 
@@ -233,6 +237,7 @@ Recommended checks to monitor:
   - Ping variable: `HEALTHARCHIVE_HC_PING_CLEANUP_AUTOMATION`
 
 Note: avoid pinging high-frequency timers (e.g., crawl metrics, crawl auto-recover) to reduce noise.
+Prefer Prometheus watchdog-freshness alerts for those timers instead of per-run external pings.
 
 Implementation approach (VPS):
 
