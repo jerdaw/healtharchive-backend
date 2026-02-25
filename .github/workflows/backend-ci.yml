@@ -43,10 +43,7 @@ jobs:
         run: make ci
 
       - name: Security audit (pip-audit)
-        run: |
-          # Temporary ignore: docs-tooling transitive pin (mkdocs-material[imaging] -> pillow 11.x)
-          # is currently vulnerable (CVE-2026-25990); tracked in roadmap item #18.
-          pip-audit --ignore-vuln CVE-2026-25990
+        run: pip-audit
 
   api-health:
     name: Backend CI / api-health

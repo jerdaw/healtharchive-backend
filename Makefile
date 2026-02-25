@@ -19,7 +19,7 @@ MIGRATION_GUARD_HEAD ?= HEAD
 
 venv:
 	$(PYTHON) -m venv $(VENV)
-	$(VENV_BIN)/pip install -e ".[dev]"
+	$(VENV_BIN)/pip install -e ".[dev,docs]"
 
 format:
 	$(RUFF) format .
@@ -84,7 +84,7 @@ audit:
 
 audit-ci:
 	$(PYTHON_RUN) -m pip install --upgrade pip
-	$(PIP_AUDIT) --ignore-vuln CVE-2026-25990
+	$(PIP_AUDIT)
 
 migration-guard:
 	$(PYTHON_RUN) scripts/ci_migration_guard.py \

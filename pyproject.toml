@@ -32,6 +32,8 @@ dev = [
   "bandit",
   "pip-audit",
   "pre-commit",
+]
+docs = [
   "mkdocs-material[imaging]",
   "mkdocs-minify-plugin",
   "mkdocs-monorepo-plugin",
