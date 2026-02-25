@@ -26,7 +26,7 @@ Canonical docs to consult first:
 - `docs/deployment/staging-rollout-checklist.md` – staging rollout steps.
 - `docs/deployment/production-rollout-checklist.md` – production rollout steps.
 - `docs/operations/monitoring-and-ci-checklist.md` – monitoring, uptime, and CI guidance.
-- `docs/operations/monitoring-and-alerting.md` – **NEW (2026):** Critical crawl metrics and alert thresholds strategies.
+- `docs/operations/monitoring-and-alerting.md` – Critical crawl metrics, alert thresholds, and monitoring strategy.
 - `docs/deployment/production-single-vps.md` – current production runbook (Hetzner + Tailscale-only SSH, nightly backups, NAS pull).
 - `docs/planning/roadmap.md` – backlog of not-yet-implemented work.
 - `docs/planning/implemented/` – historical implementation plans (executed).

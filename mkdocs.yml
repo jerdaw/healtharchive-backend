@@ -173,13 +173,15 @@ nav:
               - Replay Smoke 503 (2026-01-16): operations/incidents/2026-01-16-replay-smoke-503-and-warctieringfailed.md
   - Planning & Roadmaps:
       - Active Work: planning/README.md
-      - Active Investigations:
+      - Active Plans:
+          - Admissions Strengthening (OMSAS): planning/2026-02-admissions-strengthening-plan.md
           - Crawl Operability (Locks and Retry Controls): planning/2026-02-06-crawl-operability-locks-and-retry-controls.md
           - Hot-Path Staleness Root-Cause Investigation: planning/2026-02-06-hotpath-staleness-root-cause-investigation.md
       - Future Roadmap: planning/roadmap.md
       - Roadmap Process: roadmap-process.md
       - Implemented Plans:
           - Overview: planning/implemented/README.md
+          - Crawl Health Remediation (2026-02-25): planning/implemented/2026-02-25-crawl-health-remediation.md
           - Operational Resilience (2026-02-01): planning/implemented/2026-02-01-operational-resilience-improvements.md
           - Disk Usage Investigation (2026-02-01): planning/implemented/2026-02-01-disk-usage-investigation.md
           - Deploy Workflow Hardening (2026-02-07): planning/implemented/2026-02-07-deploy-workflow-hardening.md
