@@ -4,6 +4,7 @@ This folder contains **historical implementation plans** that have already been 
 
 Implemented plans:
 
+- `2026-02-25-crawl-health-remediation.md`
 - `2026-02-23-automation-first-crawl-alerting-and-dashboarding.md`
 - `2026-02-19-alerting-noise-reduction-and-routing-tuning.md`
 - `2025-12-24-6-phase-upgrade-roadmap-2025.md`

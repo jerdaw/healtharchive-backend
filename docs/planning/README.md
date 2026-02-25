@@ -11,6 +11,7 @@ When complete, move them to `docs/planning/implemented/` and date them.
 
 Active plans:
 
+- Admissions strengthening (OMSAS ABS + CanMEDS, ~12 weeks): `2026-02-admissions-strengthening-plan.md`
 - Crawl operability (locks, writability, retry controls): `2026-02-06-crawl-operability-locks-and-retry-controls.md`
 - Hot-path staleness root-cause investigation: `2026-02-06-hotpath-staleness-root-cause-investigation.md`
 
@@ -31,6 +32,7 @@ Current known items:
 ## Implemented plans (history)
 
 - Implemented plans archive: `implemented/README.md`
+- Crawl health remediation (scope regex, circuit breaker, dep separation, alerts): `implemented/2026-02-25-crawl-health-remediation.md`
 - Automation-first crawl alerting and dashboarding: `implemented/2026-02-23-automation-first-crawl-alerting-and-dashboarding.md`
 - Alerting noise reduction + routing tuning: `implemented/2026-02-19-alerting-noise-reduction-and-routing-tuning.md`
 - Operational resilience improvements: `implemented/2026-02-01-operational-resilience-improvements.md`
