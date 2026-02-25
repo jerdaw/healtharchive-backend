@@ -24,7 +24,11 @@ HC_CANADA_CA_SCOPE_INCLUDE_RX = (
     r"|etc/designs/canada/wet-boew/.*"
     r"|content/dam/canada/sitemenu/.*"
     r"|content/dam/themes/health/.*"
-    r"|content/dam/hc-sc/.*"
+    # Only match web-renderable assets from the HC DAM path. PDFs and binary
+    # documents are excluded from scope to prevent navigation-timeout thrashing.
+    # They are still captured as subresources when embedded in HTML pages.
+    # Rationale: "PDF indexing non-goal for v1" (2026-01-23 throughput plan).
+    r"|content/dam/hc-sc/.*\.(?:css|js|json|svg|png|jpe?g|gif|ico|webp|avif|woff2?|ttf|eot)(?:\?[^#]*)?"
     r")$"
 )
 
@@ -38,7 +42,9 @@ PHAC_CANADA_CA_SCOPE_INCLUDE_RX = (
     r"|etc/designs/canada/wet-boew/.*"
     r"|content/dam/canada/sitemenu/.*"
     r"|content/dam/themes/health/.*"
-    r"|content/dam/phac-aspc/.*"
+    # Only match web-renderable assets from the PHAC DAM path (same rationale
+    # as the HC DAM filter above).
+    r"|content/dam/phac-aspc/.*\.(?:css|js|json|svg|png|jpe?g|gif|ico|webp|avif|woff2?|ttf|eot)(?:\?[^#]*)?"
     r")$"
 )
 

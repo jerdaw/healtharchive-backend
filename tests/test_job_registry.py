@@ -157,6 +157,18 @@ def test_canada_ca_scope_regexes_match_expected_urls() -> None:
     assert not hc_rx.match("https://www.canada.ca/en/public-health.html")
     assert not hc_rx.match("https://www.canada.ca/content/dam/phac-aspc/example.jpg")
 
+    # HC DAM scope: binary/document formats are excluded to prevent timeout thrashing.
+    assert not hc_rx.match("https://www.canada.ca/content/dam/hc-sc/documents/report.pdf")
+    assert not hc_rx.match("https://www.canada.ca/content/dam/hc-sc/services/guide.docx")
+    assert not hc_rx.match("https://www.canada.ca/content/dam/hc-sc/data/export.xlsx")
+    assert not hc_rx.match("https://www.canada.ca/content/dam/hc-sc/data/archive.zip")
+    assert not hc_rx.match("https://www.canada.ca/content/dam/hc-sc/")
+    # Web-renderable assets from the HC DAM path remain in scope.
+    assert hc_rx.match("https://www.canada.ca/content/dam/hc-sc/css/custom.css")
+    assert hc_rx.match("https://www.canada.ca/content/dam/hc-sc/js/analytics.js")
+    assert hc_rx.match("https://www.canada.ca/content/dam/hc-sc/fonts/open-sans.woff2")
+    assert hc_rx.match("https://www.canada.ca/content/dam/hc-sc/images/photo.jpg?v=2")
+
     assert phac_rx.match("https://www.canada.ca/en/public-health.html")
     assert phac_rx.match("https://www.canada.ca/fr/sante-publique.html")
     assert phac_rx.match("https://www.canada.ca/en/public-health/services/diseases/measles.html")
@@ -169,6 +181,18 @@ def test_canada_ca_scope_regexes_match_expected_urls() -> None:
     assert not phac_rx.match("https://www.canada.ca/en/services/benefits.html")
     assert not phac_rx.match("https://www.canada.ca/en/health-canada.html")
     assert not phac_rx.match("https://www.canada.ca/content/dam/hc-sc/example.jpg")
+
+    # PHAC DAM scope: binary/document formats are excluded (same rationale as HC).
+    assert not phac_rx.match("https://www.canada.ca/content/dam/phac-aspc/documents/report.pdf")
+    assert not phac_rx.match("https://www.canada.ca/content/dam/phac-aspc/services/guide.docx")
+    assert not phac_rx.match("https://www.canada.ca/content/dam/phac-aspc/data/export.xlsx")
+    assert not phac_rx.match("https://www.canada.ca/content/dam/phac-aspc/data/archive.zip")
+    assert not phac_rx.match("https://www.canada.ca/content/dam/phac-aspc/")
+    # Web-renderable assets from the PHAC DAM path remain in scope.
+    assert phac_rx.match("https://www.canada.ca/content/dam/phac-aspc/css/custom.css")
+    assert phac_rx.match("https://www.canada.ca/content/dam/phac-aspc/js/analytics.js")
+    assert phac_rx.match("https://www.canada.ca/content/dam/phac-aspc/fonts/open-sans.woff2")
+    assert phac_rx.match("https://www.canada.ca/content/dam/phac-aspc/images/photo.jpg?v=2")
 
 
 def test_build_job_config_validates_adaptive_requires_monitoring() -> None:
