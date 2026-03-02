@@ -74,12 +74,23 @@ Verification:
 Use stable workflow/job check names shown in GitHub’s UI. Avoid renaming workflow/job IDs after
 you start requiring them.
 
-As of 2026-02-06 (solo-dev profile), the checks are used as follows:
+As of 2026-03-02 (solo-dev profile), the checks are used as follows:
 
-- Backend repo (required on `main`): `Backend CI / test`
+- Backend repo (required on `main`): `Backend CI / test`, `Backend CI / api-health`
 - Backend repo (not required): `Backend CI / e2e-smoke` (push/manual only), `Backend CI (Full) / test-full` (nightly/manual)
 - Frontend repo (when protecting frontend `main`): `Frontend CI / lint-and-test` (required), `Frontend CI / e2e-smoke` (optional)
 - Datasets repo (when protecting datasets `main`): `Datasets CI / lint` (required)
+
+### Step 1a — Dependabot auto-merge policy (operator + repo config)
+
+Objective: reduce weekly maintenance overhead while preserving CI gating.
+
+Current backend policy:
+
+- Dependabot PRs are auto-merged only for `semver-patch` and `semver-minor` updates.
+- `semver-major` updates stay manual review.
+- Auto-merge is enabled by workflow: `.github/workflows/dependabot-auto-merge.yml`.
+- Merges still require branch ruleset-required checks (for backend `main`: `Backend CI / test` and `Backend CI / api-health`).
 
 ### Step 1b — End-to-end smoke checks (CI)
 
