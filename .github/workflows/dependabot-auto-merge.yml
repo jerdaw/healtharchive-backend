@@ -1,0 +1,53 @@
+name: Dependabot Auto Merge
+
+on:
+  pull_request_target:
+    types:
+      - opened
+      - reopened
+      - synchronize
+      - ready_for_review
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  enable-automerge:
+    name: Dependabot auto-merge
+    if: github.actor == 'dependabot[bot]'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Fetch Dependabot metadata
+        id: metadata
+        uses: dependabot/fetch-metadata@v2
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Determine eligibility
+        id: eligibility
+        env:
+          UPDATE_TYPE: ${{ steps.metadata.outputs.update-type }}
+        run: |
+          set -euo pipefail
+
+          eligible=false
+          case "${UPDATE_TYPE}" in
+            version-update:semver-patch|version-update:semver-minor)
+              eligible=true
+              ;;
+          esac
+
+          echo "eligible=${eligible}" >> "${GITHUB_OUTPUT}"
+
+      - name: Enable auto-merge (squash)
+        if: steps.eligibility.outputs.eligible == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh pr merge --auto --squash "${{ github.event.pull_request.html_url }}"
+
+      - name: Skip non-eligible update
+        if: steps.eligibility.outputs.eligible != 'true'
+        run: |
+          echo "Skipped auto-merge for update type: ${UPDATE_TYPE:-unknown}"
