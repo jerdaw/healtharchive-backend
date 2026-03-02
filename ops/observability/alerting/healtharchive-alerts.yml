@@ -152,6 +152,21 @@ groups:
           description: "A running crawl job appears stalled: source={{ $labels.source }} job_id={{ $labels.job_id }}. Check healtharchive-worker.service logs and the job's archive_*.combined.log; consider recovering the job if it remains stalled."
           runbook_url: "https://github.com/jerdaw/healtharchive-backend/blob/main/docs/operations/playbooks/crawl-stalls.md"
 
+      - alert: HealthArchiveCrawlRateDegraded
+        expr: |
+          healtharchive_crawl_running_job_crawl_rate_ppm{source=~"hc|phac"} >= 0
+          and healtharchive_crawl_running_job_crawl_rate_ppm{source=~"hc|phac"} < 2
+          and healtharchive_crawl_running_job_last_progress_age_seconds{source=~"hc|phac"} <= 300
+          and healtharchive_crawl_running_job_stalled{source=~"hc|phac"} == 0
+        for: 45m
+        labels:
+          severity: warning
+          service: healtharchive
+        annotations:
+          summary: "Crawl throughput degraded (slow but still progressing)"
+          description: "A running crawl has sustained low crawl_rate_ppm while still making progress. source={{ $labels.source }} job_id={{ $labels.job_id }}. Investigate queue composition/timeouts and auto-recover scope reconciliation state before forcing restarts."
+          runbook_url: "https://github.com/jerdaw/healtharchive-backend/blob/main/docs/operations/playbooks/crawl-stalls.md"
+
       - alert: HealthArchiveCrawlContainerRestartsHigh
         expr: |
           (

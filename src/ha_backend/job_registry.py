@@ -48,6 +48,16 @@ PHAC_CANADA_CA_SCOPE_INCLUDE_RX = (
     r")$"
 )
 
+# Exclude binary/document URLs from top-level page queueing. These files can
+# still be captured as subresources from crawled HTML pages, but avoiding direct
+# page navigation to them reduces timeout thrashing substantially.
+_CANADA_CA_BINARY_TOP_LEVEL_EXCLUDE_RX = (
+    r"^https://www[.]canada[.]ca/.*[.](?:pdf|mp4|zip|docx?|pptx?|xlsx?)(?:[?#].*)?$"
+)
+
+HC_CANADA_CA_SCOPE_EXCLUDE_RX = _CANADA_CA_BINARY_TOP_LEVEL_EXCLUDE_RX
+PHAC_CANADA_CA_SCOPE_EXCLUDE_RX = _CANADA_CA_BINARY_TOP_LEVEL_EXCLUDE_RX
+
 
 @dataclass
 class SourceJobConfig:
@@ -85,6 +95,8 @@ SOURCE_JOB_CONFIGS: Dict[str, SourceJobConfig] = {
             "custom",
             "--scopeIncludeRx",
             HC_CANADA_CA_SCOPE_INCLUDE_RX,
+            "--scopeExcludeRx",
+            HC_CANADA_CA_SCOPE_EXCLUDE_RX,
         ],
         default_tool_options={
             "cleanup": False,
@@ -121,6 +133,8 @@ SOURCE_JOB_CONFIGS: Dict[str, SourceJobConfig] = {
             "custom",
             "--scopeIncludeRx",
             PHAC_CANADA_CA_SCOPE_INCLUDE_RX,
+            "--scopeExcludeRx",
+            PHAC_CANADA_CA_SCOPE_EXCLUDE_RX,
         ],
         default_tool_options={
             "cleanup": False,

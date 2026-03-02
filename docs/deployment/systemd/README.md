@@ -204,7 +204,7 @@ matches your operational readiness.
   - Read-only; safe to enable during rollout/burn-in weeks so evidence is captured automatically.
 - **Worker auto-start watchdog** (`healtharchive-worker-auto-start.timer`)
   - Recommended once you’re confident in the single-VPS production automation stack.
-  - The unit is sentinel-gated and refuses to start the worker if the Storage Box mount is unreadable or if the DB indicates a `status=running` job while the worker is down.
+  - The unit is sentinel-gated, refuses starts when Storage Box is unreadable, and performs conservative stale `status=running` drift reconciliation before deciding whether to start the worker.
 - **Drift auto-reconcile watchdog** (`healtharchive-drift-auto-reconcile.timer`)
   - Recommended for self-healing missing pip dependencies that cause API 502s.
   - Runs every 5 minutes and invokes `vps-deploy.sh` if the baseline report catches virtual environment drift.

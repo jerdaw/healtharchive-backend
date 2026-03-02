@@ -51,6 +51,8 @@ def test_crawl_auto_recover_systemd_template_sets_stall_threshold() -> None:
     text = unit_path.read_text(encoding="utf-8")
     assert "vps-crawl-auto-recover.py --apply" in text
     assert "--stall-threshold-seconds 3600" in text
+    assert "--degraded-rate-enabled" in text
+    assert "--degraded-action observe" in text
     assert "--ensure-min-running-jobs 3" in text
     assert "--start-max-disk-usage-percent 88" in text
 
@@ -106,3 +108,4 @@ def test_worker_auto_start_systemd_template_requires_venv() -> None:
         "ExecStart=/opt/healtharchive-backend/.venv/bin/python3 "
         "/opt/healtharchive-backend/scripts/vps-worker-auto-start.py --apply"
     ) in text
+    assert "--reconcile-running-drift" in text

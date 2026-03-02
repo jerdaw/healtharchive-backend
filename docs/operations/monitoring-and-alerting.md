@@ -1,6 +1,6 @@
 # Monitoring & Alerting Strategy - Annual Crawl Campaign
 
-**Last Updated:** 2026-02-23
+**Last Updated:** 2026-03-01
 
 ## Overview
 
@@ -36,7 +36,12 @@ Primary files (single-VPS annual campaign):
 | `healtharchive_worker_auto_start_last_run_timestamp_seconds` | Gauge | Last worker auto-start watchdog run time (freshness signal when enabled). |
 | `healtharchive_worker_auto_start_last_result{result,reason}` | Gauge | Last worker auto-start watchdog outcome (one-hot by labels). |
 | `healtharchive_worker_auto_start_start_attempts_total` | Counter | Total worker auto-start attempts (with success/fail companion counters). |
+| `healtharchive_worker_auto_start_reconciled_running_jobs` | Gauge | Stale `status=running` rows reconciled to `retryable` in the latest watchdog run. |
 | `healtharchive_crawl_auto_recover_last_run_timestamp_seconds` | Gauge | Last crawl auto-recover watchdog run time (freshness signal when enabled). |
+| `healtharchive_crawl_auto_recover_scope_drift_jobs` | Gauge | Number of running jobs where scope filter drift was detected in the latest watchdog run. |
+| `healtharchive_crawl_auto_recover_scope_rewrites_total` | Counter | Total scope filter rewrites applied by crawl auto-recover. |
+| `healtharchive_crawl_auto_recover_degraded_jobs` | Gauge | Number of running jobs currently classified as degraded (slow but progressing). |
+| `healtharchive_crawl_auto_recover_degraded_streak{job_id,source}` | Gauge | Consecutive watchdog runs where a job has remained degraded. |
 | `healtharchive_crawl_running_job_state_file_ok` | Gauge | 1 = `.archive_state.json` is readable and valid. 0 = Probe failed (SSHFS/Permissions issue). |
 | `healtharchive_crawl_running_job_container_restarts_done` | Gauge | Cumulative count of Zimit container restarts for the current job. |
 | `healtharchive_crawl_running_job_last_progress_age_seconds` | Gauge | Time since the last "pages crawled" increment in the logs. |
@@ -131,6 +136,17 @@ In practice this means:
 
 **Note on state file mtime:** The `.archive_state.json` mtime may appear stale even during healthy crawls, because the state file is only written on certain lifecycle events (container restarts, phase changes), not on every progress update. Use `last_progress_age_seconds` (derived from crawlStatus log entries) for stall detection, not `state_mtime_age_seconds`.
 
+### 4.1) Degraded Throughput (slow but progressing)
+
+**Alert:** `HealthArchiveCrawlRateDegraded`
+
+- **Threshold:** For HC/PHAC, `crawl_rate_ppm < 2` while `last_progress_age_seconds <= 300` and `stalled == 0` (for 45m).
+- **Meaning:** The crawl is alive but underperforming for an extended period, usually due to queue composition (binary-heavy links), repeated retries, or long-tail page slowness.
+- **Action:** Check combined logs for timeout/binary pressure and inspect auto-recover scope/degraded metrics:
+  - `healtharchive_crawl_auto_recover_scope_drift_jobs`
+  - `healtharchive_crawl_auto_recover_scope_rewrites_total`
+  - `healtharchive_crawl_auto_recover_degraded_streak`
+  Use controlled restart playbooks only after long-window reassessment confirms persistent degradation.
 ### 5) Infrastructure Errors
 
 **Alert:** `HealthArchiveInfraErrorsHigh`
@@ -175,9 +191,9 @@ In practice this means:
 - **Meaning:** A running crawl job has accumulated over 100 temporary directories, typically from repeated container restarts without cleanup.
 - **Action:** Investigate the job's restart history and consider running `ha-backend cleanup-job --id <ID> --mode temp` if the job is in a terminal state. If still running, the temp dirs will accumulate until the crawl finishes or is recovered.
 
-## Dashboard-only Crawl Performance Signals (no direct notifications)
+## Dashboard-heavy Crawl Performance Signals
 
-These are still monitored, but via Grafana trend panels instead of Alertmanager notifications:
+These remain monitored via Grafana trend panels. The only direct throughput alert is sustained degraded throughput for HC/PHAC (`HealthArchiveCrawlRateDegraded`).
 
 - `healtharchive_crawl_running_job_crawl_rate_ppm`
 - `healtharchive_crawl_running_job_new_crawl_phase_count`

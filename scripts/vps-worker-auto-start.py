@@ -7,7 +7,7 @@ import json
 import os
 import stat
 import subprocess
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 DEFAULT_DEPLOY_LOCK_FILE = "/tmp/healtharchive-backend-deploy.lock"
@@ -45,6 +45,49 @@ def _systemctl_is_active(unit: str) -> bool:
         ["systemctl", "is-active", unit], check=False, capture_output=True, text=True
     )
     return r.stdout.strip() == "active"
+
+
+def _run_capture(cmd: list[str]) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(cmd, check=False, capture_output=True, text=True)  # nosec: B603
+
+
+def _ps_snapshot() -> list[tuple[int, int, str]] | None:
+    cp = _run_capture(["ps", "-eo", "pid=,ppid=,args="])
+    if cp.returncode != 0:
+        return None
+    rows: list[tuple[int, int, str]] = []
+    for line in cp.stdout.splitlines():
+        parts = line.strip().split(maxsplit=2)
+        if len(parts) < 3:
+            continue
+        try:
+            pid = int(parts[0])
+            ppid = int(parts[1])
+        except ValueError:
+            continue
+        rows.append((pid, ppid, parts[2]))
+    return rows
+
+
+def _is_likely_crawl_runner_cmd(args: str) -> bool:
+    s = str(args or "")
+    if "archive-tool" in s:
+        return True
+    if "docker run" in s and "ghcr.io/openzim/zimit" in s:
+        return True
+    return False
+
+
+def _output_dir_has_running_crawl_process(
+    output_dir: str | None, ps_rows: list[tuple[int, int, str]]
+) -> bool:
+    if not output_dir:
+        return False
+    needle = str(output_dir)
+    for _pid, _ppid, args in ps_rows:
+        if needle in args and _is_likely_crawl_runner_cmd(args):
+            return True
+    return False
 
 
 def _file_age_seconds(path: Path, *, now_utc: datetime) -> float | None:
@@ -204,6 +247,7 @@ def _write_textfile_metrics(
     worker_active: int,
     running_jobs: int,
     pending_jobs: int,
+    reconciled_running_jobs: int,
     storagebox_ok: int,
     storagebox_errno: int,
     deploy_lock_present: int,
@@ -261,6 +305,12 @@ def _write_textfile_metrics(
     )
     emit("# TYPE healtharchive_worker_auto_start_jobs_pending gauge")
     emit(f"healtharchive_worker_auto_start_jobs_pending {int(pending_jobs)}")
+
+    emit(
+        "# HELP healtharchive_worker_auto_start_reconciled_running_jobs Number of stale status=running rows reconciled to retryable in this run."
+    )
+    emit("# TYPE healtharchive_worker_auto_start_reconciled_running_jobs gauge")
+    emit(f"healtharchive_worker_auto_start_reconciled_running_jobs {int(reconciled_running_jobs)}")
 
     emit(
         "# HELP healtharchive_worker_auto_start_storagebox_mount_ok 1 if the Storage Box mount is readable (ls/stat works)."
@@ -395,6 +445,33 @@ def main(argv: list[str] | None = None) -> int:
         default="healtharchive_worker_auto_start.prom",
         help="Output filename under --textfile-out-dir.",
     )
+    p.add_argument(
+        "--reconcile-running-drift",
+        action="store_true",
+        default=True,
+        help=(
+            "When worker is down, reconcile stale DB running-job rows to retryable if no crawl process "
+            "is active for their output_dir. Enabled by default."
+        ),
+    )
+    p.add_argument(
+        "--no-reconcile-running-drift",
+        dest="reconcile_running_drift",
+        action="store_false",
+        help="Disable running-job drift reconciliation.",
+    )
+    p.add_argument(
+        "--reconcile-older-than-minutes",
+        type=int,
+        default=10,
+        help="Only reconcile running jobs older than this threshold.",
+    )
+    p.add_argument(
+        "--reconcile-limit",
+        type=int,
+        default=10,
+        help="Maximum running jobs to reconcile in one watchdog run.",
+    )
     args = p.parse_args(argv)
 
     now = _utc_now()
@@ -420,6 +497,7 @@ def main(argv: list[str] | None = None) -> int:
                 worker_active=int(_systemctl_is_active(str(args.worker_unit))),
                 running_jobs=0,
                 pending_jobs=0,
+                reconciled_running_jobs=0,
                 storagebox_ok=0,
                 storagebox_errno=0,
                 deploy_lock_present=0,
@@ -469,6 +547,7 @@ def main(argv: list[str] | None = None) -> int:
                 worker_active=worker_active,
                 running_jobs=0,
                 pending_jobs=0,
+                reconciled_running_jobs=0,
                 storagebox_ok=0,
                 storagebox_errno=0,
                 deploy_lock_present=deploy_lock_present,
@@ -499,6 +578,7 @@ def main(argv: list[str] | None = None) -> int:
                 worker_active=worker_active,
                 running_jobs=0,
                 pending_jobs=0,
+                reconciled_running_jobs=0,
                 storagebox_ok=int(storagebox_ok),
                 storagebox_errno=int(storagebox_errno),
                 deploy_lock_present=deploy_lock_present,
@@ -517,6 +597,7 @@ def main(argv: list[str] | None = None) -> int:
 
     running_jobs = 0
     pending_jobs = 0
+    reconciled_running_jobs = 0
     try:
         from ha_backend.db import get_session
         from ha_backend.models import ArchiveJob
@@ -551,6 +632,7 @@ def main(argv: list[str] | None = None) -> int:
                 worker_active=worker_active,
                 running_jobs=0,
                 pending_jobs=0,
+                reconciled_running_jobs=0,
                 storagebox_ok=int(storagebox_ok),
                 storagebox_errno=int(storagebox_errno),
                 deploy_lock_present=deploy_lock_present,
@@ -566,6 +648,48 @@ def main(argv: list[str] | None = None) -> int:
         except Exception:
             pass
         return 0
+
+    if (
+        worker_active == 0
+        and running_jobs > 0
+        and bool(args.reconcile_running_drift)
+        and int(args.reconcile_limit) > 0
+    ):
+        ps_rows = _ps_snapshot()
+        if ps_rows is not None:
+            cutoff = now - timedelta(minutes=max(1, int(args.reconcile_older_than_minutes)))
+            try:
+                from ha_backend.db import get_session
+                from ha_backend.models import ArchiveJob
+
+                with get_session() as session:
+                    rows = (
+                        session.query(ArchiveJob)
+                        .filter(ArchiveJob.status == "running")
+                        .filter(ArchiveJob.started_at.is_not(None))
+                        .filter(ArchiveJob.started_at < cutoff)
+                        .order_by(ArchiveJob.started_at.asc().nullsfirst(), ArchiveJob.id.asc())
+                        .limit(int(args.reconcile_limit))
+                        .all()
+                    )
+                    for job in rows:
+                        if _output_dir_has_running_crawl_process(
+                            str(getattr(job, "output_dir", "") or ""),
+                            ps_rows,
+                        ):
+                            continue
+                        job.status = "retryable"
+                        job.crawler_stage = "reconciled_worker_down_running_drift"
+                        reconciled_running_jobs += 1
+                    if reconciled_running_jobs > 0:
+                        session.commit()
+            except Exception:
+                # Prefer safety over aggressive starts when reconciliation fails.
+                reconciled_running_jobs = 0
+
+    if reconciled_running_jobs > 0:
+        running_jobs = max(0, int(running_jobs) - int(reconciled_running_jobs))
+        pending_jobs = int(pending_jobs) + int(reconciled_running_jobs)
 
     if worker_active == 1:
         result = "skip"
@@ -636,6 +760,7 @@ def main(argv: list[str] | None = None) -> int:
             worker_active=worker_active,
             running_jobs=int(running_jobs),
             pending_jobs=int(pending_jobs),
+            reconciled_running_jobs=int(reconciled_running_jobs),
             storagebox_ok=int(storagebox_ok),
             storagebox_errno=int(storagebox_errno),
             deploy_lock_present=deploy_lock_present,

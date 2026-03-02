@@ -148,3 +148,18 @@ def test_crawl_temp_dirs_high_alert_semantics() -> None:
     assert "healtharchive_crawl_running_job_temp_dirs_count > 100" in body
     assert re.search(r"^\s*for:\s*1h\s*$", body, re.MULTILINE)
     assert re.search(r"^\s*severity:\s*warning\s*$", body, re.MULTILINE)
+
+
+def test_crawl_rate_degraded_alert_semantics() -> None:
+    text = _rules_text()
+    body = _extract_alert_block(text, "HealthArchiveCrawlRateDegraded")
+
+    assert 'healtharchive_crawl_running_job_crawl_rate_ppm{source=~"hc|phac"} >= 0' in body
+    assert 'healtharchive_crawl_running_job_crawl_rate_ppm{source=~"hc|phac"} < 2' in body
+    assert (
+        'healtharchive_crawl_running_job_last_progress_age_seconds{source=~"hc|phac"} <= 300'
+        in body
+    )
+    assert 'healtharchive_crawl_running_job_stalled{source=~"hc|phac"} == 0' in body
+    assert re.search(r"^\s*for:\s*45m\s*$", body, re.MULTILINE)
+    assert re.search(r"^\s*severity:\s*warning\s*$", body, re.MULTILINE)

@@ -9,7 +9,9 @@ import pytest
 from ha_backend import db as db_module
 from ha_backend.db import Base, get_engine, get_session
 from ha_backend.job_registry import (
+    HC_CANADA_CA_SCOPE_EXCLUDE_RX,
     HC_CANADA_CA_SCOPE_INCLUDE_RX,
+    PHAC_CANADA_CA_SCOPE_EXCLUDE_RX,
     PHAC_CANADA_CA_SCOPE_INCLUDE_RX,
     SOURCE_JOB_CONFIGS,
     build_job_config,
@@ -138,11 +140,15 @@ def test_build_job_config_merges_defaults_and_overrides() -> None:
 
     # Ensure default scope constraints are preserved.
     assert config["zimit_passthrough_args"] == cfg.default_zimit_passthrough_args
+    assert "--scopeIncludeRx" in config["zimit_passthrough_args"]
+    assert "--scopeExcludeRx" in config["zimit_passthrough_args"]
 
 
 def test_canada_ca_scope_regexes_match_expected_urls() -> None:
     hc_rx = re.compile(HC_CANADA_CA_SCOPE_INCLUDE_RX)
     phac_rx = re.compile(PHAC_CANADA_CA_SCOPE_INCLUDE_RX)
+    hc_exclude_rx = re.compile(HC_CANADA_CA_SCOPE_EXCLUDE_RX)
+    phac_exclude_rx = re.compile(PHAC_CANADA_CA_SCOPE_EXCLUDE_RX)
 
     assert hc_rx.match("https://www.canada.ca/en/health-canada.html")
     assert hc_rx.match("https://www.canada.ca/fr/sante-canada.html")
@@ -193,6 +199,24 @@ def test_canada_ca_scope_regexes_match_expected_urls() -> None:
     assert phac_rx.match("https://www.canada.ca/content/dam/phac-aspc/js/analytics.js")
     assert phac_rx.match("https://www.canada.ca/content/dam/phac-aspc/fonts/open-sans.woff2")
     assert phac_rx.match("https://www.canada.ca/content/dam/phac-aspc/images/photo.jpg?v=2")
+
+    # Top-level binary document/media links are excluded from queueing.
+    assert hc_exclude_rx.match("https://www.canada.ca/content/dam/hc-sc/documents/report.pdf")
+    assert hc_exclude_rx.match(
+        "https://www.canada.ca/en/health-canada/services/example.zip?download=1"
+    )
+    assert not hc_exclude_rx.match(
+        "https://www.canada.ca/en/health-canada/services/drugs-health-products.html"
+    )
+    assert phac_exclude_rx.match(
+        "https://www.canada.ca/en/public-health/services/publications/example.docx"
+    )
+    assert phac_exclude_rx.match(
+        "https://www.canada.ca/fr/sante-publique/services/publications/example.mp4#section"
+    )
+    assert not phac_exclude_rx.match(
+        "https://www.canada.ca/en/public-health/services/diseases/measles.html"
+    )
 
 
 def test_build_job_config_validates_adaptive_requires_monitoring() -> None:

@@ -15,7 +15,13 @@ from pathlib import Path
 
 from ha_backend.crawl_stats import parse_crawl_log_progress
 from ha_backend.db import get_session
-from ha_backend.job_registry import SOURCE_JOB_CONFIGS
+from ha_backend.job_registry import (
+    HC_CANADA_CA_SCOPE_EXCLUDE_RX,
+    HC_CANADA_CA_SCOPE_INCLUDE_RX,
+    PHAC_CANADA_CA_SCOPE_EXCLUDE_RX,
+    PHAC_CANADA_CA_SCOPE_INCLUDE_RX,
+    SOURCE_JOB_CONFIGS,
+)
 from ha_backend.models import ArchiveJob, Source
 
 DEFAULT_DEPLOY_LOCK_FILE = "/tmp/healtharchive-backend-deploy.lock"
@@ -87,6 +93,99 @@ _LEGACY_ANNUAL_BASELINE_VALUES: dict[str, set[int]] = {
     "backoff_delay_minutes": {2},
     "max_container_restarts": {20},
 }
+
+_SCOPED_SOURCES: set[str] = {"hc", "phac"}
+
+_CANONICAL_SCOPE_INCLUDE_BY_SOURCE: dict[str, str] = {
+    "hc": HC_CANADA_CA_SCOPE_INCLUDE_RX,
+    "phac": PHAC_CANADA_CA_SCOPE_INCLUDE_RX,
+}
+
+_CANONICAL_SCOPE_EXCLUDE_BY_SOURCE: dict[str, str] = {
+    "hc": HC_CANADA_CA_SCOPE_EXCLUDE_RX,
+    "phac": PHAC_CANADA_CA_SCOPE_EXCLUDE_RX,
+}
+
+
+def _canonical_scope_filters(source_code: str | None) -> tuple[str, str] | None:
+    code = str(source_code or "").strip().lower()
+    include_rx = _CANONICAL_SCOPE_INCLUDE_BY_SOURCE.get(code)
+    exclude_rx = _CANONICAL_SCOPE_EXCLUDE_BY_SOURCE.get(code)
+    if not include_rx or not exclude_rx:
+        return None
+    return include_rx, exclude_rx
+
+
+def _infer_job_source_code(job: ArchiveJob) -> str:
+    try:
+        source = getattr(job, "source", None)
+    except Exception:
+        source = None
+    if source is not None:
+        try:
+            code = str(getattr(source, "code", "") or "").strip().lower()
+        except Exception:
+            code = ""
+        if code:
+            return code
+    name = str(getattr(job, "name", "") or "").strip().lower()
+    for candidate in sorted(_SCOPED_SOURCES):
+        if name == candidate or name.startswith(f"{candidate}-"):
+            return candidate
+    return ""
+
+
+def _normalize_scope_passthrough_args(
+    args: list[str], *, scope_include_rx: str, scope_exclude_rx: str
+) -> list[str]:
+    """
+    Canonicalize scope-related passthrough args while preserving unrelated args.
+
+    We intentionally keep a deterministic order for scope args so drift detection
+    and tests remain stable across retries/restarts.
+    """
+    remaining: list[str] = []
+    i = 0
+    while i < len(args):
+        tok = str(args[i])
+        if tok in {"--scopeType", "--scopeIncludeRx", "--scopeExcludeRx"}:
+            i += 2 if (i + 1) < len(args) else 1
+            continue
+        remaining.append(tok)
+        i += 1
+    return [
+        "--scopeType",
+        "custom",
+        "--scopeIncludeRx",
+        scope_include_rx,
+        "--scopeExcludeRx",
+        scope_exclude_rx,
+        *remaining,
+    ]
+
+
+def _compute_scope_args_for_job(
+    job: ArchiveJob, *, source_code: str | None = None
+) -> tuple[list[str], bool]:
+    code = str(source_code or "").strip().lower() or _infer_job_source_code(job)
+    canonical = _canonical_scope_filters(code)
+    cfg = dict(job.config or {})
+    existing_args = list(cfg.get("zimit_passthrough_args") or [])
+    if canonical is None:
+        return existing_args, False
+    include_rx, exclude_rx = canonical
+    normalized = _normalize_scope_passthrough_args(
+        existing_args,
+        scope_include_rx=include_rx,
+        scope_exclude_rx=exclude_rx,
+    )
+    return normalized, normalized != existing_args
+
+
+def _apply_scope_args(job: ArchiveJob, normalized_args: list[str]) -> None:
+    cfg = dict(job.config or {})
+    cfg["zimit_passthrough_args"] = list(normalized_args)
+    job.config = cfg
 
 
 def _dt_to_epoch_seconds(dt: datetime) -> int:
@@ -853,7 +952,11 @@ def _write_textfile_metrics(
     enabled: int,
     running_jobs: int,
     stalled_jobs: int,
+    degraded_jobs: int,
+    degraded_streaks: dict[int, int],
+    source_by_job_id: dict[int, str],
     deploy_lock_present: int,
+    scope_drift_jobs: int,
     result: str,
     reason: str,
 ) -> None:
@@ -897,6 +1000,18 @@ def _write_textfile_metrics(
     lines.append(f"healtharchive_crawl_auto_recover_stalled_jobs {int(stalled_jobs)}")
 
     lines.append(
+        "# HELP healtharchive_crawl_auto_recover_degraded_jobs Number of running jobs detected as degraded (slow but progressing)."
+    )
+    lines.append("# TYPE healtharchive_crawl_auto_recover_degraded_jobs gauge")
+    lines.append(f"healtharchive_crawl_auto_recover_degraded_jobs {int(degraded_jobs)}")
+
+    lines.append(
+        "# HELP healtharchive_crawl_auto_recover_scope_drift_jobs Number of running jobs with scope filter drift detected."
+    )
+    lines.append("# TYPE healtharchive_crawl_auto_recover_scope_drift_jobs gauge")
+    lines.append(f"healtharchive_crawl_auto_recover_scope_drift_jobs {int(scope_drift_jobs)}")
+
+    lines.append(
         "# HELP healtharchive_crawl_auto_recover_deploy_lock_present 1 if deploy lock appears active."
     )
     lines.append("# TYPE healtharchive_crawl_auto_recover_deploy_lock_present gauge")
@@ -918,6 +1033,25 @@ def _write_textfile_metrics(
     )
     lines.append("# TYPE healtharchive_crawl_auto_recover_starts_total counter")
     lines.append(f"healtharchive_crawl_auto_recover_starts_total {int(total_starts)}")
+
+    scope_rewrites_total = int(state.get("scope_rewrites_total") or 0)
+    lines.append(
+        "# HELP healtharchive_crawl_auto_recover_scope_rewrites_total Total number of scope filter rewrites applied by the watchdog."
+    )
+    lines.append("# TYPE healtharchive_crawl_auto_recover_scope_rewrites_total counter")
+    lines.append(f"healtharchive_crawl_auto_recover_scope_rewrites_total {scope_rewrites_total}")
+
+    lines.append(
+        "# HELP healtharchive_crawl_auto_recover_degraded_streak Consecutive watchdog runs where a running job is degraded."
+    )
+    lines.append("# TYPE healtharchive_crawl_auto_recover_degraded_streak gauge")
+    for job_id in sorted(degraded_streaks.keys()):
+        source = str(source_by_job_id.get(int(job_id), "unknown"))
+        streak = int(degraded_streaks.get(int(job_id)) or 0)
+        lines.append(
+            "healtharchive_crawl_auto_recover_degraded_streak"
+            f'{{job_id="{int(job_id)}",source="{source}"}} {streak}'
+        )
 
     lines.append(
         "# HELP healtharchive_crawl_auto_recover_last_result 1 for the most recent watchdog outcome."
@@ -973,6 +1107,61 @@ def main(argv: list[str] | None = None) -> int:
         dest="soft_recover_when_guarded",
         action="store_false",
         help="Disable soft recovery when another job is progressing.",
+    )
+    parser.add_argument(
+        "--degraded-rate-enabled",
+        action="store_true",
+        default=True,
+        help=(
+            "Track degraded crawl-rate jobs (slow but progressing) and emit metrics/state. "
+            "Enabled by default."
+        ),
+    )
+    parser.add_argument(
+        "--no-degraded-rate-enabled",
+        dest="degraded_rate_enabled",
+        action="store_false",
+        help="Disable degraded crawl-rate tracking.",
+    )
+    parser.add_argument(
+        "--degraded-rate-threshold-ppm",
+        type=float,
+        default=2.0,
+        help=(
+            "Treat a job as degraded when crawl_rate_ppm is below this threshold "
+            "while still showing recent progress."
+        ),
+    )
+    parser.add_argument(
+        "--degraded-max-progress-age-seconds",
+        type=int,
+        default=300,
+        help=("Only classify jobs as degraded if last progress age is at or below this threshold."),
+    )
+    parser.add_argument(
+        "--degraded-min-consecutive-runs",
+        type=int,
+        default=6,
+        help=(
+            "Consecutive watchdog runs required before reporting degraded threshold reached "
+            "(used for observe/recover actions)."
+        ),
+    )
+    parser.add_argument(
+        "--degraded-sources",
+        default="hc,phac",
+        help=(
+            "Comma-separated source codes eligible for degraded-rate handling. Default: hc,phac."
+        ),
+    )
+    parser.add_argument(
+        "--degraded-action",
+        choices=["observe", "recover"],
+        default="observe",
+        help=(
+            "Action when degraded streak threshold is reached. "
+            "'observe' only emits metrics/logs; 'recover' is reserved for controlled rollout."
+        ),
     )
     parser.add_argument(
         "--recover-older-than-minutes",
@@ -1161,6 +1350,14 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     now = _utc_now()
+    degraded_sources = {
+        str(x).strip().lower()
+        for x in str(args.degraded_sources or "").split(",")
+        if str(x).strip()
+    }
+    degraded_threshold_ppm = max(0.0, float(args.degraded_rate_threshold_ppm))
+    degraded_max_age_seconds = max(0, int(args.degraded_max_progress_age_seconds))
+    degraded_min_runs = max(1, int(args.degraded_min_consecutive_runs))
     simulate_job_ids_raw = list(getattr(args, "simulate_stalled_job_id", []) or [])
     simulate_job_ids = [int(x) for x in simulate_job_ids_raw if str(x).strip()]
     simulate_mode = bool(simulate_job_ids)
@@ -1218,6 +1415,10 @@ def main(argv: list[str] | None = None) -> int:
     state_path = Path(args.state_file)
     sentinel_file = Path(args.sentinel_file)
     enabled = 1 if sentinel_file.is_file() else 0
+    source_by_job_id: dict[int, str] = {}
+    degraded_streaks_for_metrics: dict[int, int] = {}
+    degraded_jobs_count = 0
+    scope_drift_jobs_count = 0
 
     # Metrics helper for early exits
     def write_metrics(
@@ -1228,6 +1429,10 @@ def main(argv: list[str] | None = None) -> int:
         result: str = "skip",
         reason: str = "unknown",
         state: dict | None = None,
+        degraded_jobs: int | None = None,
+        degraded_streaks: dict[int, int] | None = None,
+        source_map: dict[int, str] | None = None,
+        scope_drift_jobs: int | None = None,
     ) -> None:
         try:
             _write_textfile_metrics(
@@ -1238,7 +1443,17 @@ def main(argv: list[str] | None = None) -> int:
                 enabled=enabled,
                 running_jobs=running_jobs,
                 stalled_jobs=stalled_jobs,
+                degraded_jobs=int(
+                    degraded_jobs_count if degraded_jobs is None else int(degraded_jobs)
+                ),
+                degraded_streaks=dict(
+                    degraded_streaks_for_metrics if degraded_streaks is None else degraded_streaks
+                ),
+                source_by_job_id=dict(source_by_job_id if source_map is None else source_map),
                 deploy_lock_present=deploy_lock_present,
+                scope_drift_jobs=int(
+                    scope_drift_jobs_count if scope_drift_jobs is None else int(scope_drift_jobs)
+                ),
                 result=result,
                 reason=reason,
             )
@@ -1426,6 +1641,36 @@ def main(argv: list[str] | None = None) -> int:
             return 2
         raise
 
+    source_by_job_id = {int(j.job_id): str(j.source_code) for j in running_jobs}
+
+    # Scope reconciliation pass for currently running scoped sources.
+    # This avoids long-lived drift where a job keeps legacy scope filters even
+    # after code defaults have been narrowed.
+    scope_rewrites_this_run = 0
+    with get_session() as session:
+        for running in running_jobs:
+            normalized_args: list[str]
+            drifted: bool
+            orm_job = session.get(ArchiveJob, int(running.job_id))
+            if orm_job is None:
+                continue
+            normalized_args, drifted = _compute_scope_args_for_job(
+                orm_job,
+                source_code=running.source_code,
+            )
+            if not drifted:
+                continue
+            scope_drift_jobs_count += 1
+            if args.apply and not simulate_mode:
+                _apply_scope_args(orm_job, normalized_args)
+                scope_rewrites_this_run += 1
+        if args.apply and not simulate_mode and scope_rewrites_this_run > 0:
+            session.commit()
+    if scope_rewrites_this_run > 0:
+        state["scope_rewrites_total"] = int(state.get("scope_rewrites_total") or 0) + int(
+            scope_rewrites_this_run
+        )
+
     if simulate_mode:
         print(
             "DRILL: simulate-stalled-job-id active; dry-run only. "
@@ -1434,6 +1679,8 @@ def main(argv: list[str] | None = None) -> int:
 
     stalled: list[tuple[RunningJob, float]] = []
     progress_age_by_job_id: dict[int, float] = {}
+    crawl_rate_ppm_by_job_id: dict[int, float] = {}
+    degraded_current_job_ids: set[int] = set()
     for job in running_jobs:
         if int(job.job_id) in simulate_job_ids:
             simulated_age = (
@@ -1453,18 +1700,101 @@ def main(argv: list[str] | None = None) -> int:
         if progress is None:
             continue
         age = progress.last_progress_age_seconds(now_utc=now)
+        crawl_rate_ppm = float(progress.crawl_rate_ppm)
         progress_age_by_job_id[int(job.job_id)] = float(age)
+        crawl_rate_ppm_by_job_id[int(job.job_id)] = crawl_rate_ppm
         if age >= float(args.stall_threshold_seconds):
             stalled.append((job, age))
+            continue
+        if not bool(args.degraded_rate_enabled):
+            continue
+        source_code = str(job.source_code).strip().lower()
+        if source_code not in degraded_sources:
+            continue
+        if age > float(degraded_max_age_seconds):
+            continue
+        if crawl_rate_ppm < 0:
+            continue
+        if crawl_rate_ppm < float(degraded_threshold_ppm):
+            degraded_current_job_ids.add(int(job.job_id))
+
+    # Degraded-rate streak tracking (observe-first in initial rollout).
+    degraded_state_raw = state.get("degraded_streaks") or {}
+    degraded_state: dict[str, int] = {}
+    if isinstance(degraded_state_raw, dict):
+        for k, v in degraded_state_raw.items():
+            try:
+                degraded_state[str(int(k))] = int(v)
+            except (TypeError, ValueError):
+                continue
+
+    running_ids = {int(j.job_id) for j in running_jobs}
+    for running in running_jobs:
+        jid = int(running.job_id)
+        source_code = str(running.source_code).strip().lower()
+        if source_code not in degraded_sources:
+            degraded_state.pop(str(jid), None)
+            continue
+        if jid not in progress_age_by_job_id or jid not in crawl_rate_ppm_by_job_id:
+            # If we cannot compute progress/rate right now, do not carry a stale
+            # degraded streak forward.
+            degraded_state.pop(str(jid), None)
+            continue
+        if jid in degraded_current_job_ids:
+            degraded_state[str(jid)] = int(degraded_state.get(str(jid), 0)) + 1
+        else:
+            degraded_state.pop(str(jid), None)
+
+    # Drop stale streaks for jobs no longer running.
+    for raw_jid in list(degraded_state.keys()):
+        try:
+            jid = int(raw_jid)
+        except ValueError:
+            degraded_state.pop(raw_jid, None)
+            continue
+        if jid not in running_ids:
+            degraded_state.pop(raw_jid, None)
+
+    state["degraded_streaks"] = degraded_state
+    degraded_jobs_count = len(degraded_current_job_ids)
+    degraded_streaks_for_metrics = {
+        int(k): int(v) for k, v in degraded_state.items() if int(v) > 0 and int(k) in running_ids
+    }
+
+    if bool(args.degraded_rate_enabled):
+        for jid in sorted(degraded_current_job_ids):
+            streak = int(degraded_state.get(str(jid), 0))
+            if streak >= int(degraded_min_runs):
+                source = source_by_job_id.get(jid, "unknown")
+                if str(args.degraded_action).strip().lower() == "observe":
+                    print(
+                        f"OBSERVE: degraded crawl-rate threshold reached for job_id={jid} source={source} "
+                        f"(streak={streak} runs, threshold_ppm={degraded_threshold_ppm:.2f})."
+                    )
+                else:
+                    print(
+                        f"NOTE: degraded-action=recover requested for job_id={jid} source={source}, "
+                        "but automatic degraded recoveries are not yet enabled; observing only."
+                    )
+
+    try:
+        _save_state(state_path, state)
+    except Exception:
+        pass
 
     if not stalled:
+        degraded_threshold_hit = any(
+            int(degraded_state.get(str(jid), 0)) >= int(degraded_min_runs)
+            for jid in degraded_current_job_ids
+        )
+        no_stall_reason = "degraded_observe" if degraded_threshold_hit else "no_stalled_jobs"
         ensure_min_running = int(getattr(args, "ensure_min_running_jobs", 0) or 0)
         if ensure_min_running <= 0:
             write_metrics(
                 running_jobs=len(running_jobs),
                 stalled_jobs=0,
                 result="skip",
-                reason="no_stalled_jobs",
+                reason=no_stall_reason,
                 state=state,
             )
             return 0
@@ -1475,7 +1805,7 @@ def main(argv: list[str] | None = None) -> int:
                 running_jobs=running_count,
                 stalled_jobs=0,
                 result="skip",
-                reason="no_stalled_jobs",
+                reason=no_stall_reason,
                 state=state,
             )
             return 0
@@ -1695,6 +2025,16 @@ def main(argv: list[str] | None = None) -> int:
                         changed = True
                     if _ensure_recovery_tool_options(orm_job):
                         changed = True
+                    normalized_args, scope_drift = _compute_scope_args_for_job(
+                        orm_job,
+                        source_code=candidate_source,
+                    )
+                    if scope_drift:
+                        _apply_scope_args(orm_job, normalized_args)
+                        changed = True
+                        state["scope_rewrites_total"] = (
+                            int(state.get("scope_rewrites_total") or 0) + 1
+                        )
                     if changed:
                         session.commit()
         except Exception as exc:
@@ -1844,7 +2184,9 @@ def main(argv: list[str] | None = None) -> int:
                     with get_session() as session:
                         orm_job = session.get(ArchiveJob, job.job_id)
                         if orm_job is not None:
+                            changed = False
                             if _ensure_recovery_tool_options(orm_job):
+                                changed = True
                                 tool_opts = (orm_job.config or {}).get("tool_options") or {}
                                 try:
                                     max_restarts = int(tool_opts.get("max_container_restarts") or 0)
@@ -1855,6 +2197,22 @@ def main(argv: list[str] | None = None) -> int:
                                     f"enable_adaptive_restart={bool(tool_opts.get('enable_adaptive_restart'))} "
                                     f"max_container_restarts={max_restarts}"
                                 )
+                            normalized_args, scope_drift = _compute_scope_args_for_job(
+                                orm_job,
+                                source_code=job.source_code,
+                            )
+                            if scope_drift:
+                                _apply_scope_args(orm_job, normalized_args)
+                                changed = True
+                                state["scope_rewrites_total"] = (
+                                    int(state.get("scope_rewrites_total") or 0) + 1
+                                )
+                                print(
+                                    "Updated job scope filters before soft recovery: "
+                                    f"source={job.source_code}"
+                                )
+                            if changed:
+                                session.commit()
                 except Exception as exc:
                     print(f"WARNING: failed to update job config before soft recovery: {exc}")
 
@@ -1971,8 +2329,9 @@ def main(argv: list[str] | None = None) -> int:
         with get_session() as session:
             orm_job = session.get(ArchiveJob, job.job_id)
             if orm_job is not None:
+                changed = False
                 if _ensure_recovery_tool_options(orm_job):
-                    session.commit()
+                    changed = True
                     tool_opts = (orm_job.config or {}).get("tool_options") or {}
                     try:
                         max_restarts = int(tool_opts.get("max_container_restarts") or 0)
@@ -1983,6 +2342,17 @@ def main(argv: list[str] | None = None) -> int:
                         f"enable_adaptive_restart={bool(tool_opts.get('enable_adaptive_restart'))} "
                         f"max_container_restarts={max_restarts}"
                     )
+                normalized_args, scope_drift = _compute_scope_args_for_job(
+                    orm_job,
+                    source_code=job.source_code,
+                )
+                if scope_drift:
+                    _apply_scope_args(orm_job, normalized_args)
+                    changed = True
+                    state["scope_rewrites_total"] = int(state.get("scope_rewrites_total") or 0) + 1
+                    print(f"Updated job scope filters before recovery: source={job.source_code}")
+                if changed:
+                    session.commit()
     except Exception as exc:
         print(f"WARNING: failed to update job config before recovery: {exc}")
 

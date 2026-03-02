@@ -322,3 +322,80 @@ def test_worker_auto_start_starts_worker_when_pending_jobs_and_safe(tmp_path, mo
     assert "healtharchive_worker_auto_start_start_attempts_total 1" in prom
     assert "healtharchive_worker_auto_start_start_success_total 1" in prom
     assert "healtharchive_worker_auto_start_start_fail_total 0" in prom
+
+
+def test_worker_auto_start_reconciles_stale_running_rows_and_starts_worker(
+    tmp_path, monkeypatch
+) -> None:
+    mod = _load_script_module(
+        "vps-worker-auto-start.py",
+        module_name="ha_test_vps_worker_auto_start_reconcile_running_drift",
+    )
+    _init_test_db(tmp_path, monkeypatch, "worker_reconcile_running_drift.db")
+
+    sentinel = tmp_path / "sentinel"
+    sentinel.write_text("1", encoding="utf-8")
+
+    monkeypatch.setattr(mod, "_systemctl_is_active", lambda _u: False)
+    monkeypatch.setattr(mod, "_file_age_seconds", lambda _p, now_utc: None)
+    monkeypatch.setattr(mod, "_probe_readable_dir", lambda _p: (1, -1))
+    monkeypatch.setattr(mod, "_ps_snapshot", lambda: [])
+
+    started_at = datetime(2026, 2, 28, 20, 0, 0, tzinfo=timezone.utc)
+    stale_output = tmp_path / "jobs" / "hc" / "out"
+    stale_output.parent.mkdir(parents=True, exist_ok=True)
+    with get_session() as session:
+        session.add(
+            ArchiveJob(
+                name="stale-running",
+                output_dir=str(stale_output),
+                status="running",
+                started_at=started_at,
+                config={},
+            )
+        )
+        session.flush()
+
+    calls: list[list[str]] = []
+
+    def fake_run(cmd: list[str], **kwargs):
+        del kwargs
+        calls.append(cmd)
+        return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
+
+    monkeypatch.setattr(mod.subprocess, "run", fake_run)
+
+    out_dir = tmp_path / "out"
+    rc = mod.main(
+        [
+            "--apply",
+            "--sentinel-file",
+            str(sentinel),
+            "--state-file",
+            str(tmp_path / "state.json"),
+            "--lock-file",
+            str(tmp_path / "lock"),
+            "--textfile-out-dir",
+            str(out_dir),
+            "--textfile-out-file",
+            "worker.prom",
+            "--reconcile-older-than-minutes",
+            "5",
+            "--reconcile-limit",
+            "5",
+        ]
+    )
+    assert rc == 0
+    assert any(cmd[:2] == ["systemctl", "start"] for cmd in calls)
+
+    with get_session() as session:
+        job = session.query(ArchiveJob).first()
+        assert job is not None
+        assert job.status == "retryable"
+        assert job.crawler_stage == "reconciled_worker_down_running_drift"
+
+    prom = (out_dir / "worker.prom").read_text(encoding="utf-8")
+    assert "healtharchive_worker_auto_start_reconciled_running_jobs 1" in prom
+    assert (
+        'healtharchive_worker_auto_start_last_result{result="ok",reason="started_worker"} 1' in prom
+    )

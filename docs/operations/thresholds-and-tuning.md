@@ -113,6 +113,23 @@ See: `docs/operations/disk-baseline-and-cleanup.md` (current baseline + cleanup 
 
 ---
 
+### Degraded Throughput Detection (observe-first)
+
+| Parameter | Value | Location | Rationale |
+|-----------|-------|----------|-----------|
+| **Degraded sources** | `hc,phac` | `docs/deployment/systemd/healtharchive-crawl-auto-recover.service` (`--degraded-sources`) | Focus on broad canada.ca crawls with known binary-link pressure |
+| **Rate threshold** | `<2.0 ppm` | `scripts/vps-crawl-auto-recover.py` (`--degraded-rate-threshold-ppm`, default: 2.0) | Detect sustained low throughput before hard stalls |
+| **Recent progress cap** | `<=300s` | `scripts/vps-crawl-auto-recover.py` (`--degraded-max-progress-age-seconds`, default: 300) | Distinguish degraded from stalled jobs |
+| **Consecutive runs** | `6` | `scripts/vps-crawl-auto-recover.py` (`--degraded-min-consecutive-runs`, default: 6) | Suppress transient dips |
+| **Action mode** | `observe` | `docs/deployment/systemd/healtharchive-crawl-auto-recover.service` (`--degraded-action observe`) | Alert-first rollout to avoid restart churn |
+
+**Tuning guidance**:
+- Keep `--degraded-action observe` until the 6–24h long-window reassessment confirms persistent degradation.
+- If false positives occur, increase consecutive runs before lowering threshold strictness.
+- If persistent low throughput remains after scope reconciliation, use controlled restart playbooks instead of immediate automatic recoveries.
+
+---
+
 ## Crawl Auto-Start (Queue Fill)
 
 When enabled, the crawl auto-recover watchdog can also act as a **queue fill** mechanism:
@@ -138,6 +155,9 @@ returns to running because the worker is already busy with another crawl.
 - Alerting integration note: worker-down notifications can be delayed/suppressed
   based on worker auto-start automation only when `healtharchive-worker-auto-start.timer`
   is enabled and `healtharchive_worker_auto_start.prom` metrics are fresh.
+- Worker auto-start watchdog now includes stale running-row reconciliation:
+  - `--reconcile-running-drift --reconcile-older-than-minutes 10 --reconcile-limit 10`
+  - It only reconciles rows with no active crawl process detected for their output dir.
 
 ---
 
