@@ -14,7 +14,7 @@ Usage:
 
 Defaults:
   --api-url        https://api.healtharchive.ca/api/health
-  --frontend-url   https://www.healtharchive.ca/archive
+  --frontend-url   https://healtharchive.ca/en/archive
   --replay-url     https://replay.healtharchive.ca/
   --timeout-seconds 20
 
@@ -26,7 +26,7 @@ EOF
 }
 
 API_URL="https://api.healtharchive.ca/api/health"
-FRONTEND_URL="https://www.healtharchive.ca/archive"
+FRONTEND_URL="https://healtharchive.ca/en/archive"
 REPLAY_URL="https://replay.healtharchive.ca/"
 TIMEOUT_SECONDS="20"
 SKIP_REPLAY="false"
