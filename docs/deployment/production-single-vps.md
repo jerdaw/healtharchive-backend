@@ -16,7 +16,7 @@ For recovery from total failure, see the [Disaster Recovery Runbook](disaster-re
 
 - **Provider / size:** Hetzner Cloud, `cx33` (Cost-Optimized, 4 vCPU / 8GB RAM / 80GB SSD)
 - **Region:** Nuremberg (cost-optimized not available in US-East at the time)
-- **Public services:** `api.healtharchive.ca` on 80/443 via Caddy
+- **Public services:** `healtharchive.ca`, `www.healtharchive.ca`, and `api.healtharchive.ca` on 80/443 via Caddy
 - **Replay (optional):** `replay.healtharchive.ca` via Caddy → pywb (see `deployment/replay-service-pywb.md`)
 - **Private-only:** SSH on Tailscale (`tailscale0`), no public port 22
 - **Storage:**
@@ -154,7 +154,7 @@ HEALTHARCHIVE_DATABASE_URL=postgresql+psycopg://healtharchive:<DB_PASSWORD>@127.
 # Keep the crawl hot-path on the local SSD for throughput; use the StorageBox only for cold storage/tiering.
 HEALTHARCHIVE_ARCHIVE_ROOT=/srv/healtharchive/jobs
 HEALTHARCHIVE_ADMIN_TOKEN=<LONG_RANDOM_TOKEN>
-HEALTHARCHIVE_CORS_ORIGINS=https://healtharchive.ca,https://www.healtharchive.ca,https://healtharchive.vercel.app,https://replay.healtharchive.ca
+HEALTHARCHIVE_CORS_ORIGINS=https://healtharchive.ca,https://www.healtharchive.ca,https://replay.healtharchive.ca
 HEALTHARCHIVE_LOG_LEVEL=INFO
 HA_SEARCH_RANKING_VERSION=v2
 HA_PAGES_FASTPATH=1
@@ -284,9 +284,9 @@ Notes:
 - The baseline policy (desired state) is versioned in git at:
   `docs/operations/production-baseline-policy.toml`
 - The deploy script runs a **public-surface smoke verify** by default (public API + frontend + replay + usage):
-  - `./scripts/verify_public_surface.py` (defaults to `https://api.healtharchive.ca` and `https://www.healtharchive.ca`)
+  - `./scripts/verify_public_surface.py` (defaults to `https://api.healtharchive.ca` and `https://healtharchive.ca`)
   - You can skip in emergencies: `./scripts/vps-deploy.sh --apply --skip-public-surface-verify`
-  - If the public frontend is externally down (e.g., Vercel `402 Payment required`), use:
+  - If the public frontend is externally down, use:
     - `./scripts/vps-hetzdeploy.sh --mode backend-only`
     - Or (if installed): `hetzdeploy --mode backend-only`
 - Crawl-safety: if any jobs are `status=running`, the deploy helper will restart `healtharchive-api` but will
@@ -584,9 +584,9 @@ enforcement), see:
 
 ---
 
-## 12) Current known defaults/assumptions (2025-12)
+## 12) Current known defaults/assumptions (2026-03)
 
-- CORS allowlist: `https://healtharchive.ca`, `https://www.healtharchive.ca`, `https://healtharchive.vercel.app`
-- Vercel envs set to use `https://api.healtharchive.ca` for both Preview and Production
+- CORS allowlist: `https://healtharchive.ca`, `https://www.healtharchive.ca`, `https://replay.healtharchive.ca`
+- Frontend runtime: direct Docker container on the VPS behind host Caddy
 - No staging backend; Preview and Production frontends point to the same API
 - Public SSH closed; Tailscale required for admin/backup access

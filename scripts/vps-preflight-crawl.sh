@@ -30,7 +30,7 @@ Options:
   --env-file FILE             Env file to source (default: /etc/healtharchive/backend.env)
   --api-base URL              Loopback API base for health checks (default: http://127.0.0.1:8001)
   --public-api-base URL       Public API base for verifiers (default: https://api.healtharchive.ca)
-  --public-frontend-base URL  Public frontend base for verifiers (default: https://www.healtharchive.ca)
+  --public-frontend-base URL  Public frontend base for verifiers (default: https://healtharchive.ca)
   --baseline-mode MODE        Baseline drift mode: local|live (default: live)
   --out-root DIR              Report root dir (default: /srv/healtharchive/ops/preflight)
   --no-write                  Do not write report files; print only
@@ -53,7 +53,7 @@ CAMPAIGN_ARCHIVE_ROOT=""
 ENV_FILE="/etc/healtharchive/backend.env"
 API_BASE="http://127.0.0.1:8001"
 PUBLIC_API_BASE="https://api.healtharchive.ca"
-PUBLIC_FRONTEND_BASE="https://www.healtharchive.ca"
+PUBLIC_FRONTEND_BASE="https://healtharchive.ca"
 BASELINE_MODE="live"
 OUT_ROOT="/srv/healtharchive/ops/preflight"
 WRITE_REPORTS="true"
