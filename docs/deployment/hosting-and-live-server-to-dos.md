@@ -1,5 +1,10 @@
 # Hosting & Live Server TODOs (Backend + Frontend)
 
+> **Status:** Historical checklist.
+> This file documents the earlier Vercel-era wiring work. The implemented
+> production model is the direct VPS + host Caddy path in
+> `production-single-vps.md`.
+
 This document tracks the remaining **infrastructure / hosting steps** needed to
 run HealthArchive.ca with a fully wired frontend + backend in production
 (and optionally add a staging environment later).

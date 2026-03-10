@@ -121,7 +121,7 @@ def main(argv: list[str] | None = None) -> int:
         "--api-base", default="https://api.healtharchive.ca", help="Backend API base URL."
     )
     parser.add_argument(
-        "--frontend-base", default="https://www.healtharchive.ca", help="Frontend base URL."
+        "--frontend-base", default="https://healtharchive.ca", help="Frontend base URL."
     )
     parser.add_argument(
         "--timeout-seconds",

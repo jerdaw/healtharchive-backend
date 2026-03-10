@@ -59,7 +59,7 @@ SKIP_PUBLIC_SURFACE_VERIFY="false"
 INSTALL_SYSTEMD_UNITS="false"
 APPLY_ALERTING="false"
 PUBLIC_API_BASE="https://api.healtharchive.ca"
-PUBLIC_FRONTEND_BASE="https://www.healtharchive.ca"
+PUBLIC_FRONTEND_BASE="https://healtharchive.ca"
 PUBLIC_TIMEOUT_SECONDS="20"
 
 while [[ $# -gt 0 ]]; do

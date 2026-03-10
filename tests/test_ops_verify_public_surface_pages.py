@@ -21,10 +21,10 @@ def _load_script_module() -> Any:
 def test_verify_public_surface_build_frontend_pages_includes_en_and_fr() -> None:
     module = _load_script_module()
 
-    pages = module._build_frontend_pages("https://www.healtharchive.ca", first_snapshot_id=123)
+    pages = module._build_frontend_pages("https://healtharchive.ca", first_snapshot_id=123)
     urls = {url for _name, url in pages}
 
-    assert "https://www.healtharchive.ca/archive" in urls
-    assert "https://www.healtharchive.ca/fr/archive" in urls
-    assert "https://www.healtharchive.ca/snapshot/123" in urls
-    assert "https://www.healtharchive.ca/fr/snapshot/123" in urls
+    assert "https://healtharchive.ca/archive" in urls
+    assert "https://healtharchive.ca/fr/archive" in urls
+    assert "https://healtharchive.ca/snapshot/123" in urls
+    assert "https://healtharchive.ca/fr/snapshot/123" in urls

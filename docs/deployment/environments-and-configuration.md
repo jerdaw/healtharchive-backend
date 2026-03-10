@@ -8,8 +8,8 @@ The root `ENVIRONMENTS.md` is a pointer to this file to avoid duplication.
 
 It is useful when:
 
-- Setting or auditing environment variables (Vercel + backend host).
-- Double‑checking that frontend hosts, backend hosts, and backend CORS settings
+- Setting or auditing environment variables on the VPS-hosted production stack.
+- Double-checking that frontend hosts, backend hosts, and backend CORS settings
   line up.
 
 For deeper operational details, see:
@@ -32,13 +32,7 @@ For deeper operational details, see:
 - Backend **CORS allowlist** is intentionally strict:
   - `https://healtharchive.ca`
   - `https://www.healtharchive.ca`
-  - `https://healtharchive.vercel.app`
   - `https://replay.healtharchive.ca` (for the optional replay banner and direct replay UX)
-
-Expected limitation (by design):
-
-- Branch preview URLs like `https://healtharchive-git-...vercel.app` may fall
-  back to demo mode until we explicitly allow those origins (CORS).
 
 ## 1.1 Validate production wiring (recommended)
 
@@ -61,9 +55,8 @@ This validates:
 | Environment | Frontend (browser origin) | Backend API base | Notes |
 | --- | --- | --- | --- |
 | Local dev | `http://localhost:3000` | `http://127.0.0.1:8001` | Local dev flow. |
-| Vercel project domain | `https://healtharchive.vercel.app` | `https://api.healtharchive.ca` | Allowed by CORS; useful as a stable “non-custom-domain” URL. |
-| Production | `https://healtharchive.ca` / `https://www.healtharchive.ca` | `https://api.healtharchive.ca` | Primary public site. |
-| Branch previews (Vercel) | `https://healtharchive-git-...vercel.app` | `https://api.healtharchive.ca` | May fall back to demo mode due to strict CORS. |
+| Production | `https://healtharchive.ca` / `https://www.healtharchive.ca` | `https://api.healtharchive.ca` | Current public site on the VPS. |
+| Historical preview | `https://healtharchive.vercel.app` | `https://api.healtharchive.ca` | Retain only if you intentionally keep a legacy preview workflow. |
 
 Optional future:
 
@@ -111,7 +104,7 @@ export HEALTHARCHIVE_DATABASE_URL=postgresql+psycopg://healtharchive:<DB_PASSWOR
 export HEALTHARCHIVE_ARCHIVE_ROOT=/srv/healtharchive/jobs
 export HEALTHARCHIVE_ZIMIT_DOCKER_IMAGE=ghcr.io/openzim/zimit@sha256:<PINNED_DIGEST>
 export HEALTHARCHIVE_ADMIN_TOKEN=<LONG_RANDOM_SECRET>
-export HEALTHARCHIVE_CORS_ORIGINS=https://healtharchive.ca,https://www.healtharchive.ca,https://healtharchive.vercel.app,https://replay.healtharchive.ca
+export HEALTHARCHIVE_CORS_ORIGINS=https://healtharchive.ca,https://www.healtharchive.ca,https://replay.healtharchive.ca
 export HEALTHARCHIVE_LOG_LEVEL=INFO
 export HA_SEARCH_RANKING_VERSION=v2
 export HA_PAGES_FASTPATH=1
@@ -169,7 +162,7 @@ export HEALTHARCHIVE_ENV=staging
 export HEALTHARCHIVE_DATABASE_URL=postgresql+psycopg://healtharchive:<DB_PASSWORD>@127.0.0.1:5432/healtharchive_staging
 export HEALTHARCHIVE_ARCHIVE_ROOT=/srv/healtharchive/jobs-staging
 export HEALTHARCHIVE_ADMIN_TOKEN=<LONG_RANDOM_SECRET>
-export HEALTHARCHIVE_CORS_ORIGINS=https://healtharchive.vercel.app
+export HEALTHARCHIVE_CORS_ORIGINS=https://healtharchive-staging.example.com
 export HEALTHARCHIVE_LOG_LEVEL=INFO
 export HEALTHARCHIVE_USAGE_METRICS_ENABLED=1
 export HEALTHARCHIVE_USAGE_METRICS_WINDOW_DAYS=30
@@ -197,9 +190,9 @@ NEXT_PUBLIC_LOG_API_HEALTH_FAILURE=true
 NEXT_PUBLIC_SHOW_API_BASE_HINT=true
 ```
 
-### 3.2 Vercel Production env
+### 3.2 Production VPS frontend env
 
-In Vercel → **Settings → Environment Variables → Production**:
+In the frontend runtime env file on the VPS:
 
 ```env
 NEXT_PUBLIC_API_BASE_URL=https://api.healtharchive.ca
@@ -208,9 +201,10 @@ NEXT_PUBLIC_LOG_API_HEALTH_FAILURE=false
 NEXT_PUBLIC_SHOW_API_BASE_HINT=false
 ```
 
-### 3.3 Vercel Preview env
+### 3.3 Optional historical preview env
 
-In Vercel → **Settings → Environment Variables → Preview**:
+If you still keep an old preview frontend path, use the same API base and make
+sure the backend CORS allowlist is updated deliberately before relying on it:
 
 ```env
 NEXT_PUBLIC_API_BASE_URL=https://api.healtharchive.ca
@@ -221,17 +215,14 @@ NEXT_PUBLIC_SHOW_API_BASE_HINT=true
 
 Note:
 
-- Even with the Preview env var set, branch preview URLs may still fall back to
-  demo mode unless the backend CORS allowlist includes those preview origins.
-
 ---
 
 ## 4) Security notes (secrets + CORS)
 
 - **Never commit secrets**:
   - No real `HEALTHARCHIVE_ADMIN_TOKEN`, DB passwords, Healthchecks URLs, etc.
-  - Use placeholders in docs and store real values in Bitwarden + server/Vercel
-    env settings.
+  - Use placeholders in docs and store real values in Bitwarden + server env
+    settings.
 - **CORS is a security control**:
   - Tight allowlists reduce accidental exposure of browser-accessible APIs.
   - If you loosen CORS to include branch previews, do it deliberately and

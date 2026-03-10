@@ -517,24 +517,29 @@ defaults:
     export HEALTHARCHIVE_CORS_ORIGINS="https://healtharchive.ca,https://www.healtharchive.ca"
     ```
 
-- **Preview (frontend at healtharchive.vercel.app):**
+- **Optional preview/historical frontend origin:**
 
   ```bash
   export HEALTHARCHIVE_CORS_ORIGINS="https://healtharchive.vercel.app"
   ```
 
+  Keep this only if you still intentionally use an old Vercel-hosted preview
+  frontend. It is not part of the current production path.
+
   You can also include `http://localhost:3000` if you want local development
   to talk directly to a remote API instance.
 
-For a more complete checklist covering staging/production configuration,
-DNS, and Vercel env vars, see:
+For the current direct-VPS production model, see:
+
+- `docs/deployment/production-single-vps.md`
+- `docs/deployment/environments-and-configuration.md`
+- `docs/operations/monitoring-and-ci-checklist.md`
+
+Historical rollout docs retained for reference:
 
 - `docs/deployment/hosting-and-live-server-to-dos.md`
-- `docs/deployment/environments-and-configuration.md`
-- `docs/deployment/production-single-vps.md`
 - `docs/deployment/staging-rollout-checklist.md`
 - `docs/deployment/production-rollout-checklist.md`
-- `docs/operations/monitoring-and-ci-checklist.md`.
 
 ---
 
