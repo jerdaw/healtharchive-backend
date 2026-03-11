@@ -9,6 +9,10 @@ on:
       - main
   workflow_dispatch: {}
 
+concurrency:
+  group: healtharchive-backend-ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test:
     name: Backend CI / test
@@ -86,7 +90,7 @@ jobs:
               echo "Backend server ready"
               break
             fi
-            if [ $i -eq 30 ]; then
+            if [ "$i" -eq 30 ]; then
               echo "Backend server failed to start"
               exit 1
             fi
@@ -108,7 +112,8 @@ jobs:
         if: always()
         run: |
           if [ -f /tmp/uvicorn.pid ]; then
-            kill $(cat /tmp/uvicorn.pid) || true
+            pid="$(cat /tmp/uvicorn.pid)"
+            kill "$pid" || true
           fi
 
   e2e-smoke:
