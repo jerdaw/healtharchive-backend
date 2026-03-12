@@ -4,6 +4,12 @@ This document is the **canonical cross-repo reference** for how the backend
 (`healtharchive-backend`) and frontend (`healtharchive-frontend`) are wired
 together across environments.
 
+Shared-VPS ownership note:
+
+1. This document owns the frontend/backend wiring contract for HealthArchive.
+2. Shared host topology, ingress ownership, service inventory, and other cross-project VPS facts are canonical in `/home/jer/repos/platform-ops`.
+3. Use `/home/jer/repos/platform-ops/PLAT-009-shared-vps-documentation-boundary.md` as the default boundary reference when deciding where a VPS fact belongs.
+
 The root `ENVIRONMENTS.md` is a pointer to this file to avoid duplication.
 
 It is useful when:

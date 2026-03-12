@@ -10,6 +10,13 @@ explaining it to new operators.
 
 For recovery from total failure, see the [Disaster Recovery Runbook](disaster-recovery.md).
 
+Documentation boundary note:
+
+1. This runbook is canonical for HealthArchive backend behavior on the VPS.
+2. Shared VPS facts that are not specific to HealthArchive alone are canonical in `/home/jer/repos/platform-ops`.
+3. That includes shared ingress ownership, cross-project host inventory, shared path conventions, and host-wide hardening posture.
+4. The explicit ownership split is documented in `/home/jer/repos/platform-ops/PLAT-009-shared-vps-documentation-boundary.md`.
+
 ---
 
 ## 1) Hosting / topology

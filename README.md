@@ -14,9 +14,8 @@ The backend has three main responsibilities:
 
 For a deep architecture and implementation walkthrough, see
 `docs/architecture.md`. For a step‑by‑step local live‑testing guide, see
-`docs/development/live-testing.md`. For the current production runbook (single
-VPS + Tailscale-only SSH + nightly backups), see
-`docs/deployment/production-single-vps.md`.
+`docs/development/live-testing.md`. For the current backend production runbook,
+see `docs/deployment/production-single-vps.md`.
 This README is intentionally shorter and focused on practical usage.
 
 Related repositories (project is multi-repo):
@@ -24,6 +23,24 @@ Related repositories (project is multi-repo):
 - Frontend UI: https://github.com/jerdaw/healtharchive-frontend
 - **Documentation Site**: Run `make docs-serve` in the backend repo for a searchable web UI.
 - **Shared VPS ops workspace**: `/home/jer/repos/platform-ops` (historical local alias: `/home/jer/repos/projects-merge`) contains the shared inventory, roadmap, handoff, and cross-project runbooks.
+
+Shared documentation boundary:
+
+- `platform-ops/` is the default home for shared VPS facts that are not specific to HealthArchive alone:
+  - host access posture
+  - shared ingress ownership
+  - cross-project service inventory
+  - host path conventions
+  - shared maintenance and hardening state
+- `healtharchive-backend/` owns the backend-specific subset:
+  - API/worker/replay behavior
+  - backend deploy and rollback steps
+  - backend env vars and automation
+  - backend recovery playbooks
+
+For the explicit boundary, see:
+
+- `/home/jer/repos/platform-ops/PLAT-009-shared-vps-documentation-boundary.md`
 
 Production entrypoints (VPS):
 

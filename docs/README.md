@@ -32,6 +32,11 @@ docs are canonical in their repos and are linked-to from this site:
 - Frontend pointers: `frontend-external/README.md`
 - Datasets pointers: `datasets-external/README.md`
 
+Shared VPS facts that are not specific to the backend are canonical in:
+
+- `/home/jer/repos/platform-ops`
+- `/home/jer/repos/platform-ops/PLAT-009-shared-vps-documentation-boundary.md`
+
 ## Recommended reading order
 
 0. Project docs portal (multi-repo navigation)

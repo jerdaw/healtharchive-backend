@@ -34,7 +34,35 @@ def test_active_docs_reflect_apex_canonical_frontend() -> None:
     assert "`healtharchive.ca` (canonical)" in production_runbook
 
 
+def test_active_entrypoints_point_shared_vps_facts_to_platform_ops() -> None:
+    for relative_path in (
+        "README.md",
+        "AGENTS.md",
+        "ENVIRONMENTS.md",
+        "docs/README.md",
+        "docs/deployment/production-rollout-checklist.md",
+        "docs/deployment/staging-rollout-checklist.md",
+    ):
+        assert (
+            "/home/jer/repos/platform-ops/PLAT-009-shared-vps-documentation-boundary.md"
+            in _read(relative_path)
+        )
+
+    production_runbook = _read("docs/deployment/production-single-vps.md")
+    env_contract = _read("docs/deployment/environments-and-configuration.md")
+
+    assert (
+        "Shared VPS facts that are not specific to HealthArchive alone are canonical in "
+        "`/home/jer/repos/platform-ops`."
+    ) in production_runbook
+    assert (
+        "Shared host topology, ingress ownership, service inventory, and other cross-project "
+        "VPS facts are canonical in `/home/jer/repos/platform-ops`."
+    ) in env_contract
+
+
 if __name__ == "__main__":
     test_systemd_public_surface_verifier_uses_apex_frontend()
     test_active_docs_do_not_treat_vercel_as_current_healtharchive_path()
     test_active_docs_reflect_apex_canonical_frontend()
+    test_active_entrypoints_point_shared_vps_facts_to_platform_ops()

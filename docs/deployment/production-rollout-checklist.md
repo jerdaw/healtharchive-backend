@@ -15,6 +15,12 @@ Use this file as the quick production checklist. Use
 [`production-single-vps.md`](production-single-vps.md) as the full rebuild and
 deployment runbook.
 
+Documentation boundary note:
+
+1. This checklist is canonical for the active HealthArchive production verification flow.
+2. Shared VPS facts that are not specific to HealthArchive alone are canonical in `/home/jer/repos/platform-ops`.
+3. The explicit ownership split is documented in `/home/jer/repos/platform-ops/PLAT-009-shared-vps-documentation-boundary.md`.
+
 ## 1. Preconditions
 
 - [ ] the backend VPS env file is current (`/etc/healtharchive/backend.env`)
