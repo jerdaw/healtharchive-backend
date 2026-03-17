@@ -139,7 +139,6 @@ Completed items were removed from this backlog and archived in:
 3. **Add `CODE_OF_CONDUCT.md` to all repos** (S: 1h) — covered by `2026-02-admissions-strengthening-plan.md` Phase 3, item 6
 4. **Add LICENSE to datasets repo if still missing** (S: 30m)
 5. **Add GitHub issue and PR templates across repos** (S: 2-3h) — covered by `2026-02-admissions-strengthening-plan.md` Phase 3, item 6
-6. **Normalize git identities with `.mailmap`** (S: 30m)
 7. **Add changelog/release tags to backend and frontend** (M: 1 day) — covered by `2026-02-admissions-strengthening-plan.md` Phase 3, item 6
 
 ### Reliability, security, and CI
