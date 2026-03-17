@@ -1040,10 +1040,10 @@
       }
     },
     "/api/sources/{source_code}/preview": {
-      "get": {
+      "head": {
         "summary": "Get Source Preview",
         "description": "Return a cached preview image for a source's replay homepage.\n\nThese previews are generated out-of-band (e.g. via an operator script) and\nstored on disk under HEALTHARCHIVE_REPLAY_PREVIEW_DIR.",
-        "operationId": "get_source_preview_api_sources__source_code__preview_get",
+        "operationId": "get_source_preview_api_sources__source_code__preview_head",
         "parameters": [
           {
             "name": "source_code",
@@ -1103,10 +1103,10 @@
           }
         }
       },
-      "head": {
+      "get": {
         "summary": "Get Source Preview",
         "description": "Return a cached preview image for a source's replay homepage.\n\nThese previews are generated out-of-band (e.g. via an operator script) and\nstored on disk under HEALTHARCHIVE_REPLAY_PREVIEW_DIR.",
-        "operationId": "get_source_preview_api_sources__source_code__preview_get",
+        "operationId": "get_source_preview_api_sources__source_code__preview_head",
         "parameters": [
           {
             "name": "source_code",

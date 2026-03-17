@@ -10,4 +10,4 @@ Type=oneshot
 User=root
 Group=root
 EnvironmentFile=/etc/healtharchive/backend.env
-ExecStart=/opt/healtharchive-backend/.venv/bin/python3 /opt/healtharchive-backend/scripts/vps-crawl-auto-recover.py --apply --stall-threshold-seconds 3600 --ensure-min-running-jobs 3 --start-max-disk-usage-percent 88
+ExecStart=/opt/healtharchive-backend/.venv/bin/python3 /opt/healtharchive-backend/scripts/vps-crawl-auto-recover.py --apply --stall-threshold-seconds 3600 --degraded-rate-enabled --degraded-rate-threshold-ppm 2.0 --degraded-max-progress-age-seconds 300 --degraded-min-consecutive-runs 6 --degraded-sources hc,phac --degraded-action observe --ensure-min-running-jobs 3 --start-max-disk-usage-percent 88
