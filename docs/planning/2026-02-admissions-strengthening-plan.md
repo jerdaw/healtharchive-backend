@@ -317,7 +317,7 @@ changes.
 
 ### 6. Batch governance hygiene
 
-*Combines: CODE_OF_CONDUCT, issue/PR templates, CI badges, NLM citation
+*Combines: code of conduct, issue/PR templates, CI badges, NLM citation
 format, changelog/release tags.*
 *Roadmap items: #3, #5, #7, #38.*
 
@@ -328,7 +328,7 @@ session, not as individual milestones.
 
 **What to do:**
 
-- Add `CODE_OF_CONDUCT.md` to all three repos (Contributor Covenant).
+- Add a code of conduct file to all three repos (Contributor Covenant).
 - Add issue templates (`Bug Report`, `Feature Request`) and PR template to
   all repos.
 - Add CI status badges to all READMEs.

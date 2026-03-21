@@ -136,7 +136,7 @@ Completed items were removed from this backlog and archived in:
 
 1. **Add `CITATION.cff` to repos still missing it** (S: 1-2h)
 2. **Add `SECURITY.md` to repos still missing it** (S: 1-2h)
-3. **Add `CODE_OF_CONDUCT.md` to all repos** (S: 1h) — covered by `2026-02-admissions-strengthening-plan.md` Phase 3, item 6
+3. **Add a code of conduct to all repos** (S: 1h) — covered by `2026-02-admissions-strengthening-plan.md` Phase 3, item 6
 4. **Add LICENSE to datasets repo if still missing** (S: 30m)
 5. **Add GitHub issue and PR templates across repos** (S: 2-3h) — covered by `2026-02-admissions-strengthening-plan.md` Phase 3, item 6
 6. **Normalize git identities with `.mailmap`** (S: 30m)

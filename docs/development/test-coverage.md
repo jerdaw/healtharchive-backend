@@ -165,6 +165,6 @@ A: Run `make coverage-critical` and open `htmlcov-critical/index.html` in a brow
 ---
 
 **Related docs**:
-- [Testing Guide](testing-guide.md) (if it exists)
-- [CI/CD Pipeline](../deployment/ci-cd.md) (if it exists)
-- [Contributing](../../CONTRIBUTING.md) (if it exists)
+- [Testing Guidelines](testing-guidelines.md)
+- [Monitoring and CI Checklist](../operations/monitoring-and-ci-checklist.md)
+- [Contributing](https://github.com/jerdaw/healtharchive-backend/blob/main/CONTRIBUTING.md)
