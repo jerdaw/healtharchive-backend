@@ -127,6 +127,9 @@ Keep this list short; prefer linking to the canonical doc that explains the item
 
 - Tighten GitHub merge discipline when there are multiple committers (PR-only + required checks).
   - See: `../operations/monitoring-and-ci-checklist.md`
+- Update the documentation deploy workflow off `peaceiris/actions-gh-pages@v4` before the GitHub Actions Node 20 cutoff on 2026-06-02.
+  - Context: the `Deploy Documentation` workflow currently passes, but GitHub Actions emits a deprecation warning for the `peaceiris/actions-gh-pages@v4` action.
+  - Goal: move to a Node 24-compatible publish path before the cutoff turns the warning into a delivery risk.
 
 ## Quality, governance, and product backlog (cross-repo)
 
