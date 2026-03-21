@@ -36,21 +36,21 @@ Items #1-6 from the roadmap (CITATION.cff, SECURITY.md, CODE_OF_CONDUCT.md, .mai
 #### Implemented Features
 
 1. **Open Graph + Twitter Card Meta Tags** (#8)
-   - Modified `src/lib/metadata.ts` to include OpenGraph and Twitter Card metadata
+   - Modified [frontend src/lib/metadata.ts](https://github.com/jerdaw/healtharchive-frontend/blob/main/src/lib/metadata.ts) to include OpenGraph and Twitter Card metadata
    - All pages now generate rich social media previews
    - Includes: og:title, og:description, og:url, og:siteName, og:locale, og:type
    - Twitter card: summary format
 
 2. **JSON-LD Structured Data** (#8)
-   - Created `src/components/seo/JsonLd.tsx` with Schema.org Organization markup
+   - Created [frontend src/components/seo/JsonLd.tsx](https://github.com/jerdaw/healtharchive-frontend/blob/main/src/components/seo/JsonLd.tsx) with Schema.org Organization markup
    - Added to root layout for automatic inclusion on all pages
    - Includes organization info and GitHub repository links
 
 3. **Sitemap Generation** (#9)
-   - Created `src/app/sitemap.ts` generating XML sitemap for all static pages
+   - Created [frontend src/app/sitemap.ts](https://github.com/jerdaw/healtharchive-frontend/blob/main/src/app/sitemap.ts) generating XML sitemap for all static pages
    - Includes EN/FR alternates for bilingual support
    - Excludes `/compare-live` (matches robots.txt)
-   - Modified `src/app/robots.ts` to reference sitemap
+   - Modified [frontend src/app/robots.ts](https://github.com/jerdaw/healtharchive-frontend/blob/main/src/app/robots.ts) to reference sitemap
 
 4. **RSS Feed Discovery** (#11)
    - Added RSS alternate link to root layout metadata
@@ -59,13 +59,13 @@ Items #1-6 from the roadmap (CITATION.cff, SECURITY.md, CODE_OF_CONDUCT.md, .mai
 #### Files Modified/Created
 
 **Modified**:
-- `src/lib/metadata.ts` - Added OG/Twitter meta generation
-- `src/app/[locale]/layout.tsx` - Added JsonLd component and RSS alternate link
-- `src/app/robots.ts` - Added sitemap directive
+- [frontend src/lib/metadata.ts](https://github.com/jerdaw/healtharchive-frontend/blob/main/src/lib/metadata.ts) - Added OG/Twitter meta generation
+- [frontend src/app/[locale]/layout.tsx](https://github.com/jerdaw/healtharchive-frontend/blob/main/src/app/%5Blocale%5D/layout.tsx) - Added JsonLd component and RSS alternate link
+- [frontend src/app/robots.ts](https://github.com/jerdaw/healtharchive-frontend/blob/main/src/app/robots.ts) - Added sitemap directive
 
 **Created**:
-- `src/components/seo/JsonLd.tsx` - JSON-LD structured data component
-- `src/app/sitemap.ts` - Sitemap generation
+- [frontend src/components/seo/JsonLd.tsx](https://github.com/jerdaw/healtharchive-frontend/blob/main/src/components/seo/JsonLd.tsx) - JSON-LD structured data component
+- [frontend src/app/sitemap.ts](https://github.com/jerdaw/healtharchive-frontend/blob/main/src/app/sitemap.ts) - Sitemap generation
 
 #### Validation
 
@@ -86,11 +86,11 @@ Added Schema.org Dataset markup to the exports page for academic/research discov
 
 #### Files Created
 
-- `src/components/seo/DatasetJsonLd.tsx` - Dataset structured data component
+- [frontend src/components/seo/DatasetJsonLd.tsx](https://github.com/jerdaw/healtharchive-frontend/blob/main/src/components/seo/DatasetJsonLd.tsx) - Dataset structured data component
 
 #### Files Modified
 
-- `src/app/[locale]/exports/page.tsx` - Added DatasetJsonLd component
+- [frontend src/app/[locale]/exports/page.tsx](https://github.com/jerdaw/healtharchive-frontend/blob/main/src/app/%5Blocale%5D/exports/page.tsx) - Added DatasetJsonLd component
 
 #### Structured Data Includes
 
@@ -560,7 +560,7 @@ Expanded backend test coverage with comprehensive edge case, security, and relia
 - Special characters (& @ $ % ? !)
 - Invalid page numbers and page sizes
 - Null byte injection
-- Path traversal attempts (`../../../etc/passwd`)
+- Path traversal attempts (for example, dot-dot-slash payloads targeting sensitive files)
 - Command injection attempts (`;ls`, `|cat`, `$(whoami)`)
 - NoSQL injection attempts (`{"$gt": ""}`)
 - Invalid source parameter handling

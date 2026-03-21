@@ -44,6 +44,6 @@ Implemented four roadmap items that improved crawl/storage reliability and monit
 
 - Roadmap: `../roadmap.md` (updated to remove completed items)
 - WARC discovery plan (partial): `2026-01-29-warc-discovery-consistency.md`
-- Annual disk incident: `../operations/incidents/2026-02-04-annual-crawl-output-dirs-on-root-disk.md`
-- Search quality: `../operations/search-quality.md`
-- Growth constraints: `../operations/growth-constraints.md`
+- Annual disk incident: `../../operations/incidents/2026-02-04-annual-crawl-output-dirs-on-root-disk.md`
+- Search quality: `../../operations/search-quality.md`
+- Growth constraints: `../../operations/growth-constraints.md`

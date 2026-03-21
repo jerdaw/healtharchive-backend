@@ -209,4 +209,4 @@ sudo /opt/healtharchive-backend/.venv/bin/python3 \
 ## See Also
 
 - [Production Single VPS Deployment](../../../deployment/production-single-vps.md) - Main VPS runbook
-- [Annual Output Tiering Design](../../../planning/implemented/2025-12_annual-output-tiering.md) - Technical details
+- [WARC Storage Tiering](../storage/warc-storage-tiering.md) - Tiering design and operating details

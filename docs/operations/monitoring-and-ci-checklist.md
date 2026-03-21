@@ -187,7 +187,7 @@ Recommended minimal monitor set (HTTP(s) checks):
    - Interval: 1–5 minutes
    - Note: backend supports `HEAD /api/health` for providers that default to `HEAD`.
 2. **Frontend integration**
-   - URL: `https://www.healtharchive.ca/archive`
+   - URL: `https://healtharchive.ca/archive`
    - Expected: HTTP 200
    - Interval: 5 minutes
    - Optional: keyword assertion (stable string that should always appear).

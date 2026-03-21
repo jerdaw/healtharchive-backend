@@ -10,13 +10,20 @@ explaining it to new operators.
 
 For recovery from total failure, see the [Disaster Recovery Runbook](disaster-recovery.md).
 
+Documentation boundary note:
+
+1. This runbook is canonical for HealthArchive backend behavior on the VPS.
+2. Shared VPS facts that are not specific to HealthArchive alone are canonical in `/home/jer/repos/platform-ops`.
+3. That includes shared ingress ownership, cross-project host inventory, shared path conventions, and host-wide hardening posture.
+4. The explicit ownership split is documented in `/home/jer/repos/platform-ops/PLAT-009-shared-vps-documentation-boundary.md`.
+
 ---
 
 ## 1) Hosting / topology
 
 - **Provider / size:** Hetzner Cloud, `cx33` (Cost-Optimized, 4 vCPU / 8GB RAM / 80GB SSD)
 - **Region:** Nuremberg (cost-optimized not available in US-East at the time)
-- **Public services:** `healtharchive.ca`, `www.healtharchive.ca`, and `api.healtharchive.ca` on 80/443 via Caddy
+- **Public services:** `healtharchive.ca` (canonical), `www.healtharchive.ca` (redirect alias), and `api.healtharchive.ca` on 80/443 via Caddy
 - **Replay (optional):** `replay.healtharchive.ca` via Caddy → pywb (see `deployment/replay-service-pywb.md`)
 - **Private-only:** SSH on Tailscale (`tailscale0`), no public port 22
 - **Storage:**
@@ -545,7 +552,7 @@ Created a minimal WARC + Snapshot for smoke checks:
 - WARC: `/srv/healtharchive/jobs/manual-warcs/viewer-test.warc.gz`
 - Snapshot ID: `1`
 - Raw: `https://api.healtharchive.ca/api/snapshots/raw/1`
-- Viewer: `https://www.healtharchive.ca/snapshot/1`
+- Viewer: `https://healtharchive.ca/snapshot/1`
 
 Use this to verify end-to-end viewer behavior after deploys.
 
@@ -572,7 +579,7 @@ Result: restore succeeded, `snapshots` contained 1 row (the synthetic test snaps
 
 Configure an external monitor (e.g., UptimeRobot) for:
 - `https://api.healtharchive.ca/api/health`
-- `https://www.healtharchive.ca/archive`
+- `https://healtharchive.ca/archive`
 - (Optional) `https://replay.healtharchive.ca/` (if replay is enabled/in use)
 
 Note: some providers use `HEAD` by default; the backend supports `HEAD /api/health`.
@@ -586,7 +593,7 @@ enforcement), see:
 
 ## 12) Current known defaults/assumptions (2026-03)
 
-- CORS allowlist: `https://healtharchive.ca`, `https://www.healtharchive.ca`, `https://replay.healtharchive.ca`
+- CORS allowlist: `https://healtharchive.ca`, `https://www.healtharchive.ca` (redirect alias compatibility), `https://replay.healtharchive.ca`
 - Frontend runtime: direct Docker container on the VPS behind host Caddy
 - No staging backend; Preview and Production frontends point to the same API
 - Public SSH closed; Tailscale required for admin/backup access

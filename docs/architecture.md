@@ -1084,17 +1084,18 @@ Typical environment setups:
   # export HEALTHARCHIVE_CORS_ORIGINS=http://localhost:3000
   ```
 
-- **Staging** (example):
+- **Optional preview/staging** (example only; not an active production path):
 
   ```bash
-  # frontend served from https://healtharchive.vercel.app
-  export HEALTHARCHIVE_CORS_ORIGINS=https://healtharchive.vercel.app
+  # If you intentionally add a separate preview/staging frontend later,
+  # allow only its exact origin.
+  export HEALTHARCHIVE_CORS_ORIGINS=https://preview.example.invalid
   ```
 
 - **Production** (example):
 
   ```bash
-  # frontend served from https://healtharchive.ca and https://www.healtharchive.ca
+  # healtharchive.ca is canonical; www may remain in the allowlist as a redirect alias.
   export HEALTHARCHIVE_CORS_ORIGINS=https://healtharchive.ca,https://www.healtharchive.ca
   ```
 

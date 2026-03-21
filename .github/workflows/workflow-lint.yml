@@ -1,0 +1,84 @@
+name: Workflow Lint
+
+on:
+  workflow_dispatch: {}
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/**"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/**"
+
+concurrency:
+  group: healtharchive-backend-workflow-lint-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  actionlint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: "1.24"
+
+      - name: Install actionlint
+        run: go install github.com/rhysd/actionlint/cmd/actionlint@latest
+
+      - name: Select workflow files
+        id: files
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          case "${GITHUB_EVENT_NAME}" in
+            pull_request)
+              git fetch --no-tags --depth=1 origin "${GITHUB_BASE_REF}"
+              files=$(git diff --name-only "origin/${GITHUB_BASE_REF}...HEAD" -- '.github/workflows/*.yml' '.github/workflows/*.yaml')
+              ;;
+            push)
+              if [[ "${{ github.event.before }}" == "0000000000000000000000000000000000000000" ]]; then
+                files=$(git ls-files '.github/workflows/*.yml' '.github/workflows/*.yaml')
+              else
+                files=$(git diff --name-only "${{ github.event.before }}" HEAD -- '.github/workflows/*.yml' '.github/workflows/*.yaml')
+              fi
+              ;;
+            workflow_dispatch)
+              if git rev-parse HEAD~1 >/dev/null 2>&1; then
+                files=$(git diff --name-only HEAD~1 HEAD -- '.github/workflows/*.yml' '.github/workflows/*.yaml')
+              else
+                files=$(git ls-files '.github/workflows/*.yml' '.github/workflows/*.yaml')
+              fi
+              ;;
+          esac
+
+          files=$(printf '%s\n' "$files" | sed '/^$/d' | sort -u)
+
+          if [[ -z "$files" ]]; then
+            echo "has_files=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "has_files=true" >> "$GITHUB_OUTPUT"
+          {
+            echo 'files<<EOF'
+            printf '%s\n' "$files"
+            echo 'EOF'
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Run actionlint
+        if: steps.files.outputs.has_files == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          while IFS= read -r file; do
+            "$(go env GOPATH)/bin/actionlint" -color "$file"
+          done <<< "${{ steps.files.outputs.files }}"

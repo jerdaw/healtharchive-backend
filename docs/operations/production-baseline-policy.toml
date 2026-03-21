@@ -44,7 +44,7 @@ HEALTHARCHIVE_EXPORTS_ENABLED = "1"
 HEALTHARCHIVE_CORS_ORIGINS = [
   "https://healtharchive.ca",
   "https://www.healtharchive.ca",
-  "https://healtharchive.vercel.app",
+  "https://replay.healtharchive.ca",
 ]
 
 [cors]

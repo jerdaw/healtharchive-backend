@@ -39,7 +39,7 @@ Canonical references:
 
    - `./scripts/vps-deploy.sh --apply --baseline-mode live --install-systemd-units --apply-alerting`
 
-   If the public frontend is externally down (e.g., Vercel `402 Payment required`), you can deploy backend-only:
+   If the public frontend is externally unavailable, you can deploy backend-only:
 
    - `./scripts/vps-hetzdeploy.sh --mode backend-only`
 

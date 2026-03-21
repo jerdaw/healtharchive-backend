@@ -16,15 +16,15 @@ guidance evolves over time. It is not current guidance or medical advice.
 
 ## 2) What is live now (key links)
 
-- Home: https://www.healtharchive.ca/
-- Archive search: https://www.healtharchive.ca/archive
-- Snapshot viewer: https://www.healtharchive.ca/snapshot/<id>
-- Changes feed (edition-aware): https://www.healtharchive.ca/changes
-- Compare view: https://www.healtharchive.ca/compare?to=<id>
-- Digest + RSS: https://www.healtharchive.ca/digest
-- Methods & scope: https://www.healtharchive.ca/methods
-- Governance: https://www.healtharchive.ca/governance
-- Status/impact: https://www.healtharchive.ca/status and /impact
+- Home: https://healtharchive.ca/
+- Archive search: https://healtharchive.ca/archive
+- Snapshot viewer: https://healtharchive.ca/snapshot/<id>
+- Changes feed (edition-aware): https://healtharchive.ca/changes
+- Compare view: https://healtharchive.ca/compare?to=<id>
+- Digest + RSS: https://healtharchive.ca/digest
+- Methods & scope: https://healtharchive.ca/methods
+- Governance: https://healtharchive.ca/governance
+- Status/impact: https://healtharchive.ca/status and /impact
 
 ## 3) What I built / operate (short bullets)
 

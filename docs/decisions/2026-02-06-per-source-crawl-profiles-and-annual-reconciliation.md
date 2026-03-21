@@ -60,4 +60,4 @@ Per-source profiles keep the default configuration aligned with reality: differe
   - `docs/operations/monitoring-and-alerting.md`
 - Related playbooks/runbooks:
   - `docs/tutorials/debug-crawl.md`
-  - `docs/operations/playbooks/annual-campaign.md`
+  - `docs/operations/playbooks/crawl/annual-campaign.md`

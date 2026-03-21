@@ -11,7 +11,7 @@ Canonical reference:
 Ensure monitors exist for:
 
 - `https://api.healtharchive.ca/api/health`
-- `https://www.healtharchive.ca/archive`
+- `https://healtharchive.ca/archive`
 - `https://replay.healtharchive.ca/` (only if you rely on replay)
 
 After changes, you can smoke-test from any machine with internet:

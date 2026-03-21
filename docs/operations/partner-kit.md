@@ -9,7 +9,7 @@ Canonical public assets (do not duplicate copy here):
 
 - One-page brief (source file): https://github.com/jerdaw/healtharchive-frontend/blob/main/public/partner-kit/healtharchive-brief.md
 - Citation handout (source file): https://github.com/jerdaw/healtharchive-frontend/blob/main/public/partner-kit/healtharchive-citation.md
-- Live pages: `https://www.healtharchive.ca/brief` and `https://www.healtharchive.ca/cite`
+- Live pages: `https://healtharchive.ca/brief` and `https://healtharchive.ca/cite`
 
 If you need to update public copy, edit the frontend assets above and deploy the frontend.
 
@@ -24,11 +24,11 @@ guidance evolves over time. It is not current guidance or medical advice.
 
 Suggested links:
 
-- Digest (RSS + overview): https://www.healtharchive.ca/digest
-- Changes feed: https://www.healtharchive.ca/changes
-- One-page brief: https://www.healtharchive.ca/brief
-- Citation guidance: https://www.healtharchive.ca/cite
-- Methods and scope: https://www.healtharchive.ca/methods
+- Digest (RSS + overview): https://healtharchive.ca/digest
+- Changes feed: https://healtharchive.ca/changes
+- One-page brief: https://healtharchive.ca/brief
+- Citation guidance: https://healtharchive.ca/cite
+- Methods and scope: https://healtharchive.ca/methods
 
 ---
 

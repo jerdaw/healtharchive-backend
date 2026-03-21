@@ -21,6 +21,7 @@
 - Local testing flows (recommended): `live-testing.md`
 - Local + VPS setup (recommended): `dev-environment-setup.md`
 - Backend testing conventions: `testing-guidelines.md`
+- Coverage policy and workflows: `test-coverage.md`
 - Development playbooks (task workflows): `playbooks/README.md`
 
 ## Code Annotations (Demo)

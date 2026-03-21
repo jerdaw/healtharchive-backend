@@ -24,8 +24,8 @@ Would you consider adding HealthArchive.ca to your digital scholarship or
 public health methods resources page? The easiest option is to link to our
 changes feed or digest:
 
-- https://www.healtharchive.ca/changes
-- https://www.healtharchive.ca/digest
+- https://healtharchive.ca/changes
+- https://healtharchive.ca/digest
 
 If helpful, I can send a short one-page brief and screenshots.
 
@@ -68,8 +68,8 @@ advice.
 
 If this could be useful to your work, the digest and changes feed are here:
 
-- https://www.healtharchive.ca/changes
-- https://www.healtharchive.ca/digest
+- https://healtharchive.ca/changes
+- https://healtharchive.ca/digest
 
 I can share a brief overview and citation guidance if helpful.
 
@@ -90,7 +90,7 @@ change tracking. It is not current guidance or medical advice.
 
 If it is useful, the quickest addition is a link to:
 
-- https://www.healtharchive.ca/digest
+- https://healtharchive.ca/digest
 
 Thanks again for considering it.
 

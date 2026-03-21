@@ -42,8 +42,8 @@ Suggested fields:
 ### 2) Prepare partner-ready assets (public)
 
 - Confirm these pages are accurate and up-to-date:
-  - `https://www.healtharchive.ca/brief`
-  - `https://www.healtharchive.ca/cite`
+  - `https://healtharchive.ca/brief`
+  - `https://healtharchive.ca/cite`
 - (Optional) Capture screenshots using `../../partner-kit.md` so you can attach them.
 
 ### 3) Build a target list (operator-only)

@@ -4,7 +4,7 @@ This doc explains how we imported **existing crawl data** (originally used to
 produce `.zim` files) into the **HealthArchive backend** so it shows up in:
 
 - `https://api.healtharchive.ca` (search, sources, viewer)
-- `https://www.healtharchive.ca/archive` (live results)
+- `https://healtharchive.ca/archive` (live results)
 
 ## Important clarification: we did not “import the `.zim` files”
 
@@ -235,8 +235,8 @@ curl -s "https://api.healtharchive.ca/api/sources"
 
 In the browser (frontend):
 
-- `https://www.healtharchive.ca/archive` should show a large snapshot count and real results.
-- Clicking “View snapshot” should open `https://www.healtharchive.ca/snapshot/<id>` and the embedded content should load from:
+- `https://healtharchive.ca/archive` should show a large snapshot count and real results.
+- Clicking “View snapshot” should open `https://healtharchive.ca/snapshot/<id>` and the embedded content should load from:
   - `https://api.healtharchive.ca/api/snapshots/raw/<id>`
 
 Optional single command (VPS; requires CIHR to be imported/indexed if you ask for it):

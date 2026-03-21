@@ -11,7 +11,7 @@ Canonical references:
 
 ## Secrets discipline (always)
 
-- Store secrets only in VPS/Vercel env (or a secret manager), never in git.
+- Store secrets only in VPS-managed env files or a secret manager, never in git.
   - `HEALTHARCHIVE_ADMIN_TOKEN`
   - DB URL/password
   - Healthchecks ping URLs
