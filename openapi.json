@@ -1040,73 +1040,10 @@
       }
     },
     "/api/sources/{source_code}/preview": {
-      "head": {
-        "summary": "Get Source Preview",
-        "description": "Return a cached preview image for a source's replay homepage.\n\nThese previews are generated out-of-band (e.g. via an operator script) and\nstored on disk under HEALTHARCHIVE_REPLAY_PREVIEW_DIR.",
-        "operationId": "get_source_preview_api_sources__source_code__preview_head",
-        "parameters": [
-          {
-            "name": "source_code",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "title": "Source Code"
-            }
-          },
-          {
-            "name": "jobId",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "minimum": 1,
-              "title": "Jobid"
-            }
-          },
-          {
-            "name": "lang",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string",
-                  "pattern": "^(en|fr)$"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Lang"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Successful Response",
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        }
-      },
       "get": {
         "summary": "Get Source Preview",
         "description": "Return a cached preview image for a source's replay homepage.\n\nThese previews are generated out-of-band (e.g. via an operator script) and\nstored on disk under HEALTHARCHIVE_REPLAY_PREVIEW_DIR.",
-        "operationId": "get_source_preview_api_sources__source_code__preview_head",
+        "operationId": "get_source_preview_api_sources__source_code__preview_get",
         "parameters": [
           {
             "name": "source_code",
