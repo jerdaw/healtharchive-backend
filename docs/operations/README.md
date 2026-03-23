@@ -19,6 +19,12 @@
 | Monitor health | [Monitoring](monitoring-and-ci-checklist.md) |
 | Quarterly tasks | [Restore Test](playbooks/validation/restore-test.md), [Dataset Release](dataset-release-runbook.md) |
 
+Operational default:
+
+- For incidents that require backend behavior changes, use a repo-first workflow:
+  classify, patch in repo, commit, push, pinned deploy, verify live code, then
+  recover.
+
 ## All Operational Documentation
 
 - Ops playbooks (task-oriented checklists): `playbooks/README.md`

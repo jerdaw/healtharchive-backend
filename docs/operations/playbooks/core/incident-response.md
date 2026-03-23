@@ -23,6 +23,25 @@ As soon as you suspect this is “an incident” (not routine maintenance), star
 
 If you can’t easily edit the repo on the VPS, capture the note in a local scratchpad and copy it into the repo later.
 
+## Operating rule: repo-first remediation
+
+When an incident appears to require a backend behavior change, source-profile
+change, scope fix, watchdog change, or CLI reconciliation fix, do not jump
+straight from diagnosis into VPS recovery commands.
+
+Use this order instead:
+
+1. Classify the incident first (storage, stale state, scope/config drift, or crawler/site compatibility).
+2. If the fix lives in the repo, make the change in the repo first.
+3. Commit and push the change.
+4. Deploy a pinned ref on the VPS via `deploy-and-verify.md`.
+5. Verify the VPS checkout contains the intended change.
+6. Only then run reconcile/recover/restart commands that depend on that fix.
+
+This project is an archive, not a just-keep-it-running service. Prefer one
+auditable, versioned fix plus one controlled recovery over repeated ad hoc
+retries against stale code.
+
 ## When the site/API looks broken
 
 1. Confirm what’s failing (public surface):
@@ -44,10 +63,13 @@ If the worker is running but jobs never advance, check for a job stuck in
    - `set -a; source /etc/healtharchive/backend.env; set +a`
 1. Inspect recent jobs:
    - `/opt/healtharchive-backend/.venv/bin/ha-backend list-jobs --limit 50`
-2. Recover stale running jobs (safe dry-run first):
+2. Decide whether recovery depends on undeployed repo changes:
+   - If yes, stop here and follow `deploy-and-verify.md` first.
+   - Verify the live checkout contains the intended change before continuing.
+3. Recover stale running jobs (safe dry-run first):
    - `/opt/healtharchive-backend/.venv/bin/ha-backend recover-stale-jobs --older-than-minutes 180`
    - Apply (sets `status=retryable`): `/opt/healtharchive-backend/.venv/bin/ha-backend recover-stale-jobs --older-than-minutes 180 --apply`
-3. Verify the worker picks them up:
+4. Verify the worker picks them up:
    - `sudo journalctl -u healtharchive-worker -n 200 --no-pager`
 
 ## If you need to deploy a fix

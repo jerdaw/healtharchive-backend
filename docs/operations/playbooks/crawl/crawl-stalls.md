@@ -50,6 +50,14 @@ If `crawled` is not increasing for a long time (often with repeated `Navigation 
 
 ## 3) Recovery (safe-by-default)
 
+Before running recovery commands, answer this first:
+
+- Is the proposed fix just operational recovery, or does it depend on a repo
+  change such as source scope updates, source-profile tuning, watchdog logic, or
+  reconcile behavior?
+- If it depends on a repo change, stop here. Commit, push, and deploy that fix
+  first, then verify the VPS checkout contains it before restarting the crawl.
+
 If you confirm the crawl is stalled and you want to restart it, do:
 
 ```bash
@@ -79,6 +87,7 @@ sudo journalctl -u healtharchive-worker.service -n 50 --no-pager
 ## Notes
 
 - `archive_tool` has built-in monitoring/adaptation; most stalls should self-heal, but this recovery is the “break glass” operator workflow.
+- Prefer one controlled restart after a deployed fix over repeated blind retries against the same live config.
 - Optional: you can enable the `healtharchive-crawl-auto-recover.timer` watchdog (sentinel: `/etc/healtharchive/crawl-auto-recover-enabled`) once you’re confident in the thresholds/caps.
 - To periodically validate the watchdog logic safely on production, run the drills in:
   - `crawl-auto-recover-drills.md`
@@ -90,3 +99,4 @@ sudo journalctl -u healtharchive-worker.service -n 50 --no-pager
   sudo bash -lc 'set -a; source /etc/healtharchive/backend.env; set +a; /opt/healtharchive-backend/.venv/bin/python3 /opt/healtharchive-backend/scripts/vps-crawl-auto-recover.py --apply --max-recoveries-per-job-per-day 4'
   ```
 - If stalls repeat for the same URL(s), consider narrowing scope rules or adjusting crawler timeouts in the source’s job configuration.
+  - For recurring source-specific failures, treat `job_registry.py` and annual reconciliation as the canonical fix path, not one-off VPS-only tweaks.
