@@ -61,6 +61,10 @@ jobs:
           esac
 
           files=$(printf '%s\n' "$files" | sed '/^$/d' | sort -u)
+          files=$(printf '%s\n' "$files" | while IFS= read -r file; do
+            [[ -z "$file" ]] && continue
+            [[ -f "$file" ]] && printf '%s\n' "$file"
+          done | sort -u)
 
           if [[ -z "$files" ]]; then
             echo "has_files=false" >> "$GITHUB_OUTPUT"
