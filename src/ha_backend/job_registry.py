@@ -59,13 +59,40 @@ _PHAC_PUBLIC_HEALTH_NOTICES_EXCLUDE_RX_BODY = (
     r"https://www[.]canada[.]ca/en/public-health/services/public-health-notices"
     r"(?:/[^?#]*)?(?:[?#].*)?"
 )
+_PHAC_TRAVEL_HEALTH_ARTESUNATE_EXCLUDE_RX_BODY = (
+    r"https://www[.]canada[.]ca/"
+    r"(?:"
+    r"en/public-health/services/travel-health/medical-access-artesunate-quinine-malaria-treatment[.]html"
+    r"|fr/sante-publique/services/sante-voyageurs/acces-medicale-a-artesunate-quinine-traitement-paludisme[.]html"
+    r")(?:[?#].*)?"
+)
+_PHAC_NACI_EXCLUDE_RX_BODY = (
+    r"https://www[.]canada[.]ca/en/public-health/services/immunization/"
+    r"national-advisory-committee-on-immunization-naci(?:/[^?#]*)?(?:[?#].*)?"
+)
+_PHAC_CCDR_EXCLUDE_RX_BODY = (
+    r"https://www[.]canada[.]ca/en/public-health/services/reports-publications/"
+    r"canada-communicable-disease-report-ccdr(?:/[^?#]*)?(?:[?#].*)?"
+)
+_PHAC_CANADIAN_IMMUNIZATION_GUIDE_EXCLUDE_RX_BODY = (
+    r"https://www[.]canada[.]ca/en/public-health/services/canadian-immunization-guide"
+    r"(?:/[^?#]*)?(?:[?#].*)?"
+)
 
 _CANADA_CA_BINARY_TOP_LEVEL_EXCLUDE_RX = rf"^(?:{_CANADA_CA_BINARY_TOP_LEVEL_EXCLUDE_RX_BODY})$"
 
 HC_CANADA_CA_SCOPE_EXCLUDE_RX = _CANADA_CA_BINARY_TOP_LEVEL_EXCLUDE_RX
 PHAC_CANADA_CA_SCOPE_EXCLUDE_RX = (
     rf"^(?:{_CANADA_CA_BINARY_TOP_LEVEL_EXCLUDE_RX_BODY}"
-    rf"|{_PHAC_PUBLIC_HEALTH_NOTICES_EXCLUDE_RX_BODY})$"
+    rf"|{_PHAC_PUBLIC_HEALTH_NOTICES_EXCLUDE_RX_BODY}"
+    # Temporary PHAC-only exclusions based on the 2026-03-23 content-cost and
+    # timeout diagnosis. These HTML families repeatedly dominated timeout churn
+    # and resume loops, so exclude them from frontier expansion while deeper
+    # canada.ca runtime compatibility work continues.
+    rf"|{_PHAC_TRAVEL_HEALTH_ARTESUNATE_EXCLUDE_RX_BODY}"
+    rf"|{_PHAC_NACI_EXCLUDE_RX_BODY}"
+    rf"|{_PHAC_CCDR_EXCLUDE_RX_BODY}"
+    rf"|{_PHAC_CANADIAN_IMMUNIZATION_GUIDE_EXCLUDE_RX_BODY})$"
 )
 
 

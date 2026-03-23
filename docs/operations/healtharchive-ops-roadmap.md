@@ -58,9 +58,15 @@ Treat the following as the current ops execution order:
 - PHAC follow-up is now repo-side investigation, not another live restart.
   - Current state: job `7` (`phac-20260101`) is parked `retryable` after a controlled restart with `--disable-http2` removed visible HTTP/2 thrash but did not restore crawl progress.
   - Current evidence: repeated resume-stage attempts, `.archive_state.json` updates, no parseable `crawlStatus`, and no new WARC mtimes.
+  - Diagnostic update (2026-03-23): the new content-cost report plus direct log review point to PHAC HTML/runtime churn, not broad binary/media frontier waste.
+    - Across the newest 120 combined logs, PHAC showed `3619` timeout signals concentrated under `en/public-health/services` and `fr/sante-publique/services`.
+    - Concrete repeated pathological targets include the travel-health artesunate page pair, the English NACI subtree, the English CCDR subtree, and the English Canadian Immunization Guide subtree.
+    - Current sampled WARC bytes remain dominated by normal pages/render assets rather than `.mp4`/dataset/document classes.
   - Next steps:
+    - deploy the temporary PHAC HTML-family exclusions backed by that diagnosis
     - deploy the `no_stats` stall fallback with a pinned ref
-    - verify the next PHAC retry surfaces an explicit monitored condition instead of silent `running`
+    - reconcile annual PHAC tool options on the VPS so job `7` picks up the new canonical scope exclude regex
+    - verify the next PHAC retry either makes measurable progress or surfaces an explicit monitored condition instead of silent `running`
     - continue the PHAC root-cause mitigation work in the repo before any further controlled restart
   - Do not do further blind PHAC recover/restart attempts from the VPS until that repo-side mitigation exists.
 - Maintenance window: complete the job lock-dir cutover by restarting services that read `/etc/healtharchive/backend.env`.

@@ -275,6 +275,21 @@ def test_canada_ca_scope_regexes_match_expected_urls() -> None:
         "https://www.canada.ca/en/public-health/services/public-health-notices/2015/public-health-notice-outbreak-e-coli-infections.html"
     )
     assert phac_exclude_rx.match(
+        "https://www.canada.ca/en/public-health/services/travel-health/medical-access-artesunate-quinine-malaria-treatment.html"
+    )
+    assert phac_exclude_rx.match(
+        "https://www.canada.ca/fr/sante-publique/services/sante-voyageurs/acces-medicale-a-artesunate-quinine-traitement-paludisme.html"
+    )
+    assert phac_exclude_rx.match(
+        "https://www.canada.ca/en/public-health/services/immunization/national-advisory-committee-on-immunization-naci/research-priorities-covid-19-vaccines.html"
+    )
+    assert phac_exclude_rx.match(
+        "https://www.canada.ca/en/public-health/services/reports-publications/canada-communicable-disease-report-ccdr/monthly-issue/2018-44/issue-9-september-6-2018/article-6-2018-naci-update-herpes-zoster-vaccines.html"
+    )
+    assert phac_exclude_rx.match(
+        "https://www.canada.ca/en/public-health/services/canadian-immunization-guide/updates.html"
+    )
+    assert phac_exclude_rx.match(
         "https://www.canada.ca/fr/sante-publique/services/publications/example.mp4#section"
     )
     assert not phac_exclude_rx.match(
