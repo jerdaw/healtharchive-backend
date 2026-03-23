@@ -12,20 +12,23 @@ Canonical references:
 
 - CI is green on the commit you intend to deploy.
 - You are on the production VPS and can `sudo`.
+- If an incident fix depends on repository changes, make sure those changes are already committed and pushed before you start the VPS procedure.
 
 ## Procedure
 
-1. Update the repo on the VPS:
+1. Identify the exact commit to deploy.
 
-   - `cd /opt/healtharchive-backend && git pull`
+   - Prefer a pinned deploy ref for incident work so the VPS change is unambiguous.
+   - Verify the commit is already present on `origin/main` before running the VPS deploy.
 
 2. Run the deploy gate (recommended one command):
 
-   - `./scripts/vps-deploy.sh --apply --baseline-mode live`
+   - `cd /opt/healtharchive-backend && ./scripts/vps-deploy.sh --apply --baseline-mode live`
+   - Or pinned: `cd /opt/healtharchive-backend && ./scripts/vps-deploy.sh --apply --baseline-mode live --ref <GIT_SHA>`
 
    Recommended wrapper (routine use):
 
-   - `./scripts/vps-hetzdeploy.sh`
+   - `cd /opt/healtharchive-backend && ./scripts/vps-hetzdeploy.sh`
 
    This includes:
 
@@ -50,6 +53,8 @@ Canonical references:
 
    Notes:
 
+   - Do **not** run `git pull` separately as a substitute for the deploy helper. Use the deploy helper to fetch, install dependencies, run migrations, and restart the right services coherently.
+   - If the operator is following assistant-provided incident commands, do not continue to repo-dependent recovery steps until the deploy output confirms the intended ref is active.
    - Prefer a real command over an alias; aliases can accidentally persist `set -euo pipefail` in your interactive shell.
    - If `hetzdeploy --mode backend-only` errors with `syntax error near unexpected token`, you probably still have an alias named `hetzdeploy`.
      - Check: `type hetzdeploy`
