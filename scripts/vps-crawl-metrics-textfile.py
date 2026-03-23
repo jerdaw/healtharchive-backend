@@ -16,6 +16,7 @@ from typing import Iterable
 from archive_tool.constants import STATE_FILE_NAME
 from ha_backend.crawl_stats import (
     count_new_crawl_phase_events_from_log_tail,
+    count_resume_crawl_events_from_log_tail,
     parse_crawl_log_progress,
 )
 from ha_backend.db import get_session
@@ -611,6 +612,11 @@ def main(argv: list[str] | None = None) -> int:
     _emit(lines, "# TYPE healtharchive_crawl_running_job_new_crawl_phase_count gauge")
     _emit(
         lines,
+        "# HELP healtharchive_crawl_running_job_resume_crawl_count Number of 'Resume Crawl' stage starts seen in the combined log tail window, or -1 when unknown.",
+    )
+    _emit(lines, "# TYPE healtharchive_crawl_running_job_resume_crawl_count gauge")
+    _emit(
+        lines,
         "# HELP healtharchive_crawl_running_job_errors_timeout Timeout error count from .archive_state.json, or -1 when unknown.",
     )
     _emit(lines, "# TYPE healtharchive_crawl_running_job_errors_timeout gauge")
@@ -722,6 +728,7 @@ def main(argv: list[str] | None = None) -> int:
         stalled = 0
         crawl_rate_ppm = -1.0
         new_crawl_phase_count = -1
+        resume_crawl_count = -1
         if log_path is not None:
             try:
                 progress = parse_crawl_log_progress(log_path, max_bytes=int(args.max_log_bytes))
@@ -744,6 +751,11 @@ def main(argv: list[str] | None = None) -> int:
             )
             if new_phase_count is not None:
                 new_crawl_phase_count = int(new_phase_count)
+            resume_count = count_resume_crawl_events_from_log_tail(
+                log_path, max_bytes=int(args.max_log_bytes)
+            )
+            if resume_count is not None:
+                resume_crawl_count = int(resume_count)
 
         state_file_ok = 0
         state_file_errno = 0
@@ -824,6 +836,10 @@ def main(argv: list[str] | None = None) -> int:
         _emit(
             lines,
             f"healtharchive_crawl_running_job_new_crawl_phase_count{{{labels}}} {new_crawl_phase_count}",
+        )
+        _emit(
+            lines,
+            f"healtharchive_crawl_running_job_resume_crawl_count{{{labels}}} {resume_crawl_count}",
         )
         _emit(lines, f"healtharchive_crawl_running_job_output_dir_ok{{{labels}}} {output_dir_ok}")
         _emit(

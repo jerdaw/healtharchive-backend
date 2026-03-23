@@ -16,6 +16,7 @@ logger = logging.getLogger("healtharchive.crawl_stats")
 CrawlStatusLogContext = "crawlStatus"
 CrawlStatusLogMessage = "Crawl statistics"
 NewCrawlPhaseStageToken = "Starting Loop Iteration: Stage 'New Crawl Phase"
+ResumeCrawlStageToken = "Starting Loop Iteration: Stage 'Resume Crawl"
 
 
 def _parse_utc_timestamp(raw: str | None) -> datetime | None:
@@ -196,6 +197,40 @@ def count_new_crawl_phase_events_from_log_tail(
     count = 0
     for line in tail.splitlines():
         if NewCrawlPhaseStageToken in line:
+            count += 1
+    return count
+
+
+def count_resume_crawl_events_from_log_tail(
+    log_path: Path, *, max_bytes: int = 1024 * 1024
+) -> int | None:
+    """
+    Count "Resume Crawl" stage starts from the tail of a combined crawl log.
+
+    Returns:
+      - count >= 0 when the log was readable
+      - None when the log could not be probed/read
+    """
+    if not log_path:
+        return None
+    try:
+        if not log_path.is_file():
+            return None
+    except OSError as exc:
+        logger.debug("Failed to stat crawl log path %s: %s", log_path, exc)
+        return None
+
+    try:
+        with open(log_path, "rb") as f:
+            f.seek(max(0, log_path.stat().st_size - max_bytes))
+            tail = f.read().decode("utf-8", errors="replace")
+    except Exception as exc:  # pragma: no cover - defensive
+        logger.debug("Failed to read crawl log tail from %s: %s", log_path, exc)
+        return None
+
+    count = 0
+    for line in tail.splitlines():
+        if ResumeCrawlStageToken in line:
             count += 1
     return count
 

@@ -187,7 +187,18 @@ if [[ -x "${HA_BIN}" ]]; then
         if have_cmd rg; then
           echo ""
           echo "[crawlStatus tail]"
-          rg -n '"context":"crawlStatus"' "${LOG}" | tail -n 3 || true
+          crawl_status_tail="$(rg -n '"context":"crawlStatus"' "${LOG}" | tail -n 3 || true)"
+          if [[ -n "${crawl_status_tail}" ]]; then
+            echo "${crawl_status_tail}"
+          else
+            echo "WARN no crawlStatus entries found in latest combined log"
+          fi
+          stage_tail="$(rg -n "Starting Loop Iteration: Stage 'Resume Crawl|Starting Loop Iteration: Stage 'New Crawl Phase" "${LOG}" | tail -n 5 || true)"
+          if [[ -n "${stage_tail}" ]]; then
+            echo ""
+            echo "[stage iteration tail]"
+            echo "${stage_tail}"
+          fi
           echo ""
           echo "[recent timeouts (last ${RECENT_LINES} log lines)]"
           # Keep this "recent" to avoid confusing operators with old matches in large logs.

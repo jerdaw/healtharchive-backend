@@ -6,6 +6,7 @@ from pathlib import Path
 
 from ha_backend.crawl_stats import (
     count_new_crawl_phase_events_from_log_tail,
+    count_resume_crawl_events_from_log_tail,
     parse_crawl_log_progress,
 )
 
@@ -99,6 +100,26 @@ def test_count_new_crawl_phase_events_from_log_tail_counts_occurrences(tmp_path:
     )
 
     count = count_new_crawl_phase_events_from_log_tail(log_path)
+    assert count == 2
+
+
+def test_count_resume_crawl_events_from_log_tail_counts_occurrences(tmp_path: Path) -> None:
+    log_path = tmp_path / "archive_resume_crawl_1.combined.log"
+    log_path.write_text(
+        "\n".join(
+            [
+                "2026-02-06 00:00:00 [INFO] Step 4: Entering Main Crawl/Resume Loop",
+                "2026-02-06 00:00:01 [INFO] --- Starting Loop Iteration: Stage 'Initial Crawl - Attempt 1' ---",
+                "2026-02-06 00:10:01 [INFO] --- Starting Loop Iteration: Stage 'Resume Crawl - Attempt 2' ---",
+                "2026-02-06 00:20:01 [INFO] --- Starting Loop Iteration: Stage 'Resume Crawl - Attempt 3' ---",
+                "2026-02-06 00:30:01 [INFO] --- Starting Loop Iteration: Stage 'New Crawl Phase - Attempt 4' ---",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    count = count_resume_crawl_events_from_log_tail(log_path)
     assert count == 2
 
 

@@ -102,6 +102,7 @@ def test_metrics_emits_archive_state_counters(tmp_path, monkeypatch) -> None:
     assert f"healtharchive_crawl_running_job_vpn_rotations_done{{{labels}}} 0" in content
     assert f"healtharchive_crawl_running_job_temp_dirs_count{{{labels}}} 2" in content
     assert f"healtharchive_crawl_running_job_new_crawl_phase_count{{{labels}}} 2" in content
+    assert f"healtharchive_crawl_running_job_resume_crawl_count{{{labels}}} 1" in content
 
 
 def test_metrics_emits_indexing_pending_job_age(tmp_path, monkeypatch) -> None:
