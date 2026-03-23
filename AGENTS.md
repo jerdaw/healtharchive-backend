@@ -52,6 +52,16 @@ When you're doing anything beyond tiny local changes, **open those docs and sync
 
 Only the human operator has direct VPS access. All VPS operations must be performed by the operator.
 
+### VPS command sequencing guardrail
+
+- If your suggested VPS remediation depends on repository changes that are only present locally, **do not** tell the operator to run the VPS-side remediation yet.
+- First make it explicit that the change must be:
+  1. committed locally,
+  2. pushed to the remote, and
+  3. deployed on the VPS (prefer the standard pinned-ref deploy helper),
+  before any VPS commands that rely on the new code/config are run.
+- When in doubt, verify the deployed VPS checkout contains the expected code change (for example with `rg` against the relevant source file) before telling the operator to run recovery/reconcile commands.
+
 ---
 
 ## Dev environment & commands

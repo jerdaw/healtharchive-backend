@@ -68,6 +68,12 @@ Interpretation:
 
 ## Recovery
 
+Before running any recovery command below, confirm whether the proposed fix depends
+on backend repo changes (for example: new scope filters, updated reconcile logic,
+or changed worker/watchdog behavior). If it does, deploy that repo change on the
+VPS first and verify the live checkout contains it before proceeding. Do not run
+reconcile/recover commands against an undeployed fix.
+
 ### Storage branch
 
 If the evidence shows hot-path storage failures (`Errno 107`, unreadable
