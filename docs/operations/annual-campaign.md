@@ -147,20 +147,13 @@ Out of scope (examples):
 -   `https://www.canada.ca/en/government/`
 -   Temporary operational exclusion (2026-03-21): `https://www.canada.ca/en/public-health/services/public-health-notices/`
     and descendants are excluded from the crawl queue. The original trigger was
-    sustained `net::ERR_HTTP2_PROTOCOL_ERROR` churn there, and the follow-up
-    2026-03-23 compatibility deploy (`--disable-http2`) still did not restore
-    measurable PHAC progress. Revisit only after the broader no-progress
-    resume-loop issue is understood.
+    sustained `net::ERR_HTTP2_PROTOCOL_ERROR` churn there. A short-lived
+    2026-03-23 attempt to force Browsertrix `--disable-http2` was later rolled
+    back after the live zimit image proved incompatible with that passthrough
+    during its `warc2zim` preflight step. Revisit only after the broader
+    no-progress resume-loop issue is understood.
 -   Any other `https://www.canada.ca/<lang>/...` that is not the hub page or under
     the allowed prefixes above.
-
-Operational compatibility note (2026-03-23):
-
--   HC/PHAC source profiles now pass Browsertrix `--extraChromeArgs --disable-http2`
-    to the crawler for canada.ca annual jobs. This is a source-profile
-    compatibility workaround for repeated document-level HTTP/2 protocol
-    failures and is intended to preserve completeness better than repeated
-    manual recoveries or broad new exclusions.
 
 #### CIHR (`cihr`) — `cihr-irsc.gc.ca`
 

@@ -53,7 +53,7 @@ def test_compute_scope_args_rewrites_legacy_hc_scope() -> None:
         "--scopeExcludeRx",
         HC_CANADA_CA_SCOPE_EXCLUDE_RX,
     ]
-    assert normalized[6:] == ["--extraChromeArgs", "--disable-http2", "--customFlag", "value"]
+    assert normalized[6:] == ["--customFlag", "value"]
 
 
 def test_compute_scope_args_noop_when_phac_scope_is_canonical() -> None:
@@ -65,8 +65,6 @@ def test_compute_scope_args_noop_when_phac_scope_is_canonical() -> None:
         PHAC_CANADA_CA_SCOPE_INCLUDE_RX,
         "--scopeExcludeRx",
         PHAC_CANADA_CA_SCOPE_EXCLUDE_RX,
-        "--extraChromeArgs",
-        "--disable-http2",
     ]
     job = ArchiveJob(
         name="phac-20260101",

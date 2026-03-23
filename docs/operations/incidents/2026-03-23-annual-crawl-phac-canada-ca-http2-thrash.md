@@ -20,7 +20,7 @@ The annual PHAC crawl (`job_id=7`) entered a sustained failure loop on `www.cana
 
 We first confirmed that the deployed backend was missing the repo-side PHAC scope reconciliation fix, then deployed that fix and reconciled the live PHAC job config. A controlled PHAC-only restart picked up the corrected scope exclusion, but the crawl still flatlined, so a broader source-profile compatibility fix (`--extraChromeArgs --disable-http2`) was prepared, deployed, and verified in the live PHAC process.
 
-That compatibility change appears to have removed the visible HTTP/2 thrash, but it still did not restore measurable crawl progress. PHAC remained in a misleading `status=running` state with `.archive_state.json` updating and repeated resume-stage attempts, yet no parseable `crawlStatus`, no new WARC mtimes, and no non-zero crawl rate. The job was parked as `retryable` pending repo-side investigation.
+Follow-up log review later showed that compatibility change was itself invalid for the deployed zimit image: each restart failed during zimit's `warc2zim` preflight with `unrecognized arguments: --extraChromeArgs --disable-http2`. PHAC was then paused pending a rollback of that incompatible passthrough. The longer-term PHAC diagnosis still points to HTML/runtime churn on specific canada.ca families, but the immediate resume-stage `RC=2` failures were self-inflicted by the passthrough flag.
 
 The immediate repo-side follow-up was to harden `archive_tool` monitoring so a
 stage that emits no `crawlStatus` for a full stall window is treated as an
@@ -69,6 +69,8 @@ the underlying PHAC no-progress behavior.
 - 2026-03-23T12:55:29Z — Status snapshot showed no recent HTTP/2/timeouts, but also no parseable `crawlStatus` and no measurable progress (`progress_known=0`, `crawl_rate_ppm=-1`).
 - 2026-03-23T13:12:30Z — Follow-up snapshot still showed no progress and no new WARC mtimes while the state file kept updating and the latest log had advanced to `archive_resume_crawl_-_attempt_8_...`.
 - 2026-03-23T13:18:16Z — PHAC job 7 was parked as `retryable` again pending repo-side investigation.
+- 2026-03-23T18:57:26Z — Direct inspection of the newest PHAC resume log showed `zimit: error: unrecognized arguments: --extraChromeArgs --disable-http2` during the `warc2zim` preflight check.
+- 2026-03-23T19:xx:xxZ — Repo-side rollback prepared to remove the incompatible HC/PHAC Browsertrix passthrough from canonical annual source config.
 - 2026-03-23Txx:xx:xxZ — Repo-side monitor hardening was implemented so stages
   that emit no `crawlStatus` for a full stall window now trigger
   `{"status": "stalled", "reason": "no_stats"}` instead of remaining silently
@@ -77,8 +79,8 @@ the underlying PHAC no-progress behavior.
 ## Root cause
 
 - Immediate trigger: repeated document-level HTTP/2 protocol failures on canada.ca pages prevented PHAC from making useful crawl progress.
+- Secondary trigger introduced during mitigation: the deployed zimit image rejected `--extraChromeArgs --disable-http2` during its `warc2zim` preflight step, causing immediate `RC=2` failures before crawl startup.
 - Underlying cause(s): current Browsertrix/chromium transport behavior appears incompatible with some canada.ca annual PHAC pages under the existing source profile; the single `public-health-notices` exclusion was not sufficient to restore progress.
-- Follow-up hypothesis after the `--disable-http2` deploy: the crawler may now be falling into repeated resume-stage churn without emitting parseable `crawlStatus` or producing new WARC output, leaving ops metrics with only a weak "running but unknown" signal.
 - Control-plane gap discovered during follow-up: the monitor only treated
   "known progress went stale" as a stall, so stages that emitted no
   `crawlStatus` at all could avoid intervention indefinitely until the
@@ -106,8 +108,8 @@ Completed after the initial draft:
 - Deployed the repo-side HC/PHAC source-profile compatibility change adding Browsertrix `--extraChromeArgs --disable-http2`.
 - Reconciled the live HC/PHAC annual job configs in production.
 - Relaunched PHAC and verified the live process included `--extraChromeArgs --disable-http2`.
-- Observed that the HTTP/2 error storm stopped, but the crawler still failed to produce measurable progress.
-- Parked PHAC as `retryable` again rather than allowing repeated blind restarts.
+- Identified that the compatibility change itself was invalid for the deployed zimit image because `warc2zim` preflight rejected those flags.
+- Paused PHAC again rather than allowing repeated blind restarts.
 - Implemented repo-side monitor hardening so stages that emit no `crawlStatus`
   for an entire stall window now trigger a `no_stats` intervention path.
 
@@ -121,26 +123,27 @@ Completed so far:
 
 Still required:
 
-- Determine why PHAC can cycle through resume attempts without parseable `crawlStatus` or new WARC mtimes.
-- Deploy the new `no_stats` stall fallback before the next controlled PHAC retry.
+- Roll back the incompatible HC/PHAC `--disable-http2` passthrough in production and reconcile the live annual jobs.
+- Re-test PHAC once with the narrowed PHAC HTML-family exclusions but without the broken Browsertrix passthrough.
 - Decide whether the temporary `public-health-notices` exclusion remains justified once the deeper crawler/runtime issue is understood.
-- Design the next repo-side mitigation before any further VPS recovery attempts.
+- Design the next repo-side mitigation only after that corrected rerun.
 
 ## Open questions (still unknown)
 
 - Why does PHAC keep touching `.archive_state.json` and advancing resume-attempt logs without surfacing any `crawlStatus` or new WARC output?
-- Once the compatibility flag is live, is the temporary `public-health-notices` exclusion still necessary?
-- Should HC pick up the same compatibility flag immediately through annual reconciliation, even if HC is not currently failing on the same pattern?
+- Once the broken compatibility flag is removed, is the temporary `public-health-notices` exclusion still necessary?
+- After rollback, does PHAC return to the original timeout families or resume successfully with the narrowed exclusions?
 
 ## Action items (TODOs)
 
 - [x] Deploy the HC/PHAC Browsertrix compatibility change with a pinned ref and verify the VPS checkout contains `--disable-http2`. (priority=high)
 - [x] Reconcile annual HC/PHAC job configs in production and confirm `show-job --id 6/7` reflect the canonical passthrough args. (priority=high)
 - [x] Perform one controlled PHAC restart with the new compatibility config and record the outcome in this note. (priority=high)
+- [ ] Roll back the incompatible HC/PHAC `--disable-http2` passthrough with a pinned deploy and annual reconciliation. (priority=high)
 - [x] Improve ops visibility for repeated `Resume Crawl` churn without `crawlStatus` so this state is obvious in VPS snapshots and metrics. (priority=medium)
 - [x] Add a repo-side `archive_tool` monitor fallback so a stage with no `crawlStatus` for the full stall window triggers an explicit `no_stats` intervention instead of silently hanging. (priority=medium)
 - [ ] Decide whether the temporary PHAC `public-health-notices` exclusion can be removed after live verification. (priority=medium)
-- [ ] If PHAC still flatlines after the compatibility change, capture the current no-progress failure mode and design a follow-up mitigation. (priority=medium)
+- [ ] If PHAC still flatlines after the rollback, capture the current no-progress failure mode and design a follow-up mitigation. (priority=medium)
 
 ## Automation opportunities
 

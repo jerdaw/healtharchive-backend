@@ -282,8 +282,6 @@ def test_reconcile_annual_tool_options_applies_canonical_scope_filters_for_phac(
             "--scopeExcludeRx",
             PHAC_CANADA_CA_SCOPE_EXCLUDE_RX,
             "--extraChromeArgs",
-            "--disable-http2",
-            "--extraChromeArgs",
             "--disable-quic",
             "--customFlag",
             "value",

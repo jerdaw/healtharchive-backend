@@ -54,7 +54,11 @@ PHAC_CANADA_CA_SCOPE_INCLUDE_RX = (
 _CANADA_CA_BINARY_TOP_LEVEL_EXCLUDE_RX_BODY = (
     r"https://www[.]canada[.]ca/.*[.](?:pdf|mp4|zip|docx?|pptx?|xlsx?)(?:[?#].*)?"
 )
-_CANADA_CA_EXTRA_CHROME_ARGS = ("--disable-http2",)
+# The deployed zimit image currently forwards ``--extraChromeArgs`` into its
+# warc2zim preflight check, which causes immediate RC=2 failures before crawl
+# startup. Keep the canonical canada.ca profiles free of Browsertrix chrome
+# passthrough args until that upstream/container behavior changes.
+_CANADA_CA_EXTRA_CHROME_ARGS: tuple[str, ...] = ()
 _PHAC_PUBLIC_HEALTH_NOTICES_EXCLUDE_RX_BODY = (
     r"https://www[.]canada[.]ca/en/public-health/services/public-health-notices"
     r"(?:/[^?#]*)?(?:[?#].*)?"
@@ -187,6 +191,13 @@ def reconcile_scope_passthrough_args(
     return normalized, normalized != existing_args
 
 
+def _canonical_extra_chrome_passthrough_tokens() -> list[str]:
+    tokens: list[str] = []
+    for value in _CANADA_CA_EXTRA_CHROME_ARGS:
+        tokens.extend(["--extraChromeArgs", value])
+    return tokens
+
+
 @dataclass
 class SourceJobConfig:
     """
@@ -225,8 +236,7 @@ SOURCE_JOB_CONFIGS: Dict[str, SourceJobConfig] = {
             HC_CANADA_CA_SCOPE_INCLUDE_RX,
             "--scopeExcludeRx",
             HC_CANADA_CA_SCOPE_EXCLUDE_RX,
-            "--extraChromeArgs",
-            *_CANADA_CA_EXTRA_CHROME_ARGS,
+            *_canonical_extra_chrome_passthrough_tokens(),
         ],
         default_tool_options={
             "cleanup": False,
@@ -265,8 +275,7 @@ SOURCE_JOB_CONFIGS: Dict[str, SourceJobConfig] = {
             PHAC_CANADA_CA_SCOPE_INCLUDE_RX,
             "--scopeExcludeRx",
             PHAC_CANADA_CA_SCOPE_EXCLUDE_RX,
-            "--extraChromeArgs",
-            *_CANADA_CA_EXTRA_CHROME_ARGS,
+            *_canonical_extra_chrome_passthrough_tokens(),
         ],
         default_tool_options={
             "cleanup": False,

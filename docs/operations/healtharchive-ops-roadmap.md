@@ -33,8 +33,9 @@ Keep the two synced copies of this file aligned:
 - Annual output-dir mount topology is currently **unexpected** (direct `sshfs` mounts instead of bind mounts) for the active 2026 jobs.
   - We are intentionally deferring conversion to bind mounts until a maintenance window to avoid interrupting in-progress crawls.
 - PHAC annual crawl job 7 is no longer blocked on deploy/config drift.
-  - The scope reconciliation fix and `--extraChromeArgs --disable-http2` compatibility flag were both deployed and verified in the live PHAC process on 2026-03-23.
-  - The visible HTTP/2 error storm stopped, but PHAC still made no measurable progress and was parked as `retryable`.
+  - The scope reconciliation fix and the temporary PHAC HTML-family exclusions were both deployed and verified in the live PHAC process on 2026-03-23.
+  - The attempted HC/PHAC `--extraChromeArgs --disable-http2` compatibility workaround was later identified as a startup regression: the deployed zimit image forwards those flags into `warc2zim` preflight and exits `RC=2`.
+  - PHAC is currently paused pending a deploy/reconcile that removes the incompatible passthrough and then re-tests the narrowed PHAC scope.
   - Repo-side monitor hardening now exists for one part of the symptom: stages that emit no `crawlStatus` for a full stall window now trigger an explicit `no_stats` intervention instead of silently hanging.
 - Alerting noise-reduction tuning is deployed and verified:
   - Alertmanager routing is severity-aware (`critical` keeps resolved notifications, non-critical suppresses resolved and repeats less often).
@@ -55,20 +56,20 @@ Treat the following as the current ops execution order:
 
 ## Current ops tasks (implementation already exists; enable/verify)
 
-- PHAC follow-up is now repo-side investigation, not another live restart.
-  - Current state: job `7` (`phac-20260101`) is parked `retryable` after a controlled restart with `--disable-http2` removed visible HTTP/2 thrash but did not restore crawl progress.
-  - Current evidence: repeated resume-stage attempts, `.archive_state.json` updates, no parseable `crawlStatus`, and no new WARC mtimes.
+- PHAC follow-up is now repo-side investigation plus one corrected redeploy, not another blind live restart.
+  - Current state: job `7` (`phac-20260101`) is paused after resume-stage attempts repeatedly failed with `RC=2` before crawl startup.
+  - Current evidence: the newest combined logs show `zimit: error: unrecognized arguments: --extraChromeArgs --disable-http2` during the `warc2zim` preflight check.
   - Diagnostic update (2026-03-23): the new content-cost report plus direct log review point to PHAC HTML/runtime churn, not broad binary/media frontier waste.
     - Across the newest 120 combined logs, PHAC showed `3619` timeout signals concentrated under `en/public-health/services` and `fr/sante-publique/services`.
     - Concrete repeated pathological targets include the travel-health artesunate page pair, the English NACI subtree, the English CCDR subtree, and the English Canadian Immunization Guide subtree.
     - Current sampled WARC bytes remain dominated by normal pages/render assets rather than `.mp4`/dataset/document classes.
   - Next steps:
-    - deploy the temporary PHAC HTML-family exclusions backed by that diagnosis
-    - deploy the `no_stats` stall fallback with a pinned ref
-    - reconcile annual PHAC tool options on the VPS so job `7` picks up the new canonical scope exclude regex
-    - verify the next PHAC retry either makes measurable progress or surfaces an explicit monitored condition instead of silent `running`
-    - continue the PHAC root-cause mitigation work in the repo before any further controlled restart
-  - Do not do further blind PHAC recover/restart attempts from the VPS until that repo-side mitigation exists.
+    - deploy the rollback that removes canonical HC/PHAC `--extraChromeArgs --disable-http2`
+    - reconcile annual HC/PHAC tool options on the VPS so live jobs drop the incompatible passthrough
+    - restart PHAC once with the narrowed PHAC exclusions still in place
+    - verify whether PHAC now resumes into actual crawl activity or returns to URL-family timeout churn
+    - continue PHAC root-cause mitigation in the repo only after that corrected rerun
+  - Do not do further blind PHAC recover/restart attempts from the VPS until that rollback is deployed and reconciled.
 - Maintenance window: complete the job lock-dir cutover by restarting services that read `/etc/healtharchive/backend.env`.
   - This must wait until crawls are idle unless you explicitly accept interrupting them.
   - Plan + commands: `../planning/2026-02-06-crawl-operability-locks-and-retry-controls.md` (Phase 4)
