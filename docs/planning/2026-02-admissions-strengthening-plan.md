@@ -16,7 +16,7 @@
 | 1. External outreach (verifier/partner/advisory) | **Not started** | Mentions log empty; no outreach batch sent |
 | 1a. Fix source counts + coverage numbers | Unknown | Requires checking live `/api/stats` against public pages |
 | 1b. Portfolio narrative page (`/about` or `/brief`) | Unknown | `/brief` exists; quality and accuracy unchecked |
-| 1c. External uptime monitoring | **Not confirmed live** | UptimeRobot listed as setup guidance in `monitoring-and-ci-checklist.md` Step 3; no public badge or status history page confirmed present; roadmap items #32 and #33 still open |
+| 1c. External uptime monitoring | **Not confirmed live** | UptimeRobot listed as setup guidance in `../operations/monitoring-and-ci-checklist.md` Step 3; no public badge or status history page confirmed present; roadmap items #32 and #33 still open |
 | 1d. Ethics/governance on `/governance` | Unknown | Page exists; whether data retention and ethics content meets the bar for outreach is unchecked |
 | 2. Methods paper | Not started | Outline exists at `docs/operations/methods-note-outline.md` |
 | 3. Dataset release with Zenodo DOI | Unknown | Pipeline exists; whether a formal release with DOI has been published is unconfirmed |
