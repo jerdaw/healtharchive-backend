@@ -98,7 +98,7 @@ HealthArchive now uses a single app monorepo plus a separate datasets repo:
 
 - **App monorepo** (this repo): backend API, crawler, docs hub, and the in-tree frontend under `frontend/`
   - GitHub: [jerdaw/healtharchive](https://github.com/jerdaw/healtharchive)
-  - Docs: [docs.healtharchive.ca](https://docs.healtharchive.ca)
+  - Docs: [Documentation portal](https://jerdaw.github.io/healtharchive/)
   - Live Site: [healtharchive.ca](https://healtharchive.ca)
 
 - **Datasets**: Versioned data releases

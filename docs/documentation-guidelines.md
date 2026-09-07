@@ -5,7 +5,7 @@ monorepo and the separate datasets repo.
 
 ## Canonical sources
 
-- Docs portal (published): https://docs.healtharchive.ca
+- Docs portal (published): https://jerdaw.github.io/healtharchive/
 - Docs portal (local): Run `make docs-serve` in the backend repo root.
 - Current site navigation config: `mkdocs.yml` (current source of truth for
   sidebar structure; update this reference when the docs platform changes).
@@ -54,7 +54,7 @@ When referencing frontend paths or another repo from docs in this repo:
   ```
 
 - Treat cross-repo references as pointers. Do not copy text across repos unless it is an intentional public-safe excerpt.
-- Links to backend docs can use relative paths within this repo or `docs.healtharchive.ca` URLs.
+- Links to backend docs can use relative paths within this repo or URLs under `https://jerdaw.github.io/healtharchive/`.
 
 ### External pointer pages
 

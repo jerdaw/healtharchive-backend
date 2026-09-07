@@ -615,10 +615,10 @@ We use labels to organize issues:
 
 ### Resources
 
-- **Documentation**: [docs.healtharchive.ca](https://docs.healtharchive.ca)
-- **Architecture Guide**: [docs/architecture.md](https://docs.healtharchive.ca/architecture/)
-- **First Contribution Tutorial**: [docs/tutorials/first-contribution.md](https://docs.healtharchive.ca/tutorials/first-contribution/)
-- **API Reference**: [docs/api.md](https://docs.healtharchive.ca/api/)
+- **Documentation**: [Documentation portal](https://jerdaw.github.io/healtharchive/)
+- **Architecture Guide**: [docs/architecture.md](https://jerdaw.github.io/healtharchive/architecture/)
+- **First Contribution Tutorial**: [docs/tutorials/first-contribution.md](https://jerdaw.github.io/healtharchive/tutorials/first-contribution/)
+- **API Reference**: [docs/api.md](https://jerdaw.github.io/healtharchive/api/)
 
 ---
 
