@@ -2,154 +2,154 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
     <url>
          <loc>https://docs.healtharchive.ca/</loc>
-         <lastmod>2026-08-15</lastmod>
+         <lastmod>2026-09-07</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/api-consumer-guide/</loc>
-         <lastmod>2026-08-15</lastmod>
+         <lastmod>2026-09-07</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/api/</loc>
-         <lastmod>2026-08-15</lastmod>
+         <lastmod>2026-09-07</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/architecture/</loc>
-         <lastmod>2026-08-15</lastmod>
+         <lastmod>2026-09-07</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/contributing/</loc>
-         <lastmod>2026-08-15</lastmod>
+         <lastmod>2026-09-07</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/maintenance-audit/</loc>
-         <lastmod>2026-08-15</lastmod>
+         <lastmod>2026-09-07</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/datasets-external/</loc>
-         <lastmod>2026-08-15</lastmod>
+         <lastmod>2026-09-07</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/development/</loc>
-         <lastmod>2026-08-15</lastmod>
+         <lastmod>2026-09-07</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/development/dev-environment-setup/</loc>
-         <lastmod>2026-08-15</lastmod>
+         <lastmod>2026-09-07</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/development/live-testing/</loc>
-         <lastmod>2026-08-15</lastmod>
+         <lastmod>2026-09-07</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/development/test-coverage/</loc>
-         <lastmod>2026-08-15</lastmod>
+         <lastmod>2026-09-07</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/development/testing-guidelines/</loc>
-         <lastmod>2026-08-15</lastmod>
+         <lastmod>2026-09-07</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/development/playbooks/</loc>
-         <lastmod>2026-08-15</lastmod>
+         <lastmod>2026-09-07</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/development/playbooks/add-cli-command/</loc>
-         <lastmod>2026-08-15</lastmod>
+         <lastmod>2026-09-07</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/development/playbooks/database-migrations/</loc>
-         <lastmod>2026-08-15</lastmod>
+         <lastmod>2026-09-07</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/frontend/</loc>
-         <lastmod>2026-08-15</lastmod>
+         <lastmod>2026-09-07</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/frontend/accessibility-audit-2026-07-10/</loc>
-         <lastmod>2026-08-15</lastmod>
+         <lastmod>2026-09-07</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/frontend/accessibility/</loc>
-         <lastmod>2026-08-15</lastmod>
+         <lastmod>2026-09-07</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/frontend/changelog-process/</loc>
-         <lastmod>2026-08-15</lastmod>
+         <lastmod>2026-09-07</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/frontend/copy-glossary/</loc>
-         <lastmod>2026-08-15</lastmod>
+         <lastmod>2026-09-07</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/frontend/copy-inventory/</loc>
-         <lastmod>2026-08-15</lastmod>
+         <lastmod>2026-09-07</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/frontend/disclaimer-matrix/</loc>
-         <lastmod>2026-08-15</lastmod>
+         <lastmod>2026-09-07</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/frontend/i18n/</loc>
-         <lastmod>2026-08-15</lastmod>
+         <lastmod>2026-09-07</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/frontend/implementation-guide/</loc>
-         <lastmod>2026-08-15</lastmod>
+         <lastmod>2026-09-07</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/frontend/deployment/</loc>
-         <lastmod>2026-08-15</lastmod>
+         <lastmod>2026-09-07</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/frontend/deployment/bilingual-release-checklist/</loc>
-         <lastmod>2026-08-15</lastmod>
+         <lastmod>2026-09-07</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/frontend/deployment/verification/</loc>
-         <lastmod>2026-08-15</lastmod>
+         <lastmod>2026-09-07</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/frontend/development/</loc>
-         <lastmod>2026-08-15</lastmod>
+         <lastmod>2026-09-07</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/frontend/development/bilingual-dev-guide/</loc>
-         <lastmod>2026-08-15</lastmod>
+         <lastmod>2026-09-07</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/frontend/development/bilingual-maintenance/</loc>
-         <lastmod>2026-08-15</lastmod>
+         <lastmod>2026-09-07</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/frontend/development/dev-environment-setup/</loc>
-         <lastmod>2026-08-15</lastmod>
+         <lastmod>2026-09-07</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/frontend/development/testing-guidelines/</loc>
-         <lastmod>2026-08-15</lastmod>
+         <lastmod>2026-09-07</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/reference/archive-tool/</loc>
-         <lastmod>2026-08-15</lastmod>
+         <lastmod>2026-09-07</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/reference/cli-commands/</loc>
-         <lastmod>2026-08-15</lastmod>
+         <lastmod>2026-09-07</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/reference/data-model/</loc>
-         <lastmod>2026-08-15</lastmod>
+         <lastmod>2026-09-07</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/tutorials/architecture-walkthrough/</loc>
-         <lastmod>2026-08-15</lastmod>
+         <lastmod>2026-09-07</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/tutorials/debug-crawl/</loc>
-         <lastmod>2026-08-15</lastmod>
+         <lastmod>2026-09-07</lastmod>
     </url>
     <url>
          <loc>https://docs.healtharchive.ca/tutorials/first-contribution/</loc>
-         <lastmod>2026-08-15</lastmod>
+         <lastmod>2026-09-07</lastmod>
     </url>
 </urlset>

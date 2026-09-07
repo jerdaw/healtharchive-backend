@@ -822,6 +822,49 @@ The database stores lifecycle and researcher-facing metadata; WARCs remain the
 durable captured-content source for indexing and replay. Optional ZIM output is
 not a prerequisite for backend search readiness.
 
+#### Replay storage readiness contract
+
+Search metadata, a running replay process, and an HTTP-success replay root do
+not establish that archived pages can be replayed. Readiness requires the
+referenced WARC targets to be available in the serving process's filesystem
+view, followed by representative replay requests. A host mount alone does not
+prove container visibility or archive integrity.
+
+The deployment-owned serving manifest must enumerate every retained output
+root, including legacy jobs and annual jobs from earlier years. Each entry
+identifies the job, source, campaign year when applicable, canonical relative
+output root, and intended storage mapping. Entries must be unique and
+non-overlapping; removal or replacement requires an explicit continuity
+decision. A reviewed, versioned deterministic plan digest can authenticate the
+same exact mapping, but a hash computed from newly observed paths is not its
+own approval. Actual manifest values and deployment wiring remain private.
+
+The annual campaign tiering helper selects a campaign year and creation window
+for crawl preparation. An empty selection is not proof that retained replay
+data needs no mounts. It must not serve as an all-years boot-restoration
+inventory. Its mount identity check compares filesystem device, type, source,
+and relative mount root from one unambiguous mount-table sample; readable
+directories and a `bind` label alone are insufficient. Unproven identity on
+a readable mounted output is a failure, not permission to unmount it. The
+former unexpected-mount repair flag is retained for argument compatibility
+but cannot bypass this refusal.
+
+The required startup sequence is storage available, all registered serving
+mounts verified, then replay ready. Startup ordering alone is insufficient:
+the readiness dependency must fail closed on missing or wrong-source mounts,
+including partial restoration after reboot. Report legacy and annual coverage
+separately against the complete serving manifest; a successful legacy-only
+check must not imply total coverage. Re-prove the same source identities in
+the container, and check representative pages from each covered job.
+
+This is an acceptance contract, not a claim that all deployment enforcement
+has been installed. The application helper is not a no-data-change incident
+repair tool: its separately authorized crawl-preparation/repair modes retain
+broader capabilities. Tests use synthetic mount tables without mounting disks
+or reading archive bytes. Deployment-specific restoration, locking, rollback,
+and reboot/propagation acceptance belong to the private operations workspace;
+no worker restart, new capture, or dataset release follows from this contract.
+
 ### 1.3 Data flow overview
 
 1. **Job creation**:
