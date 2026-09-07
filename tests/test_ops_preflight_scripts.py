@@ -361,8 +361,12 @@ def test_vps_annual_output_tiering_detects_cold_archive_backed_bind_mount(monkey
     cold = Path("/srv/healtharchive/cold-archive/jobs/hc/20260101T000502Z__hc-20260101")
 
     def fake_mountinfo(path: Path) -> dict[str, str] | None:
+        if path == Path("/"):
+            return {"id": "1", "parent": "0", "target": "/"}
         if path == cold_archive:
             return {
+                "id": "20",
+                "parent": "1",
                 "major_minor": "0:64",
                 "root": "/",
                 "target": str(cold_archive),
@@ -371,6 +375,8 @@ def test_vps_annual_output_tiering_detects_cold_archive_backed_bind_mount(monkey
             }
         if path == hot:
             return {
+                "id": "21",
+                "parent": "1",
                 "major_minor": "0:64",
                 "root": "/jobs/hc/20260101T000502Z__hc-20260101",
                 "target": str(hot),
@@ -379,7 +385,11 @@ def test_vps_annual_output_tiering_detects_cold_archive_backed_bind_mount(monkey
             }
         return None
 
-    monkeypatch.setattr(mod, "_get_mountinfo_for_target", fake_mountinfo)
+    monkeypatch.setattr(
+        mod,
+        "_read_mountinfo",
+        lambda: [fake_mountinfo(Path("/")), fake_mountinfo(cold_archive), fake_mountinfo(hot)],
+    )
     is_expected_bind = getattr(mod, "_is_expected_cold_archive_bind_mount", None)
 
     assert is_expected_bind is not None
@@ -401,8 +411,12 @@ def test_vps_annual_output_tiering_rejects_direct_cold_archive_submount(monkeypa
     cold = Path("/srv/healtharchive/cold-archive/jobs/hc/20260101T000502Z__hc-20260101")
 
     def fake_mountinfo(path: Path) -> dict[str, str] | None:
+        if path == Path("/"):
+            return {"id": "1", "parent": "0", "target": "/"}
         if path == cold_archive:
             return {
+                "id": "20",
+                "parent": "1",
                 "major_minor": "0:64",
                 "root": "/",
                 "target": str(cold_archive),
@@ -411,6 +425,8 @@ def test_vps_annual_output_tiering_rejects_direct_cold_archive_submount(monkeypa
             }
         if path == hot:
             return {
+                "id": "21",
+                "parent": "1",
                 "major_minor": "0:65",
                 "root": "/",
                 "target": str(hot),
@@ -419,7 +435,11 @@ def test_vps_annual_output_tiering_rejects_direct_cold_archive_submount(monkeypa
             }
         return None
 
-    monkeypatch.setattr(mod, "_get_mountinfo_for_target", fake_mountinfo)
+    monkeypatch.setattr(
+        mod,
+        "_read_mountinfo",
+        lambda: [fake_mountinfo(Path("/")), fake_mountinfo(cold_archive), fake_mountinfo(hot)],
+    )
     is_expected_bind = getattr(mod, "_is_expected_cold_archive_bind_mount", None)
 
     assert is_expected_bind is not None
