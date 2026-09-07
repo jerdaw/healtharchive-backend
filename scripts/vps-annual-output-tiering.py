@@ -16,6 +16,8 @@ from ha_backend.db import get_session
 from ha_backend.models import ArchiveJob, Source
 
 _MOUNTINFO_ESCAPE_RX = re.compile(r"\\([0-7]{3})")
+_MOUNTINFO_MAX_BYTES = 1024 * 1024
+_MOUNTINFO_PATH = Path("/proc/self/mountinfo")
 
 
 def _now_year_utc() -> int:
@@ -26,46 +28,97 @@ def _decode_mountinfo_path(value: str) -> str:
     return _MOUNTINFO_ESCAPE_RX.sub(lambda m: chr(int(m.group(1), 8)), value)
 
 
-def _get_mountinfo_for_target(path: Path) -> dict[str, str] | None:
-    """
-    Return the exact /proc/self/mountinfo record for `path`, or None.
+def _canonical_mount_path(value: str) -> bool:
+    return (
+        value.startswith("/")
+        and not value.startswith("//")
+        and posixpath.normpath(value) == value
+        and not any(ord(char) < 32 or ord(char) == 127 for char in value)
+    )
 
-    `findmnt` can format bind mounts from remote subdirectories as mounts
-    whose SOURCE looks like a direct remote submount. mountinfo keeps
-    the filesystem root for that mount, which lets us distinguish:
 
-    - expected: cold archive base mount root `/` plus hot bind root `/jobs/...`
-    - unexpected: independent direct remote mount root `/`
-    """
-    target = str(path)
-    try:
-        lines = Path("/proc/self/mountinfo").read_text(encoding="utf-8").splitlines()
-    except OSError:
+def _parse_mountinfo(text: str) -> list[dict[str, str]] | None:
+    """Parse one complete mount-table sample; malformed/ambiguous input is not ready."""
+    if len(text.encode("utf-8")) > _MOUNTINFO_MAX_BYTES:
         return None
-
-    for line in lines:
+    records: list[dict[str, str]] = []
+    ids: set[str] = set()
+    for line in text.splitlines():
         before, sep, after = line.partition(" - ")
         if not sep:
-            continue
+            return None
         fields = before.split()
         fs_fields = after.split()
-        if len(fields) < 5 or len(fs_fields) < 3:
-            continue
+        if len(fields) < 6 or len(fs_fields) != 3:
+            return None
+        if (
+            not fields[0].isdigit()
+            or not fields[1].isdigit()
+            or re.fullmatch(r"[0-9]+:[0-9]+", fields[2]) is None
+            or fields[0] in ids
+        ):
+            return None
+        ids.add(fields[0])
         mount_target = _decode_mountinfo_path(fields[4])
-        if mount_target != target:
-            continue
-        return {
-            "id": fields[0],
-            "parent": fields[1],
-            "major_minor": fields[2],
-            "root": _decode_mountinfo_path(fields[3]),
-            "target": mount_target,
-            "options": fields[5] if len(fields) > 5 else "",
-            "fstype": fs_fields[0],
-            "source": _decode_mountinfo_path(fs_fields[1]),
-            "super_options": fs_fields[2],
-        }
-    return None
+        mount_root = _decode_mountinfo_path(fields[3])
+        if not _canonical_mount_path(mount_target) or not _canonical_mount_path(mount_root):
+            return None
+        records.append(
+            {
+                "id": fields[0],
+                "parent": fields[1],
+                "major_minor": fields[2],
+                "root": mount_root,
+                "target": mount_target,
+                "options": fields[5],
+                "fstype": fs_fields[0],
+                "source": _decode_mountinfo_path(fs_fields[1]),
+                "super_options": fs_fields[2],
+            }
+        )
+    return records or None
+
+
+def _read_mountinfo() -> list[dict[str, str]] | None:
+    try:
+        with _MOUNTINFO_PATH.open("rb") as stream:
+            content = stream.read(_MOUNTINFO_MAX_BYTES + 1)
+        if len(content) > _MOUNTINFO_MAX_BYTES:
+            return None
+        return _parse_mountinfo(content.decode("utf-8"))
+    except (OSError, UnicodeError):
+        return None
+
+
+def _get_mountinfo_for_target(path: Path, records: list[dict[str, str]]) -> dict[str, str] | None:
+    matches = [record for record in records if record["target"] == str(path)]
+    # A stacked/covered mount is not an unambiguous source identity.
+    return matches[0] if len(matches) == 1 else None
+
+
+def _mount_record_is_visible(record: dict[str, str], records: list[dict[str, str]]) -> bool:
+    """Reject hidden mounts: matching path text is insufficient after an ancestor overmount."""
+    ids = {item["id"] for item in records}
+    visited: set[str] = set()
+    while record["id"] not in visited:
+        visited.add(record["id"])
+        target = Path(record["target"])
+        if target == Path("/"):
+            # A namespace root's parent may be itself or outside this namespace.
+            return record["parent"] == record["id"] or record["parent"] not in ids
+        ancestors = [
+            item
+            for item in records
+            if item["target"] != record["target"] and target.is_relative_to(Path(item["target"]))
+        ]
+        if not ancestors:
+            return False
+        deepest = max(len(Path(item["target"]).parts) for item in ancestors)
+        parents = [item for item in ancestors if len(Path(item["target"]).parts) == deepest]
+        if len(parents) != 1 or record["parent"] != parents[0]["id"]:
+            return False
+        record = parents[0]
+    return False
 
 
 def _get_mount_info(path: Path) -> dict[str, str] | None:
@@ -187,9 +240,11 @@ def _cold_path_for_output_dir(
     return cold_root / rel
 
 
-def _expected_mountinfo_root(cold_dir: Path, cold_archive_root: Path) -> str:
-    cold = Path(str(cold_dir)).absolute()
-    archive = Path(str(cold_archive_root)).absolute()
+def _expected_mountinfo_root(
+    cold_dir: Path, cold_archive_root: Path, archive_info: dict[str, str]
+) -> str:
+    cold = cold_dir
+    archive = cold_archive_root
     try:
         rel = cold.relative_to(archive)
     except ValueError as e:
@@ -197,8 +252,7 @@ def _expected_mountinfo_root(cold_dir: Path, cold_archive_root: Path) -> str:
     rel_posix = rel.as_posix()
     if rel_posix == ".":
         rel_posix = ""
-    archive_info = _get_mountinfo_for_target(archive)
-    archive_root = str(archive_info.get("root") or "/") if archive_info else "/"
+    archive_root = archive_info["root"]
     return posixpath.normpath(posixpath.join(archive_root, rel_posix))
 
 
@@ -216,10 +270,36 @@ def _is_expected_cold_archive_bind_mount(
     filesystem as the cold archive base mount and its mount root must be the
     cold path relative to that base mount.
     """
-    archive_info = _get_mountinfo_for_target(cold_archive_root)
-    hot_info = _get_mountinfo_for_target(output_dir)
+    paths = [str(output_dir), str(cold_dir), str(cold_archive_root)]
+    if not all(_canonical_mount_path(path) for path in paths):
+        return False
+    if cold_dir == cold_archive_root or not cold_dir.is_relative_to(cold_archive_root):
+        return False
+    if output_dir.is_relative_to(cold_archive_root) or cold_archive_root.is_relative_to(output_dir):
+        return False
+    records = _read_mountinfo()
+    if records is None:
+        return False
+    archive_info = _get_mountinfo_for_target(cold_archive_root, records)
+    hot_info = _get_mountinfo_for_target(output_dir, records)
     if not archive_info or not hot_info:
         return False
+    if not all(_mount_record_is_visible(info, records) for info in (archive_info, hot_info)):
+        return False
+    relevant_targets: set[str] = set()
+    for record in records:
+        target = Path(record["target"])
+        # Reject stacked ancestors and any intervening/descendant mount that
+        # could substitute bytes beneath the otherwise correct cold or hot root.
+        if cold_dir.is_relative_to(target) or output_dir.is_relative_to(target):
+            if record["target"] in relevant_targets:
+                return False
+            relevant_targets.add(record["target"])
+        if target != cold_archive_root and target.is_relative_to(cold_archive_root):
+            if cold_dir.is_relative_to(target) or target.is_relative_to(cold_dir):
+                return False
+        if target != output_dir and target.is_relative_to(output_dir):
+            return False
     if hot_info.get("major_minor") != archive_info.get("major_minor"):
         return False
     if hot_info.get("fstype") != archive_info.get("fstype"):
@@ -227,7 +307,7 @@ def _is_expected_cold_archive_bind_mount(
     if hot_info.get("source") != archive_info.get("source"):
         return False
     try:
-        expected_root = _expected_mountinfo_root(cold_dir, cold_archive_root)
+        expected_root = _expected_mountinfo_root(cold_dir, cold_archive_root, archive_info)
     except ValueError:
         return False
     return posixpath.normpath(str(hot_info.get("root") or "/")) == expected_root
@@ -435,9 +515,8 @@ def main(argv: list[str] | None = None) -> int:
         action="store_true",
         default=False,
         help=(
-            "If an output_dir is already mounted but is not a bind mount from the expected cold_dir, "
-            "attempt a targeted unmount and re-bind. This is only safe during maintenance "
-            "(stop the worker first)."
+            "Deprecated compatibility flag. A readable mount with unproven source identity "
+            "is never automatically unmounted; use a separately reviewed recovery plan."
         ),
     )
     p.add_argument(
@@ -517,9 +596,7 @@ def main(argv: list[str] | None = None) -> int:
     for item in plan:
         if item.mount_present:
             if item.output_dir_ok == 1:
-                opts = str(item.mount_options or "")
-                is_bind = "bind" in {o.strip().lower() for o in opts.split(",") if o.strip()}
-                if is_bind or _is_expected_cold_archive_bind_mount(
+                if _is_expected_cold_archive_bind_mount(
                     output_dir=item.output_dir,
                     cold_dir=item.cold_dir,
                     cold_archive_root=cold_archive_root,
@@ -540,33 +617,15 @@ def main(argv: list[str] | None = None) -> int:
                         f"fstype={item.mount_fstype or '?'} "
                         f"options={item.mount_options or '?'}"
                     )
-                print("     reason=unexpected_mount_type (expected a bind mount)")
-                print("     Hint: this increases staleness risk and makes recovery harder.")
+                print("     reason=expected_cold_archive_identity_unproven")
                 print(
-                    "     Fix (maintenance only): stop the worker, then run this script with "
-                    "--apply --repair-unexpected-mounts."
+                    "     Hint: a readable mount or a bind option alone does not prove its source."
                 )
-                if not args.apply or not args.repair_unexpected_mounts:
-                    continue
-                if os.geteuid() != 0:
-                    errors.append(
-                        f"repair requires root (use sudo): job_id={item.job_id} output_dir={item.output_dir}"
-                    )
-                    continue
-                if str(item.job_status) == "running" and not bool(args.allow_repair_running_jobs):
-                    errors.append(
-                        "refusing to repair unexpected mount for running job without "
-                        f"--allow-repair-running-jobs: job_id={item.job_id} output_dir={item.output_dir}"
-                    )
-                    continue
-                r = subprocess.run(["umount", str(item.output_dir)], check=False)
-                if r.returncode != 0:
-                    r2 = subprocess.run(["umount", "-l", str(item.output_dir)], check=False)
-                    if r2.returncode != 0:
-                        errors.append(
-                            f"failed to unmount unexpected mountpoint at {item.output_dir} (rc={r2.returncode})"
-                        )
-                        continue
+                print("     Refusing automatic unmount; use a separately reviewed recovery plan.")
+                # False includes unreadable or ambiguous evidence. It is never
+                # permission to detach the currently mounted filesystem.
+                errors.append(f"cold archive mount identity not proven: job_id={item.job_id}")
+                continue
 
             if item.output_dir_errno == errno.ENOTCONN:
                 print(f"STALE job={item.job_id} {item.source_code} {item.job_name} (Errno 107)")
@@ -629,8 +688,8 @@ def main(argv: list[str] | None = None) -> int:
     print(f"planned={len(plan)} mounted_now={changed} warnings={warnings}")
     if errors:
         print("ERROR: one or more mounts failed:", file=sys.stderr)
-        for e in errors:
-            print(f"- {e}", file=sys.stderr)
+        for error_message in errors:
+            print(f"- {error_message}", file=sys.stderr)
         return 1
     return 0
 
