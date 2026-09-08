@@ -50,6 +50,22 @@ def _read(relative_path: str) -> str:
     return (_repo_root() / relative_path).read_text(encoding="utf-8")
 
 
+def test_active_docs_use_the_published_pages_portal() -> None:
+    portal = "https://jerdaw.github.io/healtharchive/"
+    assert f"site_url: {portal}" in _read("mkdocs.yml").splitlines()
+    # Historical audit records may retain the former domain as evidence.
+    for relative_path in (
+        "mkdocs.yml",
+        "CONTRIBUTING.md",
+        "docs/documentation-guidelines.md",
+        "docs/quickstart.md",
+        "docs/meta/documentation-health.md",
+    ):
+        text = _read(relative_path)
+        assert portal in text, relative_path
+        assert "docs.healtharchive.ca" not in text, relative_path
+
+
 def test_deployment_and_operations_docs_are_public_boundary_safe() -> None:
     public_roots = (_repo_root() / "docs" / "deployment", _repo_root() / "docs" / "operations")
 

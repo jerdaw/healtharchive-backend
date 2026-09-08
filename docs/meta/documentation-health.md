@@ -171,7 +171,7 @@ Documents not updated in >180 days: **TBD** (requires git analysis)
 4. Run advisory checks (refs, coverage)
 5. Link checking (Lychee)
 
-**CI Status**: ✅ Auto-deploys to [docs.healtharchive.ca](https://docs.healtharchive.ca)
+**CI Status**: ✅ Auto-deploys to [GitHub Pages](https://jerdaw.github.io/healtharchive/)
 
 ### Validation Checks
 
@@ -313,7 +313,7 @@ Every 3 months, review:
 | **Diagrams** | Mermaid | Visual documentation |
 | **API Docs** | OpenAPI + Swagger UI | Interactive API reference |
 | **Search** | MkDocs search plugin | Full-text search |
-| **Hosting** | GitHub Pages | docs.healtharchive.ca |
+| **Hosting** | GitHub Pages | https://jerdaw.github.io/healtharchive/ |
 | **CI/CD** | GitHub Actions | Auto-build and deploy |
 
 ### Key Configuration Files
